@@ -503,4 +503,3 @@ docker-compose -f docker-compose.prod.yml build backend
 ## 📄 License
 
 [ระบุ license ตามต้องการ]
-
