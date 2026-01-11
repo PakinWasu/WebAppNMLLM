@@ -1,0 +1,15 @@
+fastapi
+uvicorn[standard]
+motor>=3.0.0,<4.0.0  # Compatible with MongoDB 4.4.18
+pydantic[email]
+pydantic-settings
+python-dotenv
+httpx
+python-jose[cryptography]
+passlib[bcrypt]
+bcrypt>=4.0.0
+aiofiles
+Pillow
+pdf2image
+python-multipart
+

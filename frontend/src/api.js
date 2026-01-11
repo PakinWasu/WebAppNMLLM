@@ -1,0 +1,361 @@
+// When running via Vite proxy, use empty string. 
+// When running in Docker with direct access, use the backend URL
+const API_BASE = '';
+
+
+export function getToken() {
+ return localStorage.getItem('token');
+}
+
+export function setToken(token) {
+ localStorage.setItem('token', token);
+}
+
+export function clearToken() {
+ localStorage.removeItem('token');
+}
+
+export async function api(endpoint, options = {}) {
+ const token = getToken();
+ const headers = {
+  'Content-Type': 'application/json',
+  ...options.headers,
+ };
+
+ if (token) {
+  headers['Authorization'] = `Bearer ${token}`;
+ }
+
+ try {
+  const response = await fetch(`${API_BASE}${endpoint}`, {
+   ...options,
+   headers,
+  });
+
+  if (!response.ok) {
+   const error = await response.json().catch(() => ({ detail: 'Request failed' }));
+   throw new Error(error.detail || `Request failed with status ${response.status}`);
+  }
+
+  return response.json();
+ } catch (error) {
+  // Network error or other fetch errors
+  if (error instanceof TypeError && error.message.includes('fetch')) {
+   throw new Error('Cannot connect to server. Please check your connection.');
+  }
+  throw error;
+ }
+}
+
+export async function login(username, password) {
+ const data = await api('/auth/login', {
+  method: 'POST',
+  body: JSON.stringify({ username, password }),
+ });
+ setToken(data.access_token);
+ return data;
+}
+
+export async function getMe() {
+ return api('/auth/me');
+}
+
+export async function changePassword(currentPassword, newPassword) {
+ return api('/auth/change-password', {
+  method: 'POST',
+  body: JSON.stringify({
+   current_password: currentPassword,
+   new_password: newPassword
+  }),
+ });
+}
+
+export async function testAI() {
+ return api('/ai/test');
+}
+
+export async function getProjects() {
+ return api('/projects');
+}
+
+export async function createProject(name, description, topoUrl, visibility, backupInterval) {
+ return api('/projects', {
+  method: 'POST',
+  body: JSON.stringify({ 
+    name, 
+    description,
+    topo_url: topoUrl || null,
+    visibility: visibility || "Private",
+    backup_interval: backupInterval || "Daily"
+  }),
+ });
+}
+
+export async function getProject(projectId) {
+ return api(`/projects/${projectId}`);
+}
+
+export async function getProjectMembers(projectId) {
+ return api(`/projects/${projectId}/members`);
+}
+
+export async function addProjectMember(projectId, username, role) {
+ return api(`/projects/${projectId}/members`, {
+  method: 'POST',
+  body: JSON.stringify({ username, role }),
+ });
+}
+
+export async function updateProjectMemberRole(projectId, username, role) {
+ return api(`/projects/${projectId}/members/${username}`, {
+  method: 'PUT',
+  body: JSON.stringify({ username, role }),
+ });
+}
+
+export async function removeProjectMember(projectId, username) {
+ return api(`/projects/${projectId}/members/${username}`, {
+  method: 'DELETE',
+ });
+}
+
+export async function updateProject(projectId, name, description, topoUrl, visibility, backupInterval) {
+ return api(`/projects/${projectId}`, {
+  method: 'PUT',
+  body: JSON.stringify({ 
+    name, 
+    description,
+    topo_url: topoUrl !== undefined ? topoUrl : null,
+    visibility: visibility !== undefined ? visibility : null,
+    backup_interval: backupInterval !== undefined ? backupInterval : null
+  }),
+ });
+}
+
+export async function deleteProject(projectId) {
+ return api(`/projects/${projectId}`, {
+  method: 'DELETE',
+ });
+}
+
+export async function getUsers() {
+ return api('/users');
+}
+
+export async function createUser(username, email, phoneNumber, tempPassword) {
+ return api('/users', {
+  method: 'POST',
+  body: JSON.stringify({ username, email, phone_number: phoneNumber, temp_password: tempPassword }),
+ });
+}
+
+export async function updateUser(username, email) {
+ return api(`/users/${username}`, {
+  method: 'PUT',
+  body: JSON.stringify({ email }),
+ });
+}
+
+export async function deleteUser(username) {
+ return api(`/users/${username}`, {
+  method: 'DELETE',
+ });
+}
+
+// Documents API
+export async function uploadDocuments(projectId, files, metadata, folderId) {
+ const formData = new FormData();
+ 
+ // Add all files
+ files.forEach(file => {
+  formData.append('files', file);
+ });
+ 
+ // Add metadata as form fields (FastAPI multipart form)
+ formData.append('who', metadata.who || '');
+ formData.append('what', metadata.what || '');
+ if (metadata.where) formData.append('where', metadata.where);
+ if (metadata.when) formData.append('when', metadata.when);
+ if (metadata.why) formData.append('why', metadata.why);
+ if (metadata.description) formData.append('description', metadata.description);
+ // Always append folder_id - if null/empty, send empty string (backend will treat as None)
+ formData.append('folder_id', folderId || '');
+ 
+ const token = getToken();
+ const response = await fetch(`${API_BASE}/projects/${projectId}/documents`, {
+  method: 'POST',
+  headers: {
+   'Authorization': token ? `Bearer ${token}` : '',
+   // Don't set Content-Type - browser will set it with boundary
+  },
+  body: formData,
+ });
+ 
+ if (!response.ok) {
+  let errorData;
+  try {
+   errorData = await response.json();
+  } catch {
+   errorData = { detail: `Upload failed with status ${response.status}` };
+  }
+  // Handle different error formats
+  const errorMessage = errorData.detail || errorData.message || errorData.error || `Upload failed with status ${response.status}`;
+  throw new Error(errorMessage);
+ }
+ 
+ return response.json();
+}
+
+export async function getDocuments(projectId, filters = {}) {
+ const params = new URLSearchParams();
+ if (filters.folder_id) params.append('folder_id', filters.folder_id);
+ if (filters.uploader) params.append('uploader', filters.uploader);
+ if (filters.search) params.append('search', filters.search);
+ 
+ const response = await api(`/projects/${projectId}/documents?${params}`);
+ // API returns {documents: [...], count: ...}, extract documents array
+ return response.documents || response || [];
+}
+
+export async function getDocument(projectId, documentId) {
+ return api(`/projects/${projectId}/documents/${documentId}`);
+}
+
+export async function downloadDocument(projectId, documentId, version = null) {
+ const params = version ? `?version=${version}` : '';
+ const token = getToken();
+ 
+ const response = await fetch(`/projects/${projectId}/documents/${documentId}/download${params}`, {
+  headers: {
+   'Authorization': token ? `Bearer ${token}` : '',
+  },
+ });
+ 
+ if (!response.ok) {
+  throw new Error('Download failed');
+ }
+ 
+ const blob = await response.blob();
+ const url = window.URL.createObjectURL(blob);
+ const a = document.createElement('a');
+ a.href = url;
+ a.download = response.headers.get('content-disposition')?.split('filename=')[1]?.replace(/"/g, '') || 'document';
+ document.body.appendChild(a);
+ a.click();
+ a.remove();
+ window.URL.revokeObjectURL(url);
+}
+
+export async function getDocumentPreview(projectId, documentId, version = null) {
+ const params = version ? `?version=${version}` : '';
+ return api(`/projects/${projectId}/documents/${documentId}/preview${params}`);
+}
+
+export async function getDocumentVersions(projectId, documentId) {
+ return api(`/projects/${projectId}/documents/${documentId}/versions`);
+}
+
+export async function moveDocumentFolder(projectId, documentId, folderId) {
+ const token = getToken();
+ const response = await fetch(`${API_BASE}/projects/${projectId}/documents/${documentId}/folder`, {
+  method: 'PATCH',
+  headers: {
+   'Authorization': token ? `Bearer ${token}` : '',
+   'Content-Type': 'application/json'
+  },
+  body: JSON.stringify({ folder_id: folderId || null })
+ });
+ 
+ if (!response.ok) {
+  let errorData;
+  try {
+   errorData = await response.json();
+  } catch {
+   errorData = { detail: `Move failed with status ${response.status}` };
+  }
+  const errorMessage = errorData.detail || errorData.message || errorData.error || `Move failed with status ${response.status}`;
+  throw new Error(errorMessage);
+ }
+ 
+ return response.json();
+}
+
+export async function renameDocument(projectId, documentId, filename) {
+ return api(`/projects/${projectId}/documents/${documentId}/filename`, {
+  method: 'PATCH',
+  body: JSON.stringify({ filename }),
+ });
+}
+
+export async function uploadDocumentVersion(projectId, documentId, file) {
+ const formData = new FormData();
+ formData.append('file', file);
+ 
+ const token = getToken();
+ const response = await fetch(`/projects/${projectId}/documents/${documentId}/upload-version`, {
+  method: 'POST',
+  headers: {
+   'Authorization': token ? `Bearer ${token}` : '',
+  },
+  body: formData,
+ });
+ 
+ if (!response.ok) {
+  const error = await response.json().catch(() => ({ detail: 'Upload failed' }));
+  throw new Error(error.detail || `Upload failed with status ${response.status}`);
+ }
+ 
+ return response.json();
+}
+
+export async function deleteDocument(projectId, documentId, deleteAllVersions = false) {
+ const params = deleteAllVersions ? '?delete_all_versions=true' : '';
+ return api(`/projects/${projectId}/documents/${documentId}${params}`, {
+  method: 'DELETE',
+ });
+}
+
+export async function getProjectOptions(projectId) {
+ return api(`/projects/${projectId}/options`);
+}
+
+export async function saveProjectOption(projectId, field, value) {
+  return api(`/projects/${projectId}/options`, {
+    method: 'POST',
+    body: JSON.stringify({ field, value }),
+  });
+}
+
+export async function getConfigSummary(projectId) {
+  return api(`/projects/${projectId}/summary`);
+}
+
+export async function getDeviceDetails(projectId, deviceName) {
+  return api(`/projects/${projectId}/summary/${deviceName}`);
+}
+
+// Folders API
+export async function getFolders(projectId) {
+  const response = await api(`/projects/${projectId}/folders`);
+  return response.folders || [];
+}
+
+export async function createFolder(projectId, name, parentId) {
+  return api(`/projects/${projectId}/folders`, {
+    method: 'POST',
+    body: JSON.stringify({ name, parent_id: parentId || null }),
+  });
+}
+
+export async function updateFolder(projectId, folderId, name, parentId) {
+  return api(`/projects/${projectId}/folders/${folderId}`, {
+    method: 'PUT',
+    body: JSON.stringify({ name, parent_id: parentId || null }),
+  });
+}
+
+export async function deleteFolder(projectId, folderId) {
+  return api(`/projects/${projectId}/folders/${folderId}`, {
+    method: 'DELETE',
+  });
+}

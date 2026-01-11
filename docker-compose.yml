@@ -1,0 +1,85 @@
+services:
+  backend:
+    build: ./backend
+    container_name: mnp-backend
+    ports:
+      - "8000:8000"
+    env_file:
+      - ./backend/.env
+    volumes:
+      - ./backend:/app
+      - ./storage:/app/storage
+      - ./.cursor:/app/.cursor
+    depends_on:
+      mongodb:
+        condition: service_healthy
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+    restart: unless-stopped
+    networks:
+      - mnp-network
+    # Ensure storage directory has proper permissions on startup
+    entrypoint: ["/bin/bash", "-c"]
+    command: ["mkdir -p /app/storage && chmod -R 777 /app/storage 2>/dev/null || true && /app/init-storage.sh && uvicorn app.main:app --host 0.0.0.0 --port 8000"]
+    healthcheck:
+      test: ["CMD-SHELL", "python -c \"import urllib.request; urllib.request.urlopen('http://localhost:8000/docs').read()\" || exit 1"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+      start_period: 10s
+
+  frontend:
+    build: ./frontend
+    container_name: mnp-frontend
+    ports:
+      - "5173:5173"
+    volumes:
+      - ./frontend/src:/app/src
+      - ./.cursor:/app/.cursor
+    command: [ "npm", "run", "dev", "--", "--host", "0.0.0.0" ]
+    restart: unless-stopped
+    depends_on:
+      backend:
+        condition: service_healthy
+    networks:
+      - mnp-network
+
+  mongodb:
+    image: mongo:4.4.18
+    container_name: mnp-mongo
+    restart: unless-stopped
+    ports:
+      - "27017:27017"
+    volumes:
+      - ./mongo-data:/data/db
+    environment:
+      MONGO_INITDB_DATABASE: manage_network_projects
+    healthcheck:
+      test: [ "CMD-SHELL", "mongo --eval 'db.runCommand(\"ping\").ok' || exit 1" ]
+      interval: 5s
+      timeout: 10s
+      retries: 15
+      start_period: 30s
+    networks:
+      - mnp-network
+
+  ollama:
+    image: ollama/ollama:latest
+    container_name: mnp-ollama
+    restart: unless-stopped
+    ports:
+      - "11434:11434"
+    volumes:
+      - ollama-data:/root/.ollama
+
+    networks:
+      - mnp-network
+
+networks:
+  mnp-network:
+    driver: bridge
+
+volumes:
+  ollama-data:
+
+
