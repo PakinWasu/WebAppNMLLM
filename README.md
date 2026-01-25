@@ -11,6 +11,30 @@
 - [การใช้งาน Production](#การใช้งาน-production)
 - [การ Backup และ Restore](#การ-backup-และ-restore)
 - [การแก้ไขปัญหา](#การแก้ไขปัญหา)
+- [เอกสารเพิ่มเติม](#เอกสารเพิ่มเติม)
+
+## 📚 เอกสารเพิ่มเติม
+
+### สำหรับการพัฒนา
+
+- **[WINDOWS_DEVELOPMENT.md](WINDOWS_DEVELOPMENT.md)** - คู่มือการพัฒนาโปรเจคบน Windows PC
+- **[GITHUB_WORKFLOW.md](GITHUB_WORKFLOW.md)** - Workflow การทำงานผ่าน GitHub (Windows ↔ Ubuntu Server)
+- **[QUICK_START.md](QUICK_START.md)** - Quick Start Guide
+
+### สำหรับการ Deploy
+
+- **[NGINX_SETUP.md](NGINX_SETUP.md)** - การตั้งค่า Nginx
+- **[DOMAIN_SETUP.md](DOMAIN_SETUP.md)** - การตั้งค่า Domain Name
+- **[STORAGE_FIX.md](STORAGE_FIX.md)** - การแก้ไขปัญหา Storage
+- **[MONGODB_4.4_COMPATIBILITY.md](MONGODB_4.4_COMPATIBILITY.md)** - MongoDB Compatibility
+
+### Scripts
+
+- **Windows**: `scripts/windows/` - PowerShell scripts สำหรับ Windows
+  - `dev-start.ps1` - เริ่ม development environment
+  - `git-push.ps1` - Push โค้ดไป GitHub
+- **Ubuntu**: `scripts/ubuntu/` - Bash scripts สำหรับ Ubuntu Server
+  - `deploy.sh` - Pull และ deploy บน Ubuntu Server
 
 ## ✨ คุณสมบัติ
 
