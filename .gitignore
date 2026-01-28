@@ -8,19 +8,26 @@ __pycache__/
 env/
 venv/
 ENV/
+.pytest_cache/
 
 # Database
 mongo-data/
+mongo-backup/
 *.db
 *.sqlite
 
 # Storage
 storage/
+backups/
 *.log
+*.log.*
 
 # Environment variables
 .env
 .env.local
+.env.*.local
+backend/.env
+frontend/.env
 
 # IDE
 .vscode/
@@ -28,23 +35,45 @@ storage/
 *.swp
 *.swo
 *~
+.cursor/
 
 # OS
 .DS_Store
 Thumbs.db
+desktop.ini
 
 # Build outputs
 dist/
 build/
 *.egg-info/
+frontend/dist/
+backend/dist/
 
 # Docker
 .dockerignore
+docker-compose.override.yml
 
 # Test files
 display-all/
+test_config/
+*.test.js
+*.test.ts
+*.test.jsx
+*.test.tsx
 
 # Temporary files
 *.tmp
 *.temp
+*.bak
+*.backup
+*.old
+nginx.conf.backup
+
+# Coverage reports
+coverage/
+.nyc_output/
+
+# Local development
+.local/
+local/
 

@@ -39,7 +39,7 @@ services:
       dockerfile: Dockerfile.prod
     container_name: mnp-frontend-prod
     ports:
-      - "80:80"
+      - "8080:80"  # Changed to 8080 to avoid conflict with host nginx
     depends_on:
       - backend
     restart: unless-stopped

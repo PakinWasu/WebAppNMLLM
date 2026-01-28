@@ -23,6 +23,7 @@
 
 ### สำหรับการ Deploy
 
+- **[UBUNTU_SERVER_SETUP.md](UBUNTU_SERVER_SETUP.md)** - ⭐ คู่มือการติดตั้งบน Ubuntu Server (แนะนำ)
 - **[NGINX_SETUP.md](NGINX_SETUP.md)** - การตั้งค่า Nginx
 - **[DOMAIN_SETUP.md](DOMAIN_SETUP.md)** - การตั้งค่า Domain Name
 - **[STORAGE_FIX.md](STORAGE_FIX.md)** - การแก้ไขปัญหา Storage
@@ -31,10 +32,15 @@
 ### Scripts
 
 - **Windows**: `scripts/windows/` - PowerShell scripts สำหรับ Windows
+  - `setup-windows.ps1` - ⭐ ติดตั้งและตั้งค่า Windows PC
   - `dev-start.ps1` - เริ่ม development environment
+  - `update-and-push.ps1` - ⭐ Pull, commit, และ push ไป GitHub
   - `git-push.ps1` - Push โค้ดไป GitHub
 - **Ubuntu**: `scripts/ubuntu/` - Bash scripts สำหรับ Ubuntu Server
-  - `deploy.sh` - Pull และ deploy บน Ubuntu Server
+  - `setup-ubuntu-server.sh` - ⭐ สคริปต์ติดตั้งและตั้งค่า Ubuntu Server (แนะนำ)
+  - `deploy.sh` - ⭐ Pull และ deploy บน Ubuntu Server
+  - `complete-fix.sh` - แก้ไขปัญหาและตั้งค่า nginx
+  - `nginx-setup.sh` - สคริปต์ตั้งค่า Nginx บน host
 
 ## ✨ คุณสมบัติ
 
@@ -66,6 +72,10 @@
   - **MongoDB** 6.0+
 
 ## 🚀 การติดตั้งบน Ubuntu Server
+
+> ⭐ **แนะนำ**: ใช้สคริปต์อัตโนมัติ `scripts/ubuntu/setup-ubuntu-server.sh` สำหรับการติดตั้งที่ง่ายและรวดเร็ว
+> 
+> ดูรายละเอียดเพิ่มเติมที่: **[UBUNTU_SERVER_SETUP.md](UBUNTU_SERVER_SETUP.md)**
 
 ### 1. ติดตั้ง Docker และ Docker Compose
 

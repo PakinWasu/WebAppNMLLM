@@ -1,0 +1,111 @@
+# Production Docker Compose with Nginx on Host
+# ใช้เมื่อต้องการใช้ Nginx บน host เป็น reverse proxy แทน Nginx ใน Docker container
+# 
+# การใช้งาน:
+#   docker compose -f docker-compose.prod-nginx-host.yml up -d --build
+#
+# หมายเหตุ:
+#   - Frontend เปิด port 8080 (แทน 80) เพื่อให้ Nginx บน host ใช้ port 80
+#   - Backend เปิด port 8000 เหมือนเดิม
+#   - ต้องตั้งค่า Nginx บน host ก่อน (ใช้ scripts/ubuntu/nginx-setup.sh)
+
+services:
+  backend:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    container_name: mnp-backend-prod
+    ports:
+      - "8000:8000"
+    env_file:
+      - ./backend/.env
+    volumes:
+      - ./storage:/app/storage
+    depends_on:
+      mongodb:
+        condition: service_healthy
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+    restart: unless-stopped
+    networks:
+      - mnp-network
+    # Fix storage permissions on startup (works on both Windows and Linux)
+    entrypoint: ["/bin/bash", "-c"]
+    command: 
+      - |
+        # Initialize storage with proper permissions
+        /app/init-storage.sh
+        # Start the application
+        uvicorn app.main:app --host 0.0.0.0 --port 8000
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8000/').read()"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
+
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile.prod
+    container_name: mnp-frontend-prod
+    ports:
+      - "8080:80"  # Changed from 80:80 to 8080:80 for host nginx
+    depends_on:
+      - backend
+    restart: unless-stopped
+    networks:
+      - mnp-network
+    healthcheck:
+      test: ["CMD", "wget", "--quiet", "--tries=1", "--spider", "http://127.0.0.1/"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 10s
+
+  mongodb:
+    image: mongo:4.4.18
+    container_name: mnp-mongo-prod
+    restart: unless-stopped
+    ports:
+      - "27017:27017"
+    volumes:
+      - ./mongo-data:/data/db
+      - ./mongo-backup:/backup
+    environment:
+      MONGO_INITDB_DATABASE: manage_network_projects
+    healthcheck:
+      test: [ "CMD-SHELL", "mongo --eval 'db.runCommand(\"ping\").ok' || exit 1" ]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 40s
+    networks:
+      - mnp-network
+    command: mongod --wiredTigerCacheSizeGB 1
+
+  ollama:
+    image: ollama/ollama:latest
+    container_name: mnp-ollama-prod
+    restart: unless-stopped
+    ports:
+      - "11434:11434"
+    volumes:
+      - ollama-data:/root/.ollama
+    # GPU support is optional - remove deploy section if no GPU available
+    # deploy:
+    #   resources:
+    #     reservations:
+    #       devices:
+    #         - driver: nvidia
+    #           count: all
+    #           capabilities: [ "gpu" ]
+    networks:
+      - mnp-network
+
+networks:
+  mnp-network:
+    driver: bridge
+
+volumes:
+  ollama-data:

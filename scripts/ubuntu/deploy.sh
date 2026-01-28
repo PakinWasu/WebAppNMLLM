@@ -53,6 +53,18 @@ fi
 echo ""
 echo -e "${YELLOW}Pulling latest changes from GitHub...${NC}"
 git fetch origin
+
+# Check if there are uncommitted changes
+if ! git diff-index --quiet HEAD --; then
+    echo -e "${YELLOW}Warning: You have uncommitted changes${NC}"
+    read -p "Do you want to stash them? (y/n) " -n 1 -r
+    echo
+    if [[ $REPLY =~ ^[Yy]$ ]]; then
+        git stash
+        echo -e "${GREEN}✓ Changes stashed${NC}"
+    fi
+fi
+
 git pull origin main
 
 if [ $? -ne 0 ]; then
