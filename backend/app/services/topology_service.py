@@ -1,4 +1,5 @@
-"""Topology Service for Auto-Generating Network Topology using LLM Analysis"""
+"""Topology Service for Auto-Generating Network Topology using LLM Analysis
+Based on POC logic from network-llm-poc/main.py"""
 
 import httpx
 import json
@@ -69,81 +70,93 @@ EXAMPLE OUTPUT:
 
 5. ACCURACY: Be precise. Only create edges you can verify from the provided data.
 
+6. UNKNOWN LINKS: If neighbor data is incomplete, ambiguous, or you cannot determine the connection with certainty, you MUST:
+   - Still create the edge if there's partial evidence
+   - Set evidence to "Unknown Link - incomplete neighbor data" or similar
+   - DO NOT guess or invent connection details
+
 Project ID: {project_id}
 Number of devices to analyze: {device_count}
 """
     
-    def _build_topology_prompt(self, devices_data: List[Dict[str, Any]]) -> str:
-        """Build optimized user prompt with filtered device data to reduce token usage"""
+    def _prepare_topology_data_for_llm(self, devices_data: List[Dict[str, Any]]) -> Dict[str, Any]:
+        """
+        Prepare topology data for LLM analysis following POC approach.
+        Focuses on LLDP neighbors and IP routing information.
+        """
+        topology_data = {
+            "total_devices": len(devices_data),
+            "devices": []
+        }
         
-        prompt_parts = []
-        prompt_parts.append("=== NETWORK TOPOLOGY ANALYSIS ===")
-        prompt_parts.append("Analyze devices and create topology map. Return ONLY valid JSON (no markdown, no code blocks).")
-        prompt_parts.append("\n=== DEVICE DATA ===")
-        
-        # Limit number of devices if too many (for efficiency) - reduced from 20 to 15
+        # Limit number of devices if too many (for efficiency)
         max_devices = 15
         devices_to_process = devices_data[:max_devices]
         
-        for idx, device in enumerate(devices_to_process, 1):
-            device_name = device.get("device_name", f"device_{idx}")
+        for device in devices_to_process:
+            device_name = device.get("device_name")
+            if not device_name:
+                continue
+            
             overview = device.get("device_overview", {})
             interfaces = device.get("interfaces", [])
             neighbors = device.get("neighbors", [])
             routing = device.get("routing", {})
             
-            # Compact device header
-            prompt_parts.append(f"\nDevice {idx}: {device_name}")
-            prompt_parts.append(f"Role: {overview.get('role', 'Unknown')}, Model: {overview.get('model', 'Unknown')}")
-            
-            # Only include interfaces with IPs or neighbors (most relevant for topology) - reduced from 15 to 10
-            relevant_interfaces = [
-                iface for iface in interfaces[:10]
-                if iface.get('ipv4_address') or iface.get('neighbor')
-            ]
-            
-            if relevant_interfaces:
-                prompt_parts.append("Interfaces:")
-                for iface in relevant_interfaces:
-                    # Compact format
-                    iface_parts = [iface.get('name', 'N/A')]
-                    if iface.get('ipv4_address'):
-                        iface_parts.append(f"IP:{iface['ipv4_address']}")
-                    if iface.get('neighbor'):
-                        iface_parts.append(f"Neighbor:{iface['neighbor']}")
-                    prompt_parts.append("  " + " | ".join(iface_parts))
-            
-            # Neighbors (LLDP/CDP) - most important for topology - reduced from 15 to 10
-            if neighbors:
-                prompt_parts.append("Neighbors:")
-                for neighbor in neighbors[:10]:
-                    # Compact format
-                    neighbor_parts = [neighbor.get('device_name', 'Unknown')]
-                    if neighbor.get('local_port'):
-                        neighbor_parts.append(f"L:{neighbor['local_port']}")
-                    if neighbor.get('remote_port'):
-                        neighbor_parts.append(f"R:{neighbor['remote_port']}")
-                    prompt_parts.append("  " + " | ".join(neighbor_parts))
-            
-            # Routing info (compact format for L3 relationships) - only summary
-            if routing:
-                routing_info = []
-                if routing.get('ospf'):
-                    ospf = routing['ospf']
-                    routing_info.append(f"OSPF:RID:{ospf.get('router_id', 'N/A')}")
-                if routing.get('bgp'):
-                    bgp = routing['bgp']
-                    routing_info.append(f"BGP:AS:{bgp.get('as_number', bgp.get('local_as', 'N/A'))}")
-                if routing_info:
-                    prompt_parts.append("Routing: " + " | ".join(routing_info))
+            # Prepare device info following POC structure
+            device_info = {
+                "device_id": device_name,
+                "hostname": overview.get("hostname", device_name),
+                "role": overview.get("role", "Unknown"),
+                "model": overview.get("model", overview.get("model_platform", "Unknown")),
+                "management_ip": overview.get("management_ip"),
+                # Only include UP interfaces with IPs (most relevant for topology)
+                "interfaces": [
+                    {
+                        "name": intf.get("name"),
+                        "ipv4_address": intf.get("ipv4_address"),
+                        "admin_status": intf.get("admin_status", "up"),
+                        "oper_status": intf.get("oper_status", "up"),
+                        "type": intf.get("type")
+                    }
+                    for intf in interfaces[:10]  # Limit to 10 interfaces per device
+                    if intf.get("ipv4_address") or intf.get("admin_status") == "up"
+                ],
+                # LLDP/CDP neighbors - most important for topology
+                "neighbors": neighbors[:15],  # Limit to 15 neighbors per device
+                # Routing information for L3 topology
+                "routing": {
+                    "ospf": {
+                        "neighbors": routing.get("ospf", {}).get("neighbors", []) if routing.get("ospf") else []
+                    },
+                    "bgp": {
+                        "peers": routing.get("bgp", {}).get("peers", []) if routing.get("bgp") else []
+                    },
+                    "eigrp": {
+                        "neighbors": routing.get("eigrp", {}).get("neighbors", []) if routing.get("eigrp") else []
+                    }
+                }
+            }
+            topology_data["devices"].append(device_info)
         
-        # Clear instructions with example
-        prompt_parts.append("\n=== INSTRUCTIONS ===")
-        prompt_parts.append("Return ONLY valid JSON with this structure:")
-        prompt_parts.append('{"nodes": [{"id": "DEV1", "label": "DEV1", "type": "Core"}], "edges": [{"from": "DEV1", "to": "DEV2", "label": "GE0/0/1", "evidence": "LLDP"}], "analysis_summary": "..."}')
-        prompt_parts.append("Create edges ONLY with evidence: LLDP/CDP neighbors, subnet matches, or interface descriptions.")
+        return topology_data
+    
+    def _build_topology_prompt(self, topology_data: Dict[str, Any]) -> str:
+        """Build user prompt following POC approach"""
+        user_message = f"""Analyze the following network device data and generate a complete topology structure.
+
+Network Device Data:
+{json.dumps(topology_data, ensure_ascii=False, indent=2)}
+
+Based on these LLDP/CDP neighbors and subnet masks, list all Point-to-Point connections.
+
+CRITICAL INSTRUCTIONS:
+- Create links ONLY based on explicit evidence from LLDP/CDP neighbors or subnet matching
+- If neighbor data is incomplete or ambiguous, state "Unknown Link" in the evidence field
+- DO NOT hallucinate links. If there's no evidence, do NOT create an edge.
+- Return ONLY the JSON object with nodes and edges as specified in the system prompt."""
         
-        return "\n".join(prompt_parts)
+        return user_message
     
     def _generate_rule_based_topology(self, devices_data: List[Dict[str, Any]]) -> Dict[str, Any]:
         """
@@ -311,6 +324,9 @@ Number of devices to analyze: {device_count}
                 }
             }
         
+        # Prepare topology data following POC approach
+        topology_data_for_llm = self._prepare_topology_data_for_llm(devices_data)
+        
         # Log data being sent to LLM
         total_interfaces = sum(len(d.get("interfaces", [])) for d in devices_data)
         total_neighbors = sum(len(d.get("neighbors", [])) for d in devices_data)
@@ -318,7 +334,7 @@ Number of devices to analyze: {device_count}
         
         # Build prompts
         system_prompt = self._get_topology_system_prompt(project_id, len(devices_data))
-        user_prompt = self._build_topology_prompt(devices_data)
+        user_prompt = self._build_topology_prompt(topology_data_for_llm)
         
         # Estimate prompt length (rough token count)
         prompt_length = len(system_prompt) + len(user_prompt)
