@@ -8506,12 +8506,19 @@ const TopologyGraph = ({ project, onOpenDevice, can, authedUser, setProjects }) 
   };
 
   const [editMode, setEditMode] = useState(false);
+  
+  // Zoom and Pan state
+  const [zoom, setZoom] = useState(1.0);
+  const [pan, setPan] = useState({ x: 0, y: 0 });
+  const [isPanning, setIsPanning] = useState(false);
+  const [panStart, setPanStart] = useState({ x: 0, y: 0 });
+  
   const [positions, setPositions] = useState(() => {
     if (project.topoPositions) {
       return project.topoPositions;
     }
-  const pos = {};
-  nodes.forEach(n => {
+    const pos = {};
+    nodes.forEach(n => {
       pos[n.id] = getDefaultPos(n.id, n.role);
     });
     return pos;
@@ -8523,6 +8530,37 @@ const TopologyGraph = ({ project, onOpenDevice, can, authedUser, setProjects }) 
     }
     return deriveLinksFromProject(project);
   });
+  
+  // Load topology layout from backend on mount
+  React.useEffect(() => {
+    const loadTopologyLayout = async () => {
+      const projectId = project.project_id || project.id;
+      if (!projectId) return;
+      
+      try {
+        const topologyData = await api.getTopology(projectId);
+        if (topologyData.layout) {
+          if (topologyData.layout.positions && Object.keys(topologyData.layout.positions).length > 0) {
+            setPositions(topologyData.layout.positions);
+          }
+          if (topologyData.layout.links && topologyData.layout.links.length > 0) {
+            setLinks(topologyData.layout.links);
+          }
+          if (topologyData.layout.node_labels) {
+            setNodeLabels(topologyData.layout.node_labels);
+          }
+          if (topologyData.layout.node_roles) {
+            setNodeRoles(topologyData.layout.node_roles);
+          }
+        }
+      } catch (error) {
+        console.error("Failed to load topology layout:", error);
+        // Fallback to project data (already set in useState)
+      }
+    };
+    
+    loadTopologyLayout();
+  }, [project.project_id || project.id]);
   
   // Generate topology using AI
   const handleGenerateTopology = async () => {
@@ -8622,6 +8660,9 @@ const TopologyGraph = ({ project, onOpenDevice, can, authedUser, setProjects }) 
   const [showNodeDialog, setShowNodeDialog] = useState(false);
   const [editingNode, setEditingNode] = useState(null);
   const [nodeLabels, setNodeLabels] = useState(() => {
+    if (project.topoNodeLabels) {
+      return project.topoNodeLabels;
+    }
     const labels = {};
     nodes.forEach(n => {
       labels[n.id] = n.label;
@@ -8629,6 +8670,9 @@ const TopologyGraph = ({ project, onOpenDevice, can, authedUser, setProjects }) 
     return labels;
   });
   const [nodeRoles, setNodeRoles] = useState(() => {
+    if (project.topoNodeRoles) {
+      return project.topoNodeRoles;
+    }
     const roles = {};
     nodes.forEach(n => {
       roles[n.id] = n.role;
@@ -8636,7 +8680,75 @@ const TopologyGraph = ({ project, onOpenDevice, can, authedUser, setProjects }) 
     return roles;
   });
   const [linkMode, setLinkMode] = useState("none"); // "none", "add", "edit"
+  const [reroutingLink, setReroutingLink] = useState(null); // For re-routing link connectors
+  
+  // Load topology layout from backend on mount
+  React.useEffect(() => {
+    const loadTopologyLayout = async () => {
+      const projectId = project.project_id || project.id;
+      if (!projectId) return;
+      
+      try {
+        const topologyData = await api.getTopology(projectId);
+        if (topologyData.layout) {
+          if (topologyData.layout.positions && Object.keys(topologyData.layout.positions).length > 0) {
+            setPositions(topologyData.layout.positions);
+          }
+          if (topologyData.layout.links && topologyData.layout.links.length > 0) {
+            setLinks(topologyData.layout.links);
+          }
+          if (topologyData.layout.node_labels) {
+            setNodeLabels(topologyData.layout.node_labels);
+          }
+          if (topologyData.layout.node_roles) {
+            setNodeRoles(topologyData.layout.node_roles);
+          }
+        }
+      } catch (error) {
+        console.error("Failed to load topology layout:", error);
+        // Fallback to project data (already set in useState)
+      }
+    };
+    
+    loadTopologyLayout();
+  }, [project.project_id || project.id]);
 
+  // Handle zoom
+  const handleZoomIn = () => {
+    setZoom(prev => Math.min(prev + 0.2, 3.0));
+  };
+  
+  const handleZoomOut = () => {
+    setZoom(prev => Math.max(prev - 0.2, 0.5));
+  };
+  
+  const handleZoomReset = () => {
+    setZoom(1.0);
+    setPan({ x: 0, y: 0 });
+  };
+  
+  // Handle pan (drag background)
+  const handlePanStart = (e) => {
+    if (editMode && !dragging && !linkStart && e.button === 0 && (e.ctrlKey || e.metaKey || e.shiftKey)) {
+      setIsPanning(true);
+      setPanStart({ x: e.clientX - pan.x, y: e.clientY - pan.y });
+      e.preventDefault();
+    }
+  };
+  
+  const handlePanMove = (e) => {
+    if (isPanning) {
+      setPan({
+        x: e.clientX - panStart.x,
+        y: e.clientY - panStart.y
+      });
+    }
+  };
+  
+  const handlePanEnd = () => {
+    setIsPanning(false);
+  };
+  
   // Handle node drag
   const handleMouseDown = (nodeId, e) => {
     if (!editMode) {
@@ -8645,16 +8757,32 @@ const TopologyGraph = ({ project, onOpenDevice, can, authedUser, setProjects }) 
       }
       return;
     }
+    
+    // Check if panning
+    if (e.ctrlKey || e.metaKey || e.shiftKey) {
+      handlePanStart(e);
+      return;
+    }
+    
     e.stopPropagation();
     setDragging(nodeId);
     setSelectedNode(nodeId);
   };
 
   const handleMouseMove = (e) => {
+    // Handle panning
+    if (isPanning) {
+      handlePanMove(e);
+      return;
+    }
+    
+    // Handle node dragging
     if (!dragging || !editMode) return;
     const svg = e.currentTarget;
     const rect = svg.getBoundingClientRect();
     const viewBox = svg.viewBox.baseVal;
+    
+    // Calculate position accounting for zoom and pan
     const x = ((e.clientX - rect.left) / rect.width) * viewBox.width;
     const y = ((e.clientY - rect.top) / rect.height) * viewBox.height;
     
@@ -8666,12 +8794,51 @@ const TopologyGraph = ({ project, onOpenDevice, can, authedUser, setProjects }) 
 
   const handleMouseUp = () => {
     setDragging(null);
+    handlePanEnd();
+  };
+  
+  // Handle wheel zoom
+  const handleWheel = (e) => {
+    if (!editMode) return;
+    e.preventDefault();
+    const delta = e.deltaY > 0 ? -0.1 : 0.1;
+    setZoom(prev => Math.max(0.5, Math.min(3.0, prev + delta)));
   };
 
-  // Handle link creation
+  // Handle link creation and re-routing
   const handleNodeClick = (nodeId, e) => {
     if (!editMode) return;
     e.stopPropagation();
+    
+    // Re-route link connector mode
+    if (reroutingLink !== null) {
+      const linkIndex = reroutingLink;
+      const link = links[linkIndex];
+      
+      // Determine which end to re-route (closest to clicked node)
+      const posA = getPos(link.a);
+      const posB = getPos(link.b);
+      const posNode = getPos(nodeId);
+      
+      const distToA = Math.sqrt(Math.pow(posNode.x - posA.x, 2) + Math.pow(posNode.y - posA.y, 2));
+      const distToB = Math.sqrt(Math.pow(posNode.x - posB.x, 2) + Math.pow(posNode.y - posB.y, 2));
+      
+      // Re-route the closer end
+      setLinks(prev => prev.map((l, i) => {
+        if (i === linkIndex) {
+          if (distToA < distToB) {
+            return { ...l, a: nodeId };
+          } else {
+            return { ...l, b: nodeId };
+          }
+        }
+        return l;
+      }));
+      
+      setReroutingLink(null);
+      setSelectedLink(null);
+      return;
+    }
     
     if (linkMode === "add") {
       if (linkStart === null) {
@@ -8719,10 +8886,24 @@ const TopologyGraph = ({ project, onOpenDevice, can, authedUser, setProjects }) 
 
   // Handle link click
   const handleLinkClick = (linkIndex, e) => {
-    if (!editMode || linkMode !== "edit") return;
+    if (!editMode) return;
     e.stopPropagation();
+    
+    if (linkMode === "edit") {
+      setSelectedLink(linkIndex);
+      setShowLinkDialog(true);
+    } else if (reroutingLink === linkIndex) {
+      // Cancel re-routing
+      setReroutingLink(null);
+      setSelectedLink(null);
+    }
+  };
+  
+  // Start re-routing link connector
+  const startRerouteLink = (linkIndex) => {
+    setReroutingLink(linkIndex);
     setSelectedLink(linkIndex);
-    setShowLinkDialog(true);
+    setLinkMode("none");
   };
 
   // Handle link deletion
@@ -8774,21 +8955,40 @@ const TopologyGraph = ({ project, onOpenDevice, can, authedUser, setProjects }) 
   };
 
   // Save topology
-  const handleSave = () => {
-    setProjects(prev => prev.map(p => 
-      p.id === project.id 
-        ? { ...p, topoPositions: positions, topoLinks: links, topoNodeLabels: nodeLabels, topoNodeRoles: nodeRoles }
-        : p
-    ));
-    setEditMode(false);
-    setLinkStart(null);
-    setSelectedNode(null);
-    setLinkMode("none");
-    setSelectedLink(null);
+  const handleSave = async () => {
+    const projectId = project.project_id || project.id;
+    if (!projectId) {
+      alert("❌ Project ID not found");
+      return;
+    }
+    
+    try {
+      // Save to backend
+      await api.saveTopologyLayout(projectId, positions, links, nodeLabels, nodeRoles);
+      
+      // Update local state
+      setProjects(prev => prev.map(p => 
+        p.id === project.id 
+          ? { ...p, topoPositions: positions, topoLinks: links, topoNodeLabels: nodeLabels, topoNodeRoles: nodeRoles }
+          : p
+      ));
+      
+      setEditMode(false);
+      setLinkStart(null);
+      setSelectedNode(null);
+      setLinkMode("none");
+      setSelectedLink(null);
+      
+      alert("✅ บันทึกตำแหน่ง topology สำเร็จ");
+    } catch (error) {
+      console.error("Failed to save topology layout:", error);
+      alert(`❌ ไม่สามารถบันทึกได้: ${error.message}`);
+    }
   };
 
   // Cancel edit
   const handleCancel = () => {
+    // Reset positions
     if (project.topoPositions) {
       setPositions(project.topoPositions);
     } else {
@@ -8798,16 +8998,44 @@ const TopologyGraph = ({ project, onOpenDevice, can, authedUser, setProjects }) 
       });
       setPositions(pos);
     }
+    
+    // Reset links
     if (project.topoLinks) {
       setLinks(project.topoLinks);
     } else {
       setLinks(deriveLinksFromProject(project));
     }
+    
+    // Reset node labels and roles
+    if (project.topoNodeLabels) {
+      setNodeLabels(project.topoNodeLabels);
+    } else {
+      const labels = {};
+      nodes.forEach(n => {
+        labels[n.id] = n.label;
+      });
+      setNodeLabels(labels);
+    }
+    
+    if (project.topoNodeRoles) {
+      setNodeRoles(project.topoNodeRoles);
+    } else {
+      const roles = {};
+      nodes.forEach(n => {
+        roles[n.id] = n.role;
+      });
+      setNodeRoles(roles);
+    }
+    
+    // Reset all states
     setEditMode(false);
     setLinkStart(null);
     setSelectedNode(null);
     setLinkMode("none");
     setSelectedLink(null);
+    setReroutingLink(null);
+    setZoom(1.0);
+    setPan({ x: 0, y: 0 });
   };
 
   const getPos = id => positions[id] || { x: 50, y: 50 };
@@ -8842,7 +9070,7 @@ const TopologyGraph = ({ project, onOpenDevice, can, authedUser, setProjects }) 
                       ยกเลิก
                     </Button>
                     <Button variant="primary" className="text-xs px-3 py-1.5" onClick={handleSave}>
-                      บันทึก
+                      บันทึกตำแหน่งใหม่
                     </Button>
                   </>
                 )}
@@ -8861,55 +9089,114 @@ const TopologyGraph = ({ project, onOpenDevice, can, authedUser, setProjects }) 
         </div>
       )}
       {editMode && (
-        <div className="mb-3 p-3 bg-gray-50 dark:bg-gray-800 rounded-lg flex items-center gap-3 flex-wrap">
-          <span className="text-xs font-medium text-gray-600 dark:text-gray-300">เครื่องมือ:</span>
-          <Button 
-            variant={linkMode === "add" ? "primary" : "secondary"} 
-            className="text-xs px-3 py-1.5"
-            onClick={linkMode === "add" ? cancelLinkMode : startAddLink}
-          >
-            {linkMode === "add" ? "ยกเลิกการเพิ่มลิงก์" : "เพิ่มลิงก์"}
-          </Button>
-          <Button 
-            variant={linkMode === "edit" ? "primary" : "secondary"} 
-            className="text-xs px-3 py-1.5"
-            onClick={() => setLinkMode(linkMode === "edit" ? "none" : "edit")}
-          >
-            {linkMode === "edit" ? "ยกเลิกการแก้ไข" : "แก้ไขลิงก์/โหนด"}
-          </Button>
-          {linkMode === "add" && (
-            <span className="text-xs text-blue-600 dark:text-blue-400">
-              คลิก 2 โหนดเพื่อสร้างลิงก์
+        <div className="mb-3 p-3 bg-gray-50 dark:bg-gray-800 rounded-lg">
+          <div className="flex items-center gap-3 flex-wrap mb-2">
+            <span className="text-xs font-medium text-gray-600 dark:text-gray-300">เครื่องมือ:</span>
+            <Button 
+              variant={linkMode === "add" ? "primary" : "secondary"} 
+              className="text-xs px-3 py-1.5"
+              onClick={linkMode === "add" ? cancelLinkMode : startAddLink}
+            >
+              {linkMode === "add" ? "ยกเลิกการเพิ่มลิงก์" : "เพิ่มลิงก์"}
+            </Button>
+            <Button 
+              variant={linkMode === "edit" ? "primary" : "secondary"} 
+              className="text-xs px-3 py-1.5"
+              onClick={() => {
+                setLinkMode(linkMode === "edit" ? "none" : "edit");
+                setReroutingLink(null);
+              }}
+            >
+              {linkMode === "edit" ? "ยกเลิกการแก้ไข" : "แก้ไขลิงก์/โหนด"}
+            </Button>
+            {selectedLink !== null && linkMode === "edit" && (
+              <Button 
+                variant={reroutingLink === selectedLink ? "primary" : "secondary"} 
+                className="text-xs px-3 py-1.5"
+                onClick={() => {
+                  if (reroutingLink === selectedLink) {
+                    setReroutingLink(null);
+                  } else {
+                    startRerouteLink(selectedLink);
+                  }
+                }}
+              >
+                {reroutingLink === selectedLink ? "ยกเลิกการเปลี่ยนเส้น" : "เปลี่ยนเส้นเชื่อมโยง"}
+              </Button>
+            )}
+          </div>
+          <div className="flex items-center gap-3 flex-wrap">
+            <span className="text-xs font-medium text-gray-600 dark:text-gray-300">ปรับมุมมอง:</span>
+            <Button 
+              variant="secondary" 
+              className="text-xs px-3 py-1.5"
+              onClick={handleZoomIn}
+            >
+              🔍+ ขยาย
+            </Button>
+            <Button 
+              variant="secondary" 
+              className="text-xs px-3 py-1.5"
+              onClick={handleZoomOut}
+            >
+              🔍- ย่อ
+            </Button>
+            <Button 
+              variant="secondary" 
+              className="text-xs px-3 py-1.5"
+              onClick={handleZoomReset}
+            >
+              🔄 รีเซ็ต
+            </Button>
+            <span className="text-xs text-gray-500 dark:text-gray-400">
+              (ใช้ Ctrl+ลากเพื่อเลื่อน • ใช้ล้อเมาส์เพื่อซูม)
             </span>
+          </div>
+          {linkMode === "add" && (
+            <div className="mt-2 text-xs text-blue-600 dark:text-blue-400">
+              💡 คลิก 2 โหนดเพื่อสร้างลิงก์
+            </div>
           )}
           {linkMode === "edit" && (
-            <span className="text-xs text-blue-600 dark:text-blue-400">
-              คลิกลิงก์เพื่อแก้ไข • คลิกขวาลิงก์เพื่อลบ • คลิก 2 ครั้งที่โหนดเพื่อแก้ไข
-            </span>
+            <div className="mt-2 text-xs text-blue-600 dark:text-blue-400">
+              💡 คลิกลิงก์เพื่อแก้ไข • คลิกขวาลิงก์เพื่อลบ • คลิก 2 ครั้งที่โหนดเพื่อแก้ไข
+            </div>
+          )}
+          {reroutingLink !== null && (
+            <div className="mt-2 text-xs text-green-600 dark:text-green-400">
+              💡 คลิกที่โหนดปลายทางใหม่เพื่อเปลี่ยนเส้นเชื่อมโยง
+            </div>
           )}
         </div>
       )}
-      <div className="relative h-[280px] md:h-[360px] rounded-xl bg-[#0B1220]">
+      <div className="relative h-[280px] md:h-[360px] rounded-xl bg-[#0B1220] overflow-hidden">
         <svg 
           viewBox="0 0 100 100" 
           className="w-full h-full"
           onMouseMove={handleMouseMove}
           onMouseUp={handleMouseUp}
           onMouseLeave={handleMouseUp}
+          onMouseDown={handlePanStart}
+          onWheel={handleWheel}
+          style={{
+            cursor: isPanning ? 'grabbing' : (editMode && !dragging ? 'grab' : 'default')
+          }}
         >
           {/* edges */}
           {links.map((e, i) => {
             const A = getPos(e.a), B = getPos(e.b);
             const isSelected = selectedLink === i;
+            const isRerouting = reroutingLink === i;
             const midX = (A.x + B.x) / 2;
             const midY = (A.y + B.y) / 2;
             return (
               <g key={i}>
                 <line 
-                x1={A.x} y1={A.y} x2={B.x} y2={B.y}
-                  stroke={isSelected ? "#10b981" : "#5DA0FF"} 
-                  strokeWidth={editMode ? (isSelected ? "2.5" : "2") : "1.6"} 
-                  opacity="0.85"
+                  x1={A.x} y1={A.y} x2={B.x} y2={B.y}
+                  stroke={isRerouting ? "#f59e0b" : (isSelected ? "#10b981" : "#5DA0FF")} 
+                  strokeWidth={editMode ? (isSelected || isRerouting ? "2.5" : "2") : "1.6"} 
+                  strokeDasharray={isRerouting ? "3,3" : "none"}
+                  opacity={isRerouting ? "1" : "0.85"}
                   onClick={(evt) => handleLinkClick(i, evt)}
                   onContextMenu={(evt) => handleLinkDelete(i, evt)}
                   className={editMode ? "cursor-pointer" : ""}
@@ -8985,15 +9272,22 @@ const TopologyGraph = ({ project, onOpenDevice, can, authedUser, setProjects }) 
                 ? "โหมดเพิ่มลิงก์: คลิก 2 โหนดเพื่อสร้างลิงก์"
                 : linkMode === "edit"
                 ? "โหมดแก้ไขลิงก์/โหนด: คลิกลิงก์เพื่อแก้ไข • คลิกขวาลิงก์เพื่อลบ • คลิก 2 ครั้งที่โหนดเพื่อแก้ไข"
-                : "โหมดแก้ไข: ลากโหนดเพื่อย้าย • ใช้ปุ่มด้านบนเพื่อจัดการลิงก์/โหนด"
+                : reroutingLink !== null
+                ? "โหมดเปลี่ยนเส้นเชื่อมโยง: คลิกที่โหนดปลายทางใหม่"
+                : "โหมดแก้ไข: ลากโหนดเพื่อย้าย • Ctrl+ลากเพื่อเลื่อน • ล้อเมาส์เพื่อซูม"
               }
             </span>
           ) : (
             <span>
-          Tip: ชี้เมาส์เพื่อดูบทบาท/ข้อมูล • คลิกเพื่อเปิด More Details
+              Tip: ชี้เมาส์เพื่อดูบทบาท/ข้อมูล • คลิกเพื่อเปิด More Details
             </span>
           )}
         </div>
+        {editMode && (
+          <div className="absolute top-2 right-2 text-[10px] text-gray-500 dark:text-gray-400 bg-black/30 px-2 py-1 rounded">
+            Zoom: {(zoom * 100).toFixed(0)}%
+          </div>
+        )}
       </div>
 
       {/* Link Edit Dialog */}

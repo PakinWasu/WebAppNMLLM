@@ -1,0 +1,91 @@
+! DEVICE: DIST-SW1
+! ROLE: Distribution Switch
+
+! ===== show running-config =====
+hostname DIST-SW1
+
+version 17.6
+
+interface GigabitEthernet1/0/1
+ description Uplink to R1-CORE
+ switchport trunk native vlan 10
+ switchport trunk allowed vlan 10,20
+ switchport mode trunk
+ spanning-tree portfast trunk
+
+interface GigabitEthernet1/0/2
+ description Downlink to ACCESS-SW1
+ switchport trunk native vlan 10
+ switchport trunk allowed vlan 10,20
+ switchport mode trunk
+ spanning-tree portfast trunk
+
+interface Vlan10
+ description USERS SVI
+ ip address 10.0.10.2 255.255.255.0
+
+interface Vlan20
+ description SERVERS SVI
+ ip address 10.0.20.2 255.255.255.0
+
+vlan 10
+ name USERS
+
+vlan 20
+ name SERVERS
+
+spanning-tree mode pvst
+spanning-tree vlan 10,20 priority 4096
+
+router ospf 1
+ router-id 10.255.255.2
+ network 10.0.10.0 0.0.0.255 area 0
+ network 10.0.20.0 0.0.0.255 area 0
+
+cdp run
+lldp run
+
+snmp-server community NMS-RO RO
+logging host 192.168.100.30
+
+end
+
+! ===== show ip interface brief =====
+Interface              IP-Address      OK? Method Status                Protocol
+Gi1/0/1                unassigned      YES NVRAM  up                    up
+Gi1/0/2                unassigned      YES NVRAM  up                    up
+Vl10                   10.0.10.2       YES NVRAM  up                    up
+Vl20                   10.0.20.2       YES NVRAM  up                    up
+
+! ===== show vlan brief =====
+VLAN Name                             Status    Ports
+10   USERS                            active    Gi1/0/1,Gi1/0/2,Vl10
+20   SERVERS                          active    Gi1/0/1,Gi1/0/2,Vl20
+
+! ===== show spanning-tree =====
+Spanning tree enabled protocol pvst
+Root ID    Priority    32778
+           Address     0000.aaaa.bbbb
+
+Bridge ID  Priority    4096
+           Address     0000.cccc.dddd
+           This bridge is the root for VLANs 10,20
+
+Interface           Role Sts Cost      Prio.Nbr Type
+Gi1/0/1             Desg FWD 4         128.1    P2p
+Gi1/0/2             Desg FWD 4         128.2    P2p
+
+! ===== show ip ospf neighbor =====
+Neighbor ID     Pri   State           Dead Time   Address         Interface
+10.255.255.1      1   FULL/DR         00:00:35    10.0.10.1       Vl10
+
+! ===== show cdp neighbors =====
+Device ID        Local Intrfce     Holdtme    Capability  Platform  Port ID
+R1-CORE          Gig1/0/1          163        R S I       ISR4451   Gig0/0/1
+ACCESS-SW1       Gig1/0/2          150        S I         C9300-24T Gig1/0/1
+
+! ===== show mac address-table =====
+Vlan    Mac Address       Type        Ports
+----    -----------       --------    -----
+  10    0011.2233.4455    DYNAMIC     Gi1/0/2
+  20    0011.2233.4466    DYNAMIC     Gi1/0/2

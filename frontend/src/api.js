@@ -416,3 +416,15 @@ export async function generateTopology(projectId) {
 export async function getTopology(projectId) {
   return api(`/projects/${projectId}/topology`);
 }
+
+export async function saveTopologyLayout(projectId, positions, links, nodeLabels = null, nodeRoles = null) {
+  return api(`/projects/${projectId}/topology/layout`, {
+    method: 'PUT',
+    body: JSON.stringify({
+      positions,
+      links,
+      node_labels: nodeLabels,
+      node_roles: nodeRoles
+    }),
+  });
+}

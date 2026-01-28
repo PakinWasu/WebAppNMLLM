@@ -1,0 +1,81 @@
+! DEVICE: ACCESS-SW1
+! ROLE: Access Switch
+
+! ===== show running-config =====
+hostname ACCESS-SW1
+
+version 17.3
+
+interface GigabitEthernet1/0/1
+ description Uplink to DIST-SW1
+ switchport trunk native vlan 10
+ switchport trunk allowed vlan 10,20
+ switchport mode trunk
+ spanning-tree portfast trunk
+
+interface GigabitEthernet1/0/10
+ description User PC
+ switchport mode access
+ switchport access vlan 10
+ spanning-tree portfast
+ spanning-tree bpduguard enable
+
+interface GigabitEthernet1/0/11
+ description Server
+ switchport mode access
+ switchport access vlan 20
+ spanning-tree portfast
+
+vlan 10
+ name USERS
+
+vlan 20
+ name SERVERS
+
+spanning-tree mode pvst
+
+cdp run
+lldp run
+
+! local users / mgmt
+username ops privilege 5 secret 5 HASH2
+ip ssh version 2
+line vty 0 4
+ transport input ssh
+ login local
+
+end
+
+! ===== show ip interface brief =====
+Interface              IP-Address      OK? Method Status                Protocol
+Gi1/0/1                unassigned      YES NVRAM  up                    up
+Gi1/0/10               unassigned      YES NVRAM  up                    up
+Gi1/0/11               unassigned      YES NVRAM  up                    up
+
+! ===== show vlan brief =====
+VLAN Name                             Status    Ports
+10   USERS                            active    Gi1/0/10
+20   SERVERS                          active    Gi1/0/11
+
+! ===== show spanning-tree =====
+Spanning tree enabled protocol pvst
+
+Interface           Role Sts Cost      Prio.Nbr Type
+Gi1/0/1             Root FWD 4         128.1    P2p
+Gi1/0/10            Desg FWD 19        128.10   Edge
+Gi1/0/11            Desg FWD 19        128.11   Edge
+
+! ===== show cdp neighbors =====
+Device ID        Local Intrfce     Holdtme    Capability  Platform  Port ID
+DIST-SW1         Gig1/0/1          158        S I         C9300-24T Gig1/0/2
+
+! ===== show mac address-table =====
+Vlan    Mac Address       Type        Ports
+----    -----------       --------    -----
+  10    0011.2233.4455    DYNAMIC     Gi1/0/10
+  20    0011.2233.4466    DYNAMIC     Gi1/0/11
+
+! ===== show arp =====
+Protocol  Address       Age (min)  Hardware Addr   Type   Interface
+Internet  10.0.10.101   1          0011.2233.4455  ARPA   Vlan10
+Internet  10.0.20.201   3          0011.2233.4466  ARPA   Vlan20

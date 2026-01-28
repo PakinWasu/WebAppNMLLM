@@ -1,0 +1,270 @@
+
+2.3.2 ระบบสามารถประมวลผล วิเคราะห์ข้อมูลที่สำคัญจากไฟล์ตั้งค่าอุปกรณ์เพื่อนำไปแสดงผลและสร้างผลสรุปการวิเคราะ โดยแบ่งออกเป็น 9 ส่วนดังนี้
+
+2.3.2.1 ข้อมูลภาพรวมของอุปกรณ์ (Device Overview) ระบบสามารถแสดงข้อมูลพื้นฐานที่
+
+ช่วยระบุคุณลักษณะโดยรวมของอุปกรณ์ ได้แก่
+
+2.3.2.1.1 ชื่ออุปกรณ์ (Hostname)
+
+2.3.2.1.2 ประเภทหรือบทบาทของอุปกรณ์ (Core, Distribution, Access, Switch, 
+
+Router) 
+
+2.3.2.1.3 รุ่นและแพลตฟอร์มของอุปกรณ์ (Model / Platform)
+
+2.3.2.1.4 เวอร์ชันระบบปฏิบัติการหรือเฟิร์มแวร์ (OS / Firmware Version)
+
+2.3.2.1.5 หมายเลขประจำอุปกรณ์ (Serial Number)
+
+2.3.2.1.6 ที่อยู่ IP สำหรับบริหารจัดการ (Management IP Address)
+
+2.3.2.1.7 ระยะเวลาทำงานตั้งแต่เปิดเครื่องล่าสุด (Uptime)
+
+2.3.2.1.8 การใช้งาน CPU และ RAM (CPU Utilization / Memory Utilization)
+
+2.3.2.1.9 วันที่และเวลาที่อัปโหลดไฟล์ล่าสุด (Last Configuration Upload 
+
+Timestamp)
+
+2.3.2.2 ข้อมูลพอร์ตและอินเทอร์เฟซ (Interface Information) ระบบสามารถแสดงข้อมูลเชิงลึก
+
+ของแต่ละพอร์ต ได้แก่
+
+2.3.2.2.1 ชื่ออินเทอร์เฟซ (Interface Name)
+
+2.3.2.2.2 ประเภทอินเทอร์เฟซ (Interface Type)
+
+2.3.2.2.3 สถานะการบริหาร (Administrative Status)
+
+2.3.2.2.4 สถานะการทำงานจริง (Operational Status)
+
+2.3.2.2.5 สถานะ Line Protocol (Line Protocol Status)
+
+2.3.2.2.6 คำอธิบายพอร์ต (Description)
+
+2.3.2.2.7 ที่อยู่ IP (IPv4 Address)
+
+2.3.2.2.8 ที่อยู่ IPv6 (IPv6 Address)
+
+2.3.2.2.9 ที่อยู่ MAC (MAC Address)
+
+2.3.2.2.10 ความเร็วพอร์ต (Speed)
+
+2.3.2.2.11 โหมด Duplex (Duplex Mode)
+
+2.3.2.2.12 ค่า MTU (MTU Value)
+
+2.3.2.2.13 โหมดพอร์ต (Port Mode: Access / Trunk / Routed)
+
+2.3.2.2.14 VLAN ของพอร์ตแบบ Access (Access VLAN)
+
+2.3.2.2.15 Native VLAN สำหรับพอร์ต Trunk (Native VLAN)
+
+2.3.2.2.16 รายการ VLAN ที่อนุญาต (Allowed VLAN List)
+
+2.3.2.3 ข้อมูล VLAN และ Port mode (VLAN and Layer 2 Switching) ระบบสามารถสรุป
+
+ข้อมูลVLAN ภายในอุปกรณ์ ได้แก่
+
+2.3.2.3.1 รายการ VLAN ทั้งหมด (VLAN List)
+
+2.3.2.3.2 ชื่อ VLAN (VLAN Name)
+
+2.3.2.3.3 สถานะ VLAN (VLAN Status)
+
+2.3.2.3.4 พอร์ตในโหมด Access (Access Ports)
+
+2.3.2.3.5 พอร์ตในโหมด Trunk (Trunk Ports)
+
+2.3.2.3.6 Native VLAN ของพอร์ต Trunk (Native VLAN)
+
+2.3.2.3.7 จำนวน VLAN ทั้งหมดภายในอุปกรณ์ (Total VLAN Count)
+
+2.3.2.4 ข้อมูล Spanning Tree Protocol (STP Information) ข้อมูลด้านความปลอดภัยและ
+
+ป้องกันลูปของเครือข่ายชั้นที่ 2 ได้แก่
+
+2.3.2.4.1 โหมดของ STP (STP Mode: PVST / RPVST / MST)
+
+2.3.2.4.2 ค่า Root Bridge ID (Root Bridge ID)
+
+2.3.2.4.3 Priority ของ Root Bridge (Priority)
+
+2.3.2.4.4 การเป็น Root Bridge ของอุปกรณ์ (Root Bridge Status)
+
+2.3.2.4.5 บทบาทพอร์ต (Port Role: Root / Designated / Alternate / Backup)
+
+2.3.2.4.6 สถานะพอร์ต (Port State: Forwarding / Blocking / Learning / 
+
+Discarding)
+
+2.3.2.4.7 ค่า STP Cost (STP Cost)
+
+2.3.2.4.8 การเปิดใช้งาน PortFast (PortFast Enabled)
+
+2.3.2.4.9 การเปิดใช้งาน BPDU Guard (BPDU Guard Enabled)
+
+2.3.2.5 ข้อมูลเส้นทางและโปรโตคอลเราท์ (Routing Protocol Information) ข้อมูลด้านการ
+
+กำหนดเส้นทางประกอบด้วยโปรโตคอลหลักและโปรโตคอลเสริม ดังนี้
+
+2.3.2.5.1 Static (Static Route)
+
+2.3.2.5.1.1 รายการ Static Route (Static Route List)
+
+2.3.2.5.1.2 เส้นทางเริ่มต้น (Default Route)
+
+2.3.2.5.1.3 Next-Hop หรือ Interface ที่ออก (Next Hop / Exit Interface)
+
+2.3.2.5.1.4 ค่า Administrative Distance (Administrative Distance)
+
+2.3.2.5.2 OSPF (OSPF Routing)
+
+2.3.2.5.2.1 Router ID (Router ID)
+
+2.3.2.5.2.2 Process ID (Process ID)
+
+2.3.2.5.2.3 รายการ Area (OSPF Areas)
+
+2.3.2.5.2.4 Interface ที่เข้าร่วม OSPF (OSPF Interfaces)
+
+2.3.2.5.2.5 รายการ Neighbor และสถานะ (Neighbor List and State)
+
+2.3.2.5.2.6 DR/BDR ของแต่ละ Segment (DR/BDR Information)
+
+2.3.2.5.2.7 สรุป Prefix ที่เรียนรู้ (Learned Prefix Summary)
+
+2.3.2.5.3 EIGRP (EIGRP Routing)
+
+2.3.2.5.3.1 Autonomous System Number (AS Number)
+
+2.3.2.5.3.2 Router ID (Router ID)
+
+2.3.2.5.3.3 รายการ Neighbor (Neighbor List)
+
+2.3.2.5.3.4 Hold Time (Hold Timer)
+
+2.3.2.5.3.5 รายการเส้นทางที่เรียนรู้ (Learned Routes)
+
+2.3.2.5.4 BGP (BGP Routing)
+
+2.3.2.5.4.1 Local AS (Local Autonomous System)
+
+2.3.2.5.4.2 รายการ Peer (Peer List)
+
+2.3.2.5.4.3 สถานะ Peer (Peer State)
+
+2.3.2.5.4.4 จำนวน Prefix ที่รับ (Received Prefixes)
+
+2.3.2.5.4.5 จำนวน Prefix ที่ประกาศ (Advertised Prefixes)
+
+2.3.2.5.5 RIP / RIPv2 (RIP Information)
+
+2.3.2.5.5.1 เวอร์ชันของ RIP ที่อุปกรณ์ใช้งาน (RIP Version)
+
+2.3.2.5.5.2 เครือข่ายที่ประกาศและเครือข่ายที่เรียนรู้ (Advertised and 
+
+Learned Networks)
+
+2.3.2.5.5.3 จำนวน Hop ของแต่ละเส้นทาง (Hop Count)
+
+2.3.2.5.5.4 อินเทอร์เฟซที่เข้าร่วม RIP (Participating Interfaces)
+
+2.3.2.5.5.5 การตั้งค่า Auto-Summary และ Passive Interface (Auto-
+
+Summary / Passive)
+
+2.3.2.5.5.6 ค่าตัวจับเวลา (Update / Invalid / Holddown / Flush Timers)
+
+2.3.2.5.5.7 ค่า Administrative Distance (Administrative Distance)
+
+2.3.2.6 ข้อมูลเพื่อนบ้านและโทโปโลยี (Neighbor & Topology Information) ระบบสามารถแสดงข้อมูลเพื่อนบ้านของอุปกรณ์ในเครือข่าย โดยประมวลผล วิเคราะห์จากโปรโตคอลค้นหาพื้นฐานอย่าง CDP และ LLDP เพื่อประกอบการสร้างแผนผังเครือข่ายอัตโนมัติ ประกอบด้วย:
+
+2.3.2.6.1 ชื่ออุปกรณ์ข้างเคียง (Neighbor Device Name)
+
+2.3.2.6.2 ที่อยู่ IP ของอุปกรณ์ข้างเคียง (Neighbor Device IP Address)
+
+2.3.2.6.3 รุ่นหรือแพลตฟอร์มของอุปกรณ์ข้างเคียง (Neighbor Device Platform/Model)
+
+2.3.2.6.4 พอร์ตที่เชื่อมต่อจากฝั่งอุปกรณ์หลัก (Local Port)
+
+2.3.2.6.5 พอร์ตที่เชื่อมต่อจากฝั่งอุปกรณ์ข้างเคียง (Remote Port)
+
+2.3.2.6.6 ความสามารถของอุปกรณ์ข้างเคียง (Neighbor Device Capabilities)
+
+2.3.2.6.7 โปรโตคอลที่ใช้ค้นหาอุปกรณ์ (Discovery Protocol: CDP/LLDP)
+
+2.3.2.6.8 ระบบจะนำข้อมูลดังกล่าวไปสร้างแผนผังเครือข่ายอัตโนมัติ
+
+2.3.2.7 ข้อมูลตาราง MAC และ ARP (MAC & ARP Information) ข้อมูลLayer 2และLayer 3 ที่ใช้ตรวจสอบการเชื่อมต่อปลายทางในเครือข่าย ประกอบด้วย:
+
+2.3.2.7.1 ตาราง MAC Address (MAC Address Table)
+
+2.3.2.7.1.1 รายการ MAC Address ที่อุปกรณ์เรียนรู้ (Learned MAC Address)
+
+2.3.2.7.1.2 พอร์ตที่เรียนรู้ MAC (MAC Learning Port)
+
+2.3.2.7.1.3 ประเภท MAC เช่น Dynamic หรือ Static (MAC Type)
+
+2.3.2.7.1.4 VLAN ที่เกี่ยวข้อง (Associated VLAN)
+
+2.3.2.7.2 ตาราง ARP (ARP Table)
+
+2.3.2.7.2.1 รายการจับคู่ IP–MAC (IP–MAC Mapping)
+
+2.3.2.7.2.2 อินเทอร์เฟซที่เรียนรู้ ARP (ARP Interface)
+
+2.3.2.7.2.3 อายุของข้อมูล (Age)
+
+2.3.2.8 ข้อมูลด้านความปลอดภัยและการบริหารจัดการ (Security & Management 
+
+Information)เป็นข้อมูลการกำหนดค่าที่เกี่ยวข้องกับการรักษาความปลอดภัยและการจัดการอุปกรณ์ เพื่อช่วยตรวจสอบการตั้งค่าที่มีผลต่อความมั่นคงปลอดภัย ประกอบด้วย:
+
+2.3.2.8.1 บัญชีผู้ใช้และสิทธิ์ (User Accounts & Privilege Levels)
+
+2.3.2.8.2 การตั้งค่าการพิสูจน์ตัวตน AAA (AAA Configuration)
+
+2.3.2.8.3 เวอร์ชันและสถานะของ SSH (SSH Version/Status)
+
+2.3.2.8.4 การตั้งค่า SNMP และ Community/Users (SNMP Settings)
+
+2.3.2.8.5 การตั้งค่า NTP และสถานะการซิงโครไนซ์เวลา (NTP Configuration & Sync 
+
+Status)
+
+2.3.2.8.6 การตั้งค่าระบบบันทึกเหตุการณ์ (Syslog / Logging Configuration)
+
+2.3.2.8.7 รายการ Access Control Lists (ACLs)
+
+2.3.2.9 ระบบสามารถแสดงข้อมูลฟีเจอร์ด้าน High Availability (HA) จากไฟล์ค่าตั้งค่าของอุปกรณ์ที่รองรับ โดยครอบคลุมโปรโตคอลและเทคโนโลยีที่ใช้ในองค์กร ดังนี้
+
+2.3.2.9.1 EtherChannel / Port-Channel (Link Aggregation) 
+
+2.3.2.9.1.1 รายการ Port-Channel ทั้งหมด (Port-Channel List)
+
+2.3.2.9.1.2 โหมดการทำงาน (LACP / PAGP / Static)
+
+2.3.2.9.1.3 พอร์ตสมาชิกของแต่ละ Port-Channel (Member Interfaces)
+
+2.3.2.9.1.4 สถานะลิงก์รวม (Bundled / Up / Down / Suspended)
+
+2.3.2.9.2 HSRP (Hot Standby Router Protocol) 
+
+2.3.2.9.2.1 กลุ่ม HSRP ที่ตรวจพบ (HSRP Groups)
+
+2.3.2.9.2.2 Virtual IP Address
+
+2.3.2.9.2.3 สถานะโหนด (Active / Standby / Listen)
+
+2.3.2.9.2.4 Priority และ Preempt
+
+2.3.2.9.3 VRRP (Virtual Router Redundancy Protocol) 
+
+2.3.2.9.3.1 Virtual Router ID (VRID)
+
+2.3.2.9.3.2 Virtual IP Address
+
+2.3.2.9.3.3 สถานะกลุ่ม (Master / Backup)
+
+2.3.2.9.3.4 Priority และ Preempt

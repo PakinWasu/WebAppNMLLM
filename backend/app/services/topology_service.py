@@ -33,7 +33,7 @@ CRITICAL RULES:
    - DO NOT hallucinate links. If there's no evidence, do NOT create an edge.
    - Each link must have supporting evidence cited.
 
-3. OUTPUT FORMAT: You MUST return a valid JSON object with this exact structure:
+3. OUTPUT FORMAT: You MUST return a valid JSON object with this exact structure (NO markdown, NO code blocks, ONLY pure JSON):
 {{
   "nodes": [
     {{"id": "device_name", "label": "display_name", "type": "Core|Distribution|Access|Router|Switch"}},
@@ -44,6 +44,20 @@ CRITICAL RULES:
     ...
   ],
   "analysis_summary": "Brief explanation of topology structure"
+}}
+
+EXAMPLE OUTPUT:
+{{
+  "nodes": [
+    {{"id": "CORE1", "label": "CORE1", "type": "Core"}},
+    {{"id": "DIST1", "label": "DIST1", "type": "Distribution"}},
+    {{"id": "ACC1", "label": "ACC1", "type": "Access"}}
+  ],
+  "edges": [
+    {{"from": "CORE1", "to": "DIST1", "label": "GE0/0/1-GE0/0/1", "evidence": "LLDP neighbor match"}},
+    {{"from": "DIST1", "to": "ACC1", "label": "GE0/0/2-GE0/0/1", "evidence": "LLDP neighbor match"}}
+  ],
+  "analysis_summary": "3-tier hierarchy: Core-Distribution-Access"
 }}
 
 4. DEVICE TYPE CLASSIFICATION:
@@ -64,11 +78,11 @@ Number of devices to analyze: {device_count}
         
         prompt_parts = []
         prompt_parts.append("=== NETWORK TOPOLOGY ANALYSIS ===")
-        prompt_parts.append("Analyze devices and create topology map. Return JSON only.")
+        prompt_parts.append("Analyze devices and create topology map. Return ONLY valid JSON (no markdown, no code blocks).")
         prompt_parts.append("\n=== DEVICE DATA ===")
         
-        # Limit number of devices if too many (for efficiency)
-        max_devices = 20  # Limit to prevent token overflow
+        # Limit number of devices if too many (for efficiency) - reduced from 20 to 15
+        max_devices = 15
         devices_to_process = devices_data[:max_devices]
         
         for idx, device in enumerate(devices_to_process, 1):
@@ -82,10 +96,10 @@ Number of devices to analyze: {device_count}
             prompt_parts.append(f"\nDevice {idx}: {device_name}")
             prompt_parts.append(f"Role: {overview.get('role', 'Unknown')}, Model: {overview.get('model', 'Unknown')}")
             
-            # Only include interfaces with IPs or descriptions (most relevant for topology)
+            # Only include interfaces with IPs or neighbors (most relevant for topology) - reduced from 15 to 10
             relevant_interfaces = [
-                iface for iface in interfaces[:15]  # Reduced from 20 to 15
-                if iface.get('ipv4_address') or iface.get('description') or iface.get('neighbor')
+                iface for iface in interfaces[:10]
+                if iface.get('ipv4_address') or iface.get('neighbor')
             ]
             
             if relevant_interfaces:
@@ -95,26 +109,23 @@ Number of devices to analyze: {device_count}
                     iface_parts = [iface.get('name', 'N/A')]
                     if iface.get('ipv4_address'):
                         iface_parts.append(f"IP:{iface['ipv4_address']}")
-                    if iface.get('description'):
-                        desc = iface['description'][:50]  # Limit description length
-                        iface_parts.append(f"Desc:{desc}")
+                    if iface.get('neighbor'):
+                        iface_parts.append(f"Neighbor:{iface['neighbor']}")
                     prompt_parts.append("  " + " | ".join(iface_parts))
             
-            # Neighbors (LLDP/CDP) - most important for topology
+            # Neighbors (LLDP/CDP) - most important for topology - reduced from 15 to 10
             if neighbors:
                 prompt_parts.append("Neighbors:")
-                for neighbor in neighbors[:15]:  # Reduced from 20 to 15
+                for neighbor in neighbors[:10]:
                     # Compact format
                     neighbor_parts = [neighbor.get('device_name', 'Unknown')]
                     if neighbor.get('local_port'):
                         neighbor_parts.append(f"L:{neighbor['local_port']}")
                     if neighbor.get('remote_port'):
                         neighbor_parts.append(f"R:{neighbor['remote_port']}")
-                    if neighbor.get('ip_address'):
-                        neighbor_parts.append(f"IP:{neighbor['ip_address']}")
                     prompt_parts.append("  " + " | ".join(neighbor_parts))
             
-            # Routing info (compact format for L3 relationships)
+            # Routing info (compact format for L3 relationships) - only summary
             if routing:
                 routing_info = []
                 if routing.get('ospf'):
@@ -123,21 +134,128 @@ Number of devices to analyze: {device_count}
                 if routing.get('bgp'):
                     bgp = routing['bgp']
                     routing_info.append(f"BGP:AS:{bgp.get('as_number', bgp.get('local_as', 'N/A'))}")
-                if routing.get('static'):
-                    static_routes = routing['static']
-                    if isinstance(static_routes, list):
-                        routing_info.append(f"Static:{len(static_routes)}")
-                    elif isinstance(static_routes, dict) and static_routes.get('routes'):
-                        routing_info.append(f"Static:{len(static_routes['routes'])}")
                 if routing_info:
                     prompt_parts.append("Routing: " + " | ".join(routing_info))
         
-        # Compact instructions
+        # Clear instructions with example
         prompt_parts.append("\n=== INSTRUCTIONS ===")
-        prompt_parts.append("Return JSON: nodes[] with id/label/type, edges[] with from/to/label/evidence")
-        prompt_parts.append("Create edges ONLY with evidence: LLDP matches, subnet matches, or interface descriptions.")
+        prompt_parts.append("Return ONLY valid JSON with this structure:")
+        prompt_parts.append('{"nodes": [{"id": "DEV1", "label": "DEV1", "type": "Core"}], "edges": [{"from": "DEV1", "to": "DEV2", "label": "GE0/0/1", "evidence": "LLDP"}], "analysis_summary": "..."}')
+        prompt_parts.append("Create edges ONLY with evidence: LLDP/CDP neighbors, subnet matches, or interface descriptions.")
         
         return "\n".join(prompt_parts)
+    
+    def _generate_rule_based_topology(self, devices_data: List[Dict[str, Any]]) -> Dict[str, Any]:
+        """
+        Generate topology using rule-based approach (fallback when LLM fails).
+        Uses LLDP/CDP neighbors and subnet matching to create edges.
+        """
+        nodes = []
+        edges = []
+        device_map = {}
+        
+        # Create nodes from all devices
+        for device in devices_data:
+            device_name = device.get("device_name")
+            if not device_name:
+                continue
+            
+            overview = device.get("device_overview", {})
+            device_type = overview.get("role", "Switch")
+            
+            # Classify device type based on routing info
+            routing = device.get("routing", {})
+            if routing.get("ospf") or routing.get("bgp"):
+                if device_type.lower() not in ["core", "distribution", "access"]:
+                    device_type = "Router"
+            
+            nodes.append({
+                "id": device_name,
+                "label": device_name,
+                "type": device_type
+            })
+            device_map[device_name] = device
+        
+        # Create edges based on LLDP/CDP neighbors
+        edge_set = set()  # To avoid duplicates
+        
+        for device in devices_data:
+            device_name = device.get("device_name")
+            if not device_name:
+                continue
+            
+            neighbors = device.get("neighbors", [])
+            for neighbor in neighbors:
+                neighbor_name = neighbor.get("device_name")
+                if not neighbor_name or neighbor_name not in device_map:
+                    continue
+                
+                # Check if this device exists in our device list
+                if neighbor_name in device_map:
+                    local_port = neighbor.get("local_port", "")
+                    remote_port = neighbor.get("remote_port", "")
+                    
+                    # Create edge key to avoid duplicates
+                    edge_key = tuple(sorted([device_name, neighbor_name]))
+                    if edge_key not in edge_set:
+                        edge_set.add(edge_key)
+                        edges.append({
+                            "from": device_name,
+                            "to": neighbor_name,
+                            "label": f"{local_port}-{remote_port}" if local_port and remote_port else "",
+                            "evidence": f"LLDP/CDP neighbor: {device_name} sees {neighbor_name}"
+                        })
+        
+        # Create edges based on subnet matching
+        interface_subnets = {}  # subnet -> [(device_name, interface_name, ip)]
+        
+        for device in devices_data:
+            device_name = device.get("device_name")
+            if not device_name:
+                continue
+            
+            interfaces = device.get("interfaces", [])
+            for iface in interfaces:
+                ipv4 = iface.get("ipv4_address")
+                if not ipv4:
+                    continue
+                
+                # Extract subnet (simple approach: remove last octet)
+                try:
+                    parts = ipv4.split(".")
+                    if len(parts) == 4:
+                        subnet = ".".join(parts[:3]) + ".0/24"  # Assume /24
+                        if subnet not in interface_subnets:
+                            interface_subnets[subnet] = []
+                        interface_subnets[subnet].append((device_name, iface.get("name", ""), ipv4))
+                except:
+                    continue
+        
+        # Create edges for devices on same subnet
+        for subnet, devices_on_subnet in interface_subnets.items():
+            if len(devices_on_subnet) < 2:
+                continue
+            
+            # Create edges between all devices on the same subnet
+            for i, (dev1, iface1, ip1) in enumerate(devices_on_subnet):
+                for j, (dev2, iface2, ip2) in enumerate(devices_on_subnet[i+1:], i+1):
+                    if dev1 not in device_map or dev2 not in device_map:
+                        continue
+                    
+                    edge_key = tuple(sorted([dev1, dev2]))
+                    if edge_key not in edge_set:
+                        edge_set.add(edge_key)
+                        edges.append({
+                            "from": dev1,
+                            "to": dev2,
+                            "label": f"{iface1}-{iface2}",
+                            "evidence": f"Subnet match: {dev1} ({ip1}) and {dev2} ({ip2}) on {subnet}"
+                        })
+        
+        return {
+            "nodes": nodes,
+            "edges": edges
+        }
     
     async def generate_topology(
         self,
@@ -193,9 +311,19 @@ Number of devices to analyze: {device_count}
                 }
             }
         
+        # Log data being sent to LLM
+        total_interfaces = sum(len(d.get("interfaces", [])) for d in devices_data)
+        total_neighbors = sum(len(d.get("neighbors", [])) for d in devices_data)
+        print(f"[Topology] Generating topology for project {project_id}: {len(devices_data)} devices, {total_interfaces} interfaces, {total_neighbors} neighbors")
+        
         # Build prompts
         system_prompt = self._get_topology_system_prompt(project_id, len(devices_data))
         user_prompt = self._build_topology_prompt(devices_data)
+        
+        # Estimate prompt length (rough token count)
+        prompt_length = len(system_prompt) + len(user_prompt)
+        estimated_tokens = prompt_length // 4  # Rough estimate: 4 chars per token
+        print(f"[Topology] Prompt length: {prompt_length} chars (~{estimated_tokens} tokens)")
         
         # Prepare Ollama API request
         url = f"{self.base_url}/api/chat"
@@ -206,17 +334,34 @@ Number of devices to analyze: {device_count}
                 {"role": "user", "content": user_prompt}
             ],
             "stream": False,
+            "format": "json",  # Request JSON format output (qwen2.5-coder supports this)
             "options": {
-                "temperature": 0.2,  # Very low temperature for factual topology
-                "top_p": 0.85,  # Slightly lower for faster inference
-                "num_predict": 2048,  # Limit max tokens for faster responses
+                "temperature": 0.1,  # Very low temperature for faster, more focused responses
+                "top_p": 0.8,  # Lower for faster inference
+                "num_predict": 3072,  # Increased to allow sufficient tokens for response
             }
         }
         
+        llm_success = False
+        topology_data = None
+        analysis_summary = ""
+        token_usage = {"prompt_tokens": 0, "completion_tokens": 0, "total_tokens": 0}
+        
         try:
-            # Increased timeout for topology (complex analysis) but still reasonable for 14b model
-            async with httpx.AsyncClient(timeout=450.0) as client:
+            # Use detailed timeout configuration like POC (connect, read, write, pool)
+            timeout = httpx.Timeout(
+                connect=30.0,  # Connection timeout
+                read=600.0,   # Read timeout (10 minutes for complex topology analysis)
+                write=120.0,  # Write timeout
+                pool=120.0    # Pool timeout
+            )
+            async with httpx.AsyncClient(timeout=timeout) as client:
+                llm_start_time = time.time()
+                print(f"[Topology] Calling Ollama API at {self.base_url} with model {self.model_name}...")
                 response = await client.post(url, json=payload)
+                llm_response_time = time.time() - llm_start_time
+                print(f"[Topology] Ollama API response received in {llm_response_time:.2f}s")
+                
                 response.raise_for_status()
                 data = response.json()
                 
@@ -229,151 +374,133 @@ Number of devices to analyze: {device_count}
                     "completion_tokens": data.get("eval_count", 0),
                     "total_tokens": data.get("prompt_eval_count", 0) + data.get("eval_count", 0)
                 }
-                
-                # Calculate inference time
-                inference_time_ms = (time.time() - start_time) * 1000
+                print(f"[Topology] Token usage: {token_usage}")
                 
                 # Parse JSON from response
-                topology_data = None
-                analysis_summary = ""
-                
+                # With "format": "json", Ollama should return pure JSON, but we still clean it
                 try:
-                    # Try to extract JSON from markdown code blocks
-                    if "```json" in ai_response:
-                        json_start = ai_response.find("```json") + 7
-                        json_end = ai_response.find("```", json_start)
-                        json_str = ai_response[json_start:json_end].strip()
-                        topology_data = json.loads(json_str)
-                    elif "```" in ai_response:
-                        json_start = ai_response.find("```") + 3
-                        json_end = ai_response.find("```", json_start)
-                        json_str = ai_response[json_start:json_end].strip()
-                        topology_data = json.loads(json_str)
-                    else:
-                        # Try parsing the whole response as JSON
-                        topology_data = json.loads(ai_response)
+                    content_cleaned = ai_response.strip()
                     
-                    # Extract analysis_summary if present
-                    analysis_summary = topology_data.get("analysis_summary", "")
+                    # Remove markdown code blocks if present (some models still add them)
+                    if content_cleaned.startswith("```"):
+                        lines = content_cleaned.split("\n")
+                        if lines[0].startswith("```"):
+                            lines = lines[1:]  # Remove opening ```
+                        if lines and lines[-1].strip() == "```":
+                            lines = lines[:-1]  # Remove closing ```
+                        content_cleaned = "\n".join(lines).strip()
+                    
+                    # Try parsing JSON
+                    topology_data = json.loads(content_cleaned)
                     
                     # Validate structure
-                    if "nodes" not in topology_data:
-                        topology_data["nodes"] = []
-                    if "edges" not in topology_data:
-                        topology_data["edges"] = []
+                    if not isinstance(topology_data, dict):
+                        raise ValueError("Topology must be a JSON object")
+                    if "nodes" not in topology_data or "edges" not in topology_data:
+                        raise ValueError("Topology must contain 'nodes' and 'edges' arrays")
+                    if not isinstance(topology_data["nodes"], list) or not isinstance(topology_data["edges"], list):
+                        raise ValueError("'nodes' and 'edges' must be arrays")
                     
-                    # Validate and clean nodes
-                    validated_nodes = []
-                    for node in topology_data.get("nodes", []):
-                        if isinstance(node, dict) and "id" in node:
-                            validated_nodes.append({
-                                "id": str(node["id"]),
-                                "label": node.get("label", node["id"]),
-                                "type": node.get("type", "Switch")
-                            })
+                    llm_success = True
+                    print(f"[Topology] Successfully parsed LLM response: {len(topology_data.get('nodes', []))} nodes, {len(topology_data.get('edges', []))} edges")
                     
-                    # Validate and clean edges
-                    validated_edges = []
-                    for edge in topology_data.get("edges", []):
-                        if isinstance(edge, dict) and "from" in edge and "to" in edge:
-                            validated_edges.append({
-                                "from": str(edge["from"]),
-                                "to": str(edge["to"]),
-                                "label": edge.get("label", ""),
-                                "evidence": edge.get("evidence", "")
-                            })
+                except (json.JSONDecodeError, ValueError) as e:
+                    print(f"[Topology] Failed to parse LLM JSON response: {e}")
+                    print(f"[Topology] Response preview: {ai_response[:500]}")
+                    llm_success = False
                     
-                    topology_data = {
-                        "nodes": validated_nodes,
-                        "edges": validated_edges
-                    }
-                    
-                except json.JSONDecodeError as e:
-                    # If JSON parsing fails, return error
-                    return {
-                        "topology": {"nodes": [], "edges": []},
-                        "analysis_summary": f"Failed to parse LLM response as JSON: {str(e)}",
-                        "raw_response": ai_response[:500],  # First 500 chars for debugging
-                        "metrics": {
-                            "inference_time_ms": inference_time_ms,
-                            "devices_processed": len(devices_data),
-                            "token_usage": token_usage,
-                            "model_name": self.model_name,
-                            "timestamp": datetime.utcnow()
-                        }
-                    }
-                
-                # Log performance metrics
-                await self._log_performance_metrics(
-                    project_id=project_id,
-                    inference_time_ms=inference_time_ms,
-                    devices_processed=len(devices_data),
-                    token_usage=token_usage
-                )
-                
-                return {
-                    "topology": topology_data,
-                    "analysis_summary": analysis_summary or "Topology generated successfully",
-                    "metrics": {
-                        "inference_time_ms": inference_time_ms,
-                        "devices_processed": len(devices_data),
-                        "token_usage": token_usage,
-                        "model_name": self.model_name,
-                        "timestamp": datetime.utcnow()
-                    }
-                }
-                
         except httpx.ReadTimeout:
-            return {
-                "topology": {"nodes": [], "edges": []},
-                "analysis_summary": "[ERROR] Ollama read timeout (450s) - Topology generation failed. The network may be too large. Try reducing the number of devices or check if Ollama is responsive.",
-                "metrics": {
-                    "inference_time_ms": 450000,
-                    "devices_processed": len(devices_data),
-                    "token_usage": {"prompt_tokens": 0, "completion_tokens": 0, "total_tokens": 0},
-                    "model_name": self.model_name,
-                    "timestamp": datetime.utcnow()
-                }
-            }
+            print(f"[Topology] Ollama read timeout (600s) - falling back to rule-based topology")
+            llm_success = False
+        except httpx.ConnectTimeout:
+            print(f"[Topology] Connection to Ollama timed out - falling back to rule-based topology")
+            llm_success = False
         except httpx.HTTPStatusError as e:
-            error_msg = f"[ERROR] Ollama API error ({e.response.status_code}): {e.response.text[:200] if e.response else str(e)}"
+            error_text = e.response.text[:200] if e.response else str(e)
+            print(f"[Topology] Ollama API error ({e.response.status_code}): {error_text}")
             if e.response.status_code == 404:
-                error_msg += "\n\nPossible causes:\n- Ollama is not running on your host machine\n- Ollama is not accessible from Docker container\n- Check Ollama endpoint: " + self.base_url
-            return {
-                "topology": {"nodes": [], "edges": []},
-                "analysis_summary": error_msg,
-                "metrics": {
-                    "inference_time_ms": (time.time() - start_time) * 1000,
-                    "devices_processed": len(devices_data),
-                    "token_usage": {"prompt_tokens": 0, "completion_tokens": 0, "total_tokens": 0},
-                    "model_name": self.model_name,
-                    "timestamp": datetime.utcnow()
-                }
-            }
+                print(f"[Topology] Model {self.model_name} may not be available. Check if model is pulled.")
+            llm_success = False
         except httpx.ConnectError as e:
-            return {
-                "topology": {"nodes": [], "edges": []},
-                "analysis_summary": f"[ERROR] Cannot connect to Ollama at {self.base_url}\n\nPlease ensure:\n1. Ollama is running on your host machine\n2. Ollama is accessible from Docker (check host.docker.internal)\n3. Ollama is listening on port 11434\n\nError details: {str(e)}",
-                "metrics": {
-                    "inference_time_ms": (time.time() - start_time) * 1000,
-                    "devices_processed": len(devices_data),
-                    "token_usage": {"prompt_tokens": 0, "completion_tokens": 0, "total_tokens": 0},
-                    "model_name": self.model_name,
-                    "timestamp": datetime.utcnow()
-                }
-            }
+            print(f"[Topology] Cannot connect to Ollama at {self.base_url}: {e}")
+            print(f"[Topology] Please ensure Ollama is running and accessible")
+            llm_success = False
         except Exception as e:
-            return {
-                "topology": {"nodes": [], "edges": []},
-                "analysis_summary": f"[ERROR] Topology generation failed: {str(e)}\n\nPlease check:\n1. Ollama service is running\n2. Network connectivity from Docker to host\n3. Backend logs for more details",
-                "metrics": {
-                    "inference_time_ms": (time.time() - start_time) * 1000,
-                    "devices_processed": len(devices_data),
-                    "token_usage": {"prompt_tokens": 0, "completion_tokens": 0, "total_tokens": 0},
-                    "model_name": self.model_name,
-                    "timestamp": datetime.utcnow()
-                }
+            print(f"[Topology] Unexpected error during LLM call: {type(e).__name__}: {e}")
+            import traceback
+            print(f"[Topology] Traceback: {traceback.format_exc()}")
+            llm_success = False
+        
+        # Calculate inference time
+        inference_time_ms = (time.time() - start_time) * 1000
+        
+        # If LLM failed, use rule-based fallback
+        if not llm_success or not topology_data:
+            print(f"[Topology] Using rule-based fallback topology generation")
+            rule_based_result = self._generate_rule_based_topology(devices_data)
+            topology_data = rule_based_result
+            analysis_summary = "Topology generated using rule-based method (LLDP/CDP neighbors and subnet matching)"
+            if not llm_success:
+                analysis_summary += " - LLM timeout or error occurred"
+        else:
+            # Extract analysis_summary if present
+            analysis_summary = topology_data.get("analysis_summary", "")
+            if not analysis_summary:
+                analysis_summary = f"Topology generated successfully using LLM ({len(topology_data.get('nodes', []))} nodes, {len(topology_data.get('edges', []))} edges)"
+        
+        # Validate structure
+        if "nodes" not in topology_data:
+            topology_data["nodes"] = []
+        if "edges" not in topology_data:
+            topology_data["edges"] = []
+        
+        # Validate and clean nodes
+        validated_nodes = []
+        for node in topology_data.get("nodes", []):
+            if isinstance(node, dict) and "id" in node:
+                validated_nodes.append({
+                    "id": str(node["id"]),
+                    "label": node.get("label", node["id"]),
+                    "type": node.get("type", "Switch")
+                })
+        
+        # Validate and clean edges
+        validated_edges = []
+        for edge in topology_data.get("edges", []):
+            if isinstance(edge, dict) and "from" in edge and "to" in edge:
+                validated_edges.append({
+                    "from": str(edge["from"]),
+                    "to": str(edge["to"]),
+                    "label": edge.get("label", ""),
+                    "evidence": edge.get("evidence", "")
+                })
+        
+        topology_data = {
+            "nodes": validated_nodes,
+            "edges": validated_edges
+        }
+        
+        print(f"[Topology] Final topology: {len(validated_nodes)} nodes, {len(validated_edges)} edges, time: {inference_time_ms:.0f}ms")
+        
+        # Log performance metrics
+        await self._log_performance_metrics(
+            project_id=project_id,
+            inference_time_ms=inference_time_ms,
+            devices_processed=len(devices_data),
+            token_usage=token_usage
+        )
+        
+        return {
+            "topology": topology_data,
+            "analysis_summary": analysis_summary,
+            "metrics": {
+                "inference_time_ms": inference_time_ms,
+                "devices_processed": len(devices_data),
+                "token_usage": token_usage,
+                "model_name": self.model_name,
+                "timestamp": datetime.utcnow()
             }
+        }
     
     async def _log_performance_metrics(
         self,
