@@ -127,7 +127,7 @@ async def get_summary(
                     "bgp_asn_neigh": bgp_summary,
                     "rt_proto": rt_proto_str,
                     "cpu": overview.get("cpu_utilization") or overview.get("cpu_util") or "-",
-                    "mem": overview.get("mem_util") or "-",  # New parser doesn't have mem_util
+                    "mem": overview.get("memory_usage") or overview.get("mem_util") or "-",
                     "status": status,
                     "upload_timestamp": upload_ts,
                 })
@@ -232,7 +232,7 @@ async def get_summary(
                     "bgp_asn_neigh": bgp_summary,
                     "rt_proto": rt_proto_str,
                     "cpu": overview.get("cpu_utilization") or overview.get("cpu_util") or "-",
-                    "mem": overview.get("mem_util") or "-",  # New parser doesn't have mem_util
+                    "mem": overview.get("memory_usage") or overview.get("mem_util") or "-",
                     "status": status,
                     "upload_timestamp": upload_ts,
                 })

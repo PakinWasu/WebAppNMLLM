@@ -86,7 +86,7 @@ const Card = ({ title, actions, children, className = "" }) => (
   </div>
 );
 const Field = ({ label, children }) => (
-  <label className="grid gap-1">
+  <label className="grid gap-1.5">
     <span className="text-xs font-medium text-gray-600 dark:text-gray-300">
       {label}
     </span>
@@ -96,57 +96,81 @@ const Field = ({ label, children }) => (
 const Input = (props) => (
   <input
     {...props}
-    className={`rounded-xl border border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-800 px-3 py-2 text-sm text-gray-900 dark:text-gray-100 focus:outline-none focus:ring-2 focus:ring-blue-500 ${
+    className={`w-full rounded-xl border border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-800 px-3 py-2 text-sm text-gray-900 dark:text-gray-100 focus:outline-none focus:ring-2 focus:ring-blue-500 ${
       props.className || ""
     }`}
   />
 );
 
-// Password Input - Shows password when focused, shows **** when blurred
+// Password Input with Eye Icon Toggle
 const PasswordInput = ({ value, onChange, placeholder, disabled, className = "" }) => {
-  const [isFocused, setIsFocused] = useState(false);
-  const [displayValue, setDisplayValue] = useState("");
+  const [showPassword, setShowPassword] = useState(false);
   
-  useEffect(() => {
-    if (isFocused) {
-      // Show actual password when focused
-      setDisplayValue(value || "");
-    } else {
-      // Show asterisks when blurred
-      setDisplayValue(value ? "•".repeat(value.length) : "");
-    }
-  }, [value, isFocused]);
-  
-  const handleFocus = (e) => {
-    setIsFocused(true);
-    setDisplayValue(value || "");
-  };
-  
-  const handleBlur = (e) => {
-    setIsFocused(false);
-    setDisplayValue(value ? "•".repeat(value.length) : "");
-  };
-  
-  const handleChange = (e) => {
-    const newValue = e.target.value;
-    onChange(e); // Call original onChange
-    if (isFocused) {
-      setDisplayValue(newValue);
-    }
+  const togglePasswordVisibility = () => {
+    setShowPassword(!showPassword);
   };
   
   return (
-    <Input
-      type="text"
-      value={displayValue}
-      onChange={handleChange}
-      onFocus={handleFocus}
-      onBlur={handleBlur}
-      placeholder={placeholder}
-      disabled={disabled}
-      autoComplete="current-password"
-      className={className}
-    />
+    <div className="relative w-full">
+      <input
+        type={showPassword ? "text" : "password"}
+        value={value || ""}
+        onChange={onChange}
+        placeholder={placeholder}
+        disabled={disabled}
+        autoComplete="current-password"
+        className={`w-full rounded-xl border border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-800 px-3 py-2 pr-10 text-sm text-gray-900 dark:text-gray-100 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 ${
+          className || ""
+        }`}
+      />
+      <button
+        type="button"
+        onClick={togglePasswordVisibility}
+        disabled={disabled}
+        className="absolute right-0 top-0 h-full px-3 flex items-center justify-center border-l border-gray-300 dark:border-gray-700 hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+        aria-label={showPassword ? "Hide password" : "Show password"}
+      >
+        {showPassword ? (
+          // Eye with slash (hide password)
+          <svg
+            className="w-5 h-5 text-gray-600 dark:text-gray-400"
+            fill="none"
+            stroke="currentColor"
+            viewBox="0 0 24 24"
+            xmlns="http://www.w3.org/2000/svg"
+          >
+            <path
+              strokeLinecap="round"
+              strokeLinejoin="round"
+              strokeWidth={2}
+              d="M13.875 18.825A10.05 10.05 0 0112 19c-4.478 0-8.268-2.943-9.543-7a9.97 9.97 0 011.563-3.029m5.858.908a3 3 0 114.243 4.243M9.878 9.878l4.242 4.242M9.88 9.88l-3.29-3.29m7.532 7.532l3.29 3.29M3 3l3.59 3.59m0 0A9.953 9.953 0 0112 5c4.478 0 8.268 2.943 9.543 7a10.025 10.025 0 01-4.132 5.411m0 0L21 21"
+            />
+          </svg>
+        ) : (
+          // Eye without slash (show password)
+          <svg
+            className="w-5 h-5 text-gray-600 dark:text-gray-400"
+            fill="none"
+            stroke="currentColor"
+            viewBox="0 0 24 24"
+            xmlns="http://www.w3.org/2000/svg"
+          >
+            <path
+              strokeLinecap="round"
+              strokeLinejoin="round"
+              strokeWidth={2}
+              d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"
+            />
+            <path
+              strokeLinecap="round"
+              strokeLinejoin="round"
+              strokeWidth={2}
+              d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z"
+            />
+          </svg>
+        )}
+      </button>
+    </div>
   );
 };
 const Select = ({ options = [], value, onChange, className = "" }) => (
@@ -1271,7 +1295,7 @@ const Login = ({ onLogin, goChange }) => {
   return (
     <div className="grid place-items-center py-16">
       <Card className="w-full max-w-md" title="Sign in">
-        <form onSubmit={handleSubmit} className="grid gap-4">
+        <form onSubmit={handleSubmit} className="grid gap-3">
           <Field label="Username">
             <Input
               value={username}
@@ -2061,6 +2085,7 @@ const ProjectView = ({
   if (can("view-documents", project)) {
     tabs.push({ id: "summary", label: "Summary", icon: "📊" });
     tabs.push({ id: "documents", label: "Documents", icon: "📄" });
+    tabs.push({ id: "analysis", label: "AI Analysis", icon: "🤖" });
   }
 
   return (
@@ -2130,6 +2155,13 @@ const ProjectView = ({
             authedUser={authedUser}
             setProjects={setProjects}
             openDevice={openDevice}
+          />
+        )}
+        {tab === "analysis" && can("view-documents", project) && (
+          <AnalysisPage
+            project={project}
+            authedUser={authedUser}
+            onChangeTab={onChangeTab}
           />
         )}
         {tab === "documents" && can("view-documents", project) && (
@@ -3095,15 +3127,15 @@ const DeviceDetailsView = ({ project, deviceId, goBack, uploadHistory }) => {
     vrrpGroups: haData.vrrp?.groups?.length || 0,
     routing: Object.keys(routingData).filter(k => routingData[k] && Object.keys(routingData[k]).length > 0 && k !== "routing_table").join(", ") || "—",
     ospfNeighbors: routingData.ospf?.neighbors?.length || 0,
-    bgpAsn: routingData.bgp?.local_as || "—",
+    bgpAsn: routingData.bgp?.as_number ?? routingData.bgp?.local_as ?? "—",
     bgpNeighbors: routingData.bgp?.peers?.length || 0,
     cdpNeighbors: neighborsData.filter(n => n.protocol === "CDP").length || 0,
     lldpNeighbors: neighborsData.filter(n => n.protocol === "LLDP").length || 0,
     ntpStatus: securityData.ntp?.status || securityData.ntp?.synchronized ? "Synchronized" : "—",
     snmp: securityData.snmp?.enabled ? "Enabled" : "—",
     syslog: securityData.logging?.enabled || securityData.syslog?.enabled ? "Enabled" : "—",
-    cpu: overview.cpu_util || "—",
-    mem: overview.mem_util || "—",
+    cpu: overview.cpu_utilization ?? overview.cpu_util ?? "—",
+    mem: overview.memory_usage ?? overview.mem_util ?? "—",
     uptime: overview.uptime || "—",
     ifaces: {
       total: totalIfaces,
@@ -3224,7 +3256,7 @@ const DeviceDetailsView = ({ project, deviceId, goBack, uploadHistory }) => {
     });
   }, [vlansData, interfaces, haData]);
 
-  // Interfaces - transform from API data
+  // Interfaces - transform from API data (include STP fields from parser)
   const ifaces = React.useMemo(() => {
     return interfaces.map(iface => ({
       port: iface.name || "—",
@@ -3233,23 +3265,35 @@ const DeviceDetailsView = ({ project, deviceId, goBack, uploadHistory }) => {
       mode: iface.port_mode || "—",
       accessVlan: iface.access_vlan || null,
       nativeVlan: iface.native_vlan || null,
-      allowedShort: (Array.isArray(iface.allowed_vlans) ? iface.allowed_vlans.join(",") : null) || "—",
+      allowedShort: (Array.isArray(iface.allowed_vlans) ? iface.allowed_vlans.join(",") : (typeof iface.allowed_vlans === 'string' ? iface.allowed_vlans : null)) || "—",
       poeW: iface.poe_power || null,
       speed: iface.speed || "—",
       duplex: iface.duplex || "—",
       errors: iface.errors ? `${iface.errors.input || 0}/${iface.errors.output || 0}` : "0/0",
       stp: stpData.port_states?.[iface.name] || "—",
+      stpRole: iface.stp_role || "—",  // From parser
+      stpState: iface.stp_state || "—",  // From parser
+      stpEdgedPort: iface.stp_edged_port !== undefined ? (iface.stp_edged_port ? "Yes" : "No") : "—",  // From parser
+      ipv4: iface.ipv4_address || "—",
       desc: iface.description || ""
     }));
   }, [interfaces, stpData]);
   const ifaceColumns = [
-    { header: "Port", key: "port" }, { header: "Admin", key: "admin" }, { header: "Oper", key: "oper" }, { header: "Mode", key: "mode" },
+    { header: "Port", key: "port" }, 
+    { header: "Admin", key: "admin" }, 
+    { header: "Oper", key: "oper" }, 
+    { header: "Mode", key: "mode" },
+    { header: "IPv4", key: "ipv4", cell: (r) => r.ipv4 || "—" },
     { header: "Access VLAN", key: "accessVlan", cell: (r) => r.accessVlan ?? "—" },
     { header: "Native", key: "nativeVlan", cell: (r) => r.nativeVlan ?? "—" },
-    { header: "Allowed (short)", key: "allowedShort" },
+    { header: "Allowed VLANs", key: "allowedShort" },
+    { header: "STP Role", key: "stpRole", cell: (r) => r.stpRole || "—" },
+    { header: "STP State", key: "stpState", cell: (r) => r.stpState || "—" },
+    { header: "STP Edged", key: "stpEdgedPort", cell: (r) => r.stpEdgedPort || "—" },
+    { header: "Speed", key: "speed" }, 
+    { header: "Duplex", key: "duplex" },
     { header: "PoE (W)", key: "poeW", cell: (r) => r.poeW ?? "—" },
-    { header: "Speed", key: "speed" }, { header: "Duplex", key: "duplex" },
-    { header: "Errors (C/I/O)", key: "errors" }, { header: "STP", key: "stp" }, { header: "Description", key: "desc" },
+    { header: "Description", key: "desc" },
   ];
   const [qMode, setQMode] = React.useState("all");
   const [qState, setQState] = React.useState("all");
@@ -3475,8 +3519,10 @@ const DeviceDetailsView = ({ project, deviceId, goBack, uploadHistory }) => {
               <Metric k="NTP" v={facts.ntpStatus || "—"} />
               <Metric k="SNMP" v={facts.snmp || "—"} />
               <Metric k="Syslog" v={facts.syslog || "—"} />
-              <Metric k="CPU %" v={facts.cpu != null ? `${facts.cpu}%` : "—"} />
-              <Metric k="Memory %" v={facts.mem != null ? `${facts.mem}%` : "—"} />
+              <Metric k="CPU %" v={facts.cpu != null && facts.cpu !== "—" ? `${facts.cpu}%` : "—"} />
+              <Metric k="Memory %" v={facts.mem != null && facts.mem !== "—" ? `${facts.mem}%` : "—"} />
+              <Metric k="Hostname" v={overview.hostname || "—"} />
+              <Metric k="Management IP" v={overview.management_ip || overview.mgmt_ip || "—"} />
               {overview.device_status && Object.keys(overview.device_status).length > 0 && (
                 <>
                   <Metric k="Device Slot" v={overview.device_status.slot || "—"} />
@@ -3640,18 +3686,38 @@ const DeviceDetailsView = ({ project, deviceId, goBack, uploadHistory }) => {
         <div className="grid gap-6">
           <Card title="STP Information">
             <div className="grid gap-4 md:grid-cols-3 text-sm mb-6">
-              <Metric k="STP Mode" v={stpData.mode || "—"} />
+              <Metric k="STP Mode" v={stpData.stp_mode || stpData.mode || "—"} />
+              <Metric k="Bridge Priority" v={stpData.bridge_priority ?? "—"} />
               <Metric k="Bridge ID" v={stpData.bridge_id || "—"} />
               <Metric k="Root Bridge ID" v={stpData.root_bridge_id || "—"} />
-              <Metric k="Root Priority" v={stpData.root_priority || "—"} />
-              <Metric k="Is Root Bridge" v={stpData.is_root_bridge ? "Yes" : "No"} />
-              <Metric k="Root Port" v={stpData.root_port || "—"} />
-              <Metric k="BPDU Protection" v={stpData.bpdu_protection ? "Enabled" : "Disabled"} />
+              <Metric k="Root Bridge Status" v={stpData.root_bridge_status !== undefined ? (stpData.root_bridge_status ? "Yes" : "No") : "—"} />
+              <Metric k="BPDU Guard" v={stpData.bpdu_guard !== undefined ? (stpData.bpdu_guard ? "Enabled" : "Disabled") : "—"} />
+              <Metric k="PortFast Enabled" v={stpData.portfast_enabled !== undefined ? (stpData.portfast_enabled ? "Yes" : "No") : "—"} />
             </div>
             
-            {stpData.port_roles && Object.keys(stpData.port_roles).length > 0 && (
+            {/* STP Interfaces from parser */}
+            {stpData.interfaces && Array.isArray(stpData.interfaces) && stpData.interfaces.length > 0 && (
               <div className="mt-4">
-                <h3 className="text-sm font-semibold mb-3">Port Roles & States</h3>
+                <h3 className="text-sm font-semibold mb-3">STP Port Roles & States (from parser)</h3>
+                <div className="h-[60vh] overflow-auto rounded-2xl border border-gray-200 dark:border-[#1F2937]">
+                  <Table
+                    columns={[
+                      { header: "Port", key: "port" },
+                      { header: "Role", key: "role", cell: (r) => r.role || "—" },
+                      { header: "State", key: "state", cell: (r) => r.state || "—" }
+                    ]}
+                    data={stpData.interfaces}
+                    empty="No STP port information available"
+                    minWidthClass="min-w-[600px]"
+                  />
+                </div>
+              </div>
+            )}
+            
+            {/* Fallback: Legacy port_roles format */}
+            {(!stpData.interfaces || !Array.isArray(stpData.interfaces) || stpData.interfaces.length === 0) && stpData.port_roles && Object.keys(stpData.port_roles).length > 0 && (
+              <div className="mt-4">
+                <h3 className="text-sm font-semibold mb-3">Port Roles & States (legacy format)</h3>
                 <div className="h-[60vh] overflow-auto rounded-2xl border border-gray-200 dark:border-[#1F2937]">
                   <Table
                     columns={[
@@ -3684,19 +3750,20 @@ const DeviceDetailsView = ({ project, deviceId, goBack, uploadHistory }) => {
       {!loading && !error && tab === "routing" && (
         <div className="grid gap-6">
           {/* Static Routes */}
-          {routingData.static && routingData.static.routes && routingData.static.routes.length > 0 && (
+          {routingData.static && ((Array.isArray(routingData.static) && routingData.static.length > 0) || (routingData.static.routes && routingData.static.routes.length > 0)) && (
             <Card title="Static Routes">
               <div className="h-[50vh] overflow-auto rounded-2xl border border-gray-200 dark:border-[#1F2937]">
                 <Table
                   columns={[
                     { header: "Network", key: "network" },
-                    { header: "Next Hop", key: "next_hop", cell: (r) => r.next_hop || r.exit_interface || "—" },
-                    { header: "Exit Interface", key: "exit_interface", cell: (r) => r.exit_interface || "—" },
+                    { header: "Mask", key: "mask", cell: (r) => r.mask || "—" },
+                    { header: "Next Hop", key: "nexthop", cell: (r) => r.nexthop || r.next_hop || "—" },
+                    { header: "Interface", key: "interface", cell: (r) => r.interface || r.exit_interface || "—" },
                     { header: "AD", key: "admin_distance", cell: (r) => r.admin_distance || "—" }
                   ]}
-                  data={routingData.static.routes}
+                  data={Array.isArray(routingData.static) ? routingData.static : (routingData.static.routes || [])}
                   empty="No static routes"
-                  minWidthClass="min-w-[800px]"
+                  minWidthClass="min-w-[900px]"
                 />
               </div>
             </Card>
@@ -3781,7 +3848,7 @@ const DeviceDetailsView = ({ project, deviceId, goBack, uploadHistory }) => {
           {routingData.bgp && (
             <Card title="BGP">
               <div className="grid gap-4 md:grid-cols-3 text-sm mb-4">
-                <Metric k="Local AS" v={routingData.bgp.local_as || "—"} />
+                <Metric k="AS Number" v={routingData.bgp.as_number ?? routingData.bgp.local_as ?? "—"} />
                 <Metric k="Router ID" v={routingData.bgp.router_id || "—"} />
                 <Metric k="Peers" v={routingData.bgp.peers?.length || 0} />
                 <Metric k="Received Prefixes" v={routingData.bgp.received_prefixes || 0} />
@@ -3793,9 +3860,9 @@ const DeviceDetailsView = ({ project, deviceId, goBack, uploadHistory }) => {
                   <div className="h-[40vh] overflow-auto rounded-xl border border-gray-200 dark:border-[#1F2937]">
                     <Table
                       columns={[
-                        { header: "Peer IP", key: "peer_ip" },
+                        { header: "Peer IP", key: "peer", cell: (r) => r.peer || r.peer_ip || "—" },
                         { header: "Remote AS", key: "remote_as" },
-                        { header: "State", key: "state" },
+                        { header: "State", key: "state", cell: (r) => r.state || "—" },
                         { header: "Received", key: "received_prefixes", cell: (r) => r.received_prefixes || 0 },
                         { header: "Advertised", key: "advertised_prefixes", cell: (r) => r.advertised_prefixes || 0 }
                       ]}
@@ -3820,7 +3887,7 @@ const DeviceDetailsView = ({ project, deviceId, goBack, uploadHistory }) => {
             </Card>
           )}
 
-          {!routingData.static && !routingData.ospf && !routingData.eigrp && !routingData.bgp && !routingData.rip && (
+          {(!routingData.static || ((!Array.isArray(routingData.static) || routingData.static.length === 0) && (!routingData.static.routes || routingData.static.routes.length === 0))) && !routingData.ospf && !routingData.eigrp && !routingData.bgp && !routingData.rip && (
             <Card title="Routing">
               <div className="text-sm text-gray-500 dark:text-gray-400">No routing protocol information available</div>
             </Card>
@@ -3926,16 +3993,16 @@ const DeviceDetailsView = ({ project, deviceId, goBack, uploadHistory }) => {
       {!loading && !error && tab === "security" && (
         <div className="grid gap-6">
           {/* User Accounts */}
-          {securityData.users && securityData.users.length > 0 && (
+          {(securityData.user_accounts && securityData.user_accounts.length > 0) || (securityData.users && securityData.users.length > 0) && (
             <Card title="User Accounts & Privilege Levels">
               <div className="h-[40vh] overflow-auto rounded-xl border border-gray-200 dark:border-[#1F2937]">
                 <Table
                   columns={[
                     { header: "Username", key: "username" },
-                    { header: "Privilege Level", key: "privilege_level", cell: (r) => r.privilege_level || "—" },
+                    { header: "Privilege Level", key: "privilege_level", cell: (r) => r.privilege_level ?? "—" },
                     { header: "Role", key: "role", cell: (r) => r.role || "—" }
                   ]}
-                  data={securityData.users}
+                  data={securityData.user_accounts || securityData.users || []}
                   empty="No user accounts"
                   minWidthClass="min-w-[600px]"
                 />
@@ -4033,30 +4100,38 @@ const DeviceDetailsView = ({ project, deviceId, goBack, uploadHistory }) => {
           )}
 
           {/* ACLs */}
-          {(securityData.acls?.total_count !== undefined || (securityData.acls && Array.isArray(securityData.acls) && securityData.acls.length > 0)) && (
+          {(securityData.acls && Array.isArray(securityData.acls) && securityData.acls.length > 0) && (
             <Card title="Access Control Lists (ACLs)">
-              {Array.isArray(securityData.acls) && securityData.acls.length > 0 ? (
-                <div className="h-[50vh] overflow-auto rounded-xl border border-gray-200 dark:border-[#1F2937]">
-                  <Table
-                    columns={[
-                      { header: "ACL Name", key: "name" },
-                      { header: "Type", key: "type", cell: (r) => r.type || "—" },
-                      { header: "Entries", key: "entries", cell: (r) => r.entries?.length || 0 }
-                    ]}
-                    data={securityData.acls}
-                    empty="No ACLs"
-                    minWidthClass="min-w-[600px]"
-                  />
-                </div>
-              ) : (
-                <div className="grid gap-4 md:grid-cols-2 text-sm">
-                  <Metric k="Total ACL Count" v={securityData.acls?.total_count ?? 0} />
-                </div>
-              )}
+              <div className="grid gap-4">
+                {securityData.acls.map((acl, idx) => (
+                  <Card key={idx} title={`ACL ${acl.acl_number || acl.name || `#${idx + 1}`}`} className="border border-gray-200 dark:border-gray-700">
+                    {acl.rules && Array.isArray(acl.rules) && acl.rules.length > 0 ? (
+                      <div className="h-[40vh] overflow-auto rounded-xl border border-gray-200 dark:border-[#1F2937]">
+                        <Table
+                          columns={[
+                            { header: "Rule ID", key: "id" },
+                            { header: "Action", key: "action", cell: (r) => r.action?.toUpperCase() || "—" },
+                            { header: "Protocol", key: "protocol", cell: (r) => r.protocol || "—" },
+                            { header: "Source", key: "source", cell: (r) => r.source || r.source_ip || "—" },
+                            { header: "Source Mask", key: "source_mask", cell: (r) => r.source_mask || "—" },
+                            { header: "Destination", key: "destination", cell: (r) => r.destination || r.destination_ip || "—" },
+                            { header: "Destination Mask", key: "destination_mask", cell: (r) => r.destination_mask || "—" }
+                          ]}
+                          data={acl.rules}
+                          empty="No rules in this ACL"
+                          minWidthClass="min-w-[1200px]"
+                        />
+                      </div>
+                    ) : (
+                      <div className="text-sm text-gray-500 dark:text-gray-400">No rules defined for this ACL</div>
+                    )}
+                  </Card>
+                ))}
+              </div>
             </Card>
           )}
 
-          {!securityData.users && !securityData.aaa && !securityData.ssh && !securityData.snmp && !securityData.ntp && !securityData.syslog && (!securityData.acls || securityData.acls.length === 0) && (
+          {(!securityData.user_accounts || securityData.user_accounts.length === 0) && (!securityData.users || securityData.users.length === 0) && !securityData.aaa && !securityData.ssh && !securityData.snmp && !securityData.ntp && !securityData.syslog && (!securityData.acls || securityData.acls.length === 0) && (
             <Card title="Security">
               <div className="text-sm text-gray-500 dark:text-gray-400">No security information available</div>
             </Card>
@@ -4108,7 +4183,7 @@ const DeviceDetailsView = ({ project, deviceId, goBack, uploadHistory }) => {
           )}
 
           {/* VRRP */}
-          {haData.vrrp && haData.vrrp.groups && haData.vrrp.groups.length > 0 && (
+          {haData.vrrp && ((Array.isArray(haData.vrrp) && haData.vrrp.length > 0) || (haData.vrrp.groups && haData.vrrp.groups.length > 0)) && (
             <Card title="VRRP (Virtual Router Redundancy Protocol)">
               <div className="h-[50vh] overflow-auto rounded-2xl border border-gray-200 dark:border-[#1F2937]">
                 <Table
@@ -4118,10 +4193,10 @@ const DeviceDetailsView = ({ project, deviceId, goBack, uploadHistory }) => {
                     { header: "Virtual IP", key: "virtual_ip" },
                     { header: "State", key: "state", cell: (r) => r.state || r.status || "—" },
                     { header: "Master IP", key: "master_ip", cell: (r) => r.master_ip || "—" },
-                    { header: "Priority", key: "priority", cell: (r) => r.priority || r.priority_run || "—" },
-                    { header: "Preempt", key: "preempt", cell: (r) => r.preempt ? "Yes" : "No" }
+                    { header: "Priority", key: "priority", cell: (r) => r.priority ?? r.priority_run ?? "—" },
+                    { header: "Preempt", key: "preempt", cell: (r) => r.preempt !== undefined ? (r.preempt ? "Yes" : "No") : "—" }
                   ]}
-                  data={haData.vrrp.groups}
+                  data={Array.isArray(haData.vrrp) ? haData.vrrp : (haData.vrrp.groups || [])}
                   empty="No VRRP groups"
                   minWidthClass="min-w-[1000px]"
                 />
@@ -4129,7 +4204,7 @@ const DeviceDetailsView = ({ project, deviceId, goBack, uploadHistory }) => {
             </Card>
           )}
 
-          {(!haData.etherchannel || haData.etherchannel.length === 0) && (!haData.hsrp || !haData.hsrp.groups || haData.hsrp.groups.length === 0) && (!haData.vrrp || !haData.vrrp.groups || haData.vrrp.groups.length === 0) && (
+          {(!haData.etherchannel || haData.etherchannel.length === 0) && (!haData.hsrp || !haData.hsrp.groups || haData.hsrp.groups.length === 0) && (!haData.vrrp || ((!Array.isArray(haData.vrrp) || haData.vrrp.length === 0) && (!haData.vrrp.groups || haData.vrrp.groups.length === 0))) && (
             <Card title="High Availability">
               <div className="text-sm text-gray-500 dark:text-gray-400">No HA information available</div>
             </Card>
@@ -5019,6 +5094,636 @@ const UploadDocumentForm = ({ project, authedUser, onClose, onUpload, folderStru
 };
 
 /* ========= DOCUMENTS (file tree + preview) ========= */
+/* ========= ANALYSIS PAGE ========= */
+const AnalysisPage = ({ project, authedUser, onChangeTab }) => {
+  const [analyses, setAnalyses] = useState([]);
+  const [devices, setDevices] = useState([]);
+  const [loading, setLoading] = useState(false);
+  const [selectedAnalysis, setSelectedAnalysis] = useState(null);
+  const [showCreate, setShowCreate] = useState(false);
+  const [filters, setFilters] = useState({
+    device_name: null,
+    status: null,
+    analysis_type: null
+  });
+  const [performanceMetrics, setPerformanceMetrics] = useState([]);
+  const [showMetrics, setShowMetrics] = useState(false);
+
+  useEffect(() => {
+    loadAnalyses();
+    loadDevices();
+    loadPerformanceMetrics();
+  }, [project?.project_id, filters]);
+
+  const loadDevices = async () => {
+    try {
+      const summary = await api.getConfigSummary(project.project_id);
+      const deviceNames = summary.map(d => d.device).filter(Boolean);
+      setDevices([...new Set(deviceNames)]);
+    } catch (e) {
+      console.error("Failed to load devices:", e);
+    }
+  };
+
+  const loadAnalyses = async () => {
+    setLoading(true);
+    try {
+      const data = await api.getAnalyses(project.project_id, filters);
+      setAnalyses(data);
+    } catch (e) {
+      console.error("Failed to load analyses:", e);
+      alert("Failed to load analyses: " + e.message);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const loadPerformanceMetrics = async () => {
+    try {
+      const metrics = await api.getPerformanceMetrics(project.project_id, filters.device_name, 50);
+      setPerformanceMetrics(metrics);
+    } catch (e) {
+      console.error("Failed to load performance metrics:", e);
+    }
+  };
+
+  const handleCreateAnalysis = async (deviceName, analysisType, customPrompt, includeOriginal) => {
+    setLoading(true);
+    try {
+      const newAnalysis = await api.createAnalysis(
+        project.project_id,
+        deviceName,
+        analysisType,
+        customPrompt,
+        includeOriginal
+      );
+      await loadAnalyses();
+      setSelectedAnalysis(newAnalysis);
+      setShowCreate(false);
+    } catch (e) {
+      alert("Failed to create analysis: " + e.message);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleVerifyAnalysis = async (analysisId, verifiedContent, comments, status) => {
+    setLoading(true);
+    try {
+      const updated = await api.verifyAnalysis(
+        project.project_id,
+        analysisId,
+        verifiedContent,
+        comments,
+        status
+      );
+      await loadAnalyses();
+      setSelectedAnalysis(updated);
+    } catch (e) {
+      alert("Failed to verify analysis: " + e.message);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const analysisTypes = [
+    { value: "security_audit", label: "Security Audit" },
+    { value: "performance_review", label: "Performance Review" },
+    { value: "configuration_compliance", label: "Configuration Compliance" },
+    { value: "network_topology", label: "Network Topology" },
+    { value: "best_practices", label: "Best Practices" },
+    { value: "custom", label: "Custom Analysis" }
+  ];
+
+  const statusColors = {
+    pending_review: "bg-yellow-100 text-yellow-800 dark:bg-yellow-900 dark:text-yellow-100",
+    verified: "bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-100",
+    rejected: "bg-rose-100 text-rose-800 dark:bg-rose-900 dark:text-rose-100"
+  };
+
+
+  return (
+    <div className="grid gap-6">
+      <div className="flex items-center justify-between">
+        <div>
+          <h2 className="text-xl font-semibold">AI Analysis</h2>
+          <div className="text-sm text-gray-500 dark:text-gray-400">
+            LLM-powered network configuration analysis with Human-in-the-Loop workflow
+          </div>
+        </div>
+        <div className="flex gap-2">
+          <Button variant="secondary" onClick={() => setShowMetrics(!showMetrics)}>
+            {showMetrics ? "Hide" : "Show"} Metrics
+          </Button>
+          <Button onClick={() => setShowCreate(true)} disabled={loading || devices.length === 0}>
+            + New Analysis
+          </Button>
+        </div>
+      </div>
+
+      {/* Filters */}
+      <Card>
+        <div className="grid gap-3 md:grid-cols-3">
+          <Field label="Device">
+            <Select
+              options={[{ value: null, label: "All Devices" }, ...devices.map(d => ({ value: d, label: d }))]}
+              value={filters.device_name || null}
+              onChange={(val) => setFilters({ ...filters, device_name: val || null })}
+            />
+          </Field>
+          <Field label="Status">
+            <Select
+              options={[
+                { value: null, label: "All Status" },
+                { value: "pending_review", label: "Pending Review" },
+                { value: "verified", label: "Verified" },
+                { value: "rejected", label: "Rejected" }
+              ]}
+              value={filters.status || null}
+              onChange={(val) => setFilters({ ...filters, status: val || null })}
+            />
+          </Field>
+          <Field label="Analysis Type">
+            <Select
+              options={[{ value: null, label: "All Types" }, ...analysisTypes]}
+              value={filters.analysis_type || null}
+              onChange={(val) => setFilters({ ...filters, analysis_type: val || null })}
+            />
+          </Field>
+        </div>
+      </Card>
+
+      {/* Performance Metrics Dashboard */}
+      {showMetrics && (
+        <Card title="Performance Metrics">
+          <PerformanceMetricsView metrics={performanceMetrics} />
+        </Card>
+      )}
+
+      {/* Create Analysis Modal */}
+      {showCreate && (
+        <CreateAnalysisModal
+          devices={devices}
+          analysisTypes={analysisTypes}
+          onCreate={handleCreateAnalysis}
+          onClose={() => setShowCreate(false)}
+          loading={loading}
+        />
+      )}
+
+      {/* Analysis List */}
+      {loading && analyses.length === 0 ? (
+        <div className="text-center py-12 text-gray-500">Loading analyses...</div>
+      ) : analyses.length === 0 ? (
+        <Card>
+          <div className="text-center py-12 text-gray-500">
+            <p className="mb-4">No analyses found</p>
+            <Button onClick={() => setShowCreate(true)}>Create First Analysis</Button>
+          </div>
+        </Card>
+      ) : (
+        <div className="grid gap-4">
+          {analyses.map((analysis) => (
+            <Card
+              key={analysis.analysis_id}
+              className="hover:shadow-lg transition-all cursor-pointer"
+              onClick={() => setSelectedAnalysis(analysis)}
+            >
+              <div className="flex items-start justify-between">
+                <div className="flex-1">
+                  <div className="flex items-center gap-3 mb-2">
+                    <h3 className="font-semibold">{analysis.device_name}</h3>
+                    <Badge className={statusColors[analysis.status]}>
+                      {analysis.status.replace("_", " ")}
+                    </Badge>
+                    <Badge>{analysis.analysis_type.replace("_", " ")}</Badge>
+                  </div>
+                  <div className="text-sm text-gray-600 dark:text-gray-400 mb-2">
+                    {analysis.ai_draft_text?.substring(0, 200)}...
+                  </div>
+                  <div className="flex items-center gap-4 text-xs text-gray-500">
+                    <span>Created: {formatDateTime(analysis.created_at)}</span>
+                    <span>By: {analysis.created_by}</span>
+                    {analysis.llm_metrics && (
+                      <span>
+                        {analysis.llm_metrics.inference_time_ms?.toFixed(0)}ms · {analysis.llm_metrics.model_name}
+                      </span>
+                    )}
+                    {analysis.accuracy_metrics && (
+                      <span className="font-semibold">
+                        Accuracy: {analysis.accuracy_metrics.accuracy_score}%
+                      </span>
+                    )}
+                  </div>
+                </div>
+              </div>
+            </Card>
+          ))}
+        </div>
+      )}
+
+      {/* Analysis Detail Modal */}
+      {selectedAnalysis && (
+        <AnalysisDetailModal
+          analysis={selectedAnalysis}
+          authedUser={authedUser}
+          onVerify={handleVerifyAnalysis}
+          onClose={() => setSelectedAnalysis(null)}
+          loading={loading}
+        />
+      )}
+    </div>
+  );
+};
+
+/* ========= ANALYSIS COMPONENTS ========= */
+const CreateAnalysisModal = ({ devices, analysisTypes, onCreate, onClose, loading }) => {
+  const [deviceName, setDeviceName] = useState("");
+  const [analysisType, setAnalysisType] = useState("security_audit");
+  const [customPrompt, setCustomPrompt] = useState("");
+  const [includeOriginal, setIncludeOriginal] = useState(false);
+
+  const handleSubmit = (e) => {
+    e.preventDefault();
+    if (!deviceName) {
+      alert("Please select a device");
+      return;
+    }
+    onCreate(
+      deviceName,
+      analysisType,
+      analysisType === "custom" ? customPrompt : null,
+      includeOriginal
+    );
+  };
+
+  return (
+    <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
+      <Card className="w-full max-w-2xl max-h-[90vh] overflow-y-auto">
+        <div className="flex items-center justify-between mb-4">
+          <h3 className="text-lg font-semibold">Create New Analysis</h3>
+          <button onClick={onClose} className="text-gray-500 hover:text-gray-700">✕</button>
+        </div>
+        <form onSubmit={handleSubmit} className="grid gap-4">
+          <Field label="Device">
+            <Select
+              options={devices.map(d => ({ value: d, label: d }))}
+              value={deviceName}
+              onChange={setDeviceName}
+            />
+          </Field>
+          <Field label="Analysis Type">
+            <Select
+              options={analysisTypes}
+              value={analysisType}
+              onChange={setAnalysisType}
+            />
+          </Field>
+          {analysisType === "custom" && (
+            <Field label="Custom Prompt">
+              <textarea
+                className="w-full rounded-xl border border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-800 px-3 py-2 text-sm text-gray-900 dark:text-gray-100 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                rows={4}
+                value={customPrompt}
+                onChange={(e) => setCustomPrompt(e.target.value)}
+                placeholder="Enter your custom analysis prompt..."
+              />
+            </Field>
+          )}
+          <Field>
+            <label className="flex items-center gap-2 cursor-pointer">
+              <input
+                type="checkbox"
+                checked={includeOriginal}
+                onChange={(e) => setIncludeOriginal(e.target.checked)}
+                className="rounded border-gray-300"
+              />
+              <span className="text-sm">Include original configuration content (may increase processing time)</span>
+            </label>
+          </Field>
+          <div className="flex gap-2 justify-end">
+            <Button variant="secondary" onClick={onClose} disabled={loading}>Cancel</Button>
+            <Button type="submit" disabled={loading || !deviceName}>
+              {loading ? "Creating..." : "Create Analysis"}
+            </Button>
+          </div>
+        </form>
+      </Card>
+    </div>
+  );
+};
+
+const AnalysisDetailModal = ({ analysis, authedUser, onVerify, onClose, loading }) => {
+  const [viewMode, setViewMode] = useState("draft"); // "draft" or "verified"
+  const [isEditing, setIsEditing] = useState(false);
+  const [editedContent, setEditedContent] = useState(null);
+  const [comments, setComments] = useState("");
+  const [showDiff, setShowDiff] = useState(false);
+  
+  const statusColors = {
+    pending_review: "bg-yellow-100 text-yellow-800 dark:bg-yellow-900 dark:text-yellow-100",
+    verified: "bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-100",
+    rejected: "bg-rose-100 text-rose-800 dark:bg-rose-900 dark:text-rose-100"
+  };
+
+  useEffect(() => {
+    if (analysis.verified_version) {
+      setEditedContent(analysis.verified_version);
+    } else {
+      setEditedContent(analysis.ai_draft);
+    }
+  }, [analysis]);
+
+  const handleSave = async () => {
+    if (!editedContent) return;
+    await onVerify(
+      analysis.analysis_id,
+      editedContent,
+      comments,
+      "verified"
+    );
+    setIsEditing(false);
+  };
+
+  const handleReject = async () => {
+    if (!confirm("Are you sure you want to reject this analysis?")) return;
+    await onVerify(
+      analysis.analysis_id,
+      analysis.ai_draft,
+      comments || "Rejected by reviewer",
+      "rejected"
+    );
+  };
+
+  const currentContent = viewMode === "verified" && analysis.verified_version
+    ? analysis.verified_version
+    : analysis.ai_draft;
+
+  return (
+    <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
+      <Card className="w-full max-w-6xl max-h-[90vh] overflow-hidden flex flex-col">
+        <div className="flex items-center justify-between mb-4 border-b pb-4">
+          <div>
+            <h3 className="text-lg font-semibold">{analysis.device_name} - {analysis.analysis_type.replace("_", " ")}</h3>
+            <div className="flex items-center gap-2 mt-2">
+              <Badge className={statusColors[analysis.status]}>
+                {analysis.status.replace("_", " ")}
+              </Badge>
+              {analysis.accuracy_metrics && (
+                <Badge className="bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-100">
+                  Accuracy: {analysis.accuracy_metrics.accuracy_score}%
+                </Badge>
+              )}
+            </div>
+          </div>
+          <button onClick={onClose} className="text-gray-500 hover:text-gray-700">✕</button>
+        </div>
+
+        <div className="flex-1 overflow-y-auto">
+          {/* View Mode Toggle */}
+          {analysis.verified_version && (
+            <div className="flex gap-2 mb-4">
+              <Button
+                variant={viewMode === "draft" ? "primary" : "secondary"}
+                onClick={() => setViewMode("draft")}
+              >
+                AI Draft
+              </Button>
+              <Button
+                variant={viewMode === "verified" ? "primary" : "secondary"}
+                onClick={() => setViewMode("verified")}
+              >
+                Verified Version
+              </Button>
+              {analysis.verified_version && (
+                <Button
+                  variant={showDiff ? "primary" : "secondary"}
+                  onClick={() => setShowDiff(!showDiff)}
+                >
+                  {showDiff ? "Hide" : "Show"} Diff
+                </Button>
+              )}
+            </div>
+          )}
+
+          {/* Diff View */}
+          {showDiff && analysis.diff_summary && (
+            <Card className="mb-4" title="Changes Summary">
+              <DiffView diff={analysis.diff_summary} />
+            </Card>
+          )}
+
+          {/* Content Display/Edit */}
+          {isEditing ? (
+            <div className="grid gap-4">
+              <Field label="Analysis Content (JSON)">
+                <textarea
+                  className="w-full rounded-xl border border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-800 px-3 py-2 text-sm font-mono text-gray-900 dark:text-gray-100 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  rows={20}
+                  value={JSON.stringify(editedContent, null, 2)}
+                  onChange={(e) => {
+                    try {
+                      setEditedContent(JSON.parse(e.target.value));
+                    } catch {
+                      // Invalid JSON, keep as is
+                    }
+                  }}
+                />
+              </Field>
+              <Field label="Comments">
+                <textarea
+                  className="w-full rounded-xl border border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-800 px-3 py-2 text-sm text-gray-900 dark:text-gray-100 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  rows={3}
+                  value={comments}
+                  onChange={(e) => setComments(e.target.value)}
+                  placeholder="Add comments about your changes..."
+                />
+              </Field>
+            </div>
+          ) : (
+            <div className="prose dark:prose-invert max-w-none">
+              <pre className="bg-gray-50 dark:bg-gray-900 p-4 rounded-lg overflow-x-auto text-sm">
+                {JSON.stringify(currentContent, null, 2)}
+              </pre>
+              {analysis.ai_draft_text && viewMode === "draft" && (
+                <div className="mt-4 p-4 bg-blue-50 dark:bg-blue-900/20 rounded-lg">
+                  <h4 className="font-semibold mb-2">Full AI Response:</h4>
+                  <p className="whitespace-pre-wrap text-sm">{analysis.ai_draft_text}</p>
+                </div>
+              )}
+            </div>
+          )}
+
+          {/* Metrics */}
+          {analysis.llm_metrics && (
+            <Card className="mt-4" title="Performance Metrics">
+              <div className="grid grid-cols-2 md:grid-cols-4 gap-4 text-sm">
+                <div>
+                  <div className="text-gray-500">Inference Time</div>
+                  <div className="font-semibold">{analysis.llm_metrics.inference_time_ms?.toFixed(0)}ms</div>
+                </div>
+                <div>
+                  <div className="text-gray-500">Model</div>
+                  <div className="font-semibold">{analysis.llm_metrics.model_name}</div>
+                </div>
+                <div>
+                  <div className="text-gray-500">Prompt Tokens</div>
+                  <div className="font-semibold">{analysis.llm_metrics.token_usage?.prompt_tokens || 0}</div>
+                </div>
+                <div>
+                  <div className="text-gray-500">Completion Tokens</div>
+                  <div className="font-semibold">{analysis.llm_metrics.token_usage?.completion_tokens || 0}</div>
+                </div>
+              </div>
+            </Card>
+          )}
+        </div>
+
+        {/* Actions */}
+        {analysis.status === "pending_review" && (
+          <div className="flex gap-2 justify-end mt-4 border-t pt-4">
+            <Button variant="secondary" onClick={onClose}>Close</Button>
+            <Button variant="danger" onClick={handleReject} disabled={loading}>
+              Reject
+            </Button>
+            {isEditing ? (
+              <>
+                <Button variant="secondary" onClick={() => setIsEditing(false)}>Cancel Edit</Button>
+                <Button onClick={handleSave} disabled={loading}>
+                  {loading ? "Saving..." : "Save & Verify"}
+                </Button>
+              </>
+            ) : (
+              <Button onClick={() => setIsEditing(true)}>
+                Edit & Verify
+              </Button>
+            )}
+          </div>
+        )}
+      </Card>
+    </div>
+  );
+};
+
+const DiffView = ({ diff }) => {
+  if (!diff) return null;
+
+  return (
+    <div className="grid gap-4">
+      <div className="flex items-center gap-4">
+        <div>
+          <span className="text-sm text-gray-500">Total Changes:</span>
+          <span className="ml-2 font-semibold">{diff.total_changes || 0}</span>
+        </div>
+        <div>
+          <span className="text-sm text-gray-500">Accuracy Score:</span>
+          <span className="ml-2 font-semibold">{diff.accuracy_score || 0}%</span>
+        </div>
+      </div>
+
+      {diff.changes_by_type && Object.keys(diff.changes_by_type).length > 0 && (
+        <div>
+          <h4 className="font-semibold mb-2">Changes by Type:</h4>
+          <div className="grid gap-2">
+            {Object.entries(diff.changes_by_type).map(([type, changes]) => (
+              <div key={type} className="p-2 bg-gray-50 dark:bg-gray-800 rounded">
+                <div className="font-medium capitalize">{type}: {changes.length}</div>
+                <div className="text-sm text-gray-600 dark:text-gray-400 mt-1">
+                  {changes.slice(0, 5).map((change, idx) => (
+                    <div key={idx} className="truncate">
+                      {change.field}: {JSON.stringify(change.ai_value)} → {JSON.stringify(change.verified_value)}
+                    </div>
+                  ))}
+                  {changes.length > 5 && <div>... and {changes.length - 5} more</div>}
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+
+      {diff.key_changes && diff.key_changes.length > 0 && (
+        <div>
+          <h4 className="font-semibold mb-2">Key Changes:</h4>
+          <div className="space-y-2">
+            {diff.key_changes.map((change, idx) => (
+              <div key={idx} className="p-3 bg-yellow-50 dark:bg-yellow-900/20 rounded border border-yellow-200 dark:border-yellow-800">
+                <div className="font-medium text-sm">{change.field}</div>
+                <div className="text-xs text-gray-600 dark:text-gray-400 mt-1">
+                  <div>AI: {JSON.stringify(change.ai_value)}</div>
+                  <div>Human: {JSON.stringify(change.verified_value)}</div>
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+    </div>
+  );
+};
+
+const PerformanceMetricsView = ({ metrics }) => {
+  if (!metrics || metrics.length === 0) {
+    return <div className="text-center py-8 text-gray-500">No performance metrics available</div>;
+  }
+
+  const avgInferenceTime = metrics.reduce((sum, m) => sum + (m.inference_time_ms || 0), 0) / metrics.length;
+  const avgAccuracy = metrics
+    .filter(m => m.accuracy_score !== null)
+    .reduce((sum, m) => sum + (m.accuracy_score || 0), 0) / metrics.filter(m => m.accuracy_score !== null).length || 0;
+  const totalTokens = metrics.reduce((sum, m) => sum + ((m.token_usage?.total_tokens || 0)), 0);
+
+  return (
+    <div className="grid gap-4">
+      <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+        <Card>
+          <div className="text-sm text-gray-500">Avg Inference Time</div>
+          <div className="text-2xl font-semibold">{avgInferenceTime.toFixed(0)}ms</div>
+        </Card>
+        <Card>
+          <div className="text-sm text-gray-500">Avg Accuracy</div>
+          <div className="text-2xl font-semibold">{avgAccuracy.toFixed(1)}%</div>
+        </Card>
+        <Card>
+          <div className="text-sm text-gray-500">Total Requests</div>
+          <div className="text-2xl font-semibold">{metrics.length}</div>
+        </Card>
+        <Card>
+          <div className="text-sm text-gray-500">Total Tokens</div>
+          <div className="text-2xl font-semibold">{totalTokens.toLocaleString()}</div>
+        </Card>
+      </div>
+
+      <div className="max-h-96 overflow-y-auto">
+        <table className="w-full text-sm">
+          <thead className="bg-gray-50 dark:bg-gray-800 sticky top-0">
+            <tr>
+              <th className="px-4 py-2 text-left">Device</th>
+              <th className="px-4 py-2 text-left">Time (ms)</th>
+              <th className="px-4 py-2 text-left">Tokens</th>
+              <th className="px-4 py-2 text-left">Accuracy</th>
+              <th className="px-4 py-2 text-left">Timestamp</th>
+            </tr>
+          </thead>
+          <tbody>
+            {metrics.map((m) => (
+              <tr key={m.log_id} className="border-b border-gray-200 dark:border-gray-700">
+                <td className="px-4 py-2">{m.device_name}</td>
+                <td className="px-4 py-2">{m.inference_time_ms?.toFixed(0)}</td>
+                <td className="px-4 py-2">{m.token_usage?.total_tokens || 0}</td>
+                <td className="px-4 py-2">
+                  {m.accuracy_score !== null ? `${m.accuracy_score.toFixed(1)}%` : "—"}
+                </td>
+                <td className="px-4 py-2">{formatDateTime(m.timestamp)}</td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+    </div>
+  );
+};
+
 const DocumentsPage = ({ project, can, authedUser, uploadHistory, setUploadHistory, setProjects }) => {
   const [selectedFile, setSelectedFile] = useState(null);
   const [selectedDocument, setSelectedDocument] = useState(null); // Document from API

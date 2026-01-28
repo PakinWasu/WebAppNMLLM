@@ -359,3 +359,49 @@ export async function deleteFolder(projectId, folderId) {
     method: 'DELETE',
   });
 }
+
+// Analysis API
+export async function createAnalysis(projectId, deviceName, analysisType, customPrompt = null, includeOriginalContent = false) {
+  return api(`/projects/${projectId}/analysis`, {
+    method: 'POST',
+    body: JSON.stringify({
+      device_name: deviceName,
+      analysis_type: analysisType,
+      custom_prompt: customPrompt,
+      include_original_content: includeOriginalContent
+    }),
+  });
+}
+
+export async function getAnalyses(projectId, filters = {}) {
+  const params = new URLSearchParams();
+  if (filters.device_name) params.append('device_name', filters.device_name);
+  if (filters.status) params.append('status', filters.status);
+  if (filters.analysis_type) params.append('analysis_type', filters.analysis_type);
+  
+  return api(`/projects/${projectId}/analysis?${params}`);
+}
+
+export async function getAnalysis(projectId, analysisId) {
+  return api(`/projects/${projectId}/analysis/${analysisId}`);
+}
+
+export async function verifyAnalysis(projectId, analysisId, verifiedContent, comments = null, status = 'verified') {
+  return api(`/projects/${projectId}/analysis/verify`, {
+    method: 'POST',
+    body: JSON.stringify({
+      analysis_id: analysisId,
+      verified_content: verifiedContent,
+      comments: comments,
+      status: status
+    }),
+  });
+}
+
+export async function getPerformanceMetrics(projectId, deviceName = null, limit = 100) {
+  const params = new URLSearchParams();
+  if (deviceName) params.append('device_name', deviceName);
+  params.append('limit', limit);
+  
+  return api(`/projects/${projectId}/analysis/performance/metrics?${params}`);
+}
