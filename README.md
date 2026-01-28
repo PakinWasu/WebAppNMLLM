@@ -2,6 +2,10 @@
 
 แพลตฟอร์มจัดการโปรเจคเครือข่าย (Network Project Management Platform)
 
+> **Last Updated**: 2026-01-28  
+> **Version**: 0.1.0  
+> **Status**: ✅ Production Ready
+
 ## 📋 สารบัญ
 
 - [คุณสมบัติ](#คุณสมบัติ)
@@ -20,10 +24,12 @@
 - **[WINDOWS_DEVELOPMENT.md](WINDOWS_DEVELOPMENT.md)** - คู่มือการพัฒนาโปรเจคบน Windows PC
 - **[GITHUB_WORKFLOW.md](GITHUB_WORKFLOW.md)** - Workflow การทำงานผ่าน GitHub (Windows ↔ Ubuntu Server)
 - **[QUICK_START.md](QUICK_START.md)** - Quick Start Guide
+- **[CHANGELOG.md](CHANGELOG.md)** - 📝 ประวัติการเปลี่ยนแปลงและ Bug Fixes
 
 ### สำหรับการ Deploy
 
 - **[UBUNTU_SERVER_SETUP.md](UBUNTU_SERVER_SETUP.md)** - ⭐ คู่มือการติดตั้งบน Ubuntu Server (แนะนำ)
+- **[DEPLOYMENT_GUIDE.md](DEPLOYMENT_GUIDE.md)** - ⭐ คู่มือการ Deploy แบบละเอียด
 - **[NGINX_SETUP.md](NGINX_SETUP.md)** - การตั้งค่า Nginx
 - **[DOMAIN_SETUP.md](DOMAIN_SETUP.md)** - การตั้งค่า Domain Name
 - **[STORAGE_FIX.md](STORAGE_FIX.md)** - การแก้ไขปัญหา Storage
@@ -47,9 +53,13 @@
 - 🔐 ระบบ Authentication และ Authorization แบบ JWT
 - 👥 จัดการผู้ใช้ (User Management)
 - 📁 จัดการโปรเจค (Project Management)
+- 📄 อัปโหลดและจัดการไฟล์ Configuration
+- 🔍 Configuration Parser อัตโนมัติ (Huawei VRP, Cisco IOS)
+- 📊 Summary Table แสดงสรุปข้อมูลอุปกรณ์
+- 🔎 Device Details View (Overview, Interfaces, VLANs, STP, Routing, etc.)
+- 💾 Download ไฟล์ Original Content และ Parsed JSON
 - 🌓 Dark/Light Mode Toggle
 - 🤖 AI Integration (Ollama)
-- 📊 Dashboard และ Analytics
 - 🚀 Production-ready Docker configuration
 
 ## 🛠️ ความต้องการของระบบ
@@ -441,21 +451,30 @@ docker stats
 ## 📁 โครงสร้างโปรเจค
 
 ```
-manage-network-project/
+WebAppNMLLM/
 ├── backend/                 # FastAPI Backend
 │   ├── app/
 │   │   ├── core/           # Core settings, security
 │   │   ├── db/             # Database connection
 │   │   ├── routers/        # API routes
 │   │   ├── services/       # Business logic
+│   │   │   ├── parsers/    # Configuration parsers
+│   │   │   │   ├── huawei.py  # Huawei VRP parser (Dictionary-based, Strict mode)
+│   │   │   │   ├── cisco.py   # Cisco IOS parser
+│   │   │   │   └── base.py    # Base parser class
+│   │   │   ├── config_parser.py  # Main parser service
+│   │   │   └── document_storage.py
 │   │   └── main.py         # FastAPI app
 │   ├── Dockerfile
 │   ├── requirements.txt
+│   ├── scripts/            # Utility scripts
+│   │   ├── test_parser.py
+│   │   └── check_parsed_data.py
 │   └── .env                # Environment variables
 │
 ├── frontend/               # React + Vite Frontend
 │   ├── src/
-│   │   ├── App.jsx         # Main React component
+│   │   ├── App.jsx         # Main React component (with Download buttons)
 │   │   ├── api.js          # API client
 │   │   ├── index.css       # Global styles + Tailwind
 │   │   └── main.jsx        # React entry point
@@ -465,6 +484,10 @@ manage-network-project/
 │   ├── package.json
 │   ├── tailwind.config.js
 │   └── vite.config.js
+│
+├── scripts/                # Deployment scripts
+│   ├── windows/            # PowerShell scripts
+│   └── ubuntu/             # Bash scripts
 │
 ├── mongo-data/            # MongoDB data (persistent)
 ├── mongo-backup/          # MongoDB backups
@@ -495,6 +518,16 @@ manage-network-project/
 - `GET /projects/{id}` - Get project
 - `PUT /projects/{id}` - Update project
 - `DELETE /projects/{id}` - Delete project
+
+### Documents
+- `POST /projects/{id}/documents` - Upload documents (triggers parser if folder="Config")
+- `GET /projects/{id}/documents` - List documents
+- `GET /projects/{id}/documents/{doc_id}` - Get document
+- `DELETE /projects/{id}/documents/{doc_id}` - Delete document
+
+### Summary
+- `GET /projects/{id}/summary` - Get summary table (all devices)
+- `GET /projects/{id}/summary/{device_name}` - Get device details
 
 ## 🔒 Security Best Practices
 

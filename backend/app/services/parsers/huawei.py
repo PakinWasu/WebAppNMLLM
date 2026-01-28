@@ -427,12 +427,21 @@ class HuaweiParser(BaseParser):
                 overview["uptime"] = uptime_match.group(1).strip()
         
         # Extract serial number from display esn (if present)
-        esn_match = re.search(r'display\s+esn.*?(\S+)', content, re.IGNORECASE | re.DOTALL)
-        if esn_match and "Error" not in esn_match.group(0):
-            # Try to extract ESN value
-            esn_value = re.search(r'ESN[:\s]+(\S+)', esn_match.group(0), re.IGNORECASE)
-            if esn_value:
-                overview["serial_number"] = esn_value.group(1)
+        # Handle simulator artifacts: "Failed to read ESN" or "Error: Unrecognized command"
+        esn_section = re.search(r'display\s+esn(.*?)(?=display|#|$)', content, re.IGNORECASE | re.DOTALL)
+        if esn_section:
+            esn_output = esn_section.group(1)
+            # Guard clause: If contains error, set to None
+            if "Error" in esn_output or "Failed to read ESN" in esn_output or "Unrecognized command" in esn_output:
+                overview["serial_number"] = None
+            else:
+                # Try to extract ESN value
+                esn_value = re.search(r'ESN[:\s]+(\S+)', esn_output, re.IGNORECASE)
+                if esn_value:
+                    esn_candidate = esn_value.group(1)
+                    # Reject error markers like "^"
+                    if esn_candidate != "^" and not esn_candidate.startswith("Error"):
+                        overview["serial_number"] = esn_candidate
         
         # Extract management IP from LoopBack0 or Vlanif1
         mgmt_patterns = [
@@ -449,12 +458,21 @@ class HuaweiParser(BaseParser):
                     break
         
         # Extract CPU utilization from display cpu-usage
-        cpu_match = re.search(r'CPU\s+Usage\s*:\s*(\d+)%', content, re.IGNORECASE)
-        if cpu_match:
-            try:
-                overview["cpu_utilization"] = float(cpu_match.group(1))
-            except (ValueError, AttributeError):
-                pass
+        # Handle simulator artifacts: "Warning:CPU usage monitor is disabled"
+        cpu_section = re.search(r'display\s+cpu-usage(.*?)(?=display|#|$)', content, re.IGNORECASE | re.DOTALL)
+        if cpu_section:
+            cpu_output = cpu_section.group(1)
+            # Guard clause: If CPU monitor is disabled, set to 0.0
+            if "Warning:CPU usage monitor is disabled" in cpu_output or "Warning:CPU usage monitor is disabled!" in cpu_output:
+                overview["cpu_utilization"] = 0.0
+            else:
+                # Try to extract CPU usage percentage
+                cpu_match = re.search(r'CPU\s+Usage\s*:\s*(\d+)%', cpu_output, re.IGNORECASE)
+                if cpu_match:
+                    try:
+                        overview["cpu_utilization"] = float(cpu_match.group(1))
+                    except (ValueError, AttributeError):
+                        pass
         
         return overview
     
@@ -702,29 +720,83 @@ class HuaweiParser(BaseParser):
             "bgp": None,
         }
         
-        # Parse static routes
-        static_pattern = r'ip\s+route-static\s+(\S+)\s+(\S+)(?:\s+(\S+))?'
-        for match in re.finditer(static_pattern, content, re.IGNORECASE):
-            network = match.group(1)
-            mask_or_nexthop = match.group(2)
-            third_param = match.group(3) if match.group(3) else None
+        # Parse static routes - CRITICAL FIX: Column shift bug
+        # Format: ip route-static <network> <mask> <nexthop|interface>
+        # Example: ip route-static 0.0.0.0 0.0.0.0 203.0.113.1
+        #          ip route-static 10.10.30.0 255.255.255.0 203.0.113.2
+        #          ip route-static 10.10.0.0 24 GigabitEthernet0/0/1
+        # STRICT REGEX: Matches exactly 3 groups - network (IP), mask (IP or CIDR), nexthop/interface
+        static_pattern = r'ip\s+route-static\s+(\d{1,3}(?:\.\d{1,3}){3})\s+(\d{1,3}(?:\.\d{1,3}){3}|\d{1,2})\s+(\S+)'
+        
+        # Process line by line for better control
+        lines = content.split('\n')
+        for line in lines:
+            line_stripped = line.strip()
             
-            # Determine if second param is mask or nexthop
-            if '.' in mask_or_nexthop:
-                # It's a nexthop IP
-                nexthop = mask_or_nexthop
-                mask = "255.255.255.255"  # Default /32
-                interface = third_param
+            # Skip error lines and comments
+            if line_stripped.startswith('Error:') or line_stripped.startswith('#') or not line_stripped:
+                continue
+            
+            match = re.search(static_pattern, line_stripped, re.IGNORECASE)
+            if not match:
+                continue
+            
+            network = match.group(1)
+            mask_candidate = match.group(2)
+            next_hop_candidate = match.group(3)
+            
+            # Validate network is a valid IP address
+            if not is_valid_ipv4(network):
+                continue
+            
+            # Validate and normalize mask
+            mask = None
+            if '.' in mask_candidate:
+                # Subnet mask format (e.g., 255.255.255.0)
+                if is_valid_ipv4(mask_candidate):
+                    mask = mask_candidate
+                else:
+                    continue  # Invalid mask format - skip
+            elif mask_candidate.isdigit():
+                # CIDR format (e.g., 24) - validate range 0-32
+                try:
+                    cidr = int(mask_candidate)
+                    if 0 <= cidr <= 32:
+                        mask = mask_candidate
+                    else:
+                        continue  # Invalid CIDR - skip
+                except ValueError:
+                    continue  # Not a valid number - skip
             else:
-                # It's a mask length or nexthop name
-                if mask_or_nexthop.isdigit():
-                    mask = mask_or_nexthop
-                    nexthop = third_param if third_param else None
+                continue  # Invalid mask format - skip
+            
+            # CRITICAL: Determine if next_hop_candidate is IP or interface
+            # Use strict IP validation regex
+            ip_pattern = r'^\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3}$'
+            nexthop = None
+            interface = None
+            
+            if re.match(ip_pattern, next_hop_candidate):
+                # It's a valid IP address format - validate it properly
+                if is_valid_ipv4(next_hop_candidate):
+                    nexthop = next_hop_candidate
                     interface = None
                 else:
-                    nexthop = mask_or_nexthop
-                    mask = "255.255.255.255"
-                    interface = third_param
+                    # Invalid IP format - skip this route
+                    continue
+            else:
+                # It's NOT an IP - must be an interface name
+                if is_valid_interface_name(next_hop_candidate):
+                    interface = next_hop_candidate
+                    nexthop = None
+                else:
+                    # Invalid interface name - skip this route
+                    continue
+            
+            # Sanity check: Ensure mask is NEVER assigned to nexthop
+            if mask == nexthop:
+                # This should never happen, but if it does, skip
+                continue
             
             routing["static"].append({
                 "network": network,
@@ -844,44 +916,28 @@ class HuaweiParser(BaseParser):
         """2.3.2.6 Neighbor & Topology"""
         neighbors = []
         
-        # Check for display lldp neighbor output
-        lldp_section = re.search(r'display\s+lldp\s+neighbor(.*?)(?=display|#|$)', content, re.IGNORECASE | re.DOTALL)
+        # Check for display lldp neighbor output - Parse with strict column structure
+        lldp_section = re.search(r'display\s+lldp\s+neighbor\s+brief(.*?)(?=display|#|$)', content, re.IGNORECASE | re.DOTALL)
+        if not lldp_section:
+            # Try without "brief"
+            lldp_section = re.search(r'display\s+lldp\s+neighbor(.*?)(?=display|#|$)', content, re.IGNORECASE | re.DOTALL)
+        
         if lldp_section and "No LLDP" not in lldp_section.group(1):
             lldp_output = lldp_section.group(1)
             
-            # Parse detailed neighbor output
-            neighbor_pattern = r'(\S+)\s+has\s+\d+\s+neighbors:(.*?)(?=\n\S+\s+has\s+\d+\s+neighbors:|display|#|$)'
-            for match in re.finditer(neighbor_pattern, lldp_output, re.IGNORECASE | re.DOTALL):
-                local_port = match.group(1)
-                neighbor_details = match.group(2)
+            # Parse brief format: "Local Intf | Neighbor Dev | Neighbor Intf"
+            # Look for header line first
+            header_match = re.search(r'Local\s+Intf.*?Neighbor\s+Dev.*?Neighbor\s+Intf', lldp_output, re.IGNORECASE)
+            if header_match:
+                # Find the data lines after header
+                header_end = header_match.end()
+                data_section = lldp_output[header_end:]
+                # Skip separator lines (---)
+                data_lines = [line.strip() for line in data_section.split('\n') if line.strip() and not line.strip().startswith('---')]
                 
-                # Extract system name
-                system_name_match = re.search(r'System\s+name\s*:\s*(\S+)', neighbor_details, re.IGNORECASE)
-                if system_name_match:
-                    device_name = system_name_match.group(1)
-                    
-                    # Extract remote port
-                    port_id_match = re.search(r'Port\s+ID\s*:\s*(\S+)', neighbor_details, re.IGNORECASE)
-                    remote_port = port_id_match.group(1) if port_id_match else None
-                    
-                    # Extract IP address
-                    ip_match = re.search(r'Management\s+address\s*:\s*(\d+\.\d+\.\d+\.\d+)', neighbor_details, re.IGNORECASE)
-                    ip_address = ip_match.group(1) if ip_match else None
-                    
-                    neighbors.append({
-                        "device_name": device_name,
-                        "local_port": local_port,
-                        "remote_port": remote_port,
-                        "ip_address": ip_address,
-                    })
-            
-            # Also try brief format
-            brief_match = re.search(r'Local\s+Intf.*?Neighbor\s+Dev.*?Neighbor\s+Intf.*?\n(.*?)(?=display|#|$)', lldp_output, re.IGNORECASE | re.DOTALL)
-            if brief_match:
-                brief_lines = brief_match.group(1).strip().split('\n')
-                for line in brief_lines:
-                    line = line.strip()
-                    if not line or '---' in line or any(kw in line.lower() for kw in ['local', 'neighbor', 'intf', 'dev']):
+                for line in data_lines:
+                    # Skip header lines
+                    if any(kw in line.lower() for kw in ['local', 'neighbor', 'intf', 'dev']):
                         continue
                     
                     parts = [p for p in line.split() if p]
@@ -890,9 +946,42 @@ class HuaweiParser(BaseParser):
                         device_name = parts[1]
                         remote_port = parts[2]
                         
-                        # Validate
-                        if not re.search(r'(Eth|GE|Gi|Fa|Te|Se|Lo|Vl|Po|Tu)', local_port, re.IGNORECASE):
+                        # Validate local_port is an interface name
+                        if not is_valid_interface_name(local_port):
                             continue
+                        
+                        # Check if already added (prevent duplicates)
+                        if not any(n.get("device_name") == device_name and n.get("local_port") == local_port for n in neighbors):
+                            neighbors.append({
+                                "device_name": device_name,
+                                "local_port": local_port,
+                                "remote_port": remote_port,
+                                "ip_address": None,
+                            })
+            
+            # Also parse detailed format if brief format didn't find anything
+            if not neighbors:
+                neighbor_pattern = r'(\S+)\s+has\s+\d+\s+neighbors:(.*?)(?=\n\S+\s+has\s+\d+\s+neighbors:|display|#|$)'
+                for match in re.finditer(neighbor_pattern, lldp_output, re.IGNORECASE | re.DOTALL):
+                    local_port = match.group(1)
+                    neighbor_details = match.group(2)
+                    
+                    # Validate local_port
+                    if not is_valid_interface_name(local_port):
+                        continue
+                    
+                    # Extract system name
+                    system_name_match = re.search(r'System\s+name\s*:\s*(\S+)', neighbor_details, re.IGNORECASE)
+                    if system_name_match:
+                        device_name = system_name_match.group(1)
+                        
+                        # Extract remote port
+                        port_id_match = re.search(r'Port\s+ID\s*:\s*(\S+)', neighbor_details, re.IGNORECASE)
+                        remote_port = port_id_match.group(1) if port_id_match else None
+                        
+                        # Extract IP address
+                        ip_match = re.search(r'Management\s+address\s*:\s*(\d+\.\d+\.\d+\.\d+)', neighbor_details, re.IGNORECASE)
+                        ip_address = ip_match.group(1) if ip_match and is_valid_ipv4(ip_match.group(1)) else None
                         
                         # Check if already added
                         if not any(n.get("device_name") == device_name and n.get("local_port") == local_port for n in neighbors):
@@ -900,7 +989,7 @@ class HuaweiParser(BaseParser):
                                 "device_name": device_name,
                                 "local_port": local_port,
                                 "remote_port": remote_port,
-                                "ip_address": None,
+                                "ip_address": ip_address,
                             })
         
         return neighbors
@@ -1173,7 +1262,7 @@ class HuaweiParser(BaseParser):
                 "id": current_trunk_id,
                 "name": f"Eth-Trunk{current_trunk_id}",
                 "mode": mode,
-                "members": [],  # Will be populated in second pass
+                "members": set(),  # Use SET to prevent duplicate members
             }
         
         # Second pass: Find member ports for each trunk
