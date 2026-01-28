@@ -13,6 +13,8 @@ services:
     depends_on:
       mongodb:
         condition: service_healthy
+      ollama:
+        condition: service_started
     extra_hosts:
       - "host.docker.internal:host-gateway"
     restart: unless-stopped
@@ -71,7 +73,15 @@ services:
       - "11434:11434"
     volumes:
       - ollama-data:/root/.ollama
-
+    # Resource requirements for qwen2.5-coder:32b model:
+    # - RAM: ~16-20GB recommended (model size ~18GB)
+    # - CPU: 4+ cores recommended for better performance
+    # Uncomment below to set resource limits (adjust based on your server capacity)
+    # deploy:
+    #   resources:
+    #     limits:
+    #       memory: 20G
+    #       cpus: '4'
     networks:
       - mnp-network
 

@@ -60,85 +60,82 @@ Number of devices to analyze: {device_count}
 """
     
     def _build_topology_prompt(self, devices_data: List[Dict[str, Any]]) -> str:
-        """Build user prompt with all device data for topology analysis"""
+        """Build optimized user prompt with filtered device data to reduce token usage"""
         
         prompt_parts = []
-        prompt_parts.append("=== NETWORK TOPOLOGY ANALYSIS REQUEST ===")
-        prompt_parts.append("\nAnalyze the following network devices and their relationships to generate a topology map.")
-        prompt_parts.append("\nFor each device, I will provide:")
-        prompt_parts.append("- Device name and overview")
-        prompt_parts.append("- Interfaces with IP addresses and descriptions")
-        prompt_parts.append("- LLDP/CDP neighbors")
-        prompt_parts.append("- Routing information")
+        prompt_parts.append("=== NETWORK TOPOLOGY ANALYSIS ===")
+        prompt_parts.append("Analyze devices and create topology map. Return JSON only.")
         prompt_parts.append("\n=== DEVICE DATA ===")
         
-        for idx, device in enumerate(devices_data, 1):
+        # Limit number of devices if too many (for efficiency)
+        max_devices = 20  # Limit to prevent token overflow
+        devices_to_process = devices_data[:max_devices]
+        
+        for idx, device in enumerate(devices_to_process, 1):
             device_name = device.get("device_name", f"device_{idx}")
             overview = device.get("device_overview", {})
             interfaces = device.get("interfaces", [])
             neighbors = device.get("neighbors", [])
             routing = device.get("routing", {})
             
-            prompt_parts.append(f"\n--- Device {idx}: {device_name} ---")
-            prompt_parts.append(f"Role: {overview.get('role', 'Unknown')}")
-            prompt_parts.append(f"Model: {overview.get('model', 'Unknown')}")
-            prompt_parts.append(f"Management IP: {overview.get('management_ip', 'N/A')}")
+            # Compact device header
+            prompt_parts.append(f"\nDevice {idx}: {device_name}")
+            prompt_parts.append(f"Role: {overview.get('role', 'Unknown')}, Model: {overview.get('model', 'Unknown')}")
             
-            # Interfaces with IPs and descriptions
-            if interfaces:
-                prompt_parts.append("\nInterfaces:")
-                for iface in interfaces[:20]:  # Limit to prevent token overflow
-                    iface_info = f"  - {iface.get('name', 'N/A')}"
+            # Only include interfaces with IPs or descriptions (most relevant for topology)
+            relevant_interfaces = [
+                iface for iface in interfaces[:15]  # Reduced from 20 to 15
+                if iface.get('ipv4_address') or iface.get('description') or iface.get('neighbor')
+            ]
+            
+            if relevant_interfaces:
+                prompt_parts.append("Interfaces:")
+                for iface in relevant_interfaces:
+                    # Compact format
+                    iface_parts = [iface.get('name', 'N/A')]
                     if iface.get('ipv4_address'):
-                        iface_info += f" IP: {iface.get('ipv4_address')}"
+                        iface_parts.append(f"IP:{iface['ipv4_address']}")
                     if iface.get('description'):
-                        iface_info += f" Desc: {iface.get('description')}"
-                    if iface.get('port_mode'):
-                        iface_info += f" Mode: {iface.get('port_mode')}"
-                    prompt_parts.append(iface_info)
+                        desc = iface['description'][:50]  # Limit description length
+                        iface_parts.append(f"Desc:{desc}")
+                    prompt_parts.append("  " + " | ".join(iface_parts))
             
-            # Neighbors (LLDP/CDP)
+            # Neighbors (LLDP/CDP) - most important for topology
             if neighbors:
-                prompt_parts.append("\nNeighbors (LLDP/CDP):")
-                for neighbor in neighbors[:20]:  # Limit neighbors
-                    neighbor_info = f"  - Device: {neighbor.get('device_name', 'Unknown')}"
-                    neighbor_info += f" | Local Port: {neighbor.get('local_port', 'N/A')}"
-                    neighbor_info += f" | Remote Port: {neighbor.get('remote_port', 'N/A')}"
+                prompt_parts.append("Neighbors:")
+                for neighbor in neighbors[:15]:  # Reduced from 20 to 15
+                    # Compact format
+                    neighbor_parts = [neighbor.get('device_name', 'Unknown')]
+                    if neighbor.get('local_port'):
+                        neighbor_parts.append(f"L:{neighbor['local_port']}")
+                    if neighbor.get('remote_port'):
+                        neighbor_parts.append(f"R:{neighbor['remote_port']}")
                     if neighbor.get('ip_address'):
-                        neighbor_info += f" | IP: {neighbor.get('ip_address')}"
-                    prompt_parts.append(neighbor_info)
+                        neighbor_parts.append(f"IP:{neighbor['ip_address']}")
+                    prompt_parts.append("  " + " | ".join(neighbor_parts))
             
-            # Routing info (for L3 relationships)
+            # Routing info (compact format for L3 relationships)
             if routing:
                 routing_info = []
                 if routing.get('ospf'):
                     ospf = routing['ospf']
-                    routing_info.append(f"OSPF: Router ID {ospf.get('router_id', 'N/A')}, Process {ospf.get('process_id', 'N/A')}")
+                    routing_info.append(f"OSPF:RID:{ospf.get('router_id', 'N/A')}")
                 if routing.get('bgp'):
                     bgp = routing['bgp']
-                    routing_info.append(f"BGP: AS {bgp.get('as_number', bgp.get('local_as', 'N/A'))}, Peers: {len(bgp.get('peers', []))}")
+                    routing_info.append(f"BGP:AS:{bgp.get('as_number', bgp.get('local_as', 'N/A'))}")
                 if routing.get('static'):
                     static_routes = routing['static']
                     if isinstance(static_routes, list):
-                        routing_info.append(f"Static Routes: {len(static_routes)}")
+                        routing_info.append(f"Static:{len(static_routes)}")
                     elif isinstance(static_routes, dict) and static_routes.get('routes'):
-                        routing_info.append(f"Static Routes: {len(static_routes['routes'])}")
+                        routing_info.append(f"Static:{len(static_routes['routes'])}")
                 if routing_info:
-                    prompt_parts.append("\nRouting:")
-                    prompt_parts.append("  " + " | ".join(routing_info))
+                    prompt_parts.append("Routing: " + " | ".join(routing_info))
         
-        prompt_parts.append("\n=== ANALYSIS INSTRUCTIONS ===")
-        prompt_parts.append("1. Identify all devices and classify their types (Core/Distribution/Access/Router/Switch)")
-        prompt_parts.append("2. Create edges ONLY when you have evidence:")
-        prompt_parts.append("   - LLDP/CDP shows device A connected to device B")
-        prompt_parts.append("   - Two interfaces on different devices share the same subnet")
-        prompt_parts.append("   - Interface description explicitly mentions another device")
-        prompt_parts.append("3. For each edge, include:")
-        prompt_parts.append("   - 'from': source device name")
-        prompt_parts.append("   - 'to': destination device name")
-        prompt_parts.append("   - 'label': interface or link description")
-        prompt_parts.append("   - 'evidence': why this link exists (e.g., 'LLDP neighbor match', 'Subnet match: 10.0.1.0/24')")
-        prompt_parts.append("4. Return ONLY valid JSON matching the required format.")
+        # Compact instructions
+        prompt_parts.append("\n=== INSTRUCTIONS ===")
+        prompt_parts.append("Return JSON: nodes[] with id/label/type, edges[] with from/to/label/evidence")
+        prompt_parts.append("Create edges ONLY with evidence: LLDP matches, subnet matches, or interface descriptions.")
         
         return "\n".join(prompt_parts)
     
@@ -211,12 +208,14 @@ Number of devices to analyze: {device_count}
             "stream": False,
             "options": {
                 "temperature": 0.2,  # Very low temperature for factual topology
-                "top_p": 0.9,
+                "top_p": 0.85,  # Slightly lower for faster inference
+                "num_predict": 2048,  # Limit max tokens for faster responses
             }
         }
         
         try:
-            async with httpx.AsyncClient(timeout=300.0) as client:
+            # Increased timeout for topology (complex analysis) but still reasonable for 14b model
+            async with httpx.AsyncClient(timeout=450.0) as client:
                 response = await client.post(url, json=payload)
                 response.raise_for_status()
                 data = response.json()
@@ -327,9 +326,9 @@ Number of devices to analyze: {device_count}
         except httpx.ReadTimeout:
             return {
                 "topology": {"nodes": [], "edges": []},
-                "analysis_summary": "[ERROR] Ollama read timeout (300s) - Topology generation failed. Please check if Ollama is running and responsive.",
+                "analysis_summary": "[ERROR] Ollama read timeout (450s) - Topology generation failed. The network may be too large. Try reducing the number of devices or check if Ollama is responsive.",
                 "metrics": {
-                    "inference_time_ms": 300000,
+                    "inference_time_ms": 450000,
                     "devices_processed": len(devices_data),
                     "token_usage": {"prompt_tokens": 0, "completion_tokens": 0, "total_tokens": 0},
                     "model_name": self.model_name,

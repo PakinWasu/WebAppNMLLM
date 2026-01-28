@@ -34,6 +34,7 @@
 - **[DOMAIN_SETUP.md](DOMAIN_SETUP.md)** - การตั้งค่า Domain Name
 - **[STORAGE_FIX.md](STORAGE_FIX.md)** - การแก้ไขปัญหา Storage
 - **[MONGODB_4.4_COMPATIBILITY.md](MONGODB_4.4_COMPATIBILITY.md)** - MongoDB Compatibility
+- **[LLM_SETUP.md](LLM_SETUP.md)** - ⭐ คู่มือการตั้งค่าและใช้งาน LLM (Ollama) บนเซิร์ฟเวอร์
 
 ### Scripts
 
@@ -69,9 +70,9 @@
 - **Ubuntu 20.04 LTS หรือใหม่กว่า**
 - **Docker** 20.10+
 - **Docker Compose** 2.0+
-- **RAM**: อย่างน้อย 4GB (แนะนำ 8GB+)
-- **Disk Space**: อย่างน้อย 20GB
-- **GPU** (optional): สำหรับ Ollama AI features
+- **RAM**: อย่างน้อย 8GB (แนะนำ 16GB+ สำหรับ qwen2.5-coder:14b, 32GB+ สำหรับ qwen2.5-coder:32b)
+- **Disk Space**: อย่างน้อย 30GB (สำหรับโมเดล 32B ต้องการ ~18GB)
+- **GPU** (optional): สำหรับ Ollama AI features (ช่วยเพิ่มความเร็ว แต่ไม่จำเป็น)
 
 ### สำหรับ Development
 
@@ -80,6 +81,32 @@
   - **Node.js** 20+ (สำหรับ Frontend)
   - **Python** 3.11+ (สำหรับ Backend)
   - **MongoDB** 6.0+
+
+## ⚡ Quick Start (เริ่มต้นใช้งานทันที)
+
+> ⭐ **วิธีที่ง่ายที่สุด**: ใช้สคริปต์อัตโนมัติที่ทำให้ทุกอย่างพร้อมใช้งานเลย!
+
+```bash
+# 1. Setup และ Start ทุกอย่าง (Development mode)
+./setup-and-start.sh
+
+# หรือ Production mode
+./setup-and-start.sh prod
+
+# 2. Pull โมเดล LLM (ถ้ายังไม่ได้ pull)
+./pull-llm-model.sh
+
+# 3. เข้าใช้งาน
+# - Frontend: http://localhost:5173 (dev) หรือ http://localhost:8080 (prod)
+# - Backend API: http://localhost:8000
+# - API Docs: http://localhost:8000/docs
+# - Login: admin / admin123
+```
+
+**สคริปต์ที่สร้างไว้ให้:**
+- `setup-and-start.sh` - Setup และ start ทุกอย่างอัตโนมัติ
+- `quick-start.sh` - Quick start สำหรับครั้งถัดไป (ถ้า setup แล้ว)
+- `pull-llm-model.sh` - Pull โมเดล LLM อัตโนมัติ
 
 ## 🚀 การติดตั้งบน Ubuntu Server
 
@@ -142,9 +169,13 @@ JWT_ALG=HS256
 ACCESS_TOKEN_EXPIRE_MIN=1440
 
 # AI Model (Ollama)
-AI_MODEL_NAME=qwen2.5:7b
-AI_MODEL_VERSION=v1-desktop
-AI_MODEL_ENDPOINT=http://host.docker.internal:11434
+# สำหรับ Docker: ใช้ http://ollama:11434 (เชื่อมต่อกับ Ollama container)
+# สำหรับ Development บน Host: ใช้ http://host.docker.internal:11434
+# Qwen2.5-coder:32b - โมเดลเฉพาะทางสำหรับงาน technical analysis (แนะนำสำหรับ Network Configuration Analysis)
+# ต้องการ RAM ~16-20GB, Model size ~18GB
+AI_MODEL_NAME=qwen2.5-coder:32b
+AI_MODEL_VERSION=v2-coder-32b
+AI_MODEL_ENDPOINT=http://ollama:11434
 ```
 
 **⚠️ สำคัญ**: เปลี่ยน `JWT_SECRET` เป็นค่าที่ปลอดภัยและยาวพอ (อย่างน้อย 32 ตัวอักษร)

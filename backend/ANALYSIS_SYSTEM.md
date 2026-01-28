@@ -98,7 +98,7 @@ Content-Type: application/json
       "completion_tokens": 300,
       "total_tokens": 800
     },
-    "model_name": "qwen2.5:7b"
+    "model_name": "qwen2.5-coder:32b"
   }
 }
 ```
@@ -217,9 +217,17 @@ print(f"Changes: {verified_analysis['diff_summary']}")
 Settings in `core/settings.py`:
 
 ```python
-AI_MODEL_NAME: str = "qwen2.5:7b"
-AI_MODEL_ENDPOINT: str = "http://host.docker.internal:11434"
+AI_MODEL_NAME: str = "qwen2.5-coder:32b"  # Qwen2.5 Coder - specialized for technical analysis
+AI_MODEL_ENDPOINT: str = "http://ollama:11434"  # Docker network endpoint
 ```
+
+**Important**: 
+- For Docker deployment: Use `http://ollama:11434` (connects to Ollama container)
+- For development on host machine: Use `http://host.docker.internal:11434` (if Ollama runs on host)
+- **Qwen2.5-coder:32b** is recommended for Network Configuration Analysis due to its specialized training for technical/code tasks
+- Requires ~16-20GB RAM, model size ~18GB
+
+See [LLM_SETUP.md](../LLM_SETUP.md) for detailed setup instructions and model recommendations.
 
 ## Error Handling
 

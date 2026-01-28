@@ -13,6 +13,8 @@ services:
     depends_on:
       mongodb:
         condition: service_healthy
+      ollama:
+        condition: service_started
     extra_hosts:
       - "host.docker.internal:host-gateway"
     restart: unless-stopped
@@ -81,14 +83,22 @@ services:
       - "11434:11434"
     volumes:
       - ollama-data:/root/.ollama
-    # GPU support is optional - remove deploy section if no GPU available
-    # deploy:
-    #   resources:
-    #     reservations:
-    #       devices:
-    #         - driver: nvidia
-    #           count: all
-    #           capabilities: [ "gpu" ]
+    # Resource requirements for qwen2.5-coder:32b model:
+    # - RAM: ~16-20GB recommended (model size ~18GB)
+    # - CPU: 4+ cores recommended for better performance (CPU-only mode)
+    # GPU support is optional - uncomment GPU section if available for faster inference
+    # For CPU-only mode, uncomment the resources section below to set memory limits
+    deploy:
+      resources:
+        limits:
+          memory: 20G  # Ensure enough memory for 32B model
+          cpus: '4'    # Multiple cores help with CPU inference
+    # GPU support (optional - uncomment if GPU available):
+    #   reservations:
+    #     devices:
+    #       - driver: nvidia
+    #         count: all
+    #         capabilities: [ "gpu" ]
     networks:
       - mnp-network
 

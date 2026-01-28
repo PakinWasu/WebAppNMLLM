@@ -1,6 +1,7 @@
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from datetime import datetime, timezone
+import httpx
 
 from .core.settings import settings
 from .core.security import hash_password
@@ -85,5 +86,49 @@ async def ai_test():
         "model": settings.AI_MODEL_NAME,
         "reply": reply,
     }
+
+@app.get("/health/llm")
+async def health_llm():
+    """Check LLM service health"""
+    
+    try:
+        # Test Ollama connection
+        async with httpx.AsyncClient(timeout=5.0) as client:
+            response = await client.get(f"{settings.AI_MODEL_ENDPOINT}/api/tags")
+            response.raise_for_status()
+        
+        # Check if model is available
+        model_available = False
+        try:
+            async with httpx.AsyncClient(timeout=5.0) as client:
+                models_response = await client.get(f"{settings.AI_MODEL_ENDPOINT}/api/tags")
+                models_data = models_response.json()
+                models = [m.get("name", "") for m in models_data.get("models", [])]
+                model_available = settings.AI_MODEL_NAME in models
+        except:
+            pass
+        
+        return {
+            "status": "healthy",
+            "ollama_endpoint": settings.AI_MODEL_ENDPOINT,
+            "model_name": settings.AI_MODEL_NAME,
+            "model_available": model_available,
+            "ollama_accessible": True
+        }
+    except httpx.ConnectError:
+        return {
+            "status": "unhealthy",
+            "ollama_endpoint": settings.AI_MODEL_ENDPOINT,
+            "model_name": settings.AI_MODEL_NAME,
+            "error": "Cannot connect to Ollama",
+            "suggestion": "Check if Ollama container is running: docker ps | grep ollama"
+        }
+    except Exception as e:
+        return {
+            "status": "unhealthy",
+            "ollama_endpoint": settings.AI_MODEL_ENDPOINT,
+            "model_name": settings.AI_MODEL_NAME,
+            "error": str(e)
+        }
 
 

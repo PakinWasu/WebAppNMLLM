@@ -323,9 +323,10 @@ JWT_SECRET=your-secret-key-here
 JWT_ALG=HS256
 ACCESS_TOKEN_EXPIRE_MIN=1440
 
-# AI Model
-AI_MODEL_NAME=qwen2.5:7b
-AI_MODEL_VERSION=v1-desktop
+# AI Model (แนะนำ qwen2.5-coder:32b สำหรับ Network Configuration Analysis)
+# สำหรับ Development บน Host: ใช้ http://host.docker.internal:11434
+AI_MODEL_NAME=qwen2.5-coder:32b
+AI_MODEL_VERSION=v2-coder-32b
 AI_MODEL_ENDPOINT=http://host.docker.internal:11434
 ```
 

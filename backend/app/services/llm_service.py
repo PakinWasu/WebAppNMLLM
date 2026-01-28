@@ -17,9 +17,9 @@ class LLMService:
         self.model_name = settings.AI_MODEL_NAME
     
     def _get_system_prompt(self, analysis_type: str, device_name: str) -> str:
-        """Generate specialized system prompt that forces evidence-based answers"""
+        """Generate specialized system prompt optimized for technical/code analysis models"""
         
-        base_prompt = f"""You are a Senior Network Engineer AI Assistant analyzing network device configurations.
+        base_prompt = f"""You are a Senior Network Engineer AI Assistant specialized in analyzing network device configurations. You have deep expertise in network protocols, configuration syntax, and technical documentation.
 
 CRITICAL RULES:
 1. CONTEXT ISOLATION: You are analyzing ONLY the device "{device_name}" from the provided configuration data. Do NOT reference or mix data from other devices or projects.
@@ -29,10 +29,20 @@ CRITICAL RULES:
    - If information is NOT in the configuration, you MUST respond with "Data not available" or "Not found in configuration".
    - DO NOT hallucinate or make assumptions about missing data.
    - Cite specific configuration values when making claims (e.g., "Interface GE0/0/1 has IP address 10.0.0.1").
+   - Analyze configuration syntax and command structures with technical precision.
 
-3. STRUCTURED OUTPUT: Provide your analysis in a structured JSON format with clear sections.
+3. STRUCTURED OUTPUT: Provide your analysis in a well-structured JSON format with clear sections. Ensure JSON is valid and properly formatted.
 
-4. ACCURACY: Be precise and factual. If you're uncertain, state it clearly.
+4. TECHNICAL ACCURACY: 
+   - Be precise and factual in your technical analysis.
+   - Explain configuration commands and their purposes clearly.
+   - Identify potential issues, misconfigurations, or security concerns.
+   - If you're uncertain, state it clearly rather than guessing.
+
+5. CODE/CONFIGURATION UNDERSTANDING:
+   - Parse and understand configuration syntax accurately.
+   - Recognize command hierarchies and relationships.
+   - Identify dependencies between configuration sections.
 
 Device being analyzed: {device_name}
 Analysis type: {analysis_type}
@@ -84,6 +94,53 @@ Focus on:
         
         return base_prompt + type_prompts.get(analysis_type, "")
     
+    def _filter_relevant_data(self, parsed_data: Dict[str, Any], analysis_type: str) -> Dict[str, Any]:
+        """Filter parsed data to include only relevant fields for the analysis type"""
+        filtered = {}
+        
+        # Always include basic device info
+        if "device_overview" in parsed_data:
+            filtered["device_overview"] = parsed_data["device_overview"]
+        
+        # Type-specific filtering to reduce token usage
+        if analysis_type == "security_audit":
+            if "users" in parsed_data:
+                filtered["users"] = parsed_data["users"]
+            if "acl" in parsed_data:
+                filtered["acl"] = parsed_data["acl"]
+            if "snmp" in parsed_data:
+                filtered["snmp"] = parsed_data["snmp"]
+            if "ssh" in parsed_data:
+                filtered["ssh"] = parsed_data["ssh"]
+        elif analysis_type == "performance_review":
+            if "interfaces" in parsed_data:
+                # Limit to first 30 interfaces to reduce tokens
+                filtered["interfaces"] = parsed_data["interfaces"][:30]
+            if "stp" in parsed_data:
+                filtered["stp"] = parsed_data["stp"]
+            if "routing" in parsed_data:
+                filtered["routing"] = parsed_data["routing"]
+        elif analysis_type == "network_topology":
+            if "interfaces" in parsed_data:
+                # Only include interfaces with IPs or descriptions for topology
+                filtered["interfaces"] = [
+                    iface for iface in parsed_data["interfaces"][:50]
+                    if iface.get("ipv4_address") or iface.get("description")
+                ]
+            if "neighbors" in parsed_data:
+                filtered["neighbors"] = parsed_data["neighbors"]
+            if "routing" in parsed_data:
+                filtered["routing"] = parsed_data["routing"]
+        else:
+            # For other types, include most data but limit large arrays
+            for key, value in parsed_data.items():
+                if isinstance(value, list) and len(value) > 50:
+                    filtered[key] = value[:50]  # Limit large arrays
+                else:
+                    filtered[key] = value
+        
+        return filtered
+    
     def _build_user_prompt(
         self, 
         parsed_data: Dict[str, Any], 
@@ -91,30 +148,33 @@ Focus on:
         analysis_type: str,
         custom_prompt: Optional[str] = None
     ) -> str:
-        """Build user prompt with strict context isolation"""
+        """Build optimized user prompt with filtered data to reduce token usage"""
         
         prompt_parts = []
         
-        # Add parsed data (always included)
+        # Filter data to include only relevant fields
+        filtered_data = self._filter_relevant_data(parsed_data, analysis_type)
+        
+        # Add parsed data (filtered and compressed)
         prompt_parts.append("=== PARSED CONFIGURATION DATA ===")
-        prompt_parts.append(json.dumps(parsed_data, indent=2, ensure_ascii=False))
+        # Use compact JSON format to reduce tokens
+        prompt_parts.append(json.dumps(filtered_data, separators=(',', ':'), ensure_ascii=False))
         
-        # Optionally include original content
+        # Optionally include original content (reduced limit for 14b model)
         if original_content:
-            prompt_parts.append("\n=== ORIGINAL CONFIGURATION CONTENT ===")
-            prompt_parts.append(original_content[:5000])  # Limit to prevent token overflow
-            if len(original_content) > 5000:
-                prompt_parts.append("\n[Content truncated - showing first 5000 characters]")
+            prompt_parts.append("\n=== ORIGINAL CONFIGURATION CONTENT (REFERENCE) ===")
+            prompt_parts.append(original_content[:3000])  # Reduced from 5000 to 3000 for 14b model
+            if len(original_content) > 3000:
+                prompt_parts.append("\n[Content truncated - showing first 3000 characters]")
         
-        # Add analysis request
+        # Add analysis request (optimized)
         if custom_prompt:
             prompt_parts.append(f"\n=== ANALYSIS REQUEST ===")
             prompt_parts.append(custom_prompt)
         else:
             prompt_parts.append(f"\n=== ANALYSIS REQUEST ===")
-            prompt_parts.append(f"Please perform a {analysis_type} analysis on this device configuration.")
-            prompt_parts.append("Provide your analysis in structured JSON format with clear sections.")
-            prompt_parts.append("Remember: Only use information present in the configuration data above.")
+            prompt_parts.append(f"Perform {analysis_type} analysis. Return valid JSON only.")
+            prompt_parts.append("Use only data from configuration above.")
         
         return "\n".join(prompt_parts)
     
@@ -166,13 +226,16 @@ Focus on:
             ],
             "stream": False,
             "options": {
-                "temperature": 0.3,  # Lower temperature for more factual responses
-                "top_p": 0.9,
+                # Optimized for 14b coder model: balanced temperature for efficiency and accuracy
+                "temperature": 0.3,  # Lower temperature for faster, more focused responses
+                "top_p": 0.85,  # Slightly lower for faster inference
+                "num_predict": 2048,  # Limit max tokens for faster responses
             }
         }
         
         try:
-            async with httpx.AsyncClient(timeout=600.0) as client:
+            # Reduced timeout for 14b model (faster than 32b)
+            async with httpx.AsyncClient(timeout=300.0) as client:
                 response = await client.post(url, json=payload)
                 response.raise_for_status()
                 data = response.json()
@@ -227,10 +290,37 @@ Focus on:
                 
         except httpx.ReadTimeout:
             return {
-                "content": "[ERROR] Ollama read timeout (600s) - Model may be too slow or unresponsive",
+                "content": "[ERROR] Ollama read timeout (300s) - Model may be too slow or unresponsive. Consider reducing input data size.",
                 "parsed_response": {"error": "timeout"},
                 "metrics": {
-                    "inference_time_ms": 600000,  # Max timeout
+                    "inference_time_ms": 300000,  # Max timeout
+                    "token_usage": {"prompt_tokens": 0, "completion_tokens": 0, "total_tokens": 0},
+                    "model_name": self.model_name,
+                    "timestamp": datetime.utcnow()
+                }
+            }
+        except httpx.ConnectError as e:
+            return {
+                "content": f"[ERROR] Cannot connect to Ollama at {self.base_url}\n\nPlease ensure:\n1. Ollama container is running\n2. Ollama is accessible from backend container\n3. Check network connectivity: docker network inspect mnp-network\n4. Verify endpoint in .env: AI_MODEL_ENDPOINT={self.base_url}\n\nError: {str(e)}",
+                "parsed_response": {"error": "connection_failed", "details": str(e)},
+                "metrics": {
+                    "inference_time_ms": (time.time() - start_time) * 1000,
+                    "token_usage": {"prompt_tokens": 0, "completion_tokens": 0, "total_tokens": 0},
+                    "model_name": self.model_name,
+                    "timestamp": datetime.utcnow()
+                }
+            }
+        except httpx.HTTPStatusError as e:
+            error_msg = f"[ERROR] Ollama API error ({e.response.status_code})"
+            if e.response.status_code == 404:
+                error_msg += f"\n\nModel '{self.model_name}' not found. Please pull the model:\n  docker exec mnp-ollama-prod ollama pull {self.model_name}\n  Or run: ./pull-llm-model.sh"
+            elif e.response.status_code == 500:
+                error_msg += "\n\nOllama internal error. Check Ollama logs:\n  docker logs mnp-ollama-prod"
+            return {
+                "content": error_msg + f"\n\nResponse: {e.response.text[:200] if e.response else str(e)}",
+                "parsed_response": {"error": "http_error", "status_code": e.response.status_code},
+                "metrics": {
+                    "inference_time_ms": (time.time() - start_time) * 1000,
                     "token_usage": {"prompt_tokens": 0, "completion_tokens": 0, "total_tokens": 0},
                     "model_name": self.model_name,
                     "timestamp": datetime.utcnow()
@@ -238,8 +328,8 @@ Focus on:
             }
         except Exception as e:
             return {
-                "content": f"[ERROR] Ollama call failed: {str(e)}",
-                "parsed_response": {"error": str(e)},
+                "content": f"[ERROR] Ollama call failed: {str(e)}\n\nTroubleshooting:\n1. Check Ollama is running: docker ps | grep ollama\n2. Check Ollama logs: docker logs mnp-ollama-prod\n3. Verify model exists: docker exec mnp-ollama-prod ollama list\n4. Test connection: curl http://localhost:11434/api/tags",
+                "parsed_response": {"error": str(e), "type": type(e).__name__},
                 "metrics": {
                     "inference_time_ms": (time.time() - start_time) * 1000,
                     "token_usage": {"prompt_tokens": 0, "completion_tokens": 0, "total_tokens": 0},
