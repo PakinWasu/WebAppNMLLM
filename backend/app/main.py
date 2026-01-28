@@ -5,7 +5,7 @@ from datetime import datetime, timezone
 from .core.settings import settings
 from .core.security import hash_password
 from .services.ai_engine import call_ollama_chat
-from .routers import auth, users, projects, documents, project_options, summary, folders, analysis
+from .routers import auth, users, projects, documents, project_options, summary, folders, analysis, topology
 from .db.mongo import connect, close, db
 
 app = FastAPI(
@@ -30,6 +30,7 @@ app.include_router(project_options.router)
 app.include_router(summary.router)
 app.include_router(folders.router)
 app.include_router(analysis.router)
+app.include_router(topology.router)
 
 
 async def seed_admin():

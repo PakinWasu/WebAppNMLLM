@@ -405,3 +405,14 @@ export async function getPerformanceMetrics(projectId, deviceName = null, limit 
   
   return api(`/projects/${projectId}/analysis/performance/metrics?${params}`);
 }
+
+// Topology API
+export async function generateTopology(projectId) {
+  return api(`/projects/${projectId}/topology/generate`, {
+    method: 'POST',
+  });
+}
+
+export async function getTopology(projectId) {
+  return api(`/projects/${projectId}/topology`);
+}

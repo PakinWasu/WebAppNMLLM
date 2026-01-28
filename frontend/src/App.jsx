@@ -8477,11 +8477,15 @@ const NetworkDeviceIcon = ({ role, isSelected, isLinkStart, size = 8 }) => {
 
 /* ===== TopologyGraph (SVG) ===== */
 const TopologyGraph = ({ project, onOpenDevice, can, authedUser, setProjects }) => {
+  const [generatingTopology, setGeneratingTopology] = React.useState(false);
+  const [topologyError, setTopologyError] = React.useState(null);
+  
   const rows = project.summaryRows || [];
   const nodes = rows.map(r => ({
     id: r.device,
     label: r.device,
     role: classifyRoleByName(r.device),
+    type: classifyRoleByName(r.device), // For compatibility with AI-generated topology
     model: r.model, mgmtIp: r.mgmtIp,
     routing: r.routing, stpMode: r.stpMode
   }));
@@ -8519,6 +8523,96 @@ const TopologyGraph = ({ project, onOpenDevice, can, authedUser, setProjects }) 
     }
     return deriveLinksFromProject(project);
   });
+  
+  // Generate topology using AI
+  const handleGenerateTopology = async () => {
+    const projectId = project.project_id || project.id;
+    if (!projectId) {
+      setTopologyError("Project ID not found");
+      return;
+    }
+    
+    setGeneratingTopology(true);
+    setTopologyError(null);
+    
+    try {
+      const result = await api.generateTopology(projectId);
+      
+      // Check for errors first
+      if (result.analysis_summary && result.analysis_summary.includes("[ERROR]")) {
+        setTopologyError(result.analysis_summary);
+        return;
+      }
+      
+      if (result.topology && result.topology.nodes && result.topology.edges) {
+        // Convert AI-generated topology to internal format
+        const aiNodes = result.topology.nodes || [];
+        const aiEdges = result.topology.edges || [];
+        
+        if (aiNodes.length === 0 && aiEdges.length === 0) {
+          setTopologyError("ไม่พบข้อมูล topology จาก AI. กรุณาตรวจสอบว่า Ollama ทำงานอยู่และมีข้อมูล devices ใน project");
+          return;
+        }
+        
+        // Update nodes (merge with existing, update roles/types)
+        const updatedNodes = [...nodes];
+        aiNodes.forEach(aiNode => {
+          const existingIdx = updatedNodes.findIndex(n => n.id === aiNode.id);
+          if (existingIdx >= 0) {
+            // Update existing node
+            updatedNodes[existingIdx] = {
+              ...updatedNodes[existingIdx],
+              label: aiNode.label || updatedNodes[existingIdx].label,
+              role: aiNode.type?.toLowerCase() || updatedNodes[existingIdx].role,
+              type: aiNode.type || updatedNodes[existingIdx].type
+            };
+          } else {
+            // Add new node
+            updatedNodes.push({
+              id: aiNode.id,
+              label: aiNode.label || aiNode.id,
+              role: aiNode.type?.toLowerCase() || "access",
+              type: aiNode.type || "Switch"
+            });
+          }
+        });
+        
+        // Convert edges to internal format (a/b instead of from/to)
+        const convertedEdges = aiEdges.map(edge => ({
+          a: edge.from,
+          b: edge.to,
+          label: edge.label || "",
+          evidence: edge.evidence || "",
+          type: "trunk" // Default type
+        }));
+        
+        // Update state
+        setLinks(convertedEdges);
+        
+        // Update project state (will be saved when user clicks Save)
+        setProjects(prev => prev.map(p => {
+          if (p.id === project.id) {
+            return {
+              ...p,
+              topoLinks: convertedEdges,
+              topoNodes: aiNodes
+            };
+          }
+          return p;
+        }));
+        
+        // Show success message
+        alert(`✅ Topology generated successfully!\n\n${result.analysis_summary || `Found ${aiNodes.length} nodes and ${convertedEdges.length} links.`}\n\nClick "แก้ไขกราฟ" แล้ว "บันทึก" to save the topology.`);
+      } else {
+        setTopologyError(result.analysis_summary || "Failed to generate topology. No topology data returned.");
+      }
+    } catch (error) {
+      console.error("Failed to generate topology:", error);
+      setTopologyError(error.message || "Failed to generate topology");
+    } finally {
+      setGeneratingTopology(false);
+    }
+  };
 
   const [dragging, setDragging] = useState(null);
   const [selectedNode, setSelectedNode] = useState(null);
@@ -8725,28 +8819,47 @@ const TopologyGraph = ({ project, onOpenDevice, can, authedUser, setProjects }) 
       title={
         <div className="flex items-center justify-between w-full">
           <span>Topology Graph (auto from config)</span>
-          {canEdit && (
-            <div className="flex gap-2">
-              {!editMode ? (
-                <Button variant="secondary" className="text-xs px-3 py-1.5" onClick={() => setEditMode(true)}>
-                  แก้ไขกราฟ
-                </Button>
-              ) : (
-                <>
-                  <Button variant="secondary" className="text-xs px-3 py-1.5" onClick={handleCancel}>
-                    ยกเลิก
+          <div className="flex gap-2">
+            {!editMode && (
+              <Button 
+                variant="primary" 
+                className="text-xs px-3 py-1.5 bg-blue-600 hover:bg-blue-700 text-white"
+                onClick={handleGenerateTopology}
+                disabled={generatingTopology}
+              >
+                {generatingTopology ? "⏳ กำลังสร้าง..." : "🤖 สร้าง Topology อัตโนมัติ"}
+              </Button>
+            )}
+            {canEdit && (
+              <>
+                {!editMode ? (
+                  <Button variant="secondary" className="text-xs px-3 py-1.5" onClick={() => setEditMode(true)}>
+                    แก้ไขกราฟ
                   </Button>
-                  <Button variant="primary" className="text-xs px-3 py-1.5" onClick={handleSave}>
-                    บันทึก
-                  </Button>
-                </>
-              )}
-            </div>
-          )}
+                ) : (
+                  <>
+                    <Button variant="secondary" className="text-xs px-3 py-1.5" onClick={handleCancel}>
+                      ยกเลิก
+                    </Button>
+                    <Button variant="primary" className="text-xs px-3 py-1.5" onClick={handleSave}>
+                      บันทึก
+                    </Button>
+                  </>
+                )}
+              </>
+            )}
+          </div>
         </div>
       } 
       className="w-full"
     >
+      {topologyError && (
+        <div className="mb-3 p-3 bg-rose-50 dark:bg-rose-900/20 border border-rose-300 dark:border-rose-700 rounded-lg">
+          <div className="text-sm text-rose-700 dark:text-rose-400 whitespace-pre-line">
+            <strong>⚠️ Error:</strong> {topologyError}
+          </div>
+        </div>
+      )}
       {editMode && (
         <div className="mb-3 p-3 bg-gray-50 dark:bg-gray-800 rounded-lg flex items-center gap-3 flex-wrap">
           <span className="text-xs font-medium text-gray-600 dark:text-gray-300">เครื่องมือ:</span>
