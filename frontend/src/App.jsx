@@ -1,4 +1,4 @@
-﻿// src/App.jsx
+// src/App.jsx
 import React, { useMemo, useState, useEffect, useRef } from "react";
 import * as api from "./api";
 
@@ -4162,7 +4162,37 @@ const DeviceDetailsView = ({ project, deviceId, goBack, uploadHistory }) => {
 
           {/* Parsed Data (JSON) */}
           {rawSubTab === "parsed" && (
-            <Card title="Parsed Data from Database (JSON Structure)">
+            <Card 
+              title="Parsed Data from Database (JSON Structure)"
+              actions={
+                <button
+                  onClick={() => {
+                    // Create download link for JSON
+                    if (!deviceData) {
+                      alert('No data available to download');
+                      return;
+                    }
+                    const jsonContent = JSON.stringify(deviceData, null, 2);
+                    const blob = new Blob([jsonContent], { type: 'application/json' });
+                    const url = URL.createObjectURL(blob);
+                    const a = document.createElement('a');
+                    a.href = url;
+                    const deviceName = deviceData.device_name || deviceId || 'config';
+                    a.download = `${deviceName}_parsed.json`;
+                    document.body.appendChild(a);
+                    a.click();
+                    document.body.removeChild(a);
+                    URL.revokeObjectURL(url);
+                  }}
+                  disabled={!deviceData}
+                  className="inline-flex items-center gap-2 px-3 py-1.5 text-xs font-semibold rounded-xl bg-blue-600 text-white hover:bg-blue-700 transition focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:opacity-50 disabled:cursor-not-allowed"
+                  title="Download as JSON file"
+                >
+                  <span>⬇</span>
+                  <span>Download JSON</span>
+                </button>
+              }
+            >
               <div className="rounded-xl border border-gray-200 dark:border-[#1F2937] p-3 bg-gray-50 dark:bg-[#0F172A] text-sm overflow-auto max-h-[70vh]">
                 {deviceData ? (
                   <pre className="whitespace-pre-wrap">{JSON.stringify(deviceData, null, 2)}</pre>
@@ -4175,7 +4205,37 @@ const DeviceDetailsView = ({ project, deviceId, goBack, uploadHistory }) => {
 
           {/* Original File Content */}
           {rawSubTab === "original" && (
-            <Card title="Original File Content">
+            <Card 
+              title="Original File Content"
+              actions={
+                <button
+                  onClick={() => {
+                    // Create download link
+                    const content = deviceData?.original_content || '';
+                    if (!content) {
+                      alert('No content available to download');
+                      return;
+                    }
+                    const blob = new Blob([content], { type: 'text/plain' });
+                    const url = URL.createObjectURL(blob);
+                    const a = document.createElement('a');
+                    a.href = url;
+                    const deviceName = deviceData?.device_name || deviceId || 'config';
+                    a.download = `${deviceName}_original.txt`;
+                    document.body.appendChild(a);
+                    a.click();
+                    document.body.removeChild(a);
+                    URL.revokeObjectURL(url);
+                  }}
+                  disabled={!deviceData?.original_content}
+                  className="inline-flex items-center gap-2 px-3 py-1.5 text-xs font-semibold rounded-xl bg-blue-600 text-white hover:bg-blue-700 transition focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:opacity-50 disabled:cursor-not-allowed"
+                  title="Download as TXT file"
+                >
+                  <span>⬇</span>
+                  <span>Download TXT</span>
+                </button>
+              }
+            >
               <div className="rounded-xl border border-gray-200 dark:border-[#1F2937] p-3 bg-gray-50 dark:bg-[#0F172A] text-sm overflow-auto max-h-[70vh]">
                 {deviceData?.original_content ? (
                   <pre className="whitespace-pre-wrap">{deviceData.original_content}</pre>

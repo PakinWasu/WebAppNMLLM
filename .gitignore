@@ -42,7 +42,6 @@ build/
 .dockerignore
 
 # Test files
-test-configs/
 display-all/
 
 # Temporary files

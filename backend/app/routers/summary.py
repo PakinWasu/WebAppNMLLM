@@ -65,27 +65,38 @@ async def get_summary(
                 native_vlans = [i.get("native_vlan") for i in interfaces if i.get("native_vlan")]
                 native_vlan = native_vlans[0] if native_vlans else None
                 
-                # STP info
-                stp_mode = stp.get("mode", "-")
-                stp_roles = list(stp.get("port_roles", {}).values())
-                stp_role_summary = ", ".join(set(stp_roles)) if stp_roles else "-"
+                # STP info - updated for new parser structure
+                stp_mode = stp.get("stp_mode") or "-"
+                # New parser doesn't have port_roles, so set to "-"
+                stp_role_summary = "-"
                 
-                # OSPF neighbors
-                ospf_neighbors = len(routing.get("ospf", {}).get("neighbors", []))
+                # OSPF neighbors - updated for new parser structure
+                ospf = routing.get("ospf")
+                if isinstance(ospf, dict):
+                    ospf_neighbors = len(ospf.get("neighbors", []))
+                else:
+                    ospf_neighbors = 0
                 
-                # BGP info
-                bgp = routing.get("bgp", {})
-                bgp_asn = bgp.get("local_as", "-")
-                bgp_neighbors = len(bgp.get("peers", []))
+                # BGP info - updated for new parser structure
+                bgp = routing.get("bgp")
+                if isinstance(bgp, dict):
+                    bgp_asn = bgp.get("as_number") or bgp.get("local_as") or "-"
+                    bgp_neighbors = len(bgp.get("peers", []))
+                else:
+                    bgp_asn = "-"
+                    bgp_neighbors = 0
                 bgp_summary = f"{bgp_asn}/{bgp_neighbors}" if bgp_asn != "-" else "-/-"
                 
-                # Routing protocols
+                # Routing protocols - updated for new parser structure
                 rt_protos = []
-                if routing.get("ospf", {}).get("process_id"):
+                if isinstance(ospf, dict) and ospf.get("process_id"):
                     rt_protos.append("OSPF")
-                if routing.get("bgp", {}).get("local_as"):
+                if isinstance(bgp, dict) and (bgp.get("as_number") or bgp.get("local_as")):
                     rt_protos.append("BGP")
-                if routing.get("static", {}).get("routes"):
+                static_routes = routing.get("static", [])
+                if isinstance(static_routes, list) and len(static_routes) > 0:
+                    rt_protos.append("Static")
+                elif isinstance(static_routes, dict) and static_routes.get("routes"):
                     rt_protos.append("Static")
                 rt_proto_str = ", ".join(rt_protos) if rt_protos else "-"
                 
@@ -102,7 +113,7 @@ async def get_summary(
                     "model": overview.get("model") or "-",
                     "serial": overview.get("serial_number") or "-",
                     "os_ver": overview.get("os_version") or "-",
-                    "mgmt_ip": overview.get("mgmt_ip") or "-",
+                    "mgmt_ip": overview.get("management_ip") or overview.get("mgmt_ip") or "-",
                     "ifaces": f"{total_ifaces}/{up_ifaces}/{down_ifaces}/{admin_down}",
                     "access": access_ports,
                     "trunk": trunk_ports,
@@ -115,8 +126,8 @@ async def get_summary(
                     "ospf_neigh": ospf_neighbors,
                     "bgp_asn_neigh": bgp_summary,
                     "rt_proto": rt_proto_str,
-                    "cpu": overview.get("cpu_util") or "-",
-                    "mem": overview.get("mem_util") or "-",
+                    "cpu": overview.get("cpu_utilization") or overview.get("cpu_util") or "-",
+                    "mem": overview.get("mem_util") or "-",  # New parser doesn't have mem_util
                     "status": status,
                     "upload_timestamp": upload_ts,
                 })
@@ -159,27 +170,38 @@ async def get_summary(
                 native_vlans = [i.get("native_vlan") for i in interfaces if i.get("native_vlan")]
                 native_vlan = native_vlans[0] if native_vlans else None
                 
-                # STP info
-                stp_mode = stp.get("mode", "-")
-                stp_roles = list(stp.get("port_roles", {}).values())
-                stp_role_summary = ", ".join(set(stp_roles)) if stp_roles else "-"
+                # STP info - updated for new parser structure
+                stp_mode = stp.get("stp_mode") or "-"
+                # New parser doesn't have port_roles, so set to "-"
+                stp_role_summary = "-"
                 
-                # OSPF neighbors
-                ospf_neighbors = len(routing.get("ospf", {}).get("neighbors", []))
+                # OSPF neighbors - updated for new parser structure
+                ospf = routing.get("ospf")
+                if isinstance(ospf, dict):
+                    ospf_neighbors = len(ospf.get("neighbors", []))
+                else:
+                    ospf_neighbors = 0
                 
-                # BGP info
-                bgp = routing.get("bgp", {})
-                bgp_asn = bgp.get("local_as", "-")
-                bgp_neighbors = len(bgp.get("peers", []))
+                # BGP info - updated for new parser structure
+                bgp = routing.get("bgp")
+                if isinstance(bgp, dict):
+                    bgp_asn = bgp.get("as_number") or bgp.get("local_as") or "-"
+                    bgp_neighbors = len(bgp.get("peers", []))
+                else:
+                    bgp_asn = "-"
+                    bgp_neighbors = 0
                 bgp_summary = f"{bgp_asn}/{bgp_neighbors}" if bgp_asn != "-" else "-/-"
                 
-                # Routing protocols
+                # Routing protocols - updated for new parser structure
                 rt_protos = []
-                if routing.get("ospf", {}).get("process_id"):
+                if isinstance(ospf, dict) and ospf.get("process_id"):
                     rt_protos.append("OSPF")
-                if routing.get("bgp", {}).get("local_as"):
+                if isinstance(bgp, dict) and (bgp.get("as_number") or bgp.get("local_as")):
                     rt_protos.append("BGP")
-                if routing.get("static", {}).get("routes"):
+                static_routes = routing.get("static", [])
+                if isinstance(static_routes, list) and len(static_routes) > 0:
+                    rt_protos.append("Static")
+                elif isinstance(static_routes, dict) and static_routes.get("routes"):
                     rt_protos.append("Static")
                 rt_proto_str = ", ".join(rt_protos) if rt_protos else "-"
                 
@@ -196,7 +218,7 @@ async def get_summary(
                     "model": overview.get("model") or "-",
                     "serial": overview.get("serial_number") or "-",
                     "os_ver": overview.get("os_version") or "-",
-                    "mgmt_ip": overview.get("mgmt_ip") or "-",
+                    "mgmt_ip": overview.get("management_ip") or overview.get("mgmt_ip") or "-",
                     "ifaces": f"{total_ifaces}/{up_ifaces}/{down_ifaces}/{admin_down}",
                     "access": access_ports,
                     "trunk": trunk_ports,
@@ -209,8 +231,8 @@ async def get_summary(
                     "ospf_neigh": ospf_neighbors,
                     "bgp_asn_neigh": bgp_summary,
                     "rt_proto": rt_proto_str,
-                    "cpu": overview.get("cpu_util") or "-",
-                    "mem": overview.get("mem_util") or "-",
+                    "cpu": overview.get("cpu_utilization") or overview.get("cpu_util") or "-",
+                    "mem": overview.get("mem_util") or "-",  # New parser doesn't have mem_util
                     "status": status,
                     "upload_timestamp": upload_ts,
                 })
