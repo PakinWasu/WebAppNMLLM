@@ -1,5 +1,6 @@
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.security import HTTPBearer
 from datetime import datetime, timezone
 import httpx
 
@@ -9,10 +10,54 @@ from .services.ai_engine import call_ollama_chat
 from .routers import auth, users, projects, documents, project_options, summary, folders, analysis, topology
 from .db.mongo import connect, close, db
 
+# Configure security scheme for Swagger UI
+security_scheme = HTTPBearer()
+
 app = FastAPI(
     title="Manage Network Projects API",
-    version="0.1.0"
+    version="0.1.0",
+    swagger_ui_init_oauth={
+        "usePkceWithAuthorizationCodeGrant": False,
+    }
 )
+
+# Add security scheme to OpenAPI schema
+app.openapi_schema = None
+
+def custom_openapi():
+    if app.openapi_schema:
+        return app.openapi_schema
+    from fastapi.openapi.utils import get_openapi
+    openapi_schema = get_openapi(
+        title=app.title,
+        version=app.version,
+        description="Network Project Management API with LLM-powered topology generation",
+        routes=app.routes,
+    )
+    # Add security scheme
+    openapi_schema["components"]["securitySchemes"] = {
+        "bearerAuth": {
+            "type": "http",
+            "scheme": "bearer",
+            "bearerFormat": "JWT",
+            "description": "Enter JWT token obtained from /auth/login endpoint"
+        }
+    }
+    # Add security to all endpoints that require authentication
+    for path, path_item in openapi_schema["paths"].items():
+        for method, operation in path_item.items():
+            if method in ["post", "get", "put", "delete", "patch"]:
+                # Skip auth endpoints
+                if "/auth/login" in path or "/auth/me" in path:
+                    continue
+                # Add security requirement
+                if "security" not in operation:
+                    operation["security"] = [{"bearerAuth": []}]
+    
+    app.openapi_schema = openapi_schema
+    return app.openapi_schema
+
+app.openapi = custom_openapi
 
 # Add CORS middleware
 app.add_middleware(
@@ -32,6 +77,7 @@ app.include_router(summary.router)
 app.include_router(folders.router)
 app.include_router(analysis.router)
 app.include_router(topology.router)
+app.include_router(topology.test_router)
 
 
 async def seed_admin():

@@ -8475,13 +8475,94 @@ const NetworkDeviceIcon = ({ role, isSelected, isLinkStart, size = 8 }) => {
   );
 };
 
+/* ===== จัดบทบาทโดยเดาชื่อ (core/distribution/access) ===== */
+function classifyRoleByName(name = "") {
+  const n = (name || "").toLowerCase();
+  if (n.includes("core")) return "core";
+  if (n.includes("dist")) return "distribution";
+  if (n.includes("access")) return "access";
+  if (n.includes("router")) return "router";
+  return "unknown";
+}
+
 /* ===== TopologyGraph (SVG) ===== */
 const TopologyGraph = ({ project, onOpenDevice, can, authedUser, setProjects }) => {
+  // Helper function for default positioning - defined first to avoid hoisting issues
+  const getDefaultPos = (nodeId, role, index = 0, totalByRole = {}) => {
+    const centerX = 50;
+    const centerY = 50;
+    
+    // Normalize role to lowercase for consistent matching
+    const normalizedRole = (role || "default").toLowerCase();
+    
+    // Count nodes by role for better distribution
+    const coreCount = totalByRole.core || 0;
+    const distCount = totalByRole.distribution || 0;
+    const accessCount = totalByRole.access || 0;
+    const routerCount = totalByRole.router || 0;
+    
+    switch (normalizedRole) {
+      case "core": {
+        // Core nodes: arrange in horizontal line at top-center
+        if (coreCount <= 1) {
+          return { x: centerX, y: 20 };
+        }
+        const coreSpacing = 25;
+        const coreStartX = centerX - ((coreCount - 1) * coreSpacing) / 2;
+        return { x: coreStartX + (index * coreSpacing), y: 20 };
+      }
+        
+      case "distribution": {
+        // Distribution nodes: arrange in horizontal line below core
+        if (distCount <= 1) {
+          return { x: centerX, y: 45 };
+        }
+        const distSpacing = 22;
+        const distStartX = centerX - ((distCount - 1) * distSpacing) / 2;
+        return { x: distStartX + (index * distSpacing), y: 45 };
+      }
+        
+      case "access": {
+        // Access nodes: arrange in two rows below distribution
+        if (accessCount <= 1) {
+          return { x: centerX, y: 70 };
+        }
+        const accessPerRow = Math.ceil(accessCount / 2);
+        const accessSpacing = 20;
+        const row = Math.floor(index / accessPerRow);
+        const col = index % accessPerRow;
+        const accessStartX = centerX - ((accessPerRow - 1) * accessSpacing) / 2;
+        return { x: accessStartX + (col * accessSpacing), y: 70 + (row * 20) };
+      }
+        
+      case "router": {
+        // Router nodes: arrange at bottom
+        if (routerCount <= 1) {
+          return { x: centerX, y: 85 };
+        }
+        const routerSpacing = 20;
+        const routerStartX = centerX - ((routerCount - 1) * routerSpacing) / 2;
+        return { x: routerStartX + (index * routerSpacing), y: 85 };
+      }
+        
+      default: {
+        // Default: arrange in grid
+        const defaultSpacing = 15;
+        const defaultTotal = totalByRole.default || totalByRole[normalizedRole] || 1;
+        const defaultCols = Math.ceil(Math.sqrt(defaultTotal));
+        const row = Math.floor(index / defaultCols);
+        const col = index % defaultCols;
+        return { x: 20 + (col * defaultSpacing), y: 20 + (row * defaultSpacing) };
+      }
+    }
+  };
+
   const [generatingTopology, setGeneratingTopology] = React.useState(false);
   const [topologyError, setTopologyError] = React.useState(null);
   
   const rows = project.summaryRows || [];
-  const nodes = rows.map(r => ({
+  // Base nodes from project summary rows - compute first
+  const baseNodes = rows.map(r => ({
     id: r.device,
     label: r.device,
     role: classifyRoleByName(r.device),
@@ -8489,21 +8570,41 @@ const TopologyGraph = ({ project, onOpenDevice, can, authedUser, setProjects }) 
     model: r.model, mgmtIp: r.mgmtIp,
     routing: r.routing, stpMode: r.stpMode
   }));
+  
+  // Topology nodes state - will be updated when topology is generated
+  const [topologyNodes, setTopologyNodes] = useState(() => {
+    // Initialize from project.topoNodes if available, otherwise compute baseNodes inline
+    if (project.topoNodes && project.topoNodes.length > 0) {
+      return project.topoNodes.map(n => ({
+        id: n.id || n.device_id,
+        label: n.label || n.id || n.device_id,
+        role: (n.type || n.role || "access")?.toLowerCase(),
+        type: n.type || "Switch",
+        model: n.model,
+        mgmtIp: n.ip || n.management_ip,
+        routing: n.routing,
+        stpMode: n.stpMode
+      }));
+    }
+    // Compute baseNodes inline for useState initializer
+    const summaryRows = project.summaryRows || [];
+    return summaryRows.map(r => ({
+      id: r.device,
+      label: r.device,
+      role: classifyRoleByName(r.device),
+      type: classifyRoleByName(r.device),
+      model: r.model, mgmtIp: r.mgmtIp,
+      routing: r.routing, stpMode: r.stpMode
+    }));
+  });
+  
+  // Use topology nodes if available, otherwise use base nodes
+  const nodes = topologyNodes.length > 0 ? topologyNodes : baseNodes;
 
   // Check if user is manager in this project
   const projectMember = project?.members?.find(m => m.username === authedUser?.username);
   const isManager = authedUser?.role === "admin" || projectMember?.role === "manager";
   const canEdit = isManager && can("project-setting", project);
-
-  // Initialize positions from saved data or defaults
-  const getDefaultPos = (nodeId, role) => {
-    switch (role) {
-      case "core": return { x: 70, y: 35 };
-      case "distribution": return { x: 30, y: 70 };
-      case "access": return { x: 20, y: 25 };
-      default: return { x: 50, y: 50 };
-    }
-  };
 
   const [editMode, setEditMode] = useState(false);
   
@@ -8518,8 +8619,28 @@ const TopologyGraph = ({ project, onOpenDevice, can, authedUser, setProjects }) 
       return project.topoPositions;
     }
     const pos = {};
-    nodes.forEach(n => {
-      pos[n.id] = getDefaultPos(n.id, n.role);
+    // Count nodes by role for better distribution - compute baseNodes inline
+    const summaryRows = project.summaryRows || [];
+    const initialNodes = summaryRows.map(r => ({
+      id: r.device,
+      label: r.device,
+      role: classifyRoleByName(r.device),
+      type: classifyRoleByName(r.device),
+      model: r.model, mgmtIp: r.mgmtIp,
+      routing: r.routing, stpMode: r.stpMode
+    }));
+    const roleCounts = {};
+    const roleIndices = {};
+    initialNodes.forEach(n => {
+      const role = (n.role || "default").toLowerCase();
+      roleCounts[role] = (roleCounts[role] || 0) + 1;
+    });
+    // Use initialNodes for positioning
+    initialNodes.forEach(n => {
+      const role = (n.role || "default").toLowerCase();
+      roleIndices[role] = (roleIndices[role] || 0);
+      pos[n.id] = getDefaultPos(n.id, role, roleIndices[role], roleCounts);
+      roleIndices[role]++;
     });
     return pos;
   });
@@ -8587,33 +8708,50 @@ const TopologyGraph = ({ project, onOpenDevice, can, authedUser, setProjects }) 
         const aiNodes = result.topology.nodes || [];
         const aiEdges = result.topology.edges || [];
         
+        console.log("[Topology] LLM Response:", {
+          nodes: aiNodes,
+          edges: aiEdges,
+          analysis_summary: result.analysis_summary
+        });
+        
         if (aiNodes.length === 0 && aiEdges.length === 0) {
           setTopologyError("ไม่พบข้อมูล topology จาก AI. กรุณาตรวจสอบว่า Ollama ทำงานอยู่และมีข้อมูล devices ใน project");
           return;
         }
         
-        // Update nodes (merge with existing, update roles/types)
-        const updatedNodes = [...nodes];
+        // Convert AI nodes to internal format and merge with existing
+        const nodeMap = new Map();
+        // First, add all existing nodes (from topologyNodes or baseNodes)
+        const currentNodes = topologyNodes.length > 0 ? topologyNodes : baseNodes;
+        currentNodes.forEach(n => {
+          nodeMap.set(n.id, { ...n });
+        });
+        // Then, update/add AI nodes
         aiNodes.forEach(aiNode => {
-          const existingIdx = updatedNodes.findIndex(n => n.id === aiNode.id);
-          if (existingIdx >= 0) {
+          const nodeId = aiNode.id;
+          const existingNode = nodeMap.get(nodeId);
+          if (existingNode) {
             // Update existing node
-            updatedNodes[existingIdx] = {
-              ...updatedNodes[existingIdx],
-              label: aiNode.label || updatedNodes[existingIdx].label,
-              role: aiNode.type?.toLowerCase() || updatedNodes[existingIdx].role,
-              type: aiNode.type || updatedNodes[existingIdx].type
-            };
+            nodeMap.set(nodeId, {
+              ...existingNode,
+              label: aiNode.label || existingNode.label,
+              role: (aiNode.type || existingNode.role)?.toLowerCase() || existingNode.role,
+              type: aiNode.type || existingNode.type
+            });
           } else {
-            // Add new node
-            updatedNodes.push({
-              id: aiNode.id,
-              label: aiNode.label || aiNode.id,
-              role: aiNode.type?.toLowerCase() || "access",
-              type: aiNode.type || "Switch"
+            // Add new node from AI
+            nodeMap.set(nodeId, {
+              id: nodeId,
+              label: aiNode.label || nodeId,
+              role: (aiNode.type || "access")?.toLowerCase(),
+              type: aiNode.type || "Switch",
+              model: aiNode.model,
+              mgmtIp: aiNode.ip || aiNode.management_ip
             });
           }
         });
+        
+        const updatedNodes = Array.from(nodeMap.values());
         
         // Convert edges to internal format (a/b instead of from/to)
         const convertedEdges = aiEdges.map(edge => ({
@@ -8624,8 +8762,31 @@ const TopologyGraph = ({ project, onOpenDevice, can, authedUser, setProjects }) 
           type: "trunk" // Default type
         }));
         
-        // Update state
+        // Create default positions for new nodes with better distribution
+        const updatedPositions = { ...positions };
+        
+        // Count nodes by role for better distribution
+        const roleCounts = {};
+        const roleIndices = {};
+        updatedNodes.forEach(node => {
+          const role = (node.role || "default").toLowerCase();
+          roleCounts[role] = (roleCounts[role] || 0) + 1;
+        });
+        
+        updatedNodes.forEach((node, idx) => {
+          if (!updatedPositions[node.id]) {
+            // Assign default position based on role with index
+            const role = (node.role || "access").toLowerCase();
+            roleIndices[role] = (roleIndices[role] || 0);
+            updatedPositions[node.id] = getDefaultPos(node.id, role, roleIndices[role], roleCounts);
+            roleIndices[role]++;
+          }
+        });
+        
+        // Update states
+        setTopologyNodes(updatedNodes);
         setLinks(convertedEdges);
+        setPositions(updatedPositions);
         
         // Update project state (will be saved when user clicks Save)
         setProjects(prev => prev.map(p => {
@@ -8633,7 +8794,8 @@ const TopologyGraph = ({ project, onOpenDevice, can, authedUser, setProjects }) 
             return {
               ...p,
               topoLinks: convertedEdges,
-              topoNodes: aiNodes
+              topoNodes: aiNodes,
+              topoPositions: updatedPositions
             };
           }
           return p;
@@ -8659,12 +8821,14 @@ const TopologyGraph = ({ project, onOpenDevice, can, authedUser, setProjects }) 
   const [showLinkDialog, setShowLinkDialog] = useState(false);
   const [showNodeDialog, setShowNodeDialog] = useState(false);
   const [editingNode, setEditingNode] = useState(null);
+  const [linkTooltip, setLinkTooltip] = useState(null); // {x, y, text} for link hover
   const [nodeLabels, setNodeLabels] = useState(() => {
     if (project.topoNodeLabels) {
       return project.topoNodeLabels;
     }
     const labels = {};
-    nodes.forEach(n => {
+    // Use baseNodes initially
+    baseNodes.forEach(n => {
       labels[n.id] = n.label;
     });
     return labels;
@@ -8674,7 +8838,8 @@ const TopologyGraph = ({ project, onOpenDevice, can, authedUser, setProjects }) 
       return project.topoNodeRoles;
     }
     const roles = {};
-    nodes.forEach(n => {
+    // Use baseNodes initially
+    baseNodes.forEach(n => {
       roles[n.id] = n.role;
     });
     return roles;
@@ -8683,36 +8848,6 @@ const TopologyGraph = ({ project, onOpenDevice, can, authedUser, setProjects }) 
   const [reroutingLink, setReroutingLink] = useState(null); // For re-routing link connectors
   
   // Load topology layout from backend on mount
-  React.useEffect(() => {
-    const loadTopologyLayout = async () => {
-      const projectId = project.project_id || project.id;
-      if (!projectId) return;
-      
-      try {
-        const topologyData = await api.getTopology(projectId);
-        if (topologyData.layout) {
-          if (topologyData.layout.positions && Object.keys(topologyData.layout.positions).length > 0) {
-            setPositions(topologyData.layout.positions);
-          }
-          if (topologyData.layout.links && topologyData.layout.links.length > 0) {
-            setLinks(topologyData.layout.links);
-          }
-          if (topologyData.layout.node_labels) {
-            setNodeLabels(topologyData.layout.node_labels);
-          }
-          if (topologyData.layout.node_roles) {
-            setNodeRoles(topologyData.layout.node_roles);
-          }
-        }
-      } catch (error) {
-        console.error("Failed to load topology layout:", error);
-        // Fallback to project data (already set in useState)
-      }
-    };
-    
-    loadTopologyLayout();
-  }, [project.project_id || project.id]);
-
   // Handle zoom
   const handleZoomIn = () => {
     setZoom(prev => Math.min(prev + 0.2, 3.0));
@@ -8993,8 +9128,18 @@ const TopologyGraph = ({ project, onOpenDevice, can, authedUser, setProjects }) 
       setPositions(project.topoPositions);
     } else {
       const pos = {};
+      // Count nodes by role for better distribution
+      const roleCounts = {};
+      const roleIndices = {};
       nodes.forEach(n => {
-        pos[n.id] = getDefaultPos(n.id, n.role);
+        const role = (n.role || "default").toLowerCase();
+        roleCounts[role] = (roleCounts[role] || 0) + 1;
+      });
+      nodes.forEach(n => {
+        const role = (n.role || "default").toLowerCase();
+        roleIndices[role] = (roleIndices[role] || 0);
+        pos[n.id] = getDefaultPos(n.id, role, roleIndices[role], roleCounts);
+        roleIndices[role]++;
       });
       setPositions(pos);
     }
@@ -9189,6 +9334,7 @@ const TopologyGraph = ({ project, onOpenDevice, can, authedUser, setProjects }) 
             const isRerouting = reroutingLink === i;
             const midX = (A.x + B.x) / 2;
             const midY = (A.y + B.y) / 2;
+            const linkLabel = e.label || e.evidence || "";
             return (
               <g key={i}>
                 <line 
@@ -9199,7 +9345,22 @@ const TopologyGraph = ({ project, onOpenDevice, can, authedUser, setProjects }) 
                   opacity={isRerouting ? "1" : "0.85"}
                   onClick={(evt) => handleLinkClick(i, evt)}
                   onContextMenu={(evt) => handleLinkDelete(i, evt)}
-                  className={editMode ? "cursor-pointer" : ""}
+                  onMouseEnter={(evt) => {
+                    if (linkLabel) {
+                      const svg = evt.currentTarget.ownerSVGElement;
+                      const rect = svg.getBoundingClientRect();
+                      const viewBox = svg.viewBox.baseVal;
+                      const xPercent = (midX / viewBox.width) * 100;
+                      const yPercent = (midY / viewBox.height) * 100;
+                      setLinkTooltip({
+                        x: (xPercent / 100) * rect.width,
+                        y: (yPercent / 100) * rect.height,
+                        text: linkLabel
+                      });
+                    }
+                  }}
+                  onMouseLeave={() => setLinkTooltip(null)}
+                  className={editMode ? "cursor-pointer" : (linkLabel ? "cursor-help" : "")}
                 />
                 {editMode && (
                   <line 
@@ -9210,19 +9371,6 @@ const TopologyGraph = ({ project, onOpenDevice, can, authedUser, setProjects }) 
                     onContextMenu={(evt) => handleLinkDelete(i, evt)}
                     className="cursor-pointer"
                   />
-                )}
-                {e.label && (
-                  <text 
-                    x={midX} 
-                    y={midY - 1} 
-                    fontSize="2" 
-                    fill="#C7D2FE"
-                    textAnchor="middle"
-                    pointerEvents="none"
-                    className="select-none"
-                  >
-                    {e.label}
-                  </text>
                 )}
               </g>
             );
@@ -9265,6 +9413,20 @@ const TopologyGraph = ({ project, onOpenDevice, can, authedUser, setProjects }) 
             );
           })}
         </svg>
+        {/* Link tooltip */}
+        {linkTooltip && (
+          <div
+            className="absolute z-10 text-xs bg-[#0F172A] text-gray-100 border border-[#1F2937] rounded-lg p-2 whitespace-pre"
+            style={{ 
+              left: linkTooltip.x + 8, 
+              top: linkTooltip.y + 8, 
+              pointerEvents: "none", 
+              maxWidth: 360 
+            }}
+          >
+            {linkTooltip.text}
+          </div>
+        )}
         <div className="absolute bottom-1 left-2 text-[11px] text-gray-400">
           {editMode ? (
             <span>
@@ -9440,13 +9602,7 @@ function summarizeStp(project) {
 }
 
 /* ===== จัดบทบาทโดยเดาชื่อ (core/distribution/access) ===== */
-function classifyRoleByName(name = "") {
-  const n = (name || "").toLowerCase();
-  if (n.includes("core")) return "core";
-  if (n.includes("dist")) return "distribution";
-  if (n.includes("access")) return "access";
-  return "unknown";
-}
+// Note: classifyRoleByName is now defined before TopologyGraph component (see above)
 
 /* ===== AI-like Device Narrative (เน้นความสัมพันธ์ + STP) ===== */
 function buildDeviceNarrative(project, row) {

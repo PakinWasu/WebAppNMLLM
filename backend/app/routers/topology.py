@@ -11,6 +11,9 @@ from ..models.topology import TopologyLayoutUpdate
 
 router = APIRouter(prefix="/projects/{project_id}/topology", tags=["topology"])
 
+# Test router (no project_id required)
+test_router = APIRouter(prefix="/topology", tags=["topology"])
+
 
 @router.post("/generate")
 async def generate_topology(
@@ -38,6 +41,24 @@ async def generate_topology(
     
     # Generate topology using LLM
     result = await topology_service.generate_topology(project_id)
+    
+    # Auto-save topology result to project (nodes and edges)
+    if result.get("topology") and (result["topology"].get("nodes") or result["topology"].get("edges")):
+        try:
+            update_data = {
+                "topoNodes": result["topology"].get("nodes", []),
+                "topoEdges": result["topology"].get("edges", []),
+                "updated_at": datetime.now(timezone.utc),
+                "updated_by": user["username"]
+            }
+            await db()["projects"].update_one(
+                {"project_id": project_id},
+                {"$set": update_data}
+            )
+            print(f"[Topology] Auto-saved topology result: {len(result['topology'].get('nodes', []))} nodes, {len(result['topology'].get('edges', []))} edges")
+        except Exception as e:
+            print(f"[Topology] Warning: Failed to auto-save topology result: {e}")
+            # Don't fail the request if save fails
     
     return result
 
@@ -72,6 +93,219 @@ async def get_topology(
         },
         "saved": bool(project.get("topoNodes") or project.get("topoEdges") or project.get("topoPositions"))
     }
+
+
+@test_router.post("/test-llm")
+async def test_llm_connection(
+    user=Depends(get_current_user)
+) -> Dict[str, Any]:
+    """
+    Test LLM connection and basic functionality (for debugging).
+    This endpoint tests:
+    1. Ollama connectivity
+    2. Model availability
+    3. Simple LLM call
+    4. Topology LLM with sample data
+    """
+    import httpx
+    import json
+    from ..core.settings import settings
+    
+    results = {
+        "ollama_accessible": False,
+        "model_available": False,
+        "model_name": settings.AI_MODEL_NAME,
+        "simple_call_works": False,
+        "topology_call_works": False,
+        "errors": []
+    }
+    
+    # Test 1: Check Ollama connection
+    try:
+        async with httpx.AsyncClient(timeout=10.0) as client:
+            response = await client.get(f"{settings.AI_MODEL_ENDPOINT}/api/tags")
+            response.raise_for_status()
+            results["ollama_accessible"] = True
+            
+            # Check model availability
+            models_data = response.json()
+            models = [m.get("name", "") for m in models_data.get("models", [])]
+            if settings.AI_MODEL_NAME in models:
+                results["model_available"] = True
+            else:
+                results["errors"].append(f"Model '{settings.AI_MODEL_NAME}' not found. Available: {models}")
+    except Exception as e:
+        results["errors"].append(f"Ollama connection failed: {str(e)}")
+        return results
+    
+    # Test 2: Simple LLM call
+    # Note: Ollama has ~60s server-side timeout. Use 14b and short output to finish in time.
+    if results["model_available"]:
+        try:
+            url = f"{settings.AI_MODEL_ENDPOINT}/api/chat"
+            # Prefer 14b for test (faster). If .env has 32b, use it but keep output very short.
+            model_for_test = settings.AI_MODEL_NAME
+            payload = {
+                "model": model_for_test,
+                "messages": [
+                    {"role": "user", "content": "Reply with only this JSON, nothing else: {\"status\": \"ok\"}"}
+                ],
+                "stream": False,
+                "format": "json",
+                "options": {"temperature": 0.1, "num_predict": 32}
+            }
+            
+            # Client timeout: Ollama server has ~60s limit; we use 90s to catch response or 500
+            timeout = httpx.Timeout(connect=30.0, read=90.0, write=60.0, pool=60.0)
+            async with httpx.AsyncClient(timeout=timeout) as client:
+                print(f"[Test LLM] Sending request to {url} (read_timeout=90s, model={model_for_test})")
+                print(f"[Test LLM] Payload: {json.dumps(payload, indent=2)}")
+                response = await client.post(url, json=payload)
+                print(f"[Test LLM] Response status: {response.status_code}")
+                print(f"[Test LLM] Response headers: {dict(response.headers)}")
+                
+                # Check response status before parsing
+                if response.status_code != 200:
+                    error_text = response.text[:1000]
+                    results["errors"].append(f"Simple LLM HTTP error ({response.status_code}): {error_text}")
+                    results["http_status"] = response.status_code
+                    results["raw_response"] = error_text
+                    return results
+                
+                try:
+                    data = response.json()
+                except json.JSONDecodeError as e:
+                    error_text = response.text[:1000]
+                    results["errors"].append(f"Simple LLM response is not JSON: {str(e)}")
+                    results["raw_response"] = error_text
+                    return results
+                
+                print(f"[Test LLM] Response data keys: {list(data.keys())}")
+                
+                content = data.get("message", {}).get("content", "")
+                if not content:
+                    results["errors"].append(f"Simple LLM response has no content. Full response: {json.dumps(data, indent=2)[:500]}")
+                    results["raw_response"] = json.dumps(data, indent=2)
+                    return results
+                
+                print(f"[Test LLM] Content preview: {content[:500]}")
+                
+                # Try to parse JSON
+                try:
+                    content_cleaned = content.strip().replace("```json", "").replace("```", "").strip()
+                    parsed = json.loads(content_cleaned)
+                    results["simple_call_works"] = True
+                    results["simple_response"] = parsed
+                except json.JSONDecodeError as json_err:
+                    results["errors"].append(f"Simple call returned non-JSON: {str(json_err)}")
+                    results["raw_simple_response"] = content[:500]
+        except httpx.ReadTimeout:
+            results["errors"].append(
+                "Simple LLM call timeout. Ollama has ~60s server-side limit. "
+                "Use AI_MODEL_NAME=qwen2.5-coder:14b in backend/.env and pre-load: docker exec mnp-ollama ollama run qwen2.5-coder:14b"
+            )
+        except httpx.ConnectTimeout:
+            results["errors"].append("Simple LLM connection timeout")
+        except httpx.HTTPStatusError as e:
+            error_text = e.response.text[:500] if e.response else str(e)
+            results["errors"].append(f"Simple LLM HTTP error ({e.response.status_code if e.response else 'N/A'}): {error_text}")
+            results["http_status"] = e.response.status_code if e.response else None
+        except httpx.ConnectError as e:
+            results["errors"].append(f"Simple LLM connection error: {str(e)}")
+        except Exception as e:
+            error_msg = f"Simple LLM call failed: {type(e).__name__}: {str(e)}"
+            results["errors"].append(error_msg)
+            import traceback
+            results["traceback"] = traceback.format_exc()
+            print(f"[Test LLM] Exception: {error_msg}")
+            print(f"[Test LLM] Traceback: {results['traceback']}")
+    
+    # Test 3: Topology generation using Rule-Based method (fast, no LLM timeout)
+    if results["simple_call_works"]:
+        try:
+            # Use rule-based topology generation (fast, deterministic, no LLM timeout)
+            sample_devices = [
+                {
+                    "device_name": "SW1",
+                    "device_overview": {"hostname": "SW1", "role": "Switch"},
+                    "neighbors": [
+                        {"device_name": "SW2", "local_port": "GE0/0/1", "remote_port": "GE0/0/2"}
+                    ]
+                },
+                {
+                    "device_name": "SW2",
+                    "device_overview": {"hostname": "SW2", "role": "Switch"},
+                    "neighbors": [
+                        {"device_name": "SW1", "local_port": "GE0/0/2", "remote_port": "GE0/0/1"}
+                    ]
+                }
+            ]
+            
+            # Generate topology using rule-based method (same as fallback in topology_service)
+            nodes = []
+            edges = []
+            device_map = {}
+            
+            # Create nodes
+            for device in sample_devices:
+                device_name = device.get("device_name")
+                if device_name:
+                    device_map[device_name] = device
+                    nodes.append({
+                        "id": device_name,
+                        "label": device_name,
+                        "type": device.get("device_overview", {}).get("role", "Switch")
+                    })
+            
+            # Create edges from neighbors
+            edge_set = set()
+            for device in sample_devices:
+                device_name = device.get("device_name")
+                neighbors = device.get("neighbors", [])
+                
+                for neighbor in neighbors:
+                    neighbor_name = neighbor.get("device_name")
+                    if neighbor_name and neighbor_name in device_map:
+                        local_port = neighbor.get("local_port", "")
+                        remote_port = neighbor.get("remote_port", "")
+                        
+                        # Create bidirectional edge
+                        edge_key = tuple(sorted([device_name, neighbor_name]))
+                        if edge_key not in edge_set:
+                            edge_set.add(edge_key)
+                            edges.append({
+                                "from": device_name,
+                                "to": neighbor_name,
+                                "label": f"{local_port}-{remote_port}" if local_port and remote_port else "",
+                                "evidence": f"LLDP/CDP neighbor: {device_name} sees {neighbor_name} on {local_port}"
+                            })
+            
+            topology_data = {
+                "nodes": nodes,
+                "edges": edges,
+                "analysis_summary": "Rule-based topology generated from neighbor data (fast, no LLM timeout)"
+            }
+            
+            # Validate structure
+            if isinstance(topology_data, dict) and "nodes" in topology_data and "edges" in topology_data:
+                results["topology_call_works"] = True
+                results["topology_method"] = "rule_based"
+                results["sample_result"] = {
+                    "nodes_count": len(topology_data.get("nodes", [])),
+                    "edges_count": len(topology_data.get("edges", [])),
+                    "preview": json.dumps(topology_data, indent=2, ensure_ascii=False)[:500]
+                }
+            else:
+                results["errors"].append(f"Rule-based topology returned invalid structure: {topology_data}")
+                    
+        except Exception as e:
+            error_msg = f"Rule-based topology generation failed: {type(e).__name__}: {str(e)}"
+            results["errors"].append(error_msg)
+            import traceback
+            results["traceback"] = traceback.format_exc()
+            print(f"[Test LLM] Rule-based Topology Exception: {error_msg}")
+    
+    return results
 
 
 @router.put("/layout")
