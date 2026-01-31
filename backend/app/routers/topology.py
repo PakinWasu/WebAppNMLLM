@@ -109,31 +109,32 @@ async def test_llm_connection(
     """
     import httpx
     import json
-    from ..core.settings import settings
-    
+    from ..services.llm_service import llm_service
+
+    base_url = llm_service.base_url
+    model_name = llm_service.model_name
     results = {
         "ollama_accessible": False,
         "model_available": False,
-        "model_name": settings.AI_MODEL_NAME,
+        "model_name": model_name,
         "simple_call_works": False,
         "topology_call_works": False,
         "errors": []
     }
-    
+
     # Test 1: Check Ollama connection
     try:
         async with httpx.AsyncClient(timeout=10.0) as client:
-            response = await client.get(f"{settings.AI_MODEL_ENDPOINT}/api/tags")
+            response = await client.get(f"{base_url}/api/tags")
             response.raise_for_status()
             results["ollama_accessible"] = True
-            
-            # Check model availability
+
             models_data = response.json()
             models = [m.get("name", "") for m in models_data.get("models", [])]
-            if settings.AI_MODEL_NAME in models:
+            if model_name in models:
                 results["model_available"] = True
             else:
-                results["errors"].append(f"Model '{settings.AI_MODEL_NAME}' not found. Available: {models}")
+                results["errors"].append(f"Model '{model_name}' not found. Available: {models}")
     except Exception as e:
         results["errors"].append(f"Ollama connection failed: {str(e)}")
         return results
@@ -142,11 +143,9 @@ async def test_llm_connection(
     # Note: Ollama has ~60s server-side timeout. Use 14b and short output to finish in time.
     if results["model_available"]:
         try:
-            url = f"{settings.AI_MODEL_ENDPOINT}/api/chat"
-            # Prefer 14b for test (faster). If .env has 32b, use it but keep output very short.
-            model_for_test = settings.AI_MODEL_NAME
+            url = f"{base_url}/api/chat"
             payload = {
-                "model": model_for_test,
+                "model": model_name,
                 "messages": [
                     {"role": "user", "content": "Reply with only this JSON, nothing else: {\"status\": \"ok\"}"}
                 ],
@@ -158,7 +157,7 @@ async def test_llm_connection(
             # Client timeout: Ollama server has ~60s limit; we use 90s to catch response or 500
             timeout = httpx.Timeout(connect=30.0, read=90.0, write=60.0, pool=60.0)
             async with httpx.AsyncClient(timeout=timeout) as client:
-                print(f"[Test LLM] Sending request to {url} (read_timeout=90s, model={model_for_test})")
+                print(f"[Test LLM] Sending request to {url} (read_timeout=90s, model={model_name})")
                 print(f"[Test LLM] Payload: {json.dumps(payload, indent=2)}")
                 response = await client.post(url, json=payload)
                 print(f"[Test LLM] Response status: {response.status_code}")
@@ -201,8 +200,7 @@ async def test_llm_connection(
                     results["raw_simple_response"] = content[:500]
         except httpx.ReadTimeout:
             results["errors"].append(
-                "Simple LLM call timeout. Ollama has ~60s server-side limit. "
-                "Use AI_MODEL_NAME=qwen2.5-coder:14b in backend/.env and pre-load: docker exec mnp-ollama ollama run qwen2.5-coder:14b"
+                f"Simple LLM call timeout. Check OLLAMA_TIMEOUT (current: {llm_service.timeout_seconds}s) and model load on {base_url}."
             )
         except httpx.ConnectTimeout:
             results["errors"].append("Simple LLM connection timeout")

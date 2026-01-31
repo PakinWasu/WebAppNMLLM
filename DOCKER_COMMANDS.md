@@ -39,6 +39,23 @@ docker compose -f docker-compose.prod.yml logs backend
 docker compose -f docker-compose.prod.yml logs frontend
 ```
 
+### ตรวจสอบสถานะ LLM
+
+```bash
+# 1) สถานะการเชื่อมต่อ Ollama + โมเดลที่มี
+curl -s http://localhost:8000/health/llm | python3 -m json.tool
+
+# 2) ทดสอบยิง "Hello" ไปที่ LLM ให้ตอบกลับ (อาจใช้เวลา 30s–2 นาที)
+curl -s --max-time 120 "http://localhost:8000/ai/hello" | python3 -m json.tool
+
+# หรือใช้ /ai/test (ส่งข้อความยาวกว่า)
+curl -s --max-time 120 "http://localhost:8000/ai/test" | python3 -m json.tool
+```
+
+- ถ้า **status: healthy** และ **model_available: true** = LLM พร้อมใช้  
+- ถ้า **ollama_accessible: false** = เช็ค OLLAMA_BASE_URL ใน backend/.env และว่า Ollama รันอยู่  
+- ถ้า **model_available: false** = โมเดลใน OLLAMA_MODEL ยังไม่มีบนเซิร์ฟเวอร์ (ให้ pull โมเดลที่เครื่องรัน Ollama)
+
 ### หยุด Services
 
 ```bash

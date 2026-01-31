@@ -1,22 +1,40 @@
 """Topology Service for Auto-Generating Network Topology using LLM Analysis
 Based on POC logic from network-llm-poc/main.py"""
 
+import os
 import httpx
 import json
 import time
 from typing import Dict, List, Any, Optional
 from datetime import datetime
 
-from ..core.settings import settings
 from ..db.mongo import db
+
+
+def _ollama_base_url() -> str:
+    return os.getenv("OLLAMA_BASE_URL", "http://10.4.15.152:11434").rstrip("/")
+
+
+def _ollama_model() -> str:
+    return os.getenv("OLLAMA_MODEL", "deepseek-coder-v2:16b")
+
+
+def _ollama_timeout_seconds() -> float:
+    return float(os.getenv("OLLAMA_TIMEOUT", "300"))
+
+
+def _topology_use_llm() -> bool:
+    """Whether topology generation should call LLM (default True). Set TOPOLOGY_USE_LLM=false to use rule-based only."""
+    v = os.getenv("TOPOLOGY_USE_LLM", "true").strip().lower()
+    return v in ("true", "1", "yes")
 
 
 class TopologyService:
     """Service for generating network topology using LLM analysis"""
-    
+
     def __init__(self):
-        self.base_url = settings.AI_MODEL_ENDPOINT
-        self.model_name = settings.AI_MODEL_NAME
+        self.base_url = _ollama_base_url()
+        self.model_name = _ollama_model()
     
     def _get_topology_system_prompt(self, project_id: str, device_count: int) -> str:
         """Generate system prompt for topology analysis - focused on neighbors only, optimized for speed"""
@@ -295,29 +313,24 @@ class TopologyService:
             }
         }
         
-        # Use rule-based topology as default (fast, reliable, no LLM timeout)
-        # LLM can be enabled later if needed, but currently causes timeout issues
+        # Use LLM for topology by default (TOPOLOGY_USE_LLM=true). Fallback to rule-based on error or if disabled.
         llm_success = False
         topology_data = None
         analysis_summary = ""
         token_usage = {"prompt_tokens": 0, "completion_tokens": 0, "total_tokens": 0}
-        
-        # Skip LLM call for now - use rule-based directly
-        # Set to True to enable LLM (may timeout with Ollama's ~60s limit)
-        use_llm = False
-        
-        # Start timing only when we actually start processing (skip LLM wait time)
+
+        use_llm = _topology_use_llm()
+        timeout_sec = _ollama_timeout_seconds()
+
         start_time = time.time()
-        
-        # Skip LLM entirely if disabled - go straight to rule-based
+
         if use_llm:
             try:
-                # Use shorter timeout - Ollama has ~60s server-side limit
                 timeout = httpx.Timeout(
-                    connect=30.0,  # Connection timeout
-                    read=90.0,     # Read timeout (90s to catch Ollama's ~60s server timeout)
-                    write=60.0,    # Write timeout
-                    pool=60.0      # Pool timeout
+                    connect=30.0,
+                    read=timeout_sec,
+                    write=120.0,
+                    pool=60.0,
                 )
                 async with httpx.AsyncClient(timeout=timeout) as client:
                     llm_start_time = time.time()
@@ -375,7 +388,7 @@ class TopologyService:
                         llm_success = False
                         
             except httpx.ReadTimeout:
-                print(f"[Topology] Ollama read timeout (600s) - falling back to rule-based topology")
+                print(f"[Topology] Ollama read timeout ({int(timeout_sec)}s) - falling back to rule-based topology")
                 llm_success = False
             except httpx.ConnectTimeout:
                 print(f"[Topology] Connection to Ollama timed out - falling back to rule-based topology")

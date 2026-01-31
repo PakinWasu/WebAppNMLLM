@@ -1,8 +1,17 @@
 #!/bin/bash
 # Setup Script for Ubuntu Server
 # สคริปต์สำหรับติดตั้งและตั้งค่าโปรเจคบน Ubuntu Server
+#
+# การใช้งาน:
+#   ./setup-ubuntu-server.sh           # แบบมีคำถาม
+#   NON_INTERACTIVE=1 ./setup-ubuntu-server.sh   # แบบไม่ต้องตอบ (ใช้ค่าตั้งต้น)
+#   ./setup-ubuntu-server.sh --yes     # เหมือน NON_INTERACTIVE=1
 
 set -e  # Exit on error
+
+# Non-interactive mode (สำหรับ CI หรือสคริปต์อัตโนมัติ)
+NON_INTERACTIVE="${NON_INTERACTIVE:-0}"
+[[ "$1" == "--yes" ]] || [[ "$1" == "-y" ]] && NON_INTERACTIVE=1
 
 # Colors
 RED='\033[0;31m'
@@ -121,15 +130,15 @@ sudo ufw allow 80/tcp comment 'HTTP'
 sudo ufw allow 443/tcp comment 'HTTPS'
 
 # Allow Backend API (optional, if direct access needed)
-# Check if running non-interactively
-if [ -t 0 ]; then
+if [[ "$NON_INTERACTIVE" == "1" ]]; then
+    sudo ufw allow 8000/tcp comment 'Backend API'
+elif [ -t 0 ]; then
     read -p "Allow direct access to Backend API (port 8000)? (y/n) " -n 1 -r
     echo
     if [[ $REPLY =~ ^[Yy]$ ]]; then
         sudo ufw allow 8000/tcp comment 'Backend API'
     fi
 else
-    # Non-interactive mode - allow by default
     sudo ufw allow 8000/tcp comment 'Backend API'
 fi
 
@@ -183,9 +192,12 @@ chmod -R 755 "$PROJECT_DIR/mongo-data" 2>/dev/null || true
 # 8. Setup Nginx (optional - for host-level reverse proxy)
 print_section "8. Nginx Configuration"
 NGINX_SETUP="n"
-read -p "Do you want to configure Nginx on host as reverse proxy? (y/n) " -n 1 -r
-echo
-if [[ $REPLY =~ ^[Yy]$ ]]; then
+if [[ "$NON_INTERACTIVE" == "1" ]]; then
+    echo -e "${CYAN}Non-interactive: skipping Nginx host setup${NC}"
+else
+    read -p "Do you want to configure Nginx on host as reverse proxy? (y/n) " -n 1 -r
+    echo
+    if [[ $REPLY =~ ^[Yy]$ ]]; then
     NGINX_SETUP="y"
     echo -e "${YELLOW}Setting up Nginx reverse proxy...${NC}"
     
@@ -283,6 +295,7 @@ EOF
 else
     echo -e "${YELLOW}Skipping Nginx host configuration${NC}"
     echo -e "${CYAN}Note: Nginx in Docker container will handle reverse proxy${NC}"
+    fi
 fi
 
 # 9. Summary
@@ -306,7 +319,7 @@ echo -e "   ${BLUE}docker compose -f docker-compose.prod.yml logs -f${NC}"
 echo ""
 echo -e "5. ${YELLOW}Access the application:${NC}"
 SERVER_IP=$(hostname -I | awk '{print $1}')
-echo -e "   ${BLUE}Frontend: http://$SERVER_IP${NC}"
+echo -e "   ${BLUE}Frontend: http://$SERVER_IP:8080${NC} (ใช้ docker-compose.prod.yml)"
 echo -e "   ${BLUE}Backend API: http://$SERVER_IP:8000/docs${NC}"
 echo ""
 echo -e "6. ${YELLOW}Default login credentials:${NC}"
