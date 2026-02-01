@@ -2420,6 +2420,219 @@ const OverviewPage = ({ project, uploadHistory }) => {
 
 /* ========= Topology helpers (role + links) ========= */
 
+/* ========= Project Analysis Panel Component ========= */
+const ProjectAnalysisPanel = ({ project, summaryRows, coreCount, distCount, accessCount }) => {
+  return (
+    <div className="col-span-6 min-h-0 flex flex-col gap-3 w-full">
+      {/* Network Overview Card */}
+      <NetworkOverviewCard project={project} summaryRows={summaryRows} />
+      
+      {/* Recommendations Card */}
+      <RecommendationsCard project={project} summaryRows={summaryRows} />
+    </div>
+  );
+};
+
+/* ========= Network Overview Card Component ========= */
+const NetworkOverviewCard = ({ project, summaryRows }) => {
+  const [overviewText, setOverviewText] = React.useState(null);
+  const [llmMetrics, setLlmMetrics] = React.useState(null);
+  const [generating, setGenerating] = React.useState(false);
+  const [error, setError] = React.useState(null);
+  const [loading, setLoading] = React.useState(true);
+  
+  const projectId = project?.project_id || project?.id;
+  
+  // Load saved overview on mount
+  React.useEffect(() => {
+    if (!projectId) {
+      setLoading(false);
+      return;
+    }
+    
+    const loadSavedOverview = async () => {
+      try {
+        const result = await api.getProjectOverview(projectId);
+        setOverviewText(result.overview_text || null);
+        setLlmMetrics(result.metrics || null);
+      } catch (err) {
+        // Ignore 404 - no saved overview yet
+        if (err.message && !err.message.includes("404")) {
+          console.warn("Failed to load saved overview:", err);
+        }
+      } finally {
+        setLoading(false);
+      }
+    };
+    
+    loadSavedOverview();
+  }, [projectId]);
+  
+  const handleGenerate = async () => {
+    if (!projectId) return;
+    
+    setGenerating(true);
+    setError(null);
+    
+    try {
+      const result = await api.analyzeProjectOverview(projectId);
+      setOverviewText(result.overview_text || "Analysis completed.");
+      setLlmMetrics(result.metrics || null);
+    } catch (err) {
+      console.error("Network overview analysis failed:", err);
+      setError(err.message || "Failed to generate network overview");
+    } finally {
+      setGenerating(false);
+    }
+  };
+  
+  return (
+    <div className="flex-1 min-h-0 flex flex-col rounded-xl border border-slate-800 bg-slate-900/50 overflow-hidden w-full">
+      {/* Header with LLM Analysis button */}
+      <div className="flex-shrink-0 flex items-center justify-between px-3 py-2 border-b border-slate-700">
+        <div className="font-semibold text-slate-300 text-xs">Network Overview</div>
+        <button
+          onClick={handleGenerate}
+          disabled={generating || summaryRows.length === 0}
+          className="px-3 py-1 text-[10px] font-medium rounded-md bg-blue-600 hover:bg-blue-700 text-white transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+        >
+          {generating ? "Generating..." : "LLM Analysis"}
+        </button>
+      </div>
+      
+      {/* Content area - scrollable */}
+      <div className="flex-1 min-h-0 overflow-y-auto overflow-x-hidden p-3 text-[10px] text-slate-400" style={{ maxHeight: 'calc(50vh - 100px)' }}>
+        {loading ? (
+          <div className="text-slate-500 italic">Loading...</div>
+        ) : (
+          <>
+            {error && (
+              <div className="p-2 rounded bg-rose-900/20 border border-rose-700 text-rose-400 text-xs mb-2">
+                Error: {error}
+              </div>
+            )}
+            
+            {overviewText ? (
+              <div className="text-slate-300 leading-relaxed break-words whitespace-pre-wrap">
+                {overviewText}
+              </div>
+            ) : (
+              <div className="text-slate-500 italic">
+                Click "LLM Analysis" to analyze all devices in this project.
+              </div>
+            )}
+          </>
+        )}
+      </div>
+    </div>
+  );
+};
+
+/* ========= Recommendations Card Component ========= */
+const RecommendationsCard = ({ project, summaryRows }) => {
+  const [recommendations, setRecommendations] = React.useState([]);
+  const [llmMetrics, setLlmMetrics] = React.useState(null);
+  const [generating, setGenerating] = React.useState(false);
+  const [error, setError] = React.useState(null);
+  const [loading, setLoading] = React.useState(true);
+  
+  const projectId = project?.project_id || project?.id;
+  
+  // Load saved recommendations on mount
+  React.useEffect(() => {
+    if (!projectId) {
+      setLoading(false);
+      return;
+    }
+    
+    const loadSavedRecommendations = async () => {
+      try {
+        const result = await api.getProjectRecommendations(projectId);
+        setRecommendations(result.recommendations || []);
+        setLlmMetrics(result.metrics || null);
+      } catch (err) {
+        // Ignore 404 - no saved recommendations yet
+        if (err.message && !err.message.includes("404")) {
+          console.warn("Failed to load saved recommendations:", err);
+        }
+      } finally {
+        setLoading(false);
+      }
+    };
+    
+    loadSavedRecommendations();
+  }, [projectId]);
+  
+  const handleGenerate = async () => {
+    if (!projectId) return;
+    
+    setGenerating(true);
+    setError(null);
+    
+    try {
+      const result = await api.analyzeProjectRecommendations(projectId);
+      setRecommendations(result.recommendations || []);
+      setLlmMetrics(result.metrics || null);
+    } catch (err) {
+      console.error("Recommendations analysis failed:", err);
+      setError(err.message || "Failed to generate recommendations");
+    } finally {
+      setGenerating(false);
+    }
+  };
+  
+  return (
+    <div className="flex-1 min-h-0 flex flex-col rounded-xl border border-slate-800 bg-slate-900/50 overflow-hidden w-full">
+      {/* Header with LLM Analysis button */}
+      <div className="flex-shrink-0 flex items-center justify-between px-3 py-2 border-b border-slate-700">
+        <div className="font-semibold text-slate-300 text-xs">Recommendations</div>
+        <button
+          onClick={handleGenerate}
+          disabled={generating || summaryRows.length === 0}
+          className="px-3 py-1 text-[10px] font-medium rounded-md bg-blue-600 hover:bg-blue-700 text-white transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+        >
+          {generating ? "Generating..." : "LLM Analysis"}
+        </button>
+      </div>
+      
+      {/* Content area - scrollable */}
+      <div className="flex-1 min-h-0 overflow-y-auto overflow-x-hidden p-3 text-[10px] text-slate-400" style={{ maxHeight: 'calc(50vh - 100px)' }}>
+        {loading ? (
+          <div className="text-slate-500 italic">Loading...</div>
+        ) : (
+          <>
+            {error && (
+              <div className="p-2 rounded bg-rose-900/20 border border-rose-700 text-rose-400 text-xs mb-2">
+                Error: {error}
+              </div>
+            )}
+            
+            {recommendations.length > 0 ? (
+              <ul className="list-disc pl-4 space-y-1.5 break-words">
+                {recommendations.map((rec, idx) => (
+                  <li key={idx} className="break-words">
+                    <span className={rec.severity === "high" ? "text-rose-400" : rec.severity === "medium" ? "text-yellow-400" : "text-slate-300"}>
+                      [{rec.severity?.toUpperCase() || "MEDIUM"}]
+                    </span>{" "}
+                    <span className="text-slate-300">
+                      {rec.device && rec.device !== "all" ? `[${rec.device}] ` : ""}
+                      {rec.message}
+                    </span>
+                  </li>
+                ))}
+              </ul>
+            ) : (
+              <div className="text-slate-500 italic">
+                Click "LLM Analysis" to get recommendations.
+              </div>
+            )}
+          </>
+        )}
+      </div>
+    </div>
+  );
+};
+
 /* ========= SUMMARY (network-focused) + CSV ========= */
 const SummaryPage = ({ project, can, authedUser, setProjects, openDevice }) => {
   // LLM metrics state for topology generation (shared with TopologyGraph)
@@ -2697,47 +2910,18 @@ const SummaryPage = ({ project, can, authedUser, setProjects, openDevice }) => {
         />
       )}
 
-      {/* Topology (2/3) + Narrative (1/3) */}
+      {/* Topology (2/3) + Project Analysis (1/3) */}
       <div className="flex-1 min-h-0 grid grid-cols-12 gap-3">
         <div className="col-span-6 min-h-0 overflow-hidden rounded-xl border border-slate-800 bg-slate-900/50">
           <TopologyGraph project={project} onOpenDevice={(id)=>openDevice(id)} can={can} authedUser={authedUser} setProjects={setProjects} setTopologyLLMMetrics={setTopologyLLMMetrics} topologyLLMMetrics={topologyLLMMetrics} />
         </div>
-        <div className="col-span-6 min-h-0 overflow-auto rounded-xl border border-slate-800 bg-slate-900/50 p-2 text-[10px] text-slate-400 space-y-1.5 break-words">
-          <div className="font-semibold text-slate-300 text-xs">Auto Summary</div>
-          <div className="break-words">อุปกรณ์รวม: {project.summaryRows.length} เครื่อง (Core: {coreCount}, Dist: {distCount}, Access: {accessCount})</div>
-          <div className="break-words">โครงแบบ: Core ↔ Distribution ↔ Access • HSRP/STP • OSPF/BGP</div>
-          <div className="text-slate-500">ล่าสุด: {project.lastBackup || "—"}</div>
-          
-          {/* LLM Metrics (แสดงเมื่อมีการ generate topology ด้วย LLM) */}
-          {topologyLLMMetrics && (
-            <>
-              <div className="font-semibold text-slate-300 pt-1.5 border-t border-slate-700 mt-1.5 text-xs">LLM Processing Info</div>
-              <div className="space-y-0.5 break-words">
-                <div className="break-words">โมเดล: <span className="text-slate-200">{topologyLLMMetrics.model_name || "—"}</span></div>
-                <div>เวลา: <span className="text-slate-200">{topologyLLMMetrics.inference_time_ms ? `${(topologyLLMMetrics.inference_time_ms / 1000).toFixed(2)}s` : "—"}</span></div>
-                {topologyLLMMetrics.token_usage && (
-                  <>
-                    <div>Tokens: <span className="text-slate-200">{topologyLLMMetrics.token_usage.total_tokens || topologyLLMMetrics.token_usage.prompt_tokens + topologyLLMMetrics.token_usage.completion_tokens || "—"}</span></div>
-                    <div className="text-slate-500 text-[9px] pl-1.5 break-words">
-                      (Prompt: {topologyLLMMetrics.token_usage.prompt_tokens || 0}, 
-                      Completion: {topologyLLMMetrics.token_usage.completion_tokens || 0})
-                    </div>
-                  </>
-                )}
-                {topologyLLMMetrics.devices_processed && (
-                  <div className="break-words">อุปกรณ์ที่วิเคราะห์: <span className="text-slate-200">{topologyLLMMetrics.devices_processed}</span></div>
-                )}
-              </div>
-            </>
-          )}
-          
-          <div className="font-semibold text-slate-300 pt-1 text-xs">Recommendations</div>
-          <ul className="list-disc pl-3 space-y-0.5 break-words">
-            <li className="break-words">ตั้งค่า NTP ให้ Sync</li>
-            <li className="break-words">กำหนด HSRP/STP priority</li>
-            <li className="break-words">portfast/bpduguard ด้าน access</li>
-          </ul>
-        </div>
+        <ProjectAnalysisPanel 
+          project={project}
+          summaryRows={summaryRows}
+          coreCount={coreCount}
+          distCount={distCount}
+          accessCount={accessCount}
+        />
       </div>
 
       {/* Table: fills remaining height, scrolls inside */}
@@ -9411,7 +9595,7 @@ const TopologyGraph = ({ project, onOpenDevice, can, authedUser, setProjects, se
     if (!dateStr) return null;
     try {
       const date = new Date(dateStr);
-      return date.toLocaleDateString('th-TH', { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' });
+      return date.toLocaleDateString('en-US', { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' });
     } catch {
       return dateStr.split(' ')[0] || dateStr;
     }

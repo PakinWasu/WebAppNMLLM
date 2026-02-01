@@ -4,7 +4,7 @@ import os
 import json
 import time
 import logging
-from typing import Dict, Any, Optional
+from typing import Dict, Any, Optional, List
 from datetime import datetime
 
 import httpx
@@ -20,6 +20,49 @@ Output must be in JSON format with the following keys:
 - `config_quality`: A score (1-10) based on best practices.
 
 Strictly avoid hallucination. If data is missing, state 'Not found'."""
+
+# Project-Level Analysis System Prompt - Network Overview (Scope 2.3.5.1)
+SYSTEM_PROMPT_PROJECT_OVERVIEW = """You are a Network Solution Architect. Review the configuration summaries of these devices collectively.
+
+**Task: Network Overview (Scope 2.3.5.1)**
+- Provide a concise, executive summary of the entire network architecture.
+- Mention the topology style (e.g., Star, Ring, Core-Dist-Access).
+- List key protocols detected globally (e.g., 'OSPF Area 0 is used for core routing', 'HSRP is active on Core switches').
+- **Constraint:** Keep it between 3-5 sentences. Professional and descriptive.
+
+**Output Format:** Return ONLY valid JSON:
+{
+  "overview_text": "string (3-5 sentences)"
+}
+
+**CRITICAL:** Output ONLY JSON, no markdown, no code blocks. Parseable directly as JSON object."""
+
+# Project-Level Analysis System Prompt - Recommendations (Scope 2.3.5.2)
+SYSTEM_PROMPT_PROJECT_RECOMMENDATIONS = """You are a Network Solution Architect. Review the configuration summaries of these devices collectively.
+
+**Task: Gap & Integrity Analysis (Scope 2.3.5.2)**
+- Identify MISSING configurations, security issues, and configuration inconsistencies that prevent a complete/safe topology.
+- Detect patterns of error and potential problems (e.g., 'Switch A defines VLAN 10, but the Core Switch does not have VLAN 10 created', 'STP is disabled globally - risk of Loops', 'Missing NTP configuration on device X', 'Weak password policy detected').
+- Provide SPECIFIC, ACTIONABLE recommendations with clear explanation of:
+  1. What the issue is (problem description)
+  2. Why it matters (impact/risk)
+  3. How to fix it (specific configuration steps or actions)
+- **Constraint:** Each recommendation must be detailed and actionable. Be specific (mention device names). Format each message as: "Issue: [description]. Impact: [why it matters]. Fix: [specific steps]"
+
+**Output Format:** Return ONLY valid JSON:
+{
+  "recommendations": [
+    {
+      "severity": "high|medium|low",
+      "message": "string (detailed recommendation with issue description, impact, and fix steps)",
+      "device": "string (device name or 'all' if global)"
+    }
+  ]
+}
+
+**CRITICAL:** 
+- Each message must be comprehensive and include problem description, impact, and fix steps.
+- Output ONLY JSON, no markdown, no code blocks. Parseable directly as JSON object."""
 
 
 class LLMService:
@@ -181,9 +224,172 @@ class LLMService:
                 "timeout",
                 inference_time_ms,
             )
+    
+    def _prepare_aggregated_data(self, devices_data: List[Dict[str, Any]], project_id: str) -> Dict[str, Any]:
+        """Helper method to prepare aggregated device data."""
+        aggregated_data = {
+            "project_id": project_id,
+            "total_devices": len(devices_data),
+            "devices": []
+        }
+        
+        for device in devices_data:
+            try:
+                device_name = device.get("device_name")
+                if not device_name:
+                    continue
+                
+                # Extract key configuration data for each device
+                device_summary = {
+                    "device_name": device_name,
+                    "device_overview": device.get("device_overview", {}),
+                    "interfaces": device.get("interfaces", [])[:20] if isinstance(device.get("interfaces"), list) else [],
+                    "vlans": device.get("vlans", {}),
+                    "stp": device.get("stp", {}),
+                    "routing": device.get("routing", {}),
+                    "neighbors": device.get("neighbors", [])[:10] if isinstance(device.get("neighbors"), list) else [],
+                }
+                aggregated_data["devices"].append(device_summary)
+            except Exception as e:
+                logger.warning(f"Error preparing device data for {device.get('device_name', 'unknown')}: {e}")
+                continue
+        
+        return aggregated_data
+
+    async def analyze_project_overview(
+        self,
+        devices_data: List[Dict[str, Any]],
+        project_id: str,
+    ) -> Dict[str, Any]:
+        """
+        Analyze entire project - Network Overview only (Scope 2.3.5.1).
+        Returns overview_text.
+        """
+        start_time = time.perf_counter()
+        
+        # Prepare aggregated data for all devices
+        try:
+            aggregated_data = self._prepare_aggregated_data(devices_data, project_id)
+        except Exception as e:
+            logger.exception(f"Error preparing aggregated data for project {project_id}: {e}")
+            return self._error_result(
+                f"[ERROR] Failed to prepare device data: {str(e)}",
+                "data_preparation_failed",
+                0,
+                details=str(e),
+            )
+        
+        # Build user prompt
+        try:
+            aggregated_json = json.dumps(aggregated_data, separators=(",", ":"), ensure_ascii=False, indent=2, default=str)
+        except (TypeError, ValueError) as e:
+            logger.exception(f"Error serializing aggregated data to JSON for project {project_id}: {e}")
+            return self._error_result(
+                f"[ERROR] Failed to serialize device data to JSON: {str(e)}",
+                "json_serialization_failed",
+                0,
+                details=str(e),
+            )
+        
+        user_prompt = f"""Analyze the following network project with {len(devices_data)} devices.
+
+=== AGGREGATED DEVICE CONFIGURATIONS ===
+{aggregated_json}
+
+=== ANALYSIS REQUEST ===
+Provide a Network Overview: executive summary of architecture, topology style, and key protocols.
+
+Return ONLY valid JSON with 'overview_text' key as specified in system prompt."""
+
+        url = f"{self.base_url}/api/chat"
+        payload = {
+            "model": self.model_name,
+            "messages": [
+                {"role": "system", "content": SYSTEM_PROMPT_PROJECT_OVERVIEW},
+                {"role": "user", "content": user_prompt},
+            ],
+            "stream": False,
+            "options": {
+                "temperature": 0.3,
+                "top_p": 0.85,
+                "num_predict": 1024,
+            },
+        }
+
+        try:
+            async with httpx.AsyncClient(timeout=float(self.timeout_seconds)) as client:
+                response = await client.post(url, json=payload)
+                response.raise_for_status()
+                data = response.json()
+
+            inference_time_sec = time.perf_counter() - start_time
+            inference_time_ms = inference_time_sec * 1000
+
+            logger.info(
+                "project_overview_analysis model_used=%s inference_time_sec=%.2f inference_time_ms=%.0f project_id=%s devices_count=%d",
+                self.model_name,
+                inference_time_sec,
+                inference_time_ms,
+                project_id,
+                len(devices_data),
+            )
+
+            ai_response = data.get("message", {}).get("content", "")
+            token_usage = {
+                "prompt_tokens": data.get("prompt_eval_count", 0),
+                "completion_tokens": data.get("eval_count", 0),
+                "total_tokens": data.get("prompt_eval_count", 0) + data.get("eval_count", 0),
+            }
+
+            # Parse JSON response
+            parsed_response = self._parse_json_response(ai_response)
+            
+            # Check if JSON parsing failed (returns fallback format)
+            if isinstance(parsed_response, dict) and parsed_response.get("format") == "text":
+                # JSON parsing failed, treat as error
+                logger.warning(f"Failed to parse JSON response for project overview. Raw response: {ai_response[:500]}")
+                return self._error_result(
+                    f"[ERROR] LLM returned non-JSON response. Expected JSON with 'overview_text' key. Response: {ai_response[:200]}",
+                    "json_parse_failed",
+                    inference_time_ms,
+                    details=ai_response[:500],
+                )
+            
+            # Ensure required fields exist
+            if not isinstance(parsed_response, dict):
+                parsed_response = {}
+            
+            if "overview_text" not in parsed_response:
+                logger.warning(f"LLM response missing 'overview_text' key. Response: {parsed_response}")
+                parsed_response["overview_text"] = "Analysis completed. Overview text not provided."
+
+            return {
+                "content": ai_response,
+                "parsed_response": parsed_response,
+                "metrics": {
+                    "inference_time_ms": inference_time_ms,
+                    "token_usage": token_usage,
+                    "model_name": self.model_name,
+                    "timestamp": datetime.utcnow(),
+                },
+            }
+
+        except httpx.ReadTimeout:
+            inference_time_ms = (time.perf_counter() - start_time) * 1000
+            logger.warning(
+                "project_overview_analysis timeout model_used=%s inference_time_sec=%.2f project_id=%s",
+                self.model_name,
+                (time.perf_counter() - start_time),
+                project_id,
+            )
+            return self._error_result(
+                f"[ERROR] Ollama read timeout ({self.timeout_seconds}s). Model may be slow or unresponsive.",
+                "timeout",
+                inference_time_ms,
+            )
         except httpx.ConnectError as e:
             inference_time_ms = (time.perf_counter() - start_time) * 1000
-            logger.exception("ollama_request connect_error base_url=%s error=%s", self.base_url, e)
+            logger.exception("project_overview_analysis connect_error base_url=%s error=%s", self.base_url, e)
             return self._error_result(
                 f"[ERROR] Cannot connect to Ollama at {self.base_url}. Check network and OLLAMA_BASE_URL. Error: {e!s}",
                 "connection_failed",
@@ -193,10 +399,10 @@ class LLMService:
         except httpx.HTTPStatusError as e:
             inference_time_ms = (time.perf_counter() - start_time) * 1000
             logger.warning(
-                "ollama_request http_error model_used=%s status=%s device=%s",
+                "project_overview_analysis http_error model_used=%s status=%s project_id=%s",
                 self.model_name,
                 e.response.status_code if e.response else None,
-                device_name,
+                project_id,
             )
             msg = f"[ERROR] Ollama API error ({e.response.status_code if e.response else 'unknown'})"
             if e.response and e.response.status_code == 404:
@@ -209,11 +415,179 @@ class LLMService:
             )
         except Exception as e:
             inference_time_ms = (time.perf_counter() - start_time) * 1000
-            logger.exception("ollama_request failed model_used=%s device=%s error=%s", self.model_name, device_name, e)
+            logger.exception("project_overview_analysis error project_id=%s", project_id)
             return self._error_result(
-                f"[ERROR] Ollama call failed: {e!s}",
-                type(e).__name__,
+                f"[ERROR] Analysis failed: {str(e)}",
+                "analysis_failed",
                 inference_time_ms,
+                details=str(e),
+            )
+
+    async def analyze_project_recommendations(
+        self,
+        devices_data: List[Dict[str, Any]],
+        project_id: str,
+    ) -> Dict[str, Any]:
+        """
+        Analyze entire project - Recommendations only (Scope 2.3.5.2).
+        Returns recommendations list.
+        """
+        start_time = time.perf_counter()
+        
+        # Prepare aggregated data for all devices
+        try:
+            aggregated_data = self._prepare_aggregated_data(devices_data, project_id)
+        except Exception as e:
+            logger.exception(f"Error preparing aggregated data for project {project_id}: {e}")
+            return self._error_result(
+                f"[ERROR] Failed to prepare device data: {str(e)}",
+                "data_preparation_failed",
+                0,
+                details=str(e),
+            )
+        
+        # Build user prompt
+        try:
+            aggregated_json = json.dumps(aggregated_data, separators=(",", ":"), ensure_ascii=False, indent=2, default=str)
+        except (TypeError, ValueError) as e:
+            logger.exception(f"Error serializing aggregated data to JSON for project {project_id}: {e}")
+            return self._error_result(
+                f"[ERROR] Failed to serialize device data to JSON: {str(e)}",
+                "json_serialization_failed",
+                0,
+                details=str(e),
+            )
+        
+        user_prompt = f"""Analyze the following network project with {len(devices_data)} devices.
+
+=== AGGREGATED DEVICE CONFIGURATIONS ===
+{aggregated_json}
+
+=== ANALYSIS REQUEST ===
+Perform Gap & Integrity Analysis: Identify missing configurations, errors, and suggest specific actionable fixes.
+
+Return ONLY valid JSON with 'recommendations' key as specified in system prompt."""
+
+        url = f"{self.base_url}/api/chat"
+        payload = {
+            "model": self.model_name,
+            "messages": [
+                {"role": "system", "content": SYSTEM_PROMPT_PROJECT_RECOMMENDATIONS},
+                {"role": "user", "content": user_prompt},
+            ],
+            "stream": False,
+            "options": {
+                "temperature": 0.3,
+                "top_p": 0.85,
+                "num_predict": 2048,
+            },
+        }
+
+        try:
+            async with httpx.AsyncClient(timeout=float(self.timeout_seconds)) as client:
+                response = await client.post(url, json=payload)
+                response.raise_for_status()
+                data = response.json()
+
+            inference_time_sec = time.perf_counter() - start_time
+            inference_time_ms = inference_time_sec * 1000
+
+            logger.info(
+                "project_recommendations_analysis model_used=%s inference_time_sec=%.2f inference_time_ms=%.0f project_id=%s devices_count=%d",
+                self.model_name,
+                inference_time_sec,
+                inference_time_ms,
+                project_id,
+                len(devices_data),
+            )
+
+            ai_response = data.get("message", {}).get("content", "")
+            token_usage = {
+                "prompt_tokens": data.get("prompt_eval_count", 0),
+                "completion_tokens": data.get("eval_count", 0),
+                "total_tokens": data.get("prompt_eval_count", 0) + data.get("eval_count", 0),
+            }
+
+            # Parse JSON response
+            parsed_response = self._parse_json_response(ai_response)
+            
+            # Check if JSON parsing failed (returns fallback format)
+            if isinstance(parsed_response, dict) and parsed_response.get("format") == "text":
+                # JSON parsing failed, treat as error
+                logger.warning(f"Failed to parse JSON response for project recommendations. Raw response: {ai_response[:500]}")
+                return self._error_result(
+                    f"[ERROR] LLM returned non-JSON response. Expected JSON with 'recommendations' key. Response: {ai_response[:200]}",
+                    "json_parse_failed",
+                    inference_time_ms,
+                    details=ai_response[:500],
+                )
+            
+            # Ensure required fields exist
+            if not isinstance(parsed_response, dict):
+                parsed_response = {}
+            
+            if "recommendations" not in parsed_response:
+                logger.warning(f"LLM response missing 'recommendations' key. Response: {parsed_response}")
+                parsed_response["recommendations"] = []
+
+            return {
+                "content": ai_response,
+                "parsed_response": parsed_response,
+                "metrics": {
+                    "inference_time_ms": inference_time_ms,
+                    "token_usage": token_usage,
+                    "model_name": self.model_name,
+                    "timestamp": datetime.utcnow(),
+                },
+            }
+
+        except httpx.ReadTimeout:
+            inference_time_ms = (time.perf_counter() - start_time) * 1000
+            logger.warning(
+                "project_recommendations_analysis timeout model_used=%s inference_time_sec=%.2f project_id=%s",
+                self.model_name,
+                (time.perf_counter() - start_time),
+                project_id,
+            )
+            return self._error_result(
+                f"[ERROR] Ollama read timeout ({self.timeout_seconds}s). Model may be slow or unresponsive.",
+                "timeout",
+                inference_time_ms,
+            )
+        except httpx.ConnectError as e:
+            inference_time_ms = (time.perf_counter() - start_time) * 1000
+            logger.exception("project_recommendations_analysis connect_error base_url=%s error=%s", self.base_url, e)
+            return self._error_result(
+                f"[ERROR] Cannot connect to Ollama at {self.base_url}. Check network and OLLAMA_BASE_URL. Error: {e!s}",
+                "connection_failed",
+                inference_time_ms,
+                details=str(e),
+            )
+        except httpx.HTTPStatusError as e:
+            inference_time_ms = (time.perf_counter() - start_time) * 1000
+            logger.warning(
+                "project_recommendations_analysis http_error model_used=%s status=%s project_id=%s",
+                self.model_name,
+                e.response.status_code if e.response else None,
+                project_id,
+            )
+            msg = f"[ERROR] Ollama API error ({e.response.status_code if e.response else 'unknown'})"
+            if e.response and e.response.status_code == 404:
+                msg += f"\nModel '{self.model_name}' not found. Pull it on the Ollama server: ollama pull {self.model_name}"
+            return self._error_result(
+                msg + (f"\nResponse: {e.response.text[:200]}" if e.response else ""),
+                "http_error",
+                inference_time_ms,
+                status_code=e.response.status_code if e.response else None,
+            )
+        except Exception as e:
+            inference_time_ms = (time.perf_counter() - start_time) * 1000
+            logger.exception("project_recommendations_analysis error project_id=%s", project_id)
+            return self._error_result(
+                f"[ERROR] Analysis failed: {str(e)}",
+                "analysis_failed",
+                inference_time_ms,
+                details=str(e),
             )
 
     def _parse_json_response(self, ai_response: str) -> Optional[Dict[str, Any]]:

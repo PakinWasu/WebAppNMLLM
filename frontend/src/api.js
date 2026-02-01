@@ -370,6 +370,31 @@ export async function deleteDeviceImage(projectId, deviceName) {
   });
 }
 
+// Project-Level Analysis API
+export async function analyzeProjectOverview(projectId) {
+  return api(`/projects/${projectId}/analyze/overview`, {
+    method: 'POST',
+  });
+}
+
+export async function getProjectOverview(projectId) {
+  return api(`/projects/${projectId}/analyze/overview`, {
+    method: 'GET',
+  });
+}
+
+export async function analyzeProjectRecommendations(projectId) {
+  return api(`/projects/${projectId}/analyze/recommendations`, {
+    method: 'POST',
+  });
+}
+
+export async function getProjectRecommendations(projectId) {
+  return api(`/projects/${projectId}/analyze/recommendations`, {
+    method: 'GET',
+  });
+}
+
 // Folders API
 export async function getFolders(projectId) {
   const response = await api(`/projects/${projectId}/folders`);

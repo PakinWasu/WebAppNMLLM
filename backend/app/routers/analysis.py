@@ -23,6 +23,350 @@ from ..services.accuracy_tracker import accuracy_tracker
 
 router = APIRouter(prefix="/projects/{project_id}/analysis", tags=["analysis"])
 
+# Project-Level Analysis Router
+overview_router = APIRouter(prefix="/projects/{project_id}/analyze", tags=["analyze"])
+
+
+@overview_router.get("/overview")
+async def get_project_overview(
+    project_id: str,
+    user=Depends(get_current_user)
+):
+    """Get saved project overview from database."""
+    import logging
+    logger = logging.getLogger(__name__)
+    
+    try:
+        await check_project_access(project_id, user)
+        
+        # Get saved result from database
+        saved_result = await db()["llm_results"].find_one(
+            {"project_id": project_id, "result_type": "project_overview"},
+            sort=[("generated_at", -1)]
+        )
+        
+        if not saved_result:
+            raise HTTPException(
+                status_code=404,
+                detail="No saved overview found. Generate one first."
+            )
+        
+        result_data = saved_result.get("result_data", {})
+        overview_text = result_data.get("overview_text", "No overview available.")
+        
+        return {
+            "overview_text": overview_text,
+            "metrics": saved_result.get("metrics", {}),
+            "devices_analyzed": saved_result.get("result_data", {}).get("devices_analyzed", 0),
+            "project_id": project_id,
+            "generated_at": saved_result.get("generated_at")
+        }
+    
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.exception(f"Error fetching project overview for project {project_id}: {e}")
+        raise HTTPException(
+            status_code=500,
+            detail=f"Failed to fetch overview: {str(e)}"
+        )
+
+
+@overview_router.get("/recommendations")
+async def get_project_recommendations(
+    project_id: str,
+    user=Depends(get_current_user)
+):
+    """Get saved project recommendations from database."""
+    import logging
+    logger = logging.getLogger(__name__)
+    
+    try:
+        await check_project_access(project_id, user)
+        
+        # Get saved result from database
+        saved_result = await db()["llm_results"].find_one(
+            {"project_id": project_id, "result_type": "project_recommendations"},
+            sort=[("generated_at", -1)]
+        )
+        
+        if not saved_result:
+            raise HTTPException(
+                status_code=404,
+                detail="No saved recommendations found. Generate one first."
+            )
+        
+        result_data = saved_result.get("result_data", {})
+        recommendations = result_data.get("recommendations", [])
+        
+        return {
+            "recommendations": recommendations,
+            "metrics": saved_result.get("metrics", {}),
+            "devices_analyzed": saved_result.get("result_data", {}).get("devices_analyzed", 0),
+            "project_id": project_id,
+            "generated_at": saved_result.get("generated_at")
+        }
+    
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.exception(f"Error fetching project recommendations for project {project_id}: {e}")
+        raise HTTPException(
+            status_code=500,
+            detail=f"Failed to fetch recommendations: {str(e)}"
+        )
+
+
+@overview_router.post("/overview")
+async def analyze_project_overview(
+    project_id: str,
+    user=Depends(get_current_user)
+):
+    """
+    Project-Level Analysis - Network Overview only (Scope 2.3.5.1).
+    Analyzes ALL devices in the project collectively to provide:
+    - Network Overview: Architecture, topology style, key protocols
+    """
+    import logging
+    logger = logging.getLogger(__name__)
+    
+    try:
+        await check_project_access(project_id, user)
+        
+        # Fetch ALL devices in the project
+        devices_data = []
+        device_names = set()
+        
+        try:
+            # Get latest parsed config for each device
+            async for doc in db()["parsed_configs"].find(
+                {"project_id": project_id},
+                sort=[("device_name", 1), ("upload_timestamp", -1)]
+            ):
+                device_name = doc.get("device_name")
+                if device_name and device_name not in device_names:
+                    device_names.add(device_name)
+                    
+                    # Get latest config for this device
+                    latest = await db()["parsed_configs"].find_one(
+                        {"project_id": project_id, "device_name": device_name},
+                        sort=[("upload_timestamp", -1)]
+                    )
+                    
+                    if latest:
+                        # Remove MongoDB _id
+                        latest.pop("_id", None)
+                        devices_data.append(latest)
+        except Exception as db_error:
+            logger.exception(f"Database error while fetching devices for project {project_id}: {db_error}")
+            raise HTTPException(
+                status_code=500,
+                detail=f"Failed to fetch device configurations from database: {str(db_error)}"
+            )
+        
+        if not devices_data:
+            raise HTTPException(
+                status_code=404,
+                detail="No devices found in project. Upload configuration files first."
+            )
+        
+        logger.info(f"Calling LLM service for project overview. Project: {project_id}, Devices: {len(devices_data)}")
+        
+        # Call LLM service for project-level overview analysis
+        try:
+            result = await llm_service.analyze_project_overview(
+                devices_data=devices_data,
+                project_id=project_id
+            )
+        except Exception as llm_error:
+            logger.exception(f"LLM service error for project {project_id}: {llm_error}")
+            raise HTTPException(
+                status_code=500,
+                detail=f"LLM analysis failed: {str(llm_error)}"
+            )
+        
+        # Check for errors in the result
+        parsed_response = result.get("parsed_response", {})
+        if "error" in parsed_response:
+            error_message = result.get("content", "LLM analysis failed")
+            logger.error(f"LLM returned error for project {project_id}: {error_message}")
+            raise HTTPException(
+                status_code=500,
+                detail=error_message
+            )
+        
+        # Extract parsed response
+        overview_text = parsed_response.get("overview_text", "Analysis completed.")
+        
+        # Save to database for persistence
+        try:
+            from ..services.topology_service import topology_service
+            await topology_service._save_llm_result(
+                project_id=project_id,
+                result_type="project_overview",
+                result_data={"overview_text": overview_text},
+                analysis_summary=overview_text,
+                metrics=result.get("metrics", {}),
+                llm_used=True
+            )
+            logger.info(f"Saved project overview to database for project {project_id}")
+        except Exception as save_error:
+            logger.warning(f"Failed to save project overview to database: {save_error}")
+            # Continue even if save fails
+        
+        logger.info(f"Successfully generated overview for project {project_id}")
+        
+        return {
+            "overview_text": overview_text,
+            "metrics": result.get("metrics", {}),
+            "devices_analyzed": len(devices_data),
+            "project_id": project_id
+        }
+    
+    except HTTPException:
+        # Re-raise HTTP exceptions as-is
+        raise
+    except Exception as e:
+        logger.exception(f"Unexpected error in analyze_project_overview for project {project_id}: {e}")
+        raise HTTPException(
+            status_code=500,
+            detail=f"Internal server error: {str(e)}"
+        )
+
+
+@overview_router.post("/recommendations")
+async def analyze_project_recommendations(
+    project_id: str,
+    user=Depends(get_current_user)
+):
+    """
+    Project-Level Analysis - Recommendations only (Scope 2.3.5.2).
+    Analyzes ALL devices in the project collectively to provide:
+    - Gap & Integrity Analysis: Missing configurations, errors, actionable fixes
+    """
+    import logging
+    logger = logging.getLogger(__name__)
+    
+    try:
+        await check_project_access(project_id, user)
+        
+        # Fetch ALL devices in the project
+        devices_data = []
+        device_names = set()
+        
+        try:
+            # Get latest parsed config for each device
+            async for doc in db()["parsed_configs"].find(
+                {"project_id": project_id},
+                sort=[("device_name", 1), ("upload_timestamp", -1)]
+            ):
+                device_name = doc.get("device_name")
+                if device_name and device_name not in device_names:
+                    device_names.add(device_name)
+                    
+                    # Get latest config for this device
+                    latest = await db()["parsed_configs"].find_one(
+                        {"project_id": project_id, "device_name": device_name},
+                        sort=[("upload_timestamp", -1)]
+                    )
+                    
+                    if latest:
+                        # Remove MongoDB _id
+                        latest.pop("_id", None)
+                        devices_data.append(latest)
+        except Exception as db_error:
+            logger.exception(f"Database error while fetching devices for project {project_id}: {db_error}")
+            raise HTTPException(
+                status_code=500,
+                detail=f"Failed to fetch device configurations from database: {str(db_error)}"
+            )
+        
+        if not devices_data:
+            raise HTTPException(
+                status_code=404,
+                detail="No devices found in project. Upload configuration files first."
+            )
+        
+        logger.info(f"Calling LLM service for project recommendations. Project: {project_id}, Devices: {len(devices_data)}")
+        
+        # Call LLM service for project-level recommendations analysis
+        try:
+            result = await llm_service.analyze_project_recommendations(
+                devices_data=devices_data,
+                project_id=project_id
+            )
+        except Exception as llm_error:
+            logger.exception(f"LLM service error for project {project_id}: {llm_error}")
+            raise HTTPException(
+                status_code=500,
+                detail=f"LLM analysis failed: {str(llm_error)}"
+            )
+        
+        # Check for errors in the result
+        parsed_response = result.get("parsed_response", {})
+        if "error" in parsed_response:
+            error_message = result.get("content", "LLM analysis failed")
+            logger.error(f"LLM returned error for project {project_id}: {error_message}")
+            raise HTTPException(
+                status_code=500,
+                detail=error_message
+            )
+        
+        # Extract parsed response
+        recommendations = parsed_response.get("recommendations", [])
+        
+        # Ensure recommendations is a list
+        if not isinstance(recommendations, list):
+            logger.warning(f"LLM returned non-list recommendations for project {project_id}: {type(recommendations)}")
+            recommendations = []
+        
+        # Validate recommendation structure
+        validated_recommendations = []
+        for rec in recommendations:
+            if isinstance(rec, dict):
+                validated_recommendations.append({
+                    "severity": rec.get("severity", "medium"),
+                    "message": rec.get("message", ""),
+                    "device": rec.get("device", "all")
+                })
+            else:
+                logger.warning(f"Invalid recommendation format: {rec}")
+        
+        # Save to database for persistence
+        try:
+            from ..services.topology_service import topology_service
+            await topology_service._save_llm_result(
+                project_id=project_id,
+                result_type="project_recommendations",
+                result_data={"recommendations": validated_recommendations},
+                analysis_summary=f"{len(validated_recommendations)} recommendations generated",
+                metrics=result.get("metrics", {}),
+                llm_used=True
+            )
+            logger.info(f"Saved project recommendations to database for project {project_id}")
+        except Exception as save_error:
+            logger.warning(f"Failed to save project recommendations to database: {save_error}")
+            # Continue even if save fails
+        
+        logger.info(f"Successfully generated {len(validated_recommendations)} recommendations for project {project_id}")
+        
+        return {
+            "recommendations": validated_recommendations,
+            "metrics": result.get("metrics", {}),
+            "devices_analyzed": len(devices_data),
+            "project_id": project_id
+        }
+    
+    except HTTPException:
+        # Re-raise HTTP exceptions as-is
+        raise
+    except Exception as e:
+        logger.exception(f"Unexpected error in analyze_project_recommendations for project {project_id}: {e}")
+        raise HTTPException(
+            status_code=500,
+            detail=f"Internal server error: {str(e)}"
+        )
+
 
 @router.post("", response_model=AnalysisPublic)
 async def create_analysis(
