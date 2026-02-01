@@ -37,10 +37,29 @@ const formatDate = (dateString) => {
   }
 };
 
+/** ป้องกัน React #31: ไม่เรนเดอร์ object/array เป็น child ใช้กับค่าจาก API/state */
+function safeDisplay(val) {
+  if (val === null || val === undefined) return "—";
+  if (typeof val === "string" || typeof val === "number" || typeof val === "boolean") return String(val);
+  if (React.isValidElement(val)) return val;
+  if (Array.isArray(val)) return val.length ? val.map(safeDisplay).join(", ") : "—";
+  if (typeof val === "object") return JSON.stringify(val);
+  return String(val);
+}
+
+/** ใช้กับ props ที่อาจเป็น object (เช่น actions, children) - ถ้าเป็น plain object ให้แสดงเป็น string */
+function safeChild(val) {
+  if (val === null || val === undefined) return null;
+  if (React.isValidElement(val)) return val;
+  if (Array.isArray(val)) return val;
+  if (typeof val === "object") return safeDisplay(val);
+  return val;
+}
+
 /* ========== UI PRIMITIVES ========= */
 const Badge = ({ children }) => (
   <span className="inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-medium bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-100">
-    {children}
+    {safeChild(children)}
   </span>
 );
 const Button = ({
@@ -81,19 +100,19 @@ const Card = ({ title, actions, children, className = "", compact = false }) => 
       {(title || actions) && (
         <div className={`flex items-center justify-between border-b border-gray-100 dark:border-[#1F2937] flex-shrink-0 ${compact ? 'px-2 py-1' : 'px-5 py-3'}`}>
           <h3 className={`${compact ? 'text-[10px]' : 'text-sm'} font-semibold text-gray-700 dark:text-gray-200`}>
-            {title}
+            {safeDisplay(title)}
           </h3>
-          <div className="flex gap-2">{actions}</div>
+          <div className="flex gap-2">{safeChild(actions)}</div>
         </div>
       )}
-      <div className={isFlexCard ? (isFullScreen ? "flex-1 min-h-0 flex flex-col overflow-hidden" : (compact ? "p-1 flex-1 min-h-0 flex flex-col overflow-hidden" : "p-5 flex-1 min-h-0 flex flex-col overflow-hidden")) : (compact ? "p-1" : "p-5")}>{children}</div>
+      <div className={isFlexCard ? (isFullScreen ? "flex-1 min-h-0 flex flex-col overflow-hidden" : (compact ? "p-1 flex-1 min-h-0 flex flex-col overflow-hidden" : "p-5 flex-1 min-h-0 flex flex-col overflow-hidden")) : (compact ? "p-1" : "p-5")}>{safeChild(children)}</div>
     </div>
   );
 };
 const Field = ({ label, children }) => (
   <label className="grid gap-1.5">
     <span className="text-xs font-medium text-gray-600 dark:text-gray-300">
-      {label}
+      {safeDisplay(label)}
     </span>
     {children}
   </label>
@@ -185,8 +204,8 @@ const Select = ({ options = [], value, onChange, className = "" }) => (
     className={`rounded-xl border border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-800 px-3 py-2 text-sm text-gray-900 dark:text-gray-100 focus:outline-none focus:ring-2 focus:ring-blue-500 ${className}`}
   >
     {options.map((o) => (
-      <option key={o.value} value={o.value}>
-        {o.label}
+      <option key={safeDisplay(o.value)} value={o.value}>
+        {safeDisplay(o.label)}
       </option>
     ))}
   </select>
@@ -277,7 +296,7 @@ const SelectWithOther = ({ options = [], value, onChange, className = "", placeh
               onClick={() => handleOptionClick(o.value)}
               className="px-3 py-2 hover:bg-gray-100 dark:hover:bg-gray-700 cursor-pointer text-sm"
             >
-              {o.label}
+              {safeDisplay(o.label)}
             </div>
           ))}
           {inputValue.trim() !== "" && !options.find(o => o.value === inputValue) && (
@@ -322,7 +341,7 @@ const Table = ({
                 className={`px-2 py-1.5 text-left ${headerTextSize} font-semibold uppercase tracking-wider text-gray-700 dark:text-gray-200 border-b border-gray-200 dark:border-gray-700 whitespace-nowrap`}
                 style={{ width: c.width }}
               >
-                {c.header}
+                {safeDisplay(c.header)}
               </th>
             ))}
           </tr>
@@ -334,7 +353,7 @@ const Table = ({
                 className={`px-4 py-8 ${tableTextSize} text-center text-gray-500 dark:text-gray-400`}
                 colSpan={columns.length}
               >
-                {empty}
+                {safeDisplay(empty)}
               </td>
             </tr>
           )}
@@ -344,7 +363,30 @@ const Table = ({
               className="hover:bg-gray-50 dark:hover:bg-gray-800/50 transition-colors"
             >
               {columns.map((c) => {
-                const cellContent = c.cell ? c.cell(row, i) : row[c.key];
+                let cellContent;
+                if (c.cell) {
+                  const raw = c.cell(row, i);
+                  if (typeof raw === "object" && raw !== null && !React.isValidElement(raw)) {
+                    cellContent = Array.isArray(raw) ? raw.join(", ") : JSON.stringify(raw);
+                  } else {
+                    cellContent = raw;
+                  }
+                } else {
+                  const raw = row[c.key];
+                  if (raw === null || raw === undefined) {
+                    cellContent = "—";
+                  } else if (typeof raw === "object" && raw !== null) {
+                    if (Array.isArray(raw)) {
+                      cellContent = raw.length ? raw.join(", ") : "—";
+                    } else if (Object.prototype.hasOwnProperty.call(raw, "total") && Object.prototype.hasOwnProperty.call(raw, "up")) {
+                      cellContent = `${raw.total ?? 0}/${raw.up ?? 0}/${raw.down ?? 0}/${raw.adminDown ?? 0}`;
+                    } else {
+                      cellContent = JSON.stringify(raw);
+                    }
+                  } else {
+                    cellContent = raw;
+                  }
+                }
                 return (
                   <td
                     key={c.key || c.header}
@@ -1056,14 +1098,6 @@ export default function App() {
   const memberUsernames = (p) => (p.members || []).map((m) => m.username);
   const isMember = (p, username) => memberUsernames(p).includes(username);
 
-  // #region agent log
-  useEffect(() => {
-    const logData = {location:'App.jsx:1017',message:'ROUTE_STATE_CHANGE',data:{routeName:route.name,routeDevice:route.device,routeProjectId:route.projectId,hasAuthedUser:!!authedUser},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'C'};
-    console.log('[DEBUG] ROUTE_STATE_CHANGE:', logData);
-    fetch('http://127.0.0.1:7242/ingest/b2e1e3ce-f337-4937-85a6-3e6049434e8e',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(logData)}).catch((err) => console.error('[DEBUG] Log fetch failed:', err));
-  }, [route.name, route.device, route.projectId, authedUser]);
-  // #endregion
-
   /* Single-pane layout for Index, Project, and Device (above-the-fold, no outer scroll) */
   if (authedUser && (route.name === "index" || route.name === "project" || route.name === "device")) {
     const project = (route.name === "project" || route.name === "device") 
@@ -1108,14 +1142,14 @@ export default function App() {
                           onClick={() => setRoute({ name: "project", projectId: route.projectId, tab: "summary" })}
                           className="text-sm font-medium text-slate-300 hover:text-blue-400 truncate"
                         >
-                          {project.name}
+                          {safeDisplay(project?.name)}
                         </button>
                         <span className="text-slate-600 dark:text-slate-400">/</span>
-                        <span className="text-sm font-medium text-slate-300 truncate">{route.device}</span>
+                        <span className="text-sm font-medium text-slate-300 truncate">{safeDisplay(route?.device)}</span>
                       </>
                     ) : (
                       <>
-                        <span className="text-sm font-medium text-slate-300 truncate">{project.name}</span>
+                        <span className="text-sm font-medium text-slate-300 truncate">{safeDisplay(project?.name)}</span>
                         {/* Tabs integrated in header */}
                         {projectTabs.length > 0 && (
                           <nav className="flex items-center gap-1 ml-4">
@@ -1129,8 +1163,8 @@ export default function App() {
                                     : "hover:bg-slate-700 hover:text-blue-400 text-slate-400"
                                 }`}
                               >
-                                <span>{t.icon}</span>
-                                <span>{t.label}</span>
+                                <span>{safeDisplay(t.icon)}</span>
+                                <span>{safeDisplay(t.label)}</span>
                               </button>
                             ))}
                           </nav>
@@ -1147,7 +1181,7 @@ export default function App() {
               <Button variant="ghost" className="text-slate-400 hover:text-slate-200" onClick={() => setDark(!dark)}>
                 {dark ? "🌙" : "☀️"}
               </Button>
-              <span className="text-xs text-slate-400">{authedUser?.username}</span>
+              <span className="text-xs text-slate-400">{safeDisplay(authedUser?.username)}</span>
               <Button variant="secondary" className="text-xs py-1.5 px-3" onClick={handleLogout}>
                 Sign out
               </Button>
@@ -1289,26 +1323,7 @@ export default function App() {
                 tab={route.tab || "setting"}
                 onChangeTab={(tab) => setRoute({ ...route, tab })}
                 openDevice={(device) => {
-                  // #region agent log
-                  const logData1 = {location:'App.jsx:1153',message:'openDevice CALLED',data:{device,currentRouteName:route.name,projectId:route.projectId},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'B'};
-                  console.log('[DEBUG] openDevice CALLED:', logData1);
-                  fetch('http://127.0.0.1:7242/ingest/b2e1e3ce-f337-4937-85a6-3e6049434e8e',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(logData1)}).catch((err) => console.error('[DEBUG] Log fetch failed:', err));
-                  // #endregion
-                  console.log('[ProjectView] openDevice called with device:', device);
-                  console.log('[ProjectView] Current route:', route);
-                  const newRoute = { name: "device", projectId: route.projectId, device };
-                  console.log('[ProjectView] Setting new route:', newRoute);
-                  // #region agent log
-                  const logData2 = {location:'App.jsx:1158',message:'setRoute BEFORE',data:{newRoute},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'C'};
-                  console.log('[DEBUG] setRoute BEFORE:', logData2);
-                  fetch('http://127.0.0.1:7242/ingest/b2e1e3ce-f337-4937-85a6-3e6049434e8e',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(logData2)}).catch((err) => console.error('[DEBUG] Log fetch failed:', err));
-                  // #endregion
-                  setRoute(newRoute);
-                  // #region agent log
-                  const logData3 = {location:'App.jsx:1159',message:'setRoute AFTER',data:{newRoute},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'C'};
-                  console.log('[DEBUG] setRoute AFTER:', logData3);
-                  fetch('http://127.0.0.1:7242/ingest/b2e1e3ce-f337-4937-85a6-3e6049434e8e',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(logData3)}).catch((err) => console.error('[DEBUG] Log fetch failed:', err));
-                  // #endregion
+                  setRoute({ name: "device", projectId: route.projectId, device });
                 }}
                 goIndex={() => setRoute({ name: "index" })}
                 setProjects={setProjects}
@@ -1355,7 +1370,7 @@ const Header = ({ dark, setDark, authedUser, setRoute, can, onLogout }) => (
       </Button>
       {authedUser ? (
         <>
-          <div className="text-sm text-gray-300">{authedUser.username}</div>
+          <div className="text-sm text-gray-300">{safeDisplay(authedUser?.username)}</div>
           <Button
             variant="secondary"
             onClick={onLogout}
@@ -1431,7 +1446,7 @@ const Login = ({ onLogin, goChange }) => {
               <svg className="w-5 h-5 flex-shrink-0 mt-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
               </svg>
-              <span>{error}</span>
+              <span>{safeDisplay(error)}</span>
             </div>
           )}
           <div className="flex items-center justify-between">
@@ -1546,7 +1561,7 @@ const ChangePassword = ({ initialUsername = "", isLoggedIn = false, goBack, auth
           </Field>
           {msg && (
             <div className={`text-sm ${msg.startsWith("✅") ? "text-green-600 dark:text-green-400" : "text-rose-400"}`}>
-              {msg}
+              {safeDisplay(msg)}
             </div>
           )}
           <div className="flex gap-2">
@@ -1641,9 +1656,9 @@ const ProjectIndex = ({
               </div>
             )}
             <div className="grid gap-3">
-              {p.desc && (
+              {p.desc != null && (
                 <div className="text-sm text-gray-600 dark:text-gray-300 line-clamp-2 min-h-[2.5rem]">
-                  {p.desc}
+                  {safeDisplay(p.desc)}
                 </div>
               )}
               <div className="flex flex-wrap gap-x-4 gap-y-2 text-xs text-gray-500 dark:text-gray-400 pt-1 border-t border-gray-200 dark:border-[#1F2937]">
@@ -1651,19 +1666,19 @@ const ProjectIndex = ({
                   <svg className="w-4 h-4 text-gray-400 dark:text-gray-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
                   </svg>
-                  <span className="font-medium text-gray-700 dark:text-gray-300">{p.manager || "—"}</span>
+                  <span className="font-medium text-gray-700 dark:text-gray-300">{safeDisplay(p.manager) || "—"}</span>
                 </span>
                 <span className="flex items-center gap-1.5">
                   <svg className="w-4 h-4 text-gray-400 dark:text-gray-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
                   </svg>
-                  <span>{p.updated}</span>
+                  <span>{safeDisplay(p.updated)}</span>
                 </span>
                 <span className="flex items-center gap-1.5">
                   <svg className="w-4 h-4 text-gray-400 dark:text-gray-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z" />
                   </svg>
-                  <span><b className="text-gray-700 dark:text-gray-300">{p.devices || 0}</b> devices</span>
+                  <span><b className="text-gray-700 dark:text-gray-300">{safeDisplay(p.devices) === "—" ? 0 : safeDisplay(p.devices)}</b> devices</span>
                 </span>
               </div>
               <div className="pt-2">
@@ -1827,7 +1842,7 @@ const NewProjectPage = ({ onCancel, onCreate }) => {
                   cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
               />
             </Field>
-            {error && <div className="text-sm text-rose-500 dark:text-rose-400">{error}</div>}
+            {error && <div className="text-sm text-rose-500 dark:text-rose-400">{safeDisplay(error)}</div>}
             {topoUrl && (
               <img
                 src={topoUrl}
@@ -2089,7 +2104,7 @@ const UserAdminPage = ({ users, setUsers, onClose }) => {
         </div>
         {error && (
           <div className="mt-3 text-sm text-rose-500 dark:text-rose-400 bg-rose-50 dark:bg-rose-900/20 border border-rose-200 dark:border-rose-800 rounded-lg px-3 py-2">
-            {error}
+            {safeDisplay(error)}
           </div>
         )}
         <div className="mt-4 flex gap-2">
@@ -2109,7 +2124,7 @@ const UserAdminPage = ({ users, setUsers, onClose }) => {
               key: "username",
               cell: (row) => (
                 <div className="font-medium text-gray-900 dark:text-gray-100">
-                  {row.username}
+                  {safeDisplay(row?.username)}
                 </div>
               )
             },
@@ -2118,7 +2133,7 @@ const UserAdminPage = ({ users, setUsers, onClose }) => {
               key: "email",
               cell: (row) => (
                 <div className="text-gray-700 dark:text-gray-300">
-                  {row.email || "-"}
+                  {safeDisplay(row?.email) || "-"}
                 </div>
               )
             },
@@ -2132,7 +2147,7 @@ const UserAdminPage = ({ users, setUsers, onClose }) => {
               key: "phone_number",
               cell: (row) => (
                 <div className="text-gray-700 dark:text-gray-300">
-                  {row.phone_number || "-"}
+                  {safeDisplay(row?.phone_number) || "-"}
                 </div>
               )
             },
@@ -2141,7 +2156,7 @@ const UserAdminPage = ({ users, setUsers, onClose }) => {
               key: "last_login_at",
               cell: (row) => (
                 <div className="text-sm text-gray-600 dark:text-gray-400">
-                  {row.last_login_at ? formatDateTime(row.last_login_at) : "-"}
+                  {row?.last_login_at != null ? safeDisplay(formatDateTime(row.last_login_at)) : "-"}
                 </div>
               )
             },
@@ -2311,17 +2326,17 @@ const OverviewPage = ({ project, uploadHistory }) => {
       <div>
         <h2 className="text-xl font-semibold">Overview</h2>
         <div className="text-sm text-gray-500 dark:text-gray-400">
-          Last updated: {project.updated} · Manager: {project.manager}
+          Last updated: {safeDisplay(project?.updated)} · Manager: {safeDisplay(project?.manager)}
         </div>
       </div>
     </div>
 
     {/* KPIs */}
     <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
-      <Card title="Total Devices"><div className="text-3xl font-semibold">{project.devices}</div></Card>
-      <Card title="Last Backup"><div className="text-3xl font-semibold">{project.lastBackup}</div></Card>
-      <Card title="Team Members"><div className="text-3xl font-semibold">{project.members.length}</div></Card>
-      <Card title="Active Services"><div className="text-3xl font-semibold">{project.services}</div></Card>
+      <Card title="Total Devices"><div className="text-3xl font-semibold">{safeDisplay(project?.devices)}</div></Card>
+      <Card title="Last Backup"><div className="text-3xl font-semibold">{safeDisplay(project?.lastBackup)}</div></Card>
+      <Card title="Team Members"><div className="text-3xl font-semibold">{safeDisplay(project?.members?.length)}</div></Card>
+      <Card title="Active Services"><div className="text-3xl font-semibold">{safeDisplay(project?.services)}</div></Card>
     </div>
 
     {/* Topology (ถ้ามี) */}
@@ -2351,10 +2366,10 @@ const OverviewPage = ({ project, uploadHistory }) => {
             >
               <div className="flex items-center justify-between gap-4">
                 <div className="text-sm">
-                  <div className="font-semibold text-gray-800 dark:text-gray-100">Device: {r.device}</div>
+                  <div className="font-semibold text-gray-800 dark:text-gray-100">Device: {safeDisplay(r.device)}</div>
                   <div className="text-xs text-gray-500 dark:text-gray-400 mt-0.5">
-                    Compare file: <span className="font-mono">{oldF}</span> <span className="opacity-70">→</span>{" "}
-                    <span className="font-mono">{newF}</span>
+                    Compare file: <span className="font-mono">{safeDisplay(oldF)}</span> <span className="opacity-70">→</span>{" "}
+                    <span className="font-mono">{safeDisplay(newF)}</span>
                   </div>
                 </div>
               </div>
@@ -2603,13 +2618,13 @@ const NetworkOverviewCard = ({ project, summaryRows }) => {
           <>
             {error && (
               <div className="p-2 rounded bg-rose-900/20 border border-rose-700 text-rose-400 text-xs mb-2">
-                Error: {error}
+                Error: {safeDisplay(error)}
               </div>
             )}
             
-            {overviewText ? (
+            {overviewText != null ? (
               <div className="text-slate-300 leading-relaxed break-words whitespace-pre-wrap">
-                {overviewText}
+                {safeDisplay(overviewText)}
               </div>
             ) : (
               <div className="text-slate-500 italic">
@@ -2750,7 +2765,7 @@ const RecommendationsCard = ({ project, summaryRows }) => {
           <>
             {error && (
               <div className="p-2 rounded bg-rose-900/20 border border-rose-700 text-rose-400 text-xs mb-2">
-                Error: {error}
+                Error: {safeDisplay(error)}
               </div>
             )}
             
@@ -2773,14 +2788,14 @@ const RecommendationsCard = ({ project, summaryRows }) => {
                         <span className="text-xs font-medium text-slate-300">[{item.device}]</span>
                       )}
                     </div>
-                    {item.issue && (
+                    {item.issue != null && (
                       <div className="text-xs text-slate-300 mb-1">
-                        <span className="font-semibold">Issue:</span> {item.issue}
+                        <span className="font-semibold">Issue:</span> {safeDisplay(item.issue)}
                       </div>
                     )}
-                    {item.recommendation && (
+                    {item.recommendation != null && (
                       <div className="text-xs text-slate-200">
-                        <span className="font-semibold">Recommendation:</span> {item.recommendation}
+                        <span className="font-semibold">Recommendation:</span> {safeDisplay(item.recommendation)}
                       </div>
                     )}
                   </div>
@@ -2918,35 +2933,17 @@ const SummaryPage = ({ project, can, authedUser, setProjects, openDevice }) => {
   };
 
   const handleDeviceClick = (deviceName, e) => {
-    // #region agent log
-    const logData = {location:'App.jsx:2464',message:'handleDeviceClick ENTRY',data:{deviceName,hasEvent:!!e,hasOpenDevice:!!openDevice},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'A'};
-    console.log('[DEBUG] handleDeviceClick ENTRY:', logData);
-    fetch('http://127.0.0.1:7242/ingest/b2e1e3ce-f337-4937-85a6-3e6049434e8e',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(logData)}).catch((err) => console.error('[DEBUG] Log fetch failed:', err));
-    // #endregion
     if (e) {
       e.preventDefault();
       e.stopPropagation();
     }
-    console.log('handleDeviceClick called with deviceName:', deviceName);
-    console.log('openDevice prop:', openDevice);
     if (!deviceName) {
-      // #region agent log
-      fetch('http://127.0.0.1:7242/ingest/b2e1e3ce-f337-4937-85a6-3e6049434e8e',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'App.jsx:2472',message:'handleDeviceClick MISSING_DEVICE',data:{deviceName},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'A'})}).catch(()=>{});
-      // #endregion
       console.error('Device name is missing');
       return;
     }
     if (openDevice) {
-      // #region agent log
-      fetch('http://127.0.0.1:7242/ingest/b2e1e3ce-f337-4937-85a6-3e6049434e8e',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'App.jsx:2477',message:'handleDeviceClick CALLING_OPENDEVICE',data:{deviceName},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'B'})}).catch(()=>{});
-      // #endregion
-      console.log('Calling openDevice with:', deviceName);
       openDevice(deviceName);
     } else {
-      // #region agent log
-      fetch('http://127.0.0.1:7242/ingest/b2e1e3ce-f337-4937-85a6-3e6049434e8e',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'App.jsx:2480',message:'handleDeviceClick NO_OPENDEVICE',data:{deviceName},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'B'})}).catch(()=>{});
-      // #endregion
-      // Fallback: try to navigate using route if openDevice is not available
       console.error('openDevice prop not provided, cannot navigate to device details');
     }
   };
@@ -2981,26 +2978,20 @@ const SummaryPage = ({ project, can, authedUser, setProjects, openDevice }) => {
     { header: "CPU%", key: "cpu", width: "60px" },
     { header: "MEM%", key: "mem", width: "60px" },
     { header: "STATUS", key: "status", cell: (r) => {
-        const status = r.status || "OK";
+        const raw = r.status;
+        const status = (raw != null && typeof raw === "object") ? JSON.stringify(raw) : (raw || "OK");
         if (status === "OK") {
           return <span className="text-emerald-400">✅ OK</span>;
         } else if (status === "Drift") {
           return <span className="text-amber-400">⚠ Drift</span>;
         } else {
-          return <span className="text-red-400">⚠ {status}</span>;
+          return <span className="text-red-400">⚠ {String(status)}</span>;
         }
       }},
     { header: "MORE", key: "more", width: "40px", cell: (r) => (
       <button
         className="w-6 h-6 flex items-center justify-center rounded border border-slate-600 hover:bg-slate-700 text-slate-300 text-[10px] transition-colors mx-auto"
-        onClick={(e) => {
-          // #region agent log
-          const logData = {location:'App.jsx:2556',message:'BUTTON_CLICK',data:{device:r.device,hasEvent:!!e},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'A'};
-          console.log('[DEBUG] BUTTON_CLICK:', logData);
-          fetch('http://127.0.0.1:7242/ingest/b2e1e3ce-f337-4937-85a6-3e6049434e8e',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(logData)}).catch((err) => console.error('[DEBUG] Log fetch failed:', err));
-          // #endregion
-          handleDeviceClick(r.device, e);
-        }}
+        onClick={(e) => handleDeviceClick(r.device, e)}
         title="Open Details"
       >
         →
@@ -3039,7 +3030,7 @@ const SummaryPage = ({ project, can, authedUser, setProjects, openDevice }) => {
         
         return `"${String(value).replaceAll('"','""')}"`;
       }).join(","));
-    downloadCSV([headers.join(","), ...rows].join("\n"), `summary_${project.name}.csv`);
+    downloadCSV([headers.join(","), ...rows].join("\n"), `summary_${safeDisplay(project?.name)}.csv`);
   };
 
   /* Above-the-fold metrics: from backend dashboard API or fallback to summaryRows */
@@ -3121,7 +3112,7 @@ const SummaryPage = ({ project, can, authedUser, setProjects, openDevice }) => {
       ) : error ? (
         <div className="flex-1 min-h-0 flex flex-col items-center justify-center rounded-xl border border-slate-800 bg-slate-900/50 p-4">
           <div className="text-sm text-rose-400 font-semibold mb-2">Error loading summary</div>
-          <div className="text-xs text-slate-400 mb-3">{error}</div>
+          <div className="text-xs text-slate-400 mb-3">{safeDisplay(error)}</div>
           <Button variant="secondary" className="text-xs" onClick={() => {
             setError(null);
             const projectId = project?.project_id || project?.id;
@@ -3750,7 +3741,7 @@ const DeviceDetailsView = ({ project, deviceId, goBack, uploadHistory, authedUse
 
       {error && (
         <div className="rounded-xl border border-rose-300 dark:border-rose-700 bg-rose-50 dark:bg-rose-900/20 p-4 text-sm text-rose-700 dark:text-rose-400">
-          Error: {error}
+          Error: {safeDisplay(error)}
         </div>
       )}
 
@@ -3850,7 +3841,7 @@ const DeviceDetailsView = ({ project, deviceId, goBack, uploadHistory, authedUse
         title="AI Summary (per-device)"
       >
         <div className="rounded-xl border border-gray-200 dark:border-[#1F2937] p-4 bg-gray-50 dark:bg-[#0F172A]">
-          <pre className="whitespace-pre-wrap text-[13px] leading-relaxed">{deviceNarrative}</pre>
+          <pre className="whitespace-pre-wrap text-[13px] leading-relaxed">{safeDisplay(deviceNarrative)}</pre>
         </div>
       </Card>
 
@@ -3906,12 +3897,12 @@ const DeviceDetailsView = ({ project, deviceId, goBack, uploadHistory, authedUse
             ) : (
               <div className="grid gap-3">
                 <div className="text-sm">
-                  <b>Device:</b> {facts.device} <br />
+                  <b>Device:</b> {safeDisplay(facts?.device)} <br />
                   <b>Available backups:</b> {deviceBackups.length} file(s) <br />
                   <b>Latest files:</b>{" "}
-                  <span className="text-blue-300">{driftSummary?.from}</span>{" "}
+                  <span className="text-blue-300">{safeDisplay(driftSummary?.from)}</span>{" "}
                   <span className="mx-1">→</span>
-                  <span className="text-blue-300">{driftSummary?.to}</span>
+                  <span className="text-blue-300">{safeDisplay(driftSummary?.to)}</span>
                 </div>
                 <div className="text-sm text-gray-400">
                   To view detailed diff, use the "Compare Backups" button below or download files to compare locally.
@@ -4756,8 +4747,8 @@ const DeviceDetailsView = ({ project, deviceId, goBack, uploadHistory, authedUse
 
 const Metric = ({ k, v }) => (
   <div className="rounded-xl border border-gray-200 dark:border-[#1F2937] bg-white dark:bg-[#0F172A] p-3">
-    <div className="text-xs text-gray-500 dark:text-gray-400">{k}</div>
-    <div className="mt-1 font-semibold">{v}</div>
+    <div className="text-xs text-gray-500 dark:text-gray-400">{safeDisplay(k)}</div>
+    <div className="mt-1 font-semibold">{safeDisplay(v)}</div>
   </div>
 );
 
@@ -4883,7 +4874,7 @@ const UploadConfigForm = ({ project, authedUser, onClose, onUpload }) => {
             <form onSubmit={handleSubmit} className="grid gap-3">
             {error && (
               <div className="rounded-xl border border-rose-300 dark:border-rose-700 bg-rose-50 dark:bg-rose-900/20 p-3 text-sm text-rose-700 dark:text-rose-400">
-                {error}
+                {safeDisplay(error)}
                 </div>
               )}
 
@@ -5230,7 +5221,7 @@ const UploadDocumentForm = ({ project, authedUser, onClose, onUpload, folderStru
             <form onSubmit={handleSubmit} className="grid gap-3">
             {error && (
               <div className="rounded-xl border border-rose-300 dark:border-rose-700 bg-rose-50 dark:bg-rose-900/20 p-3 text-sm text-rose-700 dark:text-rose-400">
-                {error}
+                {safeDisplay(error)}
                 </div>
               )}
 
@@ -5448,7 +5439,8 @@ const AnalysisPage = ({ project, authedUser, onChangeTab }) => {
   const loadDevices = async () => {
     try {
       const summary = await api.getConfigSummary(project.project_id);
-      const deviceNames = summary.map(d => d.device).filter(Boolean);
+      const rows = summary.summaryRows || (Array.isArray(summary) ? summary : []);
+      const deviceNames = rows.map(d => d.device).filter(Boolean);
       setDevices([...new Set(deviceNames)]);
     } catch (e) {
       console.error("Failed to load devices:", e);
@@ -5622,26 +5614,26 @@ const AnalysisPage = ({ project, authedUser, onChangeTab }) => {
               <div className="flex items-start justify-between">
                 <div className="flex-1">
                   <div className="flex items-center gap-3 mb-2">
-                    <h3 className="font-semibold">{analysis.device_name}</h3>
+                    <h3 className="font-semibold">{safeDisplay(analysis?.device_name)}</h3>
                     <Badge className={statusColors[analysis.status]}>
-                      {analysis.status.replace("_", " ")}
+                      {safeDisplay(String(analysis?.status || "").replace("_", " "))}
                     </Badge>
-                    <Badge>{analysis.analysis_type.replace("_", " ")}</Badge>
+                    <Badge>{safeDisplay(String(analysis?.analysis_type || "").replace("_", " "))}</Badge>
                   </div>
                   <div className="text-sm text-gray-600 dark:text-gray-400 mb-2">
-                    {analysis.ai_draft_text?.substring(0, 200)}...
+                    {typeof analysis?.ai_draft_text === "string" ? analysis.ai_draft_text.substring(0, 200) + "..." : safeDisplay(analysis?.ai_draft_text)}
                   </div>
                   <div className="flex items-center gap-4 text-xs text-gray-500">
                     <span>Created: {formatDateTime(analysis.created_at)}</span>
-                    <span>By: {analysis.created_by}</span>
-                    {analysis.llm_metrics && (
+                    <span>By: {safeDisplay(analysis?.created_by)}</span>
+                    {analysis?.llm_metrics && (
                       <span>
-                        {analysis.llm_metrics.inference_time_ms?.toFixed(0)}ms · {analysis.llm_metrics.model_name}
+                        {safeDisplay(analysis.llm_metrics.inference_time_ms != null ? Number(analysis.llm_metrics.inference_time_ms).toFixed(0) : null)}ms · {safeDisplay(analysis.llm_metrics?.model_name)}
                       </span>
                     )}
-                    {analysis.accuracy_metrics && (
+                    {analysis?.accuracy_metrics && (
                       <span className="font-semibold">
-                        Accuracy: {analysis.accuracy_metrics.accuracy_score}%
+                        Accuracy: {safeDisplay(analysis.accuracy_metrics?.accuracy_score)}%
                       </span>
                     )}
                   </div>
@@ -5794,14 +5786,14 @@ const AnalysisDetailModal = ({ analysis, authedUser, onVerify, onClose, loading 
       <Card className="w-full max-w-6xl max-h-[90vh] overflow-hidden flex flex-col">
         <div className="flex items-center justify-between mb-4 border-b pb-4">
           <div>
-            <h3 className="text-lg font-semibold">{analysis.device_name} - {analysis.analysis_type.replace("_", " ")}</h3>
+            <h3 className="text-lg font-semibold">{safeDisplay(analysis?.device_name)} - {safeDisplay(String(analysis?.analysis_type || "").replace("_", " "))}</h3>
             <div className="flex items-center gap-2 mt-2">
-              <Badge className={statusColors[analysis.status]}>
-                {analysis.status.replace("_", " ")}
+              <Badge className={statusColors[analysis?.status]}>
+                {safeDisplay(String(analysis?.status || "").replace("_", " "))}
               </Badge>
-              {analysis.accuracy_metrics && (
+              {analysis?.accuracy_metrics && (
                 <Badge className="bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-100">
-                  Accuracy: {analysis.accuracy_metrics.accuracy_score}%
+                  Accuracy: {safeDisplay(analysis.accuracy_metrics?.accuracy_score)}%
                 </Badge>
               )}
             </div>
@@ -5878,7 +5870,7 @@ const AnalysisDetailModal = ({ analysis, authedUser, onVerify, onClose, loading 
               {analysis.ai_draft_text && viewMode === "draft" && (
                 <div className="mt-4 p-4 bg-blue-50 dark:bg-blue-900/20 rounded-lg">
                   <h4 className="font-semibold mb-2">Full AI Response:</h4>
-                  <p className="whitespace-pre-wrap text-sm">{analysis.ai_draft_text}</p>
+                  <p className="whitespace-pre-wrap text-sm">{safeDisplay(analysis?.ai_draft_text)}</p>
                 </div>
               )}
             </div>
@@ -5890,11 +5882,11 @@ const AnalysisDetailModal = ({ analysis, authedUser, onVerify, onClose, loading 
               <div className="grid grid-cols-2 md:grid-cols-4 gap-4 text-sm">
                 <div>
                   <div className="text-gray-500">Inference Time</div>
-                  <div className="font-semibold">{analysis.llm_metrics.inference_time_ms?.toFixed(0)}ms</div>
+                  <div className="font-semibold">{safeDisplay(analysis?.llm_metrics?.inference_time_ms != null ? Number(analysis.llm_metrics.inference_time_ms).toFixed(0) : null)}ms</div>
                 </div>
                 <div>
                   <div className="text-gray-500">Model</div>
-                  <div className="font-semibold">{analysis.llm_metrics.model_name}</div>
+                  <div className="font-semibold">{safeDisplay(analysis?.llm_metrics?.model_name)}</div>
                 </div>
                 <div>
                   <div className="text-gray-500">Prompt Tokens</div>
@@ -7074,7 +7066,7 @@ const DocumentsPage = ({ project, can, authedUser, uploadHistory, setUploadHisto
     <Card
       title={
         <div className="text-sm font-semibold text-gray-700 dark:text-gray-200">
-          {selectedFile ? selectedFile.name : "Preview"}
+          {safeDisplay(selectedFile?.name) || "Preview"}
         </div>
       }
       actions={
@@ -7356,7 +7348,7 @@ const DocumentsPage = ({ project, can, authedUser, uploadHistory, setUploadHisto
                 </div>
               )}
             </Card>
-            <div className="flex-1 min-h-0 flex flex-col overflow-hidden">{PreviewPane}</div>
+            <div className="flex-1 min-h-0 flex flex-col overflow-hidden">{safeChild(PreviewPane)}</div>
           </div>
         ) : (
           <div className="flex-1 min-h-0 flex flex-col gap-4 overflow-hidden">
@@ -7418,7 +7410,7 @@ const DocumentsPage = ({ project, can, authedUser, uploadHistory, setUploadHisto
               )}
             </Card>
             {/* Preview at bottom when layout is bottom */}
-            <div className="flex-1 min-h-0 flex flex-col overflow-hidden">{PreviewPane}</div>
+            <div className="flex-1 min-h-0 flex flex-col overflow-hidden">{safeChild(PreviewPane)}</div>
           </div>
         )}
       </div>
@@ -8114,7 +8106,7 @@ const SettingPage = ({ project, setProjects, authedUser, goIndex }) => {
                   />
                   {error && (
                     <div className="text-sm text-rose-500 dark:text-rose-400 bg-rose-50 dark:bg-rose-900/20 border border-rose-200 dark:border-rose-800 rounded-lg px-3 py-2">
-                      {error}
+                      {safeDisplay(error)}
                     </div>
                   )}
                   {topoUrl && (
@@ -8157,7 +8149,7 @@ const SettingPage = ({ project, setProjects, authedUser, goIndex }) => {
             
             {error && (
               <div className="text-sm text-rose-500 dark:text-rose-400 bg-rose-50 dark:bg-rose-900/20 border border-rose-200 dark:border-rose-800 rounded-lg px-3 py-2">
-                {error}
+                {safeDisplay(error)}
               </div>
             )}
             
@@ -8738,7 +8730,7 @@ const LogsPage = ({ project, uploadHistory }) => {
       [r.time, r.files, r.who, r.what, r.where, r.when, r.why, r.description]
         .map(v => `"${(v || "").toString().replaceAll('"','""')}"`).join(",")
     );
-    downloadCSV([headers.join(","), ...rows].join("\n"), `logs_${project.name}.csv`);
+    downloadCSV([headers.join(","), ...rows].join("\n"), `logs_${safeDisplay(project?.name)}.csv`);
   };
 
   return (
@@ -9153,7 +9145,7 @@ const DeviceImageUpload = ({ project, deviceName, authedUser, setProjects }) => 
         </div>
       )}
       {error && (
-        <div className="text-sm text-rose-600 dark:text-rose-400">{error}</div>
+        <div className="text-sm text-rose-600 dark:text-rose-400">{safeDisplay(error)}</div>
       )}
       <input
         ref={fileInputRef}

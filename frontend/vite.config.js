@@ -35,6 +35,9 @@ logEntry({
 
 export default defineConfig({
  plugins: [react()],
+ build: {
+  minify: process.env.BUILD_MINIFY !== 'false',
+ },
  server: {
   port: 5173,
   host: '0.0.0.0',
