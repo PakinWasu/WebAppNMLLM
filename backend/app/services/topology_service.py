@@ -37,13 +37,14 @@ class TopologyService:
         self.model_name = _ollama_model()
     
     def _get_topology_system_prompt(self, project_id: str, device_count: int) -> str:
-        """Generate system prompt for topology analysis - focused on neighbors data"""
+        """Generate system prompt for topology analysis - ONLY CDP/LLDP neighbors, NO VLAN/interface data"""
         
-        return f"""You are an Expert Network Topology Engineer. Analyze neighbor data (CDP/LLDP) from network devices and generate a complete network topology.
+        return f"""You are an Expert Network Topology Engineer. Analyze CDP/LLDP neighbor data ONLY from network devices and generate a complete network topology.
 
 **CRITICAL OUTPUT REQUIREMENTS:**
 - Output ONLY valid JSON format (no markdown, no code blocks)
 - Parseable directly as JSON object
+- Use ONLY CDP/LLDP neighbor relationships - DO NOT use VLAN or interface information
 
 **Output Format:**
 {{
@@ -58,8 +59,8 @@ class TopologyService:
     {{
       "from": "source_device_id",
       "to": "target_device_id",
-      "label": "interface-interface",
-      "evidence": "neighbor"
+      "label": "local_port-remote_port",
+      "evidence": "CDP/LLDP neighbor"
     }}
   ],
   "analysis_summary": "brief explanation"
@@ -67,21 +68,31 @@ class TopologyService:
 
 **Analysis Guidelines:**
 1. **Nodes**: Create one node per unique device from neighbor data. Use device_id or hostname as "id".
-2. **Edges**: Create edges from CDP/LLDP neighbor information. Connect devices based on neighbor relationships.
-3. **Data Source**: Use ONLY the neighbors array provided - each neighbor entry shows which devices connect to which.
+2. **Edges**: Create edges ONLY from CDP/LLDP neighbor information. Each neighbor entry indicates a direct physical connection.
+3. **Data Source**: Use ONLY the neighbors array provided - DO NOT use VLAN or interface data.
 
-**Important:**
-- If device A has neighbor B, create edge from A to B
+**CRITICAL RULES:**
+- Use ONLY CDP/LLDP neighbor relationships to create edges
+- DO NOT create edges based on VLAN membership or interface IP addresses
+- DO NOT infer connections from routing protocols or other data
+- If device A has neighbor B in CDP/LLDP, create edge from A to B
 - If device B also has neighbor A, that's bidirectional (one edge is enough)
 - Use exact device IDs/hostnames from input data
-- Preserve interface names from neighbor data
+- Preserve port names from neighbor data (local_port-remote_port)
+
+**DO NOT:**
+- Use VLAN information to create connections
+- Use interface IP addresses to infer connections
+- Use routing protocol neighbors to create topology edges
+- Create edges that are not explicitly shown in CDP/LLDP neighbor data
 
 Project: {project_id} ({device_count} devices)"""
     
     def _prepare_topology_data_for_llm(self, devices_data: List[Dict[str, Any]]) -> Dict[str, Any]:
         """
-        Prepare topology data for LLM analysis - ONLY neighbors data for speed and accuracy.
-        Sends minimal data: device_id, hostname, and neighbors array only.
+        Prepare topology data for LLM analysis - ONLY CDP/LLDP neighbors data.
+        Sends minimal data: device_id, hostname, and CDP/LLDP neighbors array only.
+        NO VLAN, NO interface data, NO routing data.
         """
         topology_data = {
             "total_devices": len(devices_data),
@@ -100,33 +111,42 @@ Project: {project_id} ({device_count} devices)"""
             overview = device.get("device_overview", {})
             neighbors = device.get("neighbors", [])
             
-            # Skip devices with no neighbors (they won't contribute to topology)
-            if not neighbors:
+            # Filter only CDP/LLDP neighbors (exclude routing protocol neighbors)
+            cdp_lldp_neighbors = []
+            for neighbor in neighbors:
+                # Only include neighbors that have local_port/remote_port (CDP/LLDP indicators)
+                # Exclude routing protocol neighbors (OSPF/BGP/EIGRP)
+                if neighbor.get("local_port") or neighbor.get("remote_port") or \
+                   neighbor.get("local_interface") or neighbor.get("remote_interface"):
+                    cdp_lldp_neighbors.append(neighbor)
+            
+            # Skip devices with no CDP/LLDP neighbors (they won't contribute to topology)
+            if not cdp_lldp_neighbors:
                 continue
             
-            # Prepare minimal device info - ONLY what's needed for topology
+            # Prepare minimal device info - ONLY CDP/LLDP neighbors for topology
             device_info = {
                 "device_id": device_name,
                 "hostname": overview.get("hostname", device_name),
-                # Send ALL neighbors (no limit) - they are essential for topology
-                "neighbors": neighbors
+                # Send ONLY CDP/LLDP neighbors - NO VLAN, NO interface, NO routing data
+                "neighbors": cdp_lldp_neighbors
             }
             topology_data["devices"].append(device_info)
         
         return topology_data
     
     def _build_topology_prompt(self, topology_data: Dict[str, Any]) -> str:
-        """Build user prompt - focused on neighbors data for topology generation"""
+        """Build user prompt - ONLY CDP/LLDP neighbors data for topology generation"""
         devices = topology_data.get("devices", [])
         
-        # Build detailed prompt with neighbor information
+        # Build detailed prompt with CDP/LLDP neighbor information ONLY
         prompt_parts = [
-            f"Analyze the following network device neighbor data and generate a complete topology structure.",
+            f"Analyze the following CDP/LLDP neighbor data and generate a complete network topology structure.",
             f"\nTotal devices: {topology_data.get('total_devices', 0)}",
-            f"\n\nNetwork Device Neighbor Data:"
+            f"\n\nCDP/LLDP Neighbor Data (ONLY - no VLAN, no interface IPs, no routing data):"
         ]
         
-        # Include device info with neighbors (up to reasonable size)
+        # Include device info with CDP/LLDP neighbors only (up to reasonable size)
         devices_json = json.dumps(devices, separators=(',', ':'), ensure_ascii=False)
         # Limit to ~4000 chars to keep prompt manageable but informative
         if len(devices_json) > 4000:
@@ -135,13 +155,13 @@ Project: {project_id} ({device_count} devices)"""
             prompt_parts.append(f"\n{devices_json}")
         
         prompt_parts.append(
-            "\n\nPlease analyze the CDP/LLDP neighbors to create a complete network topology."
+            "\n\nIMPORTANT: Use ONLY CDP/LLDP neighbor relationships to create topology edges."
+            "\nDO NOT use VLAN information, interface IP addresses, or routing protocol data."
+            "\nCreate edges based solely on the neighbor relationships shown above."
             "\nReturn ONLY the JSON object with nodes and edges as specified in the system prompt."
         )
         
         return "".join(prompt_parts)
-        
-        return user_message
     
     def _generate_rule_based_topology(self, devices_data: List[Dict[str, Any]]) -> Dict[str, Any]:
         """
@@ -183,98 +203,33 @@ Project: {project_id} ({device_count} devices)"""
                 continue
             
             neighbors = device.get("neighbors", [])
+            # Filter only CDP/LLDP neighbors (exclude routing protocol neighbors)
             for neighbor in neighbors:
                 neighbor_name = neighbor.get("device_name")
                 if not neighbor_name or neighbor_name not in device_map:
                     continue
                 
-                # Check if this device exists in our device list
-                if neighbor_name in device_map:
-                    local_port = neighbor.get("local_port", "")
-                    remote_port = neighbor.get("remote_port", "")
-                    
-                    # Create edge key to avoid duplicates
-                    edge_key = tuple(sorted([device_name, neighbor_name]))
-                    if edge_key not in edge_set:
-                        edge_set.add(edge_key)
-                        edges.append({
-                            "from": device_name,
-                            "to": neighbor_name,
-                            "label": f"{local_port}-{remote_port}" if local_port and remote_port else "",
-                            "evidence": f"LLDP/CDP neighbor: {device_name} sees {neighbor_name}"
-                        })
-        
-        # Create edges based on subnet matching
-        # BUT: Only create subnet-based edges if they are NOT already in neighbor data
-        # This prevents false links (e.g., DIST1-DIST2) that don't actually exist
-        
-        # Build neighbor edge set for validation
-        neighbor_edge_set = set()
-        for device in devices_data:
-            device_name = device.get("device_name")
-            if not device_name:
-                continue
-            neighbors = device.get("neighbors", [])
-            for neighbor in neighbors:
-                neighbor_name = neighbor.get("device_name")
-                if neighbor_name and neighbor_name in device_map:
-                    neighbor_edge_set.add(tuple(sorted([device_name, neighbor_name])))
-        
-        interface_subnets = {}  # subnet -> [(device_name, interface_name, ip)]
-        
-        for device in devices_data:
-            device_name = device.get("device_name")
-            if not device_name:
-                continue
-            
-            interfaces = device.get("interfaces", [])
-            for iface in interfaces:
-                ipv4 = iface.get("ipv4_address")
-                if not ipv4:
+                # Only process neighbors with local_port/remote_port (CDP/LLDP indicators)
+                local_port = neighbor.get("local_port") or neighbor.get("local_interface")
+                remote_port = neighbor.get("remote_port") or neighbor.get("remote_interface")
+                
+                # Skip routing protocol neighbors (no port info) - use ONLY CDP/LLDP
+                if not local_port and not remote_port:
                     continue
                 
-                # Extract subnet (simple approach: remove last octet)
-                try:
-                    parts = ipv4.split(".")
-                    if len(parts) == 4:
-                        subnet = ".".join(parts[:3]) + ".0/24"  # Assume /24
-                        if subnet not in interface_subnets:
-                            interface_subnets[subnet] = []
-                        interface_subnets[subnet].append((device_name, iface.get("name", ""), ipv4))
-                except:
-                    continue
-        
-        # Create edges for devices on same subnet
-        # BUT: Only if the link is NOT already confirmed by neighbor data
-        for subnet, devices_on_subnet in interface_subnets.items():
-            if len(devices_on_subnet) < 2:
-                continue
-            
-            # Create edges between all devices on the same subnet (skip self-loops)
-            for i, (dev1, iface1, ip1) in enumerate(devices_on_subnet):
-                for j, (dev2, iface2, ip2) in enumerate(devices_on_subnet[i+1:], i+1):
-                    # Skip self-loops (same device)
-                    if dev1 == dev2:
-                        continue
-                    if dev1 not in device_map or dev2 not in device_map:
-                        continue
-                    
-                    edge_key = tuple(sorted([dev1, dev2]))
-                    
-                    # CRITICAL: Only create subnet-based edge if it's NOT already in neighbor data
-                    # This prevents false links like DIST1-DIST2 that don't actually connect
-                    if edge_key in neighbor_edge_set:
-                        # This link already exists from neighbor data, skip subnet matching
-                        continue
-                    
-                    if edge_key not in edge_set:
-                        edge_set.add(edge_key)
-                        edges.append({
-                            "from": dev1,
-                            "to": dev2,
-                            "label": f"{iface1}-{iface2}",
-                            "evidence": f"Subnet match: {dev1} ({ip1}) and {dev2} ({ip2}) on {subnet}"
+                # Create edge key to avoid duplicates
+                edge_key = tuple(sorted([device_name, neighbor_name]))
+                if edge_key not in edge_set:
+                    edge_set.add(edge_key)
+                    edges.append({
+                        "from": device_name,
+                        "to": neighbor_name,
+                        "label": f"{local_port}-{remote_port}" if local_port and remote_port else "",
+                        "evidence": f"CDP/LLDP neighbor: {device_name} sees {neighbor_name}"
                         })
+        
+        # NO subnet matching - use ONLY CDP/LLDP neighbors
+        # This ensures topology matches actual physical connections
         
         return {
             "nodes": nodes,
@@ -515,18 +470,11 @@ Project: {project_id} ({device_count} devices)"""
             "timestamp": datetime.utcnow()
         }
         
-        # Log performance metrics
-        await self._log_performance_metrics(
+        # Save LLM result to database (persistent storage) - metrics included in result
+        await self._save_llm_result(
             project_id=project_id,
-            inference_time_ms=inference_time_ms,
-            devices_processed=len(devices_data),
-            token_usage=token_usage
-        )
-        
-        # Save LLM topology result to database (persistent storage)
-        await self._save_topology_result(
-            project_id=project_id,
-            topology=topology_data,
+            result_type="topology",
+            result_data=topology_data,
             analysis_summary=analysis_summary,
             metrics=metrics,
             llm_used=use_llm and llm_success
@@ -564,6 +512,14 @@ Project: {project_id} ({device_count} devices)"""
             neighbors = device.get("neighbors", [])
             neighbor_set = set()
             for neighbor in neighbors:
+                # Only process CDP/LLDP neighbors (have local_port/remote_port)
+                local_port = neighbor.get("local_port") or neighbor.get("local_interface")
+                remote_port = neighbor.get("remote_port") or neighbor.get("remote_interface")
+                
+                # Skip routing protocol neighbors (no port info) - use ONLY CDP/LLDP
+                if not local_port and not remote_port:
+                    continue
+                
                 # Try multiple field names for neighbor device name
                 neighbor_name = (
                     neighbor.get("device_name") or 
@@ -619,62 +575,54 @@ Project: {project_id} ({device_count} devices)"""
         
         return validated_edges
     
-    async def _save_topology_result(
+    async def _save_llm_result(
         self,
         project_id: str,
-        topology: Dict[str, Any],
+        result_type: str,
+        result_data: Dict[str, Any],
         analysis_summary: str,
         metrics: Dict[str, Any],
         llm_used: bool
     ):
-        """Save topology generation result (topology + LLM response + metrics) to database"""
+        """
+        Save LLM result to database - unified storage for all LLM analysis results.
+        Metrics are included in the result, no separate performance_logs collection.
+        
+        Args:
+            project_id: Project ID
+            result_type: Type of LLM analysis (e.g., "topology", "config_analysis", etc.)
+            result_data: The actual result data (e.g., topology nodes/edges, analysis content)
+            analysis_summary: Summary text from LLM
+            metrics: LLM performance metrics (inference_time_ms, token_usage, model_name, etc.)
+            llm_used: Whether LLM was actually used
+        """
         try:
-            topology_result = {
+            llm_result = {
                 "project_id": project_id,
-                "topology": topology,
+                "result_type": result_type,
+                "result_data": result_data,
                 "analysis_summary": analysis_summary,
-                "metrics": metrics,
+                "metrics": metrics,  # All LLM metrics stored here (no separate performance_logs)
                 "llm_used": llm_used,
                 "generated_at": datetime.utcnow(),
                 "version": 1  # For future versioning
             }
             
-            # Save to topology_results collection (latest result per project)
-            await db()["topology_results"].update_one(
-                {"project_id": project_id},
-                {"$set": topology_result},
+            # Save to llm_results collection (latest result per project per result_type)
+            await db()["llm_results"].update_one(
+                {"project_id": project_id, "result_type": result_type},
+                {"$set": llm_result},
                 upsert=True
             )
             
-            print(f"[Topology] Saved topology result to database: {len(topology.get('nodes', []))} nodes, {len(topology.get('edges', []))} edges")
+            if result_type == "topology":
+                nodes_count = len(result_data.get('nodes', []))
+                edges_count = len(result_data.get('edges', []))
+                print(f"[Topology] Saved LLM result to database: {nodes_count} nodes, {edges_count} edges")
+            else:
+                print(f"[LLM] Saved {result_type} result to database")
         except Exception as e:
-            print(f"Warning: Failed to save topology result: {e}")
-    
-    async def _log_performance_metrics(
-        self,
-        project_id: str,
-        inference_time_ms: float,
-        devices_processed: int,
-        token_usage: Dict[str, int]
-    ):
-        """Log topology generation performance metrics"""
-        
-        try:
-            performance_log = {
-                "project_id": project_id,
-                "task_type": "topology_generation",
-                "inference_time_ms": inference_time_ms,
-                "devices_processed": devices_processed,
-                "token_usage": token_usage,
-                "model_name": self.model_name,
-                "timestamp": datetime.utcnow()
-            }
-            
-            from ..db.mongo import db
-            await db()["performance_logs"].insert_one(performance_log)
-        except Exception as e:
-            # Log error but don't fail the request
-            print(f"Warning: Failed to log topology performance metrics: {e}")
+            print(f"Warning: Failed to save LLM result: {e}")
 
 
 # Singleton instance

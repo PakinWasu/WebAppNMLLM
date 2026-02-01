@@ -342,7 +342,7 @@ const Table = ({
               {columns.map((c) => (
                 <td
                   key={c.key || c.header}
-                  className={`px-2 py-1 ${tableTextSize} text-gray-800 dark:text-gray-100 align-top`}
+                  className={`px-2 py-1 ${tableTextSize} text-gray-800 dark:text-gray-100 align-top ${c.key === 'more' ? 'text-center' : ''}`}
                 >
                   {typeof c.cell === "function" ? c.cell(row) : row[c.key]}
                 </td>
@@ -976,6 +976,7 @@ export default function App() {
           documents: { config: [], others: [] },
           vlanDetails: {},
           uploadHistory: [],
+          device_images: p.device_images || {}, // Include device_images from database
           created_at: p.created_at,
           created_by: p.created_by,
           updated_at: p.updated_at || p.created_at,
@@ -1184,6 +1185,8 @@ export default function App() {
             goBack={() => setRoute({ name: "project", projectId: route.projectId, tab: "summary" })}
             goIndex={() => setRoute({ name: "index" })}
             uploadHistory={uploadHistory}
+            authedUser={authedUser}
+            setProjects={setProjects}
           />
         )}
       </MainLayout>
@@ -2609,10 +2612,9 @@ const SummaryPage = ({ project, can, authedUser, setProjects, openDevice }) => {
           return <span className="text-red-400">⚠ {status}</span>;
         }
       }},
-    { header: "MORE", key: "more", cell: (r) => (
-      <Button 
-        variant="secondary" 
-        className="text-[9px] py-0.5 px-2 h-6"
+    { header: "MORE", key: "more", width: "40px", cell: (r) => (
+      <button
+        className="w-6 h-6 flex items-center justify-center rounded border border-slate-600 hover:bg-slate-700 text-slate-300 text-[10px] transition-colors mx-auto"
         onClick={(e) => {
           // #region agent log
           const logData = {location:'App.jsx:2556',message:'BUTTON_CLICK',data:{device:r.device,hasEvent:!!e},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'A'};
@@ -2621,9 +2623,10 @@ const SummaryPage = ({ project, can, authedUser, setProjects, openDevice }) => {
           // #endregion
           handleDeviceClick(r.device, e);
         }}
+        title="Open Details"
       >
-        Open
-      </Button>
+        →
+      </button>
     )},
   ];
 
@@ -2647,14 +2650,39 @@ const SummaryPage = ({ project, can, authedUser, setProjects, openDevice }) => {
 
   // ====== UI: Single-pane, above-the-fold (1920x1080) ======
   return (
-    <div className="h-full flex flex-col gap-1 overflow-hidden min-h-0">
-      {/* Compact header */}
-      <div className="flex-shrink-0 flex items-center justify-between gap-1.5 py-0.5">
-        <h2 className="text-[10px] font-medium text-slate-300">Summary Config</h2>
-        <div className="flex gap-1 items-center">
-          <Input placeholder="Search..." value={q} onChange={(e)=>setQ(e.target.value)} className="w-32 text-[10px] py-0.5 h-5" />
-          <Button variant="secondary" className="text-[10px] py-0.5 px-2 h-5" onClick={exportCSV}>CSV</Button>
-          {can("upload-config", project) && <Button variant="secondary" className="text-[10px] py-0.5 px-2 h-5" onClick={() => setShowUploadConfig(true)}>Upload</Button>}
+    <div className="h-full flex flex-col gap-0 overflow-hidden min-h-0">
+      {/* Content section header - integrated design */}
+      <div className="flex-shrink-0 flex items-center justify-between gap-2 py-0.5 px-2">
+        <h2 className="text-xs font-semibold text-slate-300 flex items-center gap-1.5">
+          <span className="w-0.5 h-3 bg-blue-500/70 rounded-full"></span>
+          Summary Config
+        </h2>
+        <div className="flex gap-1.5 items-center">
+          <div className="relative">
+            <Input 
+              placeholder="Search..." 
+              value={q} 
+              onChange={(e)=>setQ(e.target.value)} 
+              className="w-28 text-[9px] py-1 px-2.5 h-6 bg-slate-900/80 border-slate-700 focus:border-blue-500 focus:ring-1 focus:ring-blue-500/50 rounded-md" 
+            />
+            <span className="absolute right-2.5 top-1/2 -translate-y-1/2 text-[9px] text-slate-500 pointer-events-none">🔍</span>
+          </div>
+          <button
+            className="px-2.5 py-0.5 h-6 flex items-center justify-center rounded-md border border-slate-700 bg-slate-900/80 hover:bg-slate-800 hover:border-slate-600 text-slate-300 text-[9px] font-medium transition-all duration-150 whitespace-nowrap"
+            onClick={exportCSV}
+            title="Export CSV"
+          >
+            CSV
+          </button>
+          {can("upload-config", project) && (
+            <button
+              className="px-2.5 py-0.5 h-6 flex items-center justify-center rounded-md border border-slate-700 bg-slate-900/80 hover:bg-slate-800 hover:border-slate-600 text-slate-300 text-[9px] font-medium transition-all duration-150 whitespace-nowrap"
+              onClick={() => setShowUploadConfig(true)}
+              title="Upload Config"
+            >
+              Upload
+            </button>
+          )}
         </div>
       </div>
 
@@ -2668,26 +2696,6 @@ const SummaryPage = ({ project, can, authedUser, setProjects, openDevice }) => {
           defaultFolderId="Config"
         />
       )}
-
-      {/* Compact metrics row */}
-      <div className="flex-shrink-0 grid grid-cols-4 gap-1">
-        <div className="rounded border border-slate-800 bg-slate-900/80 px-1.5 py-0.5 flex items-center justify-between">
-          <span className="text-[9px] text-slate-500">Total</span>
-          <span className="text-xs font-semibold text-slate-200">{totalDevices}</span>
-        </div>
-        <div className="rounded border border-slate-800 bg-slate-900/80 px-1.5 py-0.5 flex items-center justify-between">
-          <span className="text-[9px] text-slate-500">Healthy</span>
-          <span className="text-xs font-semibold text-emerald-400">{okCount}</span>
-        </div>
-        <div className="rounded border border-slate-800 bg-slate-900/80 px-1.5 py-0.5 flex items-center justify-between">
-          <span className="text-[9px] text-slate-500">Critical</span>
-          <span className="text-xs font-semibold text-rose-400">{criticalCount}</span>
-        </div>
-        <div className="rounded border border-slate-800 bg-slate-900/80 px-1.5 py-0.5 flex items-center justify-between">
-          <span className="text-[9px] text-slate-500">C/D/A</span>
-          <span className="text-[9px] font-semibold text-slate-200">{coreCount}/{distCount}/{accessCount}</span>
-        </div>
-      </div>
 
       {/* Topology (2/3) + Narrative (1/3) */}
       <div className="flex-1 min-h-0 grid grid-cols-12 gap-3">
@@ -2760,8 +2768,8 @@ const SummaryPage = ({ project, can, authedUser, setProjects, openDevice }) => {
           }}>Retry</Button>
         </div>
       ) : (
-        <div className="flex-1 min-h-0 overflow-auto rounded-xl border border-slate-800 bg-slate-900/50 p-1" style={{ maxHeight: 'calc(100vh - 600px)' }}>
-          <Table columns={columns} data={filtered} empty="No devices yet. Upload config files to see summary." minWidthClass="min-w-full" containerClassName="text-[10px]" />
+        <div className="flex-1 min-h-0 overflow-auto rounded-xl border border-slate-800 bg-slate-900/50 p-1" style={{ maxHeight: 'calc(100vh - 575px)' }}>
+          <Table columns={columns} data={filtered} empty="No devices yet. Upload config files to see summary." minWidthClass="min-w-full" containerClassName="text-[12px]" />
         </div>
       )}
 
@@ -2781,7 +2789,7 @@ const SummaryPage = ({ project, can, authedUser, setProjects, openDevice }) => {
 
 
 /* ========= DEVICE DETAILS PAGE (with header navigation) ========= */
-const DeviceDetailsPage = ({ project, deviceId, goBack, goIndex, uploadHistory }) => {
+const DeviceDetailsPage = ({ project, deviceId, goBack, goIndex, uploadHistory, authedUser, setProjects }) => {
   if (!project) {
     return <div className="text-sm text-rose-400">Project not found</div>;
   }
@@ -2793,6 +2801,8 @@ const DeviceDetailsPage = ({ project, deviceId, goBack, goIndex, uploadHistory }
         deviceId={deviceId}
         goBack={goBack}
         uploadHistory={uploadHistory}
+        authedUser={authedUser}
+        setProjects={setProjects}
       />
     </div>
   );
@@ -2800,7 +2810,7 @@ const DeviceDetailsPage = ({ project, deviceId, goBack, goIndex, uploadHistory }
 
 /* ========= DEVICE DETAILS (Overview / Interfaces / VLANs / Raw) ========= */
 /* ========= DEVICE DETAILS (Overview / Interfaces / VLANs / Raw) ========= */
-const DeviceDetailsView = ({ project, deviceId, goBack, uploadHistory }) => {
+const DeviceDetailsView = ({ project, deviceId, goBack, uploadHistory, authedUser, setProjects }) => {
   console.log('[DeviceDetailsView] Rendering with props:', { project, deviceId, hasGoBack: !!goBack });
   
   // Early return if project or deviceId is missing
@@ -3406,6 +3416,16 @@ const DeviceDetailsView = ({ project, deviceId, goBack, uploadHistory }) => {
       {/* OVERVIEW */}
       {!loading && !error && tab === "overview" && (
         <div className="grid gap-6">
+          {/* Device Image Upload */}
+          <Card title="Device Image">
+            <DeviceImageUpload 
+              project={project}
+              deviceName={deviceId}
+              authedUser={authedUser}
+              setProjects={setProjects}
+            />
+          </Card>
+          
           <Card title="Device Facts">
             <div className="grid gap-4 md:grid-cols-3 text-sm">
               <Metric k="Model" v={facts.model || "—"} />
@@ -8339,8 +8359,250 @@ const TopoGraph = ({ nodes = [], links = [], getNodeTooltip, onNodeClick }) => {
  */
 
 
+/* ===== Device Image Upload Component ===== */
+const DeviceImageUpload = ({ project, deviceName, authedUser, setProjects }) => {
+  const [imageUrl, setImageUrl] = React.useState(null);
+  const [uploading, setUploading] = React.useState(false);
+  const [error, setError] = React.useState(null);
+  const fileInputRef = React.useRef(null);
+  
+  // Check if user can edit
+  const projectMember = project?.members?.find(m => m.username === authedUser?.username);
+  const isManager = authedUser?.role === "admin" || projectMember?.role === "manager";
+  const canEdit = isManager;
+  
+  // Load existing image from project state or API
+  React.useEffect(() => {
+    const loadImage = async () => {
+      try {
+        const projectId = project?.project_id || project?.id;
+        // First try to get from project state (device_images)
+        const deviceImages = project?.device_images || {};
+        if (deviceImages[deviceName]) {
+          // Check if it's PNG or JPEG based on data format
+          const imageData = deviceImages[deviceName];
+          const imageFormat = imageData.startsWith('/9j/') ? 'jpeg' : 'png';
+          setImageUrl(`data:image/${imageFormat};base64,${imageData}`);
+          return;
+        }
+        
+        // If not in project state, try to fetch from API
+        try {
+          const result = await api.getDeviceImage(projectId, deviceName);
+          if (result.image) {
+            // Check if it's PNG or JPEG based on data format
+            const imageData = result.image;
+            const imageFormat = imageData.startsWith('/9j/') ? 'jpeg' : 'png';
+            setImageUrl(`data:image/${imageFormat};base64,${imageData}`);
+            // Update project state with fetched image
+            if (setProjects) {
+              setProjects(prev => prev.map(p => {
+                const pId = p.project_id || p.id;
+                if (pId === projectId) {
+                  const updatedDeviceImages = { ...(p.device_images || {}), [deviceName]: result.image };
+                  return { ...p, device_images: updatedDeviceImages };
+                }
+                return p;
+              }));
+            }
+          }
+        } catch (apiErr) {
+          // Image not found in API, that's okay
+          if (apiErr.message && !apiErr.message.includes("404")) {
+            console.error("Failed to load device image from API:", apiErr);
+          }
+        }
+      } catch (err) {
+        console.error("Failed to load device image:", err);
+      }
+    };
+    loadImage();
+  }, [project, deviceName, setProjects]);
+  
+  const handleFileSelect = async (e) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    
+    if (!file.type.startsWith("image/")) {
+      setError("Please select an image file");
+      return;
+    }
+    
+    setUploading(true);
+    setError(null);
+    
+    try {
+      const projectId = project?.project_id || project?.id;
+      await api.uploadDeviceImage(projectId, deviceName, file);
+      
+      // Reload image from API
+      const result = await api.getDeviceImage(projectId, deviceName);
+      // Check if it's PNG or JPEG based on data format
+      const imageData = result.image;
+      const imageFormat = imageData.startsWith('/9j/') ? 'jpeg' : 'png';
+      const newImageUrl = `data:image/${imageFormat};base64,${imageData}`;
+      setImageUrl(newImageUrl);
+      
+      // Update project state with new device_images
+      if (setProjects) {
+        setProjects(prev => prev.map(p => {
+          const pId = p.project_id || p.id;
+          if (pId === projectId) {
+            const deviceImages = p.device_images || {};
+            return {
+              ...p,
+              device_images: {
+                ...deviceImages,
+                [deviceName]: result.image
+              }
+            };
+          }
+          return p;
+        }));
+      }
+    } catch (err) {
+      console.error("Upload failed:", err);
+      setError(err.message || "Failed to upload image");
+    } finally {
+      setUploading(false);
+      // Reset file input
+      if (fileInputRef.current) {
+        fileInputRef.current.value = '';
+      }
+    }
+  };
+  
+  const handleDelete = async () => {
+    if (!confirm("Delete device image?")) return;
+    
+    try {
+      const projectId = project?.project_id || project?.id;
+      await api.deleteDeviceImage(projectId, deviceName);
+      setImageUrl(null);
+      
+      // Update project state to remove device image
+      if (setProjects) {
+        setProjects(prev => prev.map(p => {
+          const pId = p.project_id || p.id;
+          if (pId === projectId) {
+            const deviceImages = { ...(p.device_images || {}) };
+            delete deviceImages[deviceName];
+            return {
+              ...p,
+              device_images: deviceImages
+            };
+          }
+          return p;
+        }));
+      }
+    } catch (err) {
+      console.error("Delete failed:", err);
+      setError(err.message || "Failed to delete image");
+    }
+  };
+  
+  return (
+    <div className="space-y-3">
+      {imageUrl ? (
+        <div className="flex items-start gap-4">
+          <img 
+            src={imageUrl} 
+            alt={`${deviceName} device`}
+            className="w-32 h-32 object-contain border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-800"
+          />
+          {canEdit && (
+            <div className="flex flex-col gap-2">
+              <Button
+                variant="secondary"
+                size="sm"
+                onClick={() => fileInputRef.current?.click()}
+                disabled={uploading}
+              >
+                {uploading ? "Uploading..." : "Change Image"}
+              </Button>
+              <Button
+                variant="secondary"
+                size="sm"
+                onClick={handleDelete}
+                disabled={uploading}
+              >
+                Delete Image
+              </Button>
+            </div>
+          )}
+        </div>
+      ) : (
+        <div className="flex items-center gap-4">
+          <div className="w-32 h-32 border-2 border-dashed border-gray-300 dark:border-gray-600 rounded-lg flex items-center justify-center bg-gray-50 dark:bg-gray-800">
+            <span className="text-sm text-gray-500 dark:text-gray-400">No image</span>
+          </div>
+          {canEdit && (
+            <Button
+              variant="secondary"
+              onClick={() => fileInputRef.current?.click()}
+              disabled={uploading}
+            >
+              {uploading ? "Uploading..." : "Upload Image"}
+            </Button>
+          )}
+        </div>
+      )}
+      {error && (
+        <div className="text-sm text-rose-600 dark:text-rose-400">{error}</div>
+      )}
+      <input
+        ref={fileInputRef}
+        type="file"
+        accept="image/*"
+        onChange={handleFileSelect}
+        className="hidden"
+      />
+      {canEdit && (
+        <div className="text-xs text-gray-500 dark:text-gray-400">
+          Upload an image to replace the default device icon in topology view. Max size: 600x600px (auto-resized). PNG format recommended for transparent backgrounds.
+        </div>
+      )}
+    </div>
+  );
+};
+
 /* ===== Network Device Icon Component ===== */
-const NetworkDeviceIcon = ({ role, isSelected, isLinkStart, size = 8 }) => {
+const NetworkDeviceIcon = ({ role, isSelected, isLinkStart, size = 8, imageUrl = null }) => {
+  // If image is provided, show image instead of SVG icon
+  if (imageUrl) {
+    // Make image much larger - 8x the base size for much better visibility
+    const imageSize = size * 8;
+    return (
+      <g>
+        {/* Display image directly - no background, no clipPath, preserves transparency */}
+        <image
+          href={imageUrl}
+          x={-imageSize/2}
+          y={-imageSize/2}
+          width={imageSize}
+          height={imageSize}
+          preserveAspectRatio="xMidYMid meet"
+          opacity={isSelected || isLinkStart ? 1 : 0.95}
+          style={{ imageRendering: 'auto' }}
+        />
+        {/* Border highlight when selected - only border, no background fill */}
+        {(isSelected || isLinkStart) && (
+          <rect
+            x={-imageSize/2 - 1}
+            y={-imageSize/2 - 1}
+            width={imageSize + 2}
+            height={imageSize + 2}
+            fill="none"
+            stroke={isLinkStart ? "#10b981" : "#3b82f6"}
+            strokeWidth="0.8"
+            rx="3"
+          />
+        )}
+      </g>
+    );
+  }
+  
+  // Fallback to SVG icon if no image
   const baseColor = isLinkStart ? "#10b981" : isSelected ? "#3b82f6" : "#F59E0B";
   const strokeColor = isSelected || isLinkStart ? "#ffffff" : "#0B1220";
   const strokeWidth = isSelected || isLinkStart ? "1.5" : "0.5";
@@ -8879,7 +9141,7 @@ const TopologyGraph = ({ project, onOpenDevice, can, authedUser, setProjects, se
     
     setPositions(prev => ({
       ...prev,
-      [dragging]: { x: Math.max(5, Math.min(95, x)), y: Math.max(5, Math.min(95, y)) }
+      [dragging]: { x, y } // No position limits - allow free dragging
     }));
   };
 
@@ -9158,85 +9420,86 @@ const TopologyGraph = ({ project, onOpenDevice, can, authedUser, setProjects, se
   return (
     <Card 
       title={
-        <div className="flex items-center justify-between w-full py-0.5">
-          <div className="flex items-center gap-2 flex-1 min-w-0">
-            <span className="text-[10px] text-slate-400">Topology</span>
-            {/* LLM info and last modified - short format */}
+        <div className="flex items-center justify-between w-full py-1 gap-2">
+          <span className="text-xs font-medium text-slate-300 flex-shrink-0">Topology</span>
+          <div className="flex items-center gap-2 flex-1 justify-end min-w-0">
+            {/* LLM info and last modified - larger format */}
             {topologyLLMMetrics && (
-              <span className="text-[9px] text-slate-500">
-                LLM: {topologyLLMMetrics.model_name?.split(':')[0] || '—'} | {topologyLLMMetrics.inference_time_ms ? `${(topologyLLMMetrics.inference_time_ms / 1000).toFixed(1)}s` : '—'}
+              <span className="text-[10px] text-slate-400 whitespace-nowrap">
+                {topologyLLMMetrics.model_name?.split(':')[0] || '—'} | {topologyLLMMetrics.inference_time_ms ? `${(topologyLLMMetrics.inference_time_ms / 1000).toFixed(1)}s` : '—'}
               </span>
             )}
             {lastModified && (
-              <span className="text-[9px] text-slate-500">
-                | แก้ไข: {formatShortDate(lastModified)}
+              <span className="text-[10px] text-slate-400 whitespace-nowrap">
+                {formatShortDate(lastModified)}
               </span>
             )}
-          </div>
-          <div className="flex gap-1 flex-shrink-0">
-            {!editMode && (
-              <button
-                className="w-5 h-5 flex items-center justify-center rounded bg-blue-600 hover:bg-blue-700 text-white text-[10px] transition-colors disabled:opacity-50"
-                onClick={handleGenerateTopology}
-                disabled={generatingTopology}
-                title={generatingTopology ? "กำลังสร้าง..." : "สร้าง Topology อัตโนมัติ"}
-              >
-                {generatingTopology ? "⏳" : "🤖"}
-              </button>
-            )}
-            {canEdit && (
-              <>
-                {!editMode ? (
-                  <button
-                    className="w-5 h-5 flex items-center justify-center rounded border border-slate-600 hover:bg-slate-700 text-slate-300 text-[10px] transition-colors"
-                    onClick={() => setEditMode(true)}
-                    title="แก้ไขกราฟ"
-                  >
-                    ✏️
-                  </button>
-                ) : (
-                  <>
+            {/* Action buttons - larger and clearer */}
+            <div className="flex gap-1 items-center flex-shrink-0">
+              {!editMode && (
+                <button
+                  className="w-6 h-6 flex items-center justify-center rounded bg-blue-600 hover:bg-blue-700 text-white text-xs transition-colors disabled:opacity-50"
+                  onClick={handleGenerateTopology}
+                  disabled={generatingTopology}
+                  title={generatingTopology ? "Generating..." : "Generate Topology"}
+                >
+                  {generatingTopology ? "⏳" : "🤖"}
+                </button>
+              )}
+              {canEdit && (
+                <>
+                  {!editMode ? (
                     <button
-                      className="w-5 h-5 flex items-center justify-center rounded border border-slate-600 hover:bg-slate-700 text-slate-300 text-[10px] transition-colors"
-                      onClick={handleCancel}
-                      title="ยกเลิก"
+                      className="w-6 h-6 flex items-center justify-center rounded border border-slate-600 hover:bg-slate-700 text-slate-300 text-xs transition-colors"
+                      onClick={() => setEditMode(true)}
+                      title="Edit Graph"
                     >
-                      ✕
+                      ✏️
                     </button>
-                    <button
-                      className="w-5 h-5 flex items-center justify-center rounded bg-blue-600 hover:bg-blue-700 text-white text-[10px] transition-colors"
-                      onClick={handleSave}
-                      title="บันทึกตำแหน่งใหม่"
-                    >
-                      ✓
-                    </button>
-                  </>
-                )}
-              </>
-            )}
-            {/* Zoom controls - always visible */}
-            <div className="flex gap-0.5 ml-1 border-l border-slate-700 pl-1">
-              <button
-                className="w-5 h-5 flex items-center justify-center rounded border border-slate-600 hover:bg-slate-700 text-slate-300 text-[9px] transition-colors"
-                onClick={handleZoomIn}
-                title="ขยาย"
-              >
-                +
-              </button>
-              <button
-                className="w-5 h-5 flex items-center justify-center rounded border border-slate-600 hover:bg-slate-700 text-slate-300 text-[9px] transition-colors"
-                onClick={handleZoomOut}
-                title="ย่อ"
-              >
-                −
-              </button>
-              <button
-                className="w-5 h-5 flex items-center justify-center rounded border border-slate-600 hover:bg-slate-700 text-slate-300 text-[9px] transition-colors"
-                onClick={handleZoomReset}
-                title="รีเซ็ต"
-              >
-                ↻
-              </button>
+                  ) : (
+                    <>
+                      <button
+                        className="w-6 h-6 flex items-center justify-center rounded border border-slate-600 hover:bg-slate-700 text-slate-300 text-xs transition-colors"
+                        onClick={handleCancel}
+                        title="Cancel"
+                      >
+                        ✕
+                      </button>
+                      <button
+                        className="w-6 h-6 flex items-center justify-center rounded bg-blue-600 hover:bg-blue-700 text-white text-xs transition-colors"
+                        onClick={handleSave}
+                        title="Save Layout"
+                      >
+                        ✓
+                      </button>
+                    </>
+                  )}
+                </>
+              )}
+              {/* Zoom controls - larger and clearer */}
+              <div className="flex gap-1 ml-1 border-l border-slate-700 pl-1">
+                <button
+                  className="w-6 h-6 flex items-center justify-center rounded border border-slate-600 hover:bg-slate-700 text-slate-300 text-xs transition-colors"
+                  onClick={handleZoomIn}
+                  title="Zoom In"
+                >
+                  +
+                </button>
+                <button
+                  className="w-6 h-6 flex items-center justify-center rounded border border-slate-600 hover:bg-slate-700 text-slate-300 text-xs transition-colors"
+                  onClick={handleZoomOut}
+                  title="Zoom Out"
+                >
+                  −
+                </button>
+                <button
+                  className="w-6 h-6 flex items-center justify-center rounded border border-slate-600 hover:bg-slate-700 text-slate-300 text-xs transition-colors"
+                  onClick={handleZoomReset}
+                  title="Reset View"
+                >
+                  ↻
+                </button>
+              </div>
             </div>
           </div>
         </div>
@@ -9252,30 +9515,29 @@ const TopologyGraph = ({ project, onOpenDevice, can, authedUser, setProjects, se
         </div>
       )}
       {editMode && (
-        <div className="mb-3 p-3 bg-gray-50 dark:bg-gray-800 rounded-lg">
-          <div className="flex items-center gap-3 flex-wrap mb-2">
-            <span className="text-xs font-medium text-gray-600 dark:text-gray-300">เครื่องมือ:</span>
+        <div className="mb-2 px-2 py-1 bg-gray-50 dark:bg-gray-800 rounded">
+          <div className="flex items-center gap-1.5 flex-wrap">
             <Button 
               variant={linkMode === "add" ? "primary" : "secondary"} 
-              className="text-xs px-3 py-1.5"
+              className="text-[10px] px-2 py-0.5 h-6"
               onClick={linkMode === "add" ? cancelLinkMode : startAddLink}
             >
-              {linkMode === "add" ? "ยกเลิกการเพิ่มลิงก์" : "เพิ่มลิงก์"}
+              {linkMode === "add" ? "Cancel" : "Add Link"}
             </Button>
             <Button 
               variant={linkMode === "edit" ? "primary" : "secondary"} 
-              className="text-xs px-3 py-1.5"
+              className="text-[10px] px-2 py-0.5 h-6"
               onClick={() => {
                 setLinkMode(linkMode === "edit" ? "none" : "edit");
                 setReroutingLink(null);
               }}
             >
-              {linkMode === "edit" ? "ยกเลิกการแก้ไข" : "แก้ไขลิงก์/โหนด"}
+              {linkMode === "edit" ? "Cancel" : "Edit"}
             </Button>
             {selectedLink !== null && linkMode === "edit" && (
               <Button 
                 variant={reroutingLink === selectedLink ? "primary" : "secondary"} 
-                className="text-xs px-3 py-1.5"
+                className="text-[10px] px-2 py-0.5 h-6"
                 onClick={() => {
                   if (reroutingLink === selectedLink) {
                     setReroutingLink(null);
@@ -9284,25 +9546,10 @@ const TopologyGraph = ({ project, onOpenDevice, can, authedUser, setProjects, se
                   }
                 }}
               >
-                {reroutingLink === selectedLink ? "ยกเลิกการเปลี่ยนเส้น" : "เปลี่ยนเส้นเชื่อมโยง"}
+                {reroutingLink === selectedLink ? "Cancel" : "Reroute"}
               </Button>
             )}
           </div>
-          {linkMode === "add" && (
-            <div className="mt-2 text-xs text-blue-600 dark:text-blue-400">
-              💡 คลิก 2 โหนดเพื่อสร้างลิงก์
-            </div>
-          )}
-          {linkMode === "edit" && (
-            <div className="mt-2 text-xs text-blue-600 dark:text-blue-400">
-              💡 คลิกลิงก์เพื่อแก้ไข • คลิกขวาลิงก์เพื่อลบ • คลิก 2 ครั้งที่โหนดเพื่อแก้ไข
-            </div>
-          )}
-          {reroutingLink !== null && (
-            <div className="mt-2 text-xs text-green-600 dark:text-green-400">
-              💡 คลิกที่โหนดปลายทางใหม่เพื่อเปลี่ยนเส้นเชื่อมโยง
-            </div>
-          )}
         </div>
       )}
       <div className="relative h-[calc(100vh-380px)] min-h-[450px] rounded-xl bg-[#0B1220] overflow-hidden">
@@ -9319,10 +9566,10 @@ const TopologyGraph = ({ project, onOpenDevice, can, authedUser, setProjects, se
           }}
         >
           <g transform={`translate(${pan.x}, ${pan.y}) scale(${zoom})`}>
-          {/* Background pan area - behind everything for panning */}
+          {/* Background pan area - unlimited size for dragging */}
           <rect 
-            x="-50" y="-50" 
-            width="200" height="200" 
+            x="-10000" y="-10000" 
+            width="20000" height="20000" 
             fill="transparent" 
             className="pan-area"
             onMouseDown={handlePanStart}
@@ -9341,7 +9588,7 @@ const TopologyGraph = ({ project, onOpenDevice, can, authedUser, setProjects, se
                 <line 
                   x1={A.x} y1={A.y} x2={B.x} y2={B.y}
                   stroke={isRerouting ? "#f59e0b" : (isSelected ? "#10b981" : "#5DA0FF")} 
-                  strokeWidth={editMode ? (isSelected || isRerouting ? "2.5" : "2") : "1.6"} 
+                  strokeWidth={editMode ? (isSelected || isRerouting ? "1.5" : "1.2") : "1.0"} 
                   strokeDasharray={isRerouting ? "3,3" : "none"}
                   opacity={isRerouting ? "1" : "0.85"}
                   onClick={(evt) => handleLinkClick(i, evt)}
@@ -9382,6 +9629,17 @@ const TopologyGraph = ({ project, onOpenDevice, can, authedUser, setProjects, se
             const isSelected = selectedNode === n.id;
             const isLinkStart = linkStart === n.id;
             const deviceSize = editMode ? (isSelected || isLinkStart ? 5 : 4) : 3.5;
+            
+            // Get device image if available
+            const deviceImages = project?.device_images || {};
+            const deviceImageBase64 = deviceImages[n.id];
+            // Detect format: PNG starts with iVBOR, JPEG starts with /9j/
+            let deviceImageUrl = null;
+            if (deviceImageBase64) {
+              const imageFormat = deviceImageBase64.startsWith('iVBOR') ? 'png' : 'jpeg';
+              deviceImageUrl = `data:image/${imageFormat};base64,${deviceImageBase64}`;
+            }
+            
             return (
               <g 
                 key={n.id}
@@ -9396,6 +9654,7 @@ const TopologyGraph = ({ project, onOpenDevice, can, authedUser, setProjects, se
                   isSelected={isSelected}
                   isLinkStart={isLinkStart}
                   size={deviceSize}
+                  imageUrl={deviceImageUrl}
                 />
                 <text 
                   x={0} 
@@ -9429,24 +9688,6 @@ const TopologyGraph = ({ project, onOpenDevice, can, authedUser, setProjects, se
             {linkTooltip.text}
           </div>
         )}
-        <div className="absolute bottom-1 left-2 text-[11px] text-gray-400">
-          {editMode ? (
-            <span>
-              {linkMode === "add" 
-                ? "โหมดเพิ่มลิงก์: คลิก 2 โหนดเพื่อสร้างลิงก์"
-                : linkMode === "edit"
-                ? "โหมดแก้ไขลิงก์/โหนด: คลิกลิงก์เพื่อแก้ไข • คลิกขวาลิงก์เพื่อลบ • คลิก 2 ครั้งที่โหนดเพื่อแก้ไข"
-                : reroutingLink !== null
-                ? "โหมดเปลี่ยนเส้นเชื่อมโยง: คลิกที่โหนดปลายทางใหม่"
-                : "โหมดแก้ไข: ลากโหนดเพื่อย้าย • Ctrl+ลากเพื่อเลื่อน • ล้อเมาส์เพื่อซูม"
-              }
-            </span>
-          ) : (
-            <span>
-              Tip: คลิกที่โหนดเพื่อดูรายละเอียด • Ctrl+Shift+ลากเพื่อเลื่อน • ล้อเมาส์เพื่อซูม • ใช้ปุ่ม +/-/↻ เพื่อควบคุม
-            </span>
-          )}
-        </div>
         <div className="absolute top-2 right-2 text-[10px] text-gray-500 dark:text-gray-400 bg-black/30 px-2 py-1 rounded">
           Zoom: {(zoom * 100).toFixed(0)}%
         </div>

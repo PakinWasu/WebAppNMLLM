@@ -1,13 +1,152 @@
 """Summary API endpoints for device configuration summary"""
 
-from fastapi import APIRouter, Depends, HTTPException
-from typing import List, Dict, Any
-from datetime import datetime
+from fastapi import APIRouter, Depends, HTTPException, UploadFile, File, Form
+from typing import List, Dict, Any, Optional
+from datetime import datetime, timezone
+import base64
+from PIL import Image
+import io
 
 from ..db.mongo import db
 from ..dependencies.auth import get_current_user, check_project_access
 
 router = APIRouter(prefix="/projects/{project_id}/summary", tags=["summary"])
+device_router = APIRouter(prefix="/projects/{project_id}/devices", tags=["devices"])
+
+
+@device_router.post("/{device_name}/image")
+async def upload_device_image(
+    project_id: str,
+    device_name: str,
+    file: UploadFile = File(...),
+    user=Depends(get_current_user)
+):
+    """Upload device image - stores as base64 in project metadata"""
+    await check_project_access(project_id, user)
+    
+    # Check if user can edit project
+    project = await db()["projects"].find_one({"project_id": project_id})
+    if not project:
+        raise HTTPException(status_code=404, detail="Project not found")
+    
+    # Check permissions
+    project_member = next((m for m in project.get("members", []) if m.get("username") == user["username"]), None)
+    is_manager = user["role"] == "admin" or (project_member and project_member.get("role") == "manager")
+    if not is_manager:
+        raise HTTPException(status_code=403, detail="Only managers can upload device images")
+    
+    # Validate file type
+    if not file.content_type or not file.content_type.startswith("image/"):
+        raise HTTPException(status_code=400, detail="File must be an image")
+    
+    # Read and process image
+    try:
+        file_content = await file.read()
+        
+        # Open image with PIL to resize and optimize
+        img = Image.open(io.BytesIO(file_content))
+        
+        # Check if image has transparency/alpha channel
+        has_transparency = False
+        original_mode = img.mode
+        
+        if img.mode in ("RGBA", "LA"):
+            # Check if there are any transparent pixels
+            if img.mode == "RGBA":
+                alpha = img.split()[3]
+                has_transparency = alpha.getextrema()[0] < 255
+            elif img.mode == "LA":
+                alpha = img.split()[1]
+                has_transparency = alpha.getextrema()[0] < 255
+        elif img.mode == "P":
+            # Palette mode - check if transparency is in info
+            has_transparency = "transparency" in img.info
+            # Convert palette to RGBA to check transparency properly
+            if has_transparency:
+                img = img.convert("RGBA")
+        
+        # Resize to max 600x600 while maintaining aspect ratio (much larger for better visibility)
+        max_size = 600
+        img.thumbnail((max_size, max_size), Image.Resampling.LANCZOS)
+        
+        # Convert to base64 - always use PNG to preserve quality and potential transparency
+        # PNG supports both transparent and opaque images, and has better quality
+        buffer = io.BytesIO()
+        if img.mode != "RGBA":
+            # Convert to RGBA to support transparency if needed
+            img = img.convert("RGBA")
+        
+        # Save as PNG - preserves transparency and has better quality than JPEG
+        img.save(buffer, format="PNG", optimize=True)
+        img_bytes = buffer.getvalue()
+        img_base64 = base64.b64encode(img_bytes).decode("utf-8")
+        
+        # Store in project metadata
+        device_images = project.get("device_images", {})
+        device_images[device_name] = img_base64
+        
+        await db()["projects"].update_one(
+            {"project_id": project_id},
+            {"$set": {"device_images": device_images, "updated_at": datetime.now(timezone.utc)}}
+        )
+        
+        return {"success": True, "message": "Device image uploaded successfully"}
+    except Exception as e:
+        print(f"Error processing image: {e}")
+        raise HTTPException(status_code=500, detail=f"Failed to process image: {str(e)}")
+
+
+@device_router.get("/{device_name}/image")
+async def get_device_image(
+    project_id: str,
+    device_name: str,
+    user=Depends(get_current_user)
+):
+    """Get device image as base64"""
+    await check_project_access(project_id, user)
+    
+    project = await db()["projects"].find_one({"project_id": project_id})
+    if not project:
+        raise HTTPException(status_code=404, detail="Project not found")
+    
+    device_images = project.get("device_images", {})
+    img_data = device_images.get(device_name)
+    
+    if not img_data:
+        raise HTTPException(status_code=404, detail="Device image not found")
+    
+    # Return image data (can be PNG or JPEG base64)
+    return {"image": img_data}
+
+
+@device_router.delete("/{device_name}/image")
+async def delete_device_image(
+    project_id: str,
+    device_name: str,
+    user=Depends(get_current_user)
+):
+    """Delete device image"""
+    await check_project_access(project_id, user)
+    
+    project = await db()["projects"].find_one({"project_id": project_id})
+    if not project:
+        raise HTTPException(status_code=404, detail="Project not found")
+    
+    # Check permissions
+    project_member = next((m for m in project.get("members", []) if m.get("username") == user["username"]), None)
+    is_manager = user["role"] == "admin" or (project_member and project_member.get("role") == "manager")
+    if not is_manager:
+        raise HTTPException(status_code=403, detail="Only managers can delete device images")
+    
+    device_images = project.get("device_images", {})
+    if device_name in device_images:
+        del device_images[device_name]
+        await db()["projects"].update_one(
+            {"project_id": project_id},
+            {"$set": {"device_images": device_images, "updated_at": datetime.now(timezone.utc)}}
+        )
+    
+    return {"success": True, "message": "Device image deleted successfully"}
 
 
 def _device_status(latest: dict) -> str:

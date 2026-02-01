@@ -9,6 +9,7 @@ from .core.security import hash_password
 from .services.ai_engine import call_ollama_chat
 from .services.llm_service import llm_service
 from .routers import auth, users, projects, documents, project_options, summary, folders, analysis, topology
+from .routers.summary import device_router
 from .db.mongo import connect, close, db
 
 # Configure security scheme for Swagger UI
@@ -75,6 +76,7 @@ app.include_router(projects.router)
 app.include_router(documents.router)
 app.include_router(project_options.router)
 app.include_router(summary.router)
+app.include_router(device_router)
 app.include_router(folders.router)
 app.include_router(analysis.router)
 app.include_router(topology.router)

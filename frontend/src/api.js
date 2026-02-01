@@ -339,6 +339,37 @@ export async function getDeviceDetails(projectId, deviceName) {
   return api(`/projects/${projectId}/summary/${deviceName}`);
 }
 
+export async function uploadDeviceImage(projectId, deviceName, file) {
+  const formData = new FormData();
+  formData.append('file', file);
+  
+  const token = getToken();
+  const response = await fetch(`${API_BASE}/projects/${projectId}/devices/${deviceName}/image`, {
+    method: 'POST',
+    headers: {
+      'Authorization': token ? `Bearer ${token}` : '',
+    },
+    body: formData,
+  });
+  
+  if (!response.ok) {
+    const errorData = await response.json().catch(() => ({ detail: `Upload failed with status ${response.status}` }));
+    throw new Error(errorData.detail || errorData.message || `Upload failed with status ${response.status}`);
+  }
+  
+  return response.json();
+}
+
+export async function getDeviceImage(projectId, deviceName) {
+  return api(`/projects/${projectId}/devices/${deviceName}/image`);
+}
+
+export async function deleteDeviceImage(projectId, deviceName) {
+  return api(`/projects/${projectId}/devices/${deviceName}/image`, {
+    method: 'DELETE',
+  });
+}
+
 // Folders API
 export async function getFolders(projectId) {
   const response = await api(`/projects/${projectId}/folders`);

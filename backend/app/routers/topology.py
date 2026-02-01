@@ -48,8 +48,8 @@ async def generate_topology(
             update_data = {
                 "topoNodes": result["topology"].get("nodes", []),
                 "topoEdges": result["topology"].get("edges", []),
-                "topology_llm_metrics": result.get("metrics"),  # Save LLM metrics to project
-                "topology_llm_summary": result.get("analysis_summary"),  # Save LLM summary
+                "topology_llm_metrics": result.get("metrics"),  # Save LLM metrics to project (backward compat)
+                "topology_llm_summary": result.get("analysis_summary"),  # Save LLM summary (backward compat)
                 "updated_at": datetime.now(timezone.utc),
                 "updated_by": user["username"]
             }
@@ -82,26 +82,26 @@ async def get_topology(
     if not project:
         raise HTTPException(status_code=404, detail="Project not found")
     
-    # Try to get latest topology result from topology_results collection
-    topology_result = await db()["topology_results"].find_one(
-        {"project_id": project_id},
+    # Try to get latest topology result from llm_results collection
+    llm_result = await db()["llm_results"].find_one(
+        {"project_id": project_id, "result_type": "topology"},
         sort=[("generated_at", -1)]
     )
     
-    # Use topology from topology_results if available, otherwise fallback to project metadata
-    if topology_result and topology_result.get("topology"):
+    # Use topology from llm_results if available, otherwise fallback to project metadata
+    if llm_result and llm_result.get("result_data"):
         return {
-            "topology": topology_result["topology"],
+            "topology": llm_result.get("result_data"),
             "layout": {
                 "positions": project.get("topoPositions", {}),
                 "links": project.get("topoLinks", []),
                 "node_labels": project.get("topoNodeLabels", {}),
                 "node_roles": project.get("topoNodeRoles", {})
             },
-            "llm_metrics": topology_result.get("metrics"),
-            "llm_summary": topology_result.get("analysis_summary"),
-            "llm_used": topology_result.get("llm_used", False),
-            "generated_at": topology_result.get("generated_at"),
+            "llm_metrics": llm_result.get("metrics"),
+            "llm_summary": llm_result.get("analysis_summary"),
+            "llm_used": llm_result.get("llm_used", False),
+            "generated_at": llm_result.get("generated_at"),
             "saved": True
         }
     
