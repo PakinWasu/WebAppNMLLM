@@ -37,10 +37,46 @@ class TopologyService:
         self.model_name = _ollama_model()
     
     def _get_topology_system_prompt(self, project_id: str, device_count: int) -> str:
-        """Generate system prompt for topology analysis - focused on neighbors only, optimized for speed"""
+        """Generate system prompt for topology analysis - focused on neighbors data"""
         
-        # Ultra-minimal prompt for fastest response
-        return f"""Output JSON: {{"nodes":[{{"id":"name","label":"name","type":"Switch"}}],"edges":[{{"from":"a","to":"b","label":"port-port","evidence":"neighbor"}}],"analysis_summary":"brief"}}. Project: {project_id}"""
+        return f"""You are an Expert Network Topology Engineer. Analyze neighbor data (CDP/LLDP) from network devices and generate a complete network topology.
+
+**CRITICAL OUTPUT REQUIREMENTS:**
+- Output ONLY valid JSON format (no markdown, no code blocks)
+- Parseable directly as JSON object
+
+**Output Format:**
+{{
+  "nodes": [
+    {{
+      "id": "device_id_or_hostname",
+      "label": "display_name",
+      "type": "router|switch|access_switch|firewall|other"
+    }}
+  ],
+  "edges": [
+    {{
+      "from": "source_device_id",
+      "to": "target_device_id",
+      "label": "interface-interface",
+      "evidence": "neighbor"
+    }}
+  ],
+  "analysis_summary": "brief explanation"
+}}
+
+**Analysis Guidelines:**
+1. **Nodes**: Create one node per unique device from neighbor data. Use device_id or hostname as "id".
+2. **Edges**: Create edges from CDP/LLDP neighbor information. Connect devices based on neighbor relationships.
+3. **Data Source**: Use ONLY the neighbors array provided - each neighbor entry shows which devices connect to which.
+
+**Important:**
+- If device A has neighbor B, create edge from A to B
+- If device B also has neighbor A, that's bidirectional (one edge is enough)
+- Use exact device IDs/hostnames from input data
+- Preserve interface names from neighbor data
+
+Project: {project_id} ({device_count} devices)"""
     
     def _prepare_topology_data_for_llm(self, devices_data: List[Dict[str, Any]]) -> Dict[str, Any]:
         """
@@ -80,12 +116,30 @@ class TopologyService:
         return topology_data
     
     def _build_topology_prompt(self, topology_data: Dict[str, Any]) -> str:
-        """Build user prompt - focused on neighbors only, optimized for speed"""
-        # Ultra-compact JSON format - minimal size for fastest response
-        devices_json = json.dumps(topology_data.get("devices", []), separators=(',', ':'))
-        # Limit to 1500 chars to keep prompt very small
-        devices_json_limited = devices_json[:1500] if len(devices_json) > 1500 else devices_json
-        user_message = f"Neighbors: {devices_json_limited}. Create JSON."
+        """Build user prompt - focused on neighbors data for topology generation"""
+        devices = topology_data.get("devices", [])
+        
+        # Build detailed prompt with neighbor information
+        prompt_parts = [
+            f"Analyze the following network device neighbor data and generate a complete topology structure.",
+            f"\nTotal devices: {topology_data.get('total_devices', 0)}",
+            f"\n\nNetwork Device Neighbor Data:"
+        ]
+        
+        # Include device info with neighbors (up to reasonable size)
+        devices_json = json.dumps(devices, separators=(',', ':'), ensure_ascii=False)
+        # Limit to ~4000 chars to keep prompt manageable but informative
+        if len(devices_json) > 4000:
+            prompt_parts.append(f"\n{devices_json[:4000]}... (truncated)")
+        else:
+            prompt_parts.append(f"\n{devices_json}")
+        
+        prompt_parts.append(
+            "\n\nPlease analyze the CDP/LLDP neighbors to create a complete network topology."
+            "\nReturn ONLY the JSON object with nodes and edges as specified in the system prompt."
+        )
+        
+        return "".join(prompt_parts)
         
         return user_message
     
@@ -439,16 +493,11 @@ class TopologyService:
                         "type": node.get("type", "Switch")
                     })
             
-            # Validate and clean edges
-            validated_edges = []
-            for edge in topology_data.get("edges", []):
-                if isinstance(edge, dict) and "from" in edge and "to" in edge:
-                    validated_edges.append({
-                        "from": str(edge["from"]),
-                        "to": str(edge["to"]),
-                        "label": edge.get("label", ""),
-                        "evidence": edge.get("evidence", "")
-                    })
+            # CRITICAL: Validate edges against neighbor data to prevent hallucination
+            validated_edges = self._validate_edges_against_neighbors(
+                topology_data.get("edges", []),
+                devices_data
+            )
             
             topology_data = {
                 "nodes": validated_nodes,
@@ -456,6 +505,15 @@ class TopologyService:
             }
         
         print(f"[Topology] Final topology: {len(topology_data.get('nodes', []))} nodes, {len(topology_data.get('edges', []))} edges, time: {inference_time_ms:.0f}ms")
+        
+        # Prepare metrics
+        metrics = {
+            "inference_time_ms": inference_time_ms,
+            "devices_processed": len(devices_data),
+            "token_usage": token_usage,
+            "model_name": self.model_name,
+            "timestamp": datetime.utcnow()
+        }
         
         # Log performance metrics
         await self._log_performance_metrics(
@@ -465,17 +523,132 @@ class TopologyService:
             token_usage=token_usage
         )
         
+        # Save LLM topology result to database (persistent storage)
+        await self._save_topology_result(
+            project_id=project_id,
+            topology=topology_data,
+            analysis_summary=analysis_summary,
+            metrics=metrics,
+            llm_used=use_llm and llm_success
+        )
+        
         return {
             "topology": topology_data,
             "analysis_summary": analysis_summary,
-                    "metrics": {
-                        "inference_time_ms": inference_time_ms,
-                        "devices_processed": len(devices_data),
-                        "token_usage": token_usage,
-                    "model_name": self.model_name,
-                    "timestamp": datetime.utcnow()
-                }
+            "metrics": metrics
+        }
+    
+    def _validate_edges_against_neighbors(
+        self,
+        llm_edges: List[Dict[str, Any]],
+        devices_data: List[Dict[str, Any]]
+    ) -> List[Dict[str, Any]]:
+        """
+        Validate LLM-generated edges against actual neighbor data.
+        Remove edges that don't exist in neighbor data (hallucination).
+        
+        Returns only edges that are confirmed by neighbor relationships.
+        """
+        # Build neighbor relationship map: device -> set of neighbor device names
+        # Normalize device names (lowercase, strip) for consistent matching
+        device_name_map = {}  # normalized -> original
+        neighbor_map = {}
+        
+        for device in devices_data:
+            device_name = device.get("device_name")
+            if not device_name:
+                continue
+            device_name_normalized = str(device_name).strip().lower()
+            device_name_map[device_name_normalized] = device_name
+            
+            neighbors = device.get("neighbors", [])
+            neighbor_set = set()
+            for neighbor in neighbors:
+                # Try multiple field names for neighbor device name
+                neighbor_name = (
+                    neighbor.get("device_name") or 
+                    neighbor.get("neighbor_device") or 
+                    neighbor.get("remote_device") or
+                    neighbor.get("system_name")
+                )
+                if neighbor_name:
+                    neighbor_set.add(str(neighbor_name).strip().lower())
+            if neighbor_set:
+                neighbor_map[device_name_normalized] = neighbor_set
+        
+        # Validate each edge
+        validated_edges = []
+        removed_count = 0
+        removed_edges = []
+        
+        for edge in llm_edges:
+            if not isinstance(edge, dict) or "from" not in edge or "to" not in edge:
+                continue
+            
+            from_dev = str(edge["from"]).strip()
+            to_dev = str(edge["to"]).strip()
+            
+            if not from_dev or not to_dev or from_dev == to_dev:
+                continue
+            
+            # Normalize device names for matching
+            from_dev_norm = from_dev.lower()
+            to_dev_norm = to_dev.lower()
+            
+            # Check if this edge exists in neighbor data
+            # Edge A->B is valid if: A has neighbor B OR B has neighbor A (bidirectional)
+            is_valid = (
+                (from_dev_norm in neighbor_map and to_dev_norm in neighbor_map[from_dev_norm]) or
+                (to_dev_norm in neighbor_map and from_dev_norm in neighbor_map[to_dev_norm])
+            )
+            
+            if is_valid:
+                # Use original device names (not normalized) in output
+                validated_edges.append({
+                    "from": device_name_map.get(from_dev_norm, from_dev),
+                    "to": device_name_map.get(to_dev_norm, to_dev),
+                    "label": edge.get("label", ""),
+                    "evidence": edge.get("evidence", "neighbor")
+                })
+            else:
+                removed_count += 1
+                removed_edges.append(f"{from_dev}->{to_dev}")
+        
+        if removed_count > 0:
+            print(f"[Topology] Removed {removed_count} hallucinated edge(s) not in neighbor data: {', '.join(removed_edges[:5])}")
+        
+        return validated_edges
+    
+    async def _save_topology_result(
+        self,
+        project_id: str,
+        topology: Dict[str, Any],
+        analysis_summary: str,
+        metrics: Dict[str, Any],
+        llm_used: bool
+    ):
+        """Save topology generation result (topology + LLM response + metrics) to database"""
+        try:
+            topology_result = {
+                "project_id": project_id,
+                "topology": topology,
+                "analysis_summary": analysis_summary,
+                "metrics": metrics,
+                "llm_used": llm_used,
+                "generated_at": datetime.utcnow(),
+                "version": 1  # For future versioning
             }
+            
+            # Save to topology_results collection (latest result per project)
+            await db()["topology_results"].update_one(
+                {"project_id": project_id},
+                {"$set": topology_result},
+                upsert=True
+            )
+            
+            print(f"[Topology] Saved topology result to database: {len(topology.get('nodes', []))} nodes, {len(topology.get('edges', []))} edges")
+        except Exception as e:
+            print(f"Warning: Failed to save topology result: {e}")
     
     async def _log_performance_metrics(
         self,

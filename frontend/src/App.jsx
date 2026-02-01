@@ -71,19 +71,19 @@ const Button = ({
     </button>
   );
 };
-const Card = ({ title, actions, children, className = "" }) => (
+const Card = ({ title, actions, children, className = "", compact = false }) => (
   <div
     className={`rounded-2xl border border-gray-200 dark:border-[#1F2937] bg-white dark:bg-[#111827] shadow-sm ${className}`}
   >
     {(title || actions) && (
-      <div className="flex items-center justify-between border-b border-gray-100 dark:border-[#1F2937] px-5 py-3">
-        <h3 className="text-sm font-semibold text-gray-700 dark:text-gray-200">
+      <div className={`flex items-center justify-between border-b border-gray-100 dark:border-[#1F2937] ${compact ? 'px-2 py-1' : 'px-5 py-3'}`}>
+        <h3 className={`${compact ? 'text-[10px]' : 'text-sm'} font-semibold text-gray-700 dark:text-gray-200`}>
           {title}
         </h3>
         <div className="flex gap-2">{actions}</div>
       </div>
     )}
-    <div className="p-5">{children}</div>
+    <div className={compact ? "p-1" : "p-5"}>{children}</div>
   </div>
 );
 const Field = ({ label, children }) => (
@@ -295,56 +295,65 @@ const Table = ({
   empty = "No data",
   containerClassName = "",
   minWidthClass = "min-w-full",
-}) => (
-  <div
-    className={`overflow-auto rounded-2xl border border-gray-200 dark:border-[#1F2937] ${containerClassName}`}
-  >
-    <table
-      className={`${minWidthClass} divide-y divide-gray-200 dark:divide-[#1F2937]`}
+}) => {
+  // Check if containerClassName includes text size override
+  const textSizeClass = containerClassName.includes('text-[') 
+    ? containerClassName.match(/text-\[[^\]]+\]/)?.[0] 
+    : null;
+  const tableTextSize = textSizeClass || "text-[11px]";
+  const headerTextSize = textSizeClass ? textSizeClass.replace('text-', 'text-').replace('px]', 'px]') : "text-[10px]";
+  
+  return (
+    <div
+      className={`overflow-auto rounded-2xl border border-gray-200 dark:border-[#1F2937] ${containerClassName}`}
     >
-      <thead className="bg-gray-50 dark:bg-[#111827] sticky top-0 z-10">
-        <tr>
-          {columns.map((c) => (
-            <th
-              key={c.key || c.header}
-              className="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wider text-gray-600 dark:text-gray-300"
-              style={{ width: c.width }}
-            >
-              {c.header}
-            </th>
-          ))}
-        </tr>
-      </thead>
-      <tbody className="divide-y divide-gray-100 dark:divide-[#1F2937] bg-white dark:bg-[#0F172A]">
-        {data.length === 0 && (
+      <table
+        className={`${minWidthClass} divide-y divide-gray-200 dark:divide-[#1F2937]`}
+      >
+        <thead className="bg-gray-50 dark:bg-[#111827] sticky top-0 z-10">
           <tr>
-            <td
-              className="px-4 py-6 text-sm text-gray-500 dark:text-gray-400"
-              colSpan={columns.length}
-            >
-              {empty}
-            </td>
-          </tr>
-        )}
-        {data.map((row, i) => (
-          <tr
-            key={i}
-            className="odd:bg-white even:bg-gray-50 dark:odd:bg-[#0F172A] dark:even:bg-[#0D1422] hover:bg-gray-50 dark:hover:bg-[#1A2231]"
-          >
             {columns.map((c) => (
-              <td
+              <th
                 key={c.key || c.header}
-                className="px-4 py-2 text-[13px] text-gray-800 dark:text-gray-100 align-top"
+                className={`px-2 py-1.5 text-left ${headerTextSize} font-semibold uppercase tracking-wider text-gray-600 dark:text-gray-300`}
+                style={{ width: c.width }}
               >
-                {typeof c.cell === "function" ? c.cell(row) : row[c.key]}
-              </td>
+                {c.header}
+              </th>
             ))}
           </tr>
-        ))}
-      </tbody>
-    </table>
-  </div>
-);
+        </thead>
+        <tbody className="divide-y divide-gray-100 dark:divide-[#1F2937] bg-white dark:bg-[#0F172A]">
+          {data.length === 0 && (
+            <tr>
+              <td
+                className={`px-2 py-4 ${tableTextSize} text-gray-500 dark:text-gray-400`}
+                colSpan={columns.length}
+              >
+                {empty}
+              </td>
+            </tr>
+          )}
+          {data.map((row, i) => (
+            <tr
+              key={i}
+              className="odd:bg-white even:bg-gray-50 dark:odd:bg-[#0F172A] dark:even:bg-[#0D1422] hover:bg-gray-50 dark:hover:bg-[#1A2231]"
+            >
+              {columns.map((c) => (
+                <td
+                  key={c.key || c.header}
+                  className={`px-2 py-1 ${tableTextSize} text-gray-800 dark:text-gray-100 align-top`}
+                >
+                  {typeof c.cell === "function" ? c.cell(row) : row[c.key]}
+                </td>
+              ))}
+            </tr>
+          ))}
+        </tbody>
+      </table>
+    </div>
+  );
+};
 
 /* ========= TXT SAMPLES (commands + show outputs) ========= */
 const CMDSET = `# === COMMAND SET USED TO COLLECT DATA ===
@@ -1047,21 +1056,86 @@ export default function App() {
   }, [route.name, route.device, route.projectId, authedUser]);
   // #endregion
 
-  /* Single-pane layout for Index and Project (above-the-fold, no outer scroll) */
-  if (authedUser && (route.name === "index" || route.name === "project")) {
-    const project = route.name === "project" ? projects.find((p) => (p.project_id || p.id) === route.projectId) : null;
+  /* Single-pane layout for Index, Project, and Device (above-the-fold, no outer scroll) */
+  if (authedUser && (route.name === "index" || route.name === "project" || route.name === "device")) {
+    const project = (route.name === "project" || route.name === "device") 
+      ? projects.find((p) => (p.project_id || p.id) === route.projectId) 
+      : null;
+    
+    // Build tabs for project view
+    const projectTabs = [];
+    if (project && route.name === "project") {
+      if (can("project-setting", project)) {
+        projectTabs.push({ id: "setting", label: "Setting", icon: "⚙️" });
+      }
+      if (can("view-documents", project)) {
+        projectTabs.push({ id: "summary", label: "Summary", icon: "📊" });
+        projectTabs.push({ id: "documents", label: "Documents", icon: "📄" });
+        projectTabs.push({ id: "analysis", label: "AI Analysis", icon: "🤖" });
+      }
+    }
+    
     return (
       <MainLayout
         topBar={
-          <div className="h-full flex items-center justify-between px-4">
-            <button
-              onClick={() => setRoute({ name: "index" })}
-              className="flex items-center gap-3 hover:opacity-80 transition-opacity cursor-pointer"
-            >
-              <div className="h-7 w-7 rounded-lg bg-blue-600 flex-shrink-0" />
-              <span className="text-sm font-semibold text-slate-200">Network Project Platform</span>
-            </button>
-            <div className="flex items-center gap-2">
+          <div className="h-full flex items-center justify-between px-4 border-b border-slate-800">
+            {/* Left: Logo + Platform Name + Breadcrumb */}
+            <div className="flex items-center gap-4 flex-1 min-w-0">
+              <button
+                onClick={() => setRoute({ name: "index" })}
+                className="flex items-center gap-3 hover:opacity-80 transition-opacity cursor-pointer flex-shrink-0"
+              >
+                <div className="h-7 w-7 rounded-lg bg-blue-600 flex-shrink-0" />
+                <span className="text-sm font-semibold text-slate-200 whitespace-nowrap">Network Project Platform</span>
+              </button>
+              
+              {/* Breadcrumb and Tabs (show when in project or device) */}
+              {project && (
+                <>
+                  <span className="text-slate-600 dark:text-slate-400">/</span>
+                  <div className="flex items-center gap-4 flex-1 min-w-0">
+                    {route.name === "device" ? (
+                      <>
+                        <button
+                          onClick={() => setRoute({ name: "project", projectId: route.projectId, tab: "summary" })}
+                          className="text-sm font-medium text-slate-300 hover:text-blue-400 truncate"
+                        >
+                          {project.name}
+                        </button>
+                        <span className="text-slate-600 dark:text-slate-400">/</span>
+                        <span className="text-sm font-medium text-slate-300 truncate">{route.device}</span>
+                      </>
+                    ) : (
+                      <>
+                        <span className="text-sm font-medium text-slate-300 truncate">{project.name}</span>
+                        {/* Tabs integrated in header */}
+                        {projectTabs.length > 0 && (
+                          <nav className="flex items-center gap-1 ml-4">
+                            {projectTabs.map((t) => (
+                              <button
+                                key={t.id}
+                                onClick={() => setRoute({ ...route, tab: t.id })}
+                                className={`flex items-center gap-2 px-3 py-1.5 text-xs font-medium transition rounded-lg whitespace-nowrap ${
+                                  (route.tab || "setting") === t.id
+                                    ? "bg-blue-600 text-white"
+                                    : "hover:bg-slate-700 hover:text-blue-400 text-slate-400"
+                                }`}
+                              >
+                                <span>{t.icon}</span>
+                                <span>{t.label}</span>
+                              </button>
+                            ))}
+                          </nav>
+                        )}
+                      </>
+                    )}
+                  </div>
+                </>
+              )}
+            </div>
+            
+            {/* Right: Dark mode + User + Sign out */}
+            <div className="flex items-center gap-2 flex-shrink-0">
               <Button variant="ghost" className="text-slate-400 hover:text-slate-200" onClick={() => setDark(!dark)}>
                 {dark ? "🌙" : "☀️"}
               </Button>
@@ -1103,6 +1177,15 @@ export default function App() {
         {route.name === "project" && !project && (
           <div className="p-6 text-sm text-rose-400">Project not found.</div>
         )}
+        {route.name === "device" && project && route.device && (
+          <DeviceDetailsPage
+            project={project}
+            deviceId={route.device}
+            goBack={() => setRoute({ name: "project", projectId: route.projectId, tab: "summary" })}
+            goIndex={() => setRoute({ name: "index" })}
+            uploadHistory={uploadHistory}
+          />
+        )}
       </MainLayout>
     );
   }
@@ -1111,7 +1194,7 @@ export default function App() {
     <div
       className={`min-h-screen bg-slate-50 text-slate-900 dark:bg-[#0B0F19] dark:text-gray-100`}
     >
-      <div className={authedUser && route.name === "device" ? "" : "mx-auto max-w-[1440px] px-6 py-6"}>
+      <div className="mx-auto max-w-[1440px] px-6 py-6">
         <Header
           dark={dark}
           setDark={setDark}
@@ -1121,58 +1204,7 @@ export default function App() {
           onLogout={handleLogout}
         />
       </div>
-      {authedUser && route.name === "device" ? (
-        (() => {
-          // #region agent log
-          fetch('http://127.0.0.1:7242/ingest/b2e1e3ce-f337-4937-85a6-3e6049434e8e',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'App.jsx:1027',message:'RENDERING_DEVICE_PAGE',data:{routeName:route.name,routeDevice:route.device,routeProjectId:route.projectId},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'D'})}).catch(()=>{});
-          // #endregion
-          console.log('[App] Rendering DeviceDetailsPage with route:', route);
-          console.log('[App] All projects:', projects);
-          const foundProject = projects.find((p) => (p.project_id || p.id) === route.projectId);
-          console.log('[App] Found project:', foundProject);
-          console.log('[App] Device ID from route:', route.device);
-          if (!foundProject) {
-            return (
-              <div className="mx-auto max-w-[1440px] px-6 py-6 mt-6">
-                <div className="grid gap-4">
-                  <div className="text-sm text-rose-400">Project not found for ID: {route.projectId}</div>
-                  <Button variant="secondary" onClick={() => setRoute({ name: "project", projectId: route.projectId, tab: "summary" })}>
-                    ← Back to Summary
-                  </Button>
-                </div>
-              </div>
-            );
-          }
-          if (!route.device) {
-            return (
-              <div className="mx-auto max-w-[1440px] px-6 py-6 mt-6">
-                <div className="grid gap-4">
-                  <div className="text-sm text-rose-400">Device ID not found in route</div>
-                  <Button variant="secondary" onClick={() => setRoute({ name: "project", projectId: route.projectId, tab: "summary" })}>
-                    ← Back to Summary
-                  </Button>
-                </div>
-              </div>
-            );
-          }
-          return (
-            <DeviceDetailsPage
-              project={foundProject}
-              deviceId={route.device}
-              goBack={() =>
-                setRoute({
-                  name: "project",
-                  projectId: route.projectId,
-                  tab: "summary",
-                })
-              }
-              goIndex={() => setRoute({ name: "index" })}
-              uploadHistory={uploadHistory}
-            />
-          );
-        })()
-      ) : (
-        <div className="mx-auto max-w-[1440px] px-6 py-6">
+      <div className="mx-auto max-w-[1440px] px-6 py-6">
           <div className="mt-6">
             {route.name === "login" && (
               <Login
@@ -2135,9 +2167,9 @@ const ProjectView = ({
   uploadHistory,
   setUploadHistory,
 }) => {
-  const [sidebarOpen, setSidebarOpen] = useState(true);
   if (!project)
     return <div className="text-sm text-rose-400">Project not found</div>;
+  
   // Show tabs based on permissions
   const tabs = [];
   if (can("project-setting", project)) {
@@ -2150,57 +2182,9 @@ const ProjectView = ({
   }
 
   return (
-    <div className="h-full flex min-h-0">
-      <aside
-        className={`fixed top-0 left-0 h-screen transition-all duration-300 bg-white dark:bg-[#090E17] border-r border-gray-200 dark:border-gray-800 text-gray-900 dark:text-gray-100 ${
-          sidebarOpen ? "w-64" : "w-20"
-        } flex flex-col z-30`}
-      >
-        <div className="flex items-center justify-between px-4 py-3 border-b border-gray-200 dark:border-gray-800">
-          <button
-            onClick={goIndex}
-            className="flex items-center gap-2 hover:opacity-80"
-          >
-            <div className="h-6 w-6 bg-blue-600 rounded-md" />
-            {sidebarOpen && <span className="font-semibold text-gray-900 dark:text-gray-100">Index</span>}
-          </button>
-          <button
-            onClick={() => setSidebarOpen(!sidebarOpen)}
-            className="p-2 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-800 text-gray-700 dark:text-gray-300"
-          >
-            ☰
-          </button>
-        </div>
-        <nav className="flex-1 mt-4 space-y-1">
-          <div
-            className={`px-4 text-xs uppercase tracking-wide text-gray-500 dark:text-gray-400 ${
-              sidebarOpen ? "" : "sr-only"
-            }`}
-          >
-            {project.name}
-          </div>
-          {tabs.map((t) => (
-            <button
-              key={t.id}
-              onClick={() => onChangeTab(t.id)}
-              className={`flex items-center w-full px-4 py-3 text-sm font-medium transition rounded-xl ${
-                tab === t.id
-                  ? "bg-blue-600 text-white"
-                  : "hover:bg-gray-100 dark:hover:bg-gray-800 hover:text-blue-600 dark:hover:text-blue-400 text-gray-700 dark:text-gray-300"
-              }`}
-            >
-              <span className="text-lg mr-3">{t.icon}</span>
-              {sidebarOpen && t.label}
-            </button>
-          ))}
-        </nav>
-      </aside>
-
-      <main
-        className={`${
-          sidebarOpen ? "ml-64" : "ml-20"
-        } transition-all px-4 py-3 flex-1 min-h-0 overflow-hidden flex flex-col gap-3`}
-      >
+    <div className="h-full flex flex-col min-h-0">
+      {/* Main content - full width (header is now in MainLayout topBar) */}
+      <main className="flex-1 min-h-0 overflow-hidden flex flex-col gap-3 px-4 py-3">
         {tab === "setting" && can("project-setting", project) && (
           <SettingPage
             project={project}
@@ -2435,6 +2419,8 @@ const OverviewPage = ({ project, uploadHistory }) => {
 
 /* ========= SUMMARY (network-focused) + CSV ========= */
 const SummaryPage = ({ project, can, authedUser, setProjects, openDevice }) => {
+  // LLM metrics state for topology generation (shared with TopologyGraph)
+  const [topologyLLMMetrics, setTopologyLLMMetrics] = React.useState(null);
   const [q, setQ] = useState("");
   const [showUploadConfig, setShowUploadConfig] = useState(false);
   const [summaryRows, setSummaryRows] = useState([]);
@@ -2442,10 +2428,7 @@ const SummaryPage = ({ project, can, authedUser, setProjects, openDevice }) => {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
   const [folderStructure, setFolderStructure] = useState(null);
-  const [searchConfig, setSearchConfig] = useState("");
-  const [filterConfigWho, setFilterConfigWho] = useState("all");
-  const [filterConfigWhat, setFilterConfigWhat] = useState("all");
-  const [configUploadHistory, setConfigUploadHistory] = useState([]);
+  // Removed: searchConfig, filterConfigWho, filterConfigWhat, configUploadHistory (History table removed)
 
   // Load summary + dashboard metrics from API (NOC backend)
   useEffect(() => {
@@ -2517,41 +2500,7 @@ const SummaryPage = ({ project, can, authedUser, setProjects, openDevice }) => {
   }, [project]);
 
   // Load config upload history from documents
-  useEffect(() => {
-    const loadConfigHistory = async () => {
-      const projectId = project?.project_id || project?.id;
-      if (!projectId) return;
-      try {
-        const docs = await api.getDocuments(projectId, { folder_id: "Config" });
-        // Transform documents to upload history format
-        const history = docs
-          .filter(doc => doc.folder_id === "Config")
-          .map(doc => ({
-            timestamp: doc.created_at,
-            files: [{ name: doc.filename }],
-            user: doc.uploader || "Unknown",
-            details: {
-              who: doc.metadata?.who || doc.uploader || "Unknown",
-              what: doc.metadata?.what || "—",
-              where: doc.metadata?.where || "—",
-              when: doc.metadata?.when || "—",
-              why: doc.metadata?.why || "—",
-              description: doc.metadata?.description || doc.description || "—",
-            },
-            type: "config",
-            project: projectId,
-          }))
-          .sort((a, b) => new Date(b.timestamp) - new Date(a.timestamp));
-        setConfigUploadHistory(history);
-      } catch (error) {
-        console.error('Failed to load config history:', error);
-        setConfigUploadHistory([]);
-      }
-    };
-    loadConfigHistory();
-    // Only depend on project ID, not the whole project object
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [project?.project_id || project?.id]);
+  // Config upload history removed - no longer displayed on Summary page
 
   const handleUpload = async (uploadRecord, folderId) => {
     console.log('Upload completed:', uploadRecord);
@@ -2661,14 +2610,20 @@ const SummaryPage = ({ project, can, authedUser, setProjects, openDevice }) => {
         }
       }},
     { header: "MORE", key: "more", cell: (r) => (
-      <Button variant="secondary" onClick={(e) => {
-        // #region agent log
-        const logData = {location:'App.jsx:2556',message:'BUTTON_CLICK',data:{device:r.device,hasEvent:!!e},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'A'};
-        console.log('[DEBUG] BUTTON_CLICK:', logData);
-        fetch('http://127.0.0.1:7242/ingest/b2e1e3ce-f337-4937-85a6-3e6049434e8e',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(logData)}).catch((err) => console.error('[DEBUG] Log fetch failed:', err));
-        // #endregion
-        handleDeviceClick(r.device, e);
-      }}>Open</Button>
+      <Button 
+        variant="secondary" 
+        className="text-[9px] py-0.5 px-2 h-6"
+        onClick={(e) => {
+          // #region agent log
+          const logData = {location:'App.jsx:2556',message:'BUTTON_CLICK',data:{device:r.device,hasEvent:!!e},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'A'};
+          console.log('[DEBUG] BUTTON_CLICK:', logData);
+          fetch('http://127.0.0.1:7242/ingest/b2e1e3ce-f337-4937-85a6-3e6049434e8e',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(logData)}).catch((err) => console.error('[DEBUG] Log fetch failed:', err));
+          // #endregion
+          handleDeviceClick(r.device, e);
+        }}
+      >
+        Open
+      </Button>
     )},
   ];
 
@@ -2692,13 +2647,14 @@ const SummaryPage = ({ project, can, authedUser, setProjects, openDevice }) => {
 
   // ====== UI: Single-pane, above-the-fold (1920x1080) ======
   return (
-    <div className="h-full flex flex-col gap-3 overflow-hidden min-h-0">
-      <div className="flex-shrink-0 flex items-center justify-between gap-2">
-        <h2 className="text-sm font-semibold text-slate-200">Summary Config</h2>
-        <div className="flex gap-2">
-          <Input placeholder="Search by Device/Model/IP..." value={q} onChange={(e)=>setQ(e.target.value)} className="w-48 text-xs py-1.5" />
-          <Button variant="secondary" className="text-xs py-1.5 px-3" onClick={exportCSV}>Export CSV</Button>
-          {can("upload-config", project) && <Button variant="secondary" className="text-xs py-1.5 px-3" onClick={() => setShowUploadConfig(true)}>Upload Config</Button>}
+    <div className="h-full flex flex-col gap-1 overflow-hidden min-h-0">
+      {/* Compact header */}
+      <div className="flex-shrink-0 flex items-center justify-between gap-1.5 py-0.5">
+        <h2 className="text-[10px] font-medium text-slate-300">Summary Config</h2>
+        <div className="flex gap-1 items-center">
+          <Input placeholder="Search..." value={q} onChange={(e)=>setQ(e.target.value)} className="w-32 text-[10px] py-0.5 h-5" />
+          <Button variant="secondary" className="text-[10px] py-0.5 px-2 h-5" onClick={exportCSV}>CSV</Button>
+          {can("upload-config", project) && <Button variant="secondary" className="text-[10px] py-0.5 px-2 h-5" onClick={() => setShowUploadConfig(true)}>Upload</Button>}
         </div>
       </div>
 
@@ -2713,41 +2669,65 @@ const SummaryPage = ({ project, can, authedUser, setProjects, openDevice }) => {
         />
       )}
 
-      {/* Metrics row */}
-      <div className="flex-shrink-0 grid grid-cols-4 gap-2">
-        <div className="rounded-lg border border-slate-800 bg-slate-900/80 px-3 py-2 flex items-center justify-between">
-          <span className="text-xs text-slate-400">Total Devices</span>
-          <span className="text-lg font-semibold text-slate-200">{totalDevices}</span>
+      {/* Compact metrics row */}
+      <div className="flex-shrink-0 grid grid-cols-4 gap-1">
+        <div className="rounded border border-slate-800 bg-slate-900/80 px-1.5 py-0.5 flex items-center justify-between">
+          <span className="text-[9px] text-slate-500">Total</span>
+          <span className="text-xs font-semibold text-slate-200">{totalDevices}</span>
         </div>
-        <div className="rounded-lg border border-slate-800 bg-slate-900/80 px-3 py-2 flex items-center justify-between">
-          <span className="text-xs text-slate-400">Healthy</span>
-          <span className="text-lg font-semibold text-emerald-400">{okCount}</span>
+        <div className="rounded border border-slate-800 bg-slate-900/80 px-1.5 py-0.5 flex items-center justify-between">
+          <span className="text-[9px] text-slate-500">Healthy</span>
+          <span className="text-xs font-semibold text-emerald-400">{okCount}</span>
         </div>
-        <div className="rounded-lg border border-slate-800 bg-slate-900/80 px-3 py-2 flex items-center justify-between">
-          <span className="text-xs text-slate-400">Critical</span>
-          <span className="text-lg font-semibold text-rose-400">{criticalCount}</span>
+        <div className="rounded border border-slate-800 bg-slate-900/80 px-1.5 py-0.5 flex items-center justify-between">
+          <span className="text-[9px] text-slate-500">Critical</span>
+          <span className="text-xs font-semibold text-rose-400">{criticalCount}</span>
         </div>
-        <div className="rounded-lg border border-slate-800 bg-slate-900/80 px-3 py-2 flex items-center justify-between">
-          <span className="text-xs text-slate-400">Core/Dist/Access</span>
-          <span className="text-xs font-semibold text-slate-200">{coreCount}/{distCount}/{accessCount}</span>
+        <div className="rounded border border-slate-800 bg-slate-900/80 px-1.5 py-0.5 flex items-center justify-between">
+          <span className="text-[9px] text-slate-500">C/D/A</span>
+          <span className="text-[9px] font-semibold text-slate-200">{coreCount}/{distCount}/{accessCount}</span>
         </div>
       </div>
 
       {/* Topology (2/3) + Narrative (1/3) */}
       <div className="flex-1 min-h-0 grid grid-cols-12 gap-3">
-        <div className="col-span-8 min-h-0 overflow-hidden rounded-xl border border-slate-800 bg-slate-900/50">
-          <TopologyGraph project={project} onOpenDevice={(id)=>openDevice(id)} can={can} authedUser={authedUser} setProjects={setProjects} />
+        <div className="col-span-6 min-h-0 overflow-hidden rounded-xl border border-slate-800 bg-slate-900/50">
+          <TopologyGraph project={project} onOpenDevice={(id)=>openDevice(id)} can={can} authedUser={authedUser} setProjects={setProjects} setTopologyLLMMetrics={setTopologyLLMMetrics} topologyLLMMetrics={topologyLLMMetrics} />
         </div>
-        <div className="col-span-4 min-h-0 overflow-auto rounded-xl border border-slate-800 bg-slate-900/50 p-3 text-xs text-slate-400 space-y-2">
-          <div className="font-semibold text-slate-300">Auto Summary</div>
-          <div>อุปกรณ์รวม: {project.summaryRows.length} เครื่อง (Core: {coreCount}, Dist: {distCount}, Access: {accessCount})</div>
-          <div>โครงแบบ: Core ↔ Distribution ↔ Access • HSRP/STP • OSPF/BGP</div>
+        <div className="col-span-6 min-h-0 overflow-auto rounded-xl border border-slate-800 bg-slate-900/50 p-2 text-[10px] text-slate-400 space-y-1.5 break-words">
+          <div className="font-semibold text-slate-300 text-xs">Auto Summary</div>
+          <div className="break-words">อุปกรณ์รวม: {project.summaryRows.length} เครื่อง (Core: {coreCount}, Dist: {distCount}, Access: {accessCount})</div>
+          <div className="break-words">โครงแบบ: Core ↔ Distribution ↔ Access • HSRP/STP • OSPF/BGP</div>
           <div className="text-slate-500">ล่าสุด: {project.lastBackup || "—"}</div>
-          <div className="font-semibold text-slate-300 pt-1">Recommendations</div>
-          <ul className="list-disc pl-4 space-y-0.5">
-            <li>ตั้งค่า NTP ให้ Sync</li>
-            <li>กำหนด HSRP/STP priority</li>
-            <li>portfast/bpduguard ด้าน access</li>
+          
+          {/* LLM Metrics (แสดงเมื่อมีการ generate topology ด้วย LLM) */}
+          {topologyLLMMetrics && (
+            <>
+              <div className="font-semibold text-slate-300 pt-1.5 border-t border-slate-700 mt-1.5 text-xs">LLM Processing Info</div>
+              <div className="space-y-0.5 break-words">
+                <div className="break-words">โมเดล: <span className="text-slate-200">{topologyLLMMetrics.model_name || "—"}</span></div>
+                <div>เวลา: <span className="text-slate-200">{topologyLLMMetrics.inference_time_ms ? `${(topologyLLMMetrics.inference_time_ms / 1000).toFixed(2)}s` : "—"}</span></div>
+                {topologyLLMMetrics.token_usage && (
+                  <>
+                    <div>Tokens: <span className="text-slate-200">{topologyLLMMetrics.token_usage.total_tokens || topologyLLMMetrics.token_usage.prompt_tokens + topologyLLMMetrics.token_usage.completion_tokens || "—"}</span></div>
+                    <div className="text-slate-500 text-[9px] pl-1.5 break-words">
+                      (Prompt: {topologyLLMMetrics.token_usage.prompt_tokens || 0}, 
+                      Completion: {topologyLLMMetrics.token_usage.completion_tokens || 0})
+                    </div>
+                  </>
+                )}
+                {topologyLLMMetrics.devices_processed && (
+                  <div className="break-words">อุปกรณ์ที่วิเคราะห์: <span className="text-slate-200">{topologyLLMMetrics.devices_processed}</span></div>
+                )}
+              </div>
+            </>
+          )}
+          
+          <div className="font-semibold text-slate-300 pt-1 text-xs">Recommendations</div>
+          <ul className="list-disc pl-3 space-y-0.5 break-words">
+            <li className="break-words">ตั้งค่า NTP ให้ Sync</li>
+            <li className="break-words">กำหนด HSRP/STP priority</li>
+            <li className="break-words">portfast/bpduguard ด้าน access</li>
           </ul>
         </div>
       </div>
@@ -2780,104 +2760,11 @@ const SummaryPage = ({ project, can, authedUser, setProjects, openDevice }) => {
           }}>Retry</Button>
         </div>
       ) : (
-        <div className="flex-1 min-h-0 overflow-auto rounded-xl border border-slate-800 bg-slate-900/50 p-1">
-          <Table columns={columns} data={filtered} empty="No devices yet. Upload config files to see summary." minWidthClass="min-w-[1500px]" />
+        <div className="flex-1 min-h-0 overflow-auto rounded-xl border border-slate-800 bg-slate-900/50 p-1" style={{ maxHeight: 'calc(100vh - 600px)' }}>
+          <Table columns={columns} data={filtered} empty="No devices yet. Upload config files to see summary." minWidthClass="min-w-full" containerClassName="text-[10px]" />
         </div>
       )}
 
-      {/* Config Upload History (compact, scrolls inside) */}
-      <div className="flex-shrink-0 max-h-[220px] overflow-hidden flex flex-col rounded-xl border border-slate-800 bg-slate-900/50">
-        <div className="flex items-center justify-between border-b border-slate-800 px-3 py-2">
-          <h3 className="text-xs font-semibold text-slate-200">Config Upload History</h3>
-        </div>
-        <div className="flex-1 min-h-0 overflow-auto p-2">
-        {(() => {
-          const projectId = project?.project_id || project?.id;
-          const allConfigs = (configUploadHistory || []).filter(upload => upload.project === projectId);
-          const uniqueWhos = [...new Set(allConfigs.map(d => d.details?.who || d.user))];
-          const uniqueWhats = [...new Set(allConfigs.map(d => d.details?.what || "—"))];
-          
-          const filteredConfigs = allConfigs.filter(config => {
-            const matchSearch = !searchConfig.trim() || 
-              [config.files.map(f => f.name).join(', '), 
-               config.details?.who || config.user,
-               config.details?.what || "—",
-               config.details?.where || "—",
-               config.details?.description || "—"].some(v => 
-                v.toLowerCase().includes(searchConfig.toLowerCase())
-              );
-            const matchWho = filterConfigWho === "all" || (config.details?.who || config.user) === filterConfigWho;
-            const matchWhat = filterConfigWhat === "all" || (config.details?.what || "—") === filterConfigWhat;
-            return matchSearch && matchWho && matchWhat;
-          });
-          
-          return (
-            <>
-              <div className="mb-4 grid grid-cols-1 md:grid-cols-3 gap-2">
-                <Input 
-                  placeholder="ค้นหา (ชื่อไฟล์, ผู้ใช้, คำอธิบาย...)" 
-                  value={searchConfig} 
-                  onChange={(e) => setSearchConfig(e.target.value)} 
-                />
-                <Select 
-                  value={filterConfigWho} 
-                  onChange={setFilterConfigWho} 
-                  options={[{value: "all", label: "ทั้งหมด (Responsible User)"}, ...uniqueWhos.map(w => ({value: w, label: w}))]} 
-                />
-                <Select 
-                  value={filterConfigWhat} 
-                  onChange={setFilterConfigWhat} 
-                  options={[{value: "all", label: "ทั้งหมด (Activity Type)"}, ...uniqueWhats.map(w => ({value: w, label: w}))]} 
-                />
-              </div>
-              <Table
-                columns={[
-                  { header: "Time", key: "timestamp", cell: (r) => formatDateTime(r.timestamp) },
-                  { header: "Name", key: "files", cell: (r) => r.files.map(f => f.name).join(', ') },
-                  { header: "Responsible User", key: "who", cell: (r) => r.details?.who || r.user },
-                  { header: "Activity Type", key: "what", cell: (r) => r.details?.what || "—" },
-                  { header: "Site", key: "where", cell: (r) => r.details?.where || "—" },
-                  { header: "Operational Timing", key: "when", cell: (r) => r.details?.when || "—" },
-                  { header: "Purpose", key: "why", cell: (r) => r.details?.why || "—" },
-                  { header: "Description", key: "description", cell: (r) => r.details?.description || "—" },
-                  {
-                    header: "Action",
-                    key: "act",
-                    cell: (r) => (
-                      <div className="flex gap-2">
-                        <Button 
-                          variant="secondary" 
-                          onClick={() => {
-                            const file = r.files[0];
-                            if (!file) return;
-                            const blob = new Blob(
-                              [file.content || `# Configuration Backup\n# File: ${file.name}\n# Uploaded: ${formatDateTime(r.timestamp)}\n# User: ${r.details?.who || r.user}\n\n(mock file content - actual backup file would be here)`],
-                              { type: file.type || "text/plain;charset=utf-8" }
-                            );
-                            const url = URL.createObjectURL(blob);
-                            const a = document.createElement("a");
-                            a.href = url;
-                            a.download = file.name || "backup.txt";
-                            document.body.appendChild(a);
-                            a.click();
-                            a.remove();
-                            URL.revokeObjectURL(url);
-                          }}
-                        >
-                          ⬇ Download
-                        </Button>
-                      </div>
-                    ),
-                  },
-                ]}
-                data={filteredConfigs}
-                empty="No config uploads yet"
-              />
-            </>
-          );
-        })()}
-        </div>
-      </div>
 
       {/* Upload Config Modal */}
       {showUploadConfig && (
@@ -2893,66 +2780,20 @@ const SummaryPage = ({ project, can, authedUser, setProjects, openDevice }) => {
 };
 
 
-/* ========= DEVICE DETAILS PAGE (with sidebar) ========= */
+/* ========= DEVICE DETAILS PAGE (with header navigation) ========= */
 const DeviceDetailsPage = ({ project, deviceId, goBack, goIndex, uploadHistory }) => {
-  const [sidebarOpen, setSidebarOpen] = useState(true);
-  
   if (!project) {
     return <div className="text-sm text-rose-400">Project not found</div>;
   }
 
   return (
-    <div>
-      <aside
-        className={`fixed top-0 left-0 h-screen transition-all duration-300 bg-white dark:bg-[#090E17] border-r border-gray-200 dark:border-gray-800 text-gray-900 dark:text-gray-100 ${
-          sidebarOpen ? "w-64" : "w-20"
-        } flex flex-col z-30`}
-      >
-        <div className="flex items-center justify-between px-4 py-3 border-b border-gray-200 dark:border-gray-800">
-          <button
-            onClick={goIndex}
-            className="flex items-center gap-2 hover:opacity-80"
-          >
-            <div className="h-6 w-6 bg-blue-600 rounded-md" />
-            {sidebarOpen && <span className="font-semibold text-gray-900 dark:text-gray-100">Index</span>}
-          </button>
-          <button
-            onClick={() => setSidebarOpen(!sidebarOpen)}
-            className="p-2 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-800 text-gray-700 dark:text-gray-300"
-          >
-            ☰
-          </button>
-        </div>
-        <nav className="flex-1 mt-4 space-y-1">
-          <div
-            className={`px-4 text-xs uppercase tracking-wide text-gray-500 dark:text-gray-400 ${
-              sidebarOpen ? "" : "sr-only"
-            }`}
-          >
-            {project.name}
-          </div>
-          <button
-            onClick={goBack}
-            className={`flex items-center w-full px-4 py-3 text-sm font-medium transition rounded-xl hover:bg-gray-100 dark:hover:bg-gray-800 hover:text-blue-600 dark:hover:text-blue-400 text-gray-700 dark:text-gray-300`}
-          >
-            <span className="text-lg mr-3">📊</span>
-            {sidebarOpen && "Summary"}
-          </button>
-        </nav>
-      </aside>
-
-      <main
-        className={`${
-          sidebarOpen ? "ml-64" : "ml-20"
-        } transition-all px-6 grid gap-6`}
-      >
-        <DeviceDetailsView
-          project={project}
-          deviceId={deviceId}
-          goBack={goBack}
-          uploadHistory={uploadHistory}
-        />
-      </main>
+    <div className="h-full flex flex-col min-h-0 px-6 py-4">
+      <DeviceDetailsView
+        project={project}
+        deviceId={deviceId}
+        goBack={goBack}
+        uploadHistory={uploadHistory}
+      />
     </div>
   );
 };
@@ -8554,7 +8395,7 @@ function classifyRoleByName(name = "") {
 }
 
 /* ===== TopologyGraph (SVG) ===== */
-const TopologyGraph = ({ project, onOpenDevice, can, authedUser, setProjects }) => {
+const TopologyGraph = ({ project, onOpenDevice, can, authedUser, setProjects, setTopologyLLMMetrics, topologyLLMMetrics }) => {
   // Helper function for default positioning - defined first to avoid hoisting issues
   const getDefaultPos = (nodeId, role, index = 0, totalByRole = {}) => {
     const centerX = 50;
@@ -8742,6 +8583,19 @@ const TopologyGraph = ({ project, onOpenDevice, can, authedUser, setProjects }) 
             setNodeRoles(topologyData.layout.node_roles);
           }
         }
+        // Load LLM metrics from database if available
+        if (topologyData.llm_metrics) {
+          setTopologyLLMMetrics(topologyData.llm_metrics);
+        }
+        // Store last modified date if available
+        if (topologyData.updated_at || topologyData.last_modified) {
+          setProjects(prev => prev.map(p => {
+            if ((p.project_id || p.id) === projectId) {
+              return { ...p, topoUpdatedAt: topologyData.updated_at || topologyData.last_modified };
+            }
+            return p;
+          }));
+        }
       } catch (error) {
         console.error("Failed to load topology layout:", error);
         // Fallback to project data (already set in useState)
@@ -8779,8 +8633,14 @@ const TopologyGraph = ({ project, onOpenDevice, can, authedUser, setProjects }) 
         console.log("[Topology] LLM Response:", {
           nodes: aiNodes,
           edges: aiEdges,
-          analysis_summary: result.analysis_summary
+          analysis_summary: result.analysis_summary,
+          metrics: result.metrics
         });
+        
+        // Store LLM metrics for display (if setter provided)
+        if (result.metrics && setTopologyLLMMetrics) {
+          setTopologyLLMMetrics(result.metrics);
+        }
         
         if (aiNodes.length === 0 && aiEdges.length === 0) {
           setTopologyError("ไม่พบข้อมูล topology จาก AI. กรุณาตรวจสอบว่า Ollama ทำงานอยู่และมีข้อมูล devices ใน project");
@@ -8930,20 +8790,43 @@ const TopologyGraph = ({ project, onOpenDevice, can, authedUser, setProjects }) 
     setPan({ x: 0, y: 0 });
   };
   
-  // Handle pan (drag background)
+  // Handle pan (drag background) - works in both edit and view mode
   const handlePanStart = (e) => {
-    if (editMode && !dragging && !linkStart && e.button === 0 && (e.ctrlKey || e.metaKey || e.shiftKey)) {
-      setIsPanning(true);
-      setPanStart({ x: e.clientX - pan.x, y: e.clientY - pan.y });
-      e.preventDefault();
+    // Don't pan if already dragging a node or starting a link
+    if (dragging || linkStart || e.button !== 0) return;
+    
+    // Check if clicking on empty space (SVG background, pan area rect, or line, not on nodes)
+    const target = e.target;
+    const isClickingEmptySpace = target.tagName === 'svg' || 
+                                  target.tagName === 'line' ||
+                                  (target.classList && target.classList.contains('pan-area')) ||
+                                  (target.tagName === 'rect' && target.getAttribute('fill') === 'transparent');
+    
+    if (editMode) {
+      // In edit mode: Ctrl/Shift/Cmd+drag or drag empty space (but not on nodes)
+      if (e.ctrlKey || e.metaKey || e.shiftKey || isClickingEmptySpace) {
+        setIsPanning(true);
+        setPanStart({ x: e.clientX - pan.x, y: e.clientY - pan.y });
+        e.preventDefault();
+        e.stopPropagation();
+      }
+    } else {
+      // In view mode: always allow panning on empty space (SVG background, pan area, or lines)
+      if (isClickingEmptySpace) {
+        setIsPanning(true);
+        setPanStart({ x: e.clientX - pan.x, y: e.clientY - pan.y });
+        e.preventDefault();
+        e.stopPropagation();
+      }
     }
   };
   
   const handlePanMove = (e) => {
     if (isPanning) {
+      // Reduce panning speed by dividing by 1.5
       setPan({
-        x: e.clientX - panStart.x,
-        y: e.clientY - panStart.y
+        x: (e.clientX - panStart.x) / 1.5,
+        y: (e.clientY - panStart.y) / 1.5
       });
     }
   };
@@ -8961,9 +8844,14 @@ const TopologyGraph = ({ project, onOpenDevice, can, authedUser, setProjects }) 
       return;
     }
     
-    // Check if panning
-    if (e.ctrlKey || e.metaKey || e.shiftKey) {
+    // In edit mode: Check if panning with modifier keys
+    if (editMode && (e.ctrlKey || e.metaKey || e.shiftKey)) {
       handlePanStart(e);
+      return;
+    }
+    
+    // Don't start dragging if we're panning
+    if (isPanning) {
       return;
     }
     
@@ -8986,8 +8874,8 @@ const TopologyGraph = ({ project, onOpenDevice, can, authedUser, setProjects }) 
     const viewBox = svg.viewBox.baseVal;
     
     // Calculate position accounting for zoom and pan
-    const x = ((e.clientX - rect.left) / rect.width) * viewBox.width;
-    const y = ((e.clientY - rect.top) / rect.height) * viewBox.height;
+    const x = ((e.clientX - rect.left) / rect.width) * viewBox.width / zoom - pan.x / zoom;
+    const y = ((e.clientY - rect.top) / rect.height) * viewBox.height / zoom - pan.y / zoom;
     
     setPositions(prev => ({
       ...prev,
@@ -9000,9 +8888,8 @@ const TopologyGraph = ({ project, onOpenDevice, can, authedUser, setProjects }) 
     handlePanEnd();
   };
   
-  // Handle wheel zoom
+  // Handle wheel zoom - works in both edit and view mode
   const handleWheel = (e) => {
-    if (!editMode) return;
     e.preventDefault();
     const delta = e.deltaY > 0 ? -0.1 : 0.1;
     setZoom(prev => Math.max(0.5, Math.min(3.0, prev + delta)));
@@ -9169,10 +9056,11 @@ const TopologyGraph = ({ project, onOpenDevice, can, authedUser, setProjects }) 
       // Save to backend
       await api.saveTopologyLayout(projectId, positions, links, nodeLabels, nodeRoles);
       
-      // Update local state
+      // Update local state with current timestamp
+      const now = new Date().toISOString();
       setProjects(prev => prev.map(p => 
         p.id === project.id 
-          ? { ...p, topoPositions: positions, topoLinks: links, topoNodeLabels: nodeLabels, topoNodeRoles: nodeRoles }
+          ? { ...p, topoPositions: positions, topoLinks: links, topoNodeLabels: nodeLabels, topoNodeRoles: nodeRoles, topoUpdatedAt: now }
           : p
       ));
       
@@ -9255,44 +9143,106 @@ const TopologyGraph = ({ project, onOpenDevice, can, authedUser, setProjects }) 
   const getNodeName = id => nodeLabels[id] || nodes.find(n => n.id === id)?.label || id;
   const getNodeRole = id => nodeRoles[id] || nodes.find(n => n.id === id)?.role || "access";
 
+  // Get last modified date from project or topology data
+  const lastModified = project.topoUpdatedAt || project.updated_at || project.updated || null;
+  const formatShortDate = (dateStr) => {
+    if (!dateStr) return null;
+    try {
+      const date = new Date(dateStr);
+      return date.toLocaleDateString('th-TH', { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' });
+    } catch {
+      return dateStr.split(' ')[0] || dateStr;
+    }
+  };
+
   return (
     <Card 
       title={
-        <div className="flex items-center justify-between w-full">
-          <span>Topology Graph (auto from config)</span>
-          <div className="flex gap-2">
+        <div className="flex items-center justify-between w-full py-0.5">
+          <div className="flex items-center gap-2 flex-1 min-w-0">
+            <span className="text-[10px] text-slate-400">Topology</span>
+            {/* LLM info and last modified - short format */}
+            {topologyLLMMetrics && (
+              <span className="text-[9px] text-slate-500">
+                LLM: {topologyLLMMetrics.model_name?.split(':')[0] || '—'} | {topologyLLMMetrics.inference_time_ms ? `${(topologyLLMMetrics.inference_time_ms / 1000).toFixed(1)}s` : '—'}
+              </span>
+            )}
+            {lastModified && (
+              <span className="text-[9px] text-slate-500">
+                | แก้ไข: {formatShortDate(lastModified)}
+              </span>
+            )}
+          </div>
+          <div className="flex gap-1 flex-shrink-0">
             {!editMode && (
-              <Button 
-                variant="primary" 
-                className="text-xs px-3 py-1.5 bg-blue-600 hover:bg-blue-700 text-white"
+              <button
+                className="w-5 h-5 flex items-center justify-center rounded bg-blue-600 hover:bg-blue-700 text-white text-[10px] transition-colors disabled:opacity-50"
                 onClick={handleGenerateTopology}
                 disabled={generatingTopology}
+                title={generatingTopology ? "กำลังสร้าง..." : "สร้าง Topology อัตโนมัติ"}
               >
-                {generatingTopology ? "⏳ กำลังสร้าง..." : "🤖 สร้าง Topology อัตโนมัติ"}
-              </Button>
+                {generatingTopology ? "⏳" : "🤖"}
+              </button>
             )}
             {canEdit && (
               <>
                 {!editMode ? (
-                  <Button variant="secondary" className="text-xs px-3 py-1.5" onClick={() => setEditMode(true)}>
-                    แก้ไขกราฟ
-                  </Button>
+                  <button
+                    className="w-5 h-5 flex items-center justify-center rounded border border-slate-600 hover:bg-slate-700 text-slate-300 text-[10px] transition-colors"
+                    onClick={() => setEditMode(true)}
+                    title="แก้ไขกราฟ"
+                  >
+                    ✏️
+                  </button>
                 ) : (
                   <>
-                    <Button variant="secondary" className="text-xs px-3 py-1.5" onClick={handleCancel}>
-                      ยกเลิก
-                    </Button>
-                    <Button variant="primary" className="text-xs px-3 py-1.5" onClick={handleSave}>
-                      บันทึกตำแหน่งใหม่
-                    </Button>
+                    <button
+                      className="w-5 h-5 flex items-center justify-center rounded border border-slate-600 hover:bg-slate-700 text-slate-300 text-[10px] transition-colors"
+                      onClick={handleCancel}
+                      title="ยกเลิก"
+                    >
+                      ✕
+                    </button>
+                    <button
+                      className="w-5 h-5 flex items-center justify-center rounded bg-blue-600 hover:bg-blue-700 text-white text-[10px] transition-colors"
+                      onClick={handleSave}
+                      title="บันทึกตำแหน่งใหม่"
+                    >
+                      ✓
+                    </button>
                   </>
                 )}
               </>
             )}
+            {/* Zoom controls - always visible */}
+            <div className="flex gap-0.5 ml-1 border-l border-slate-700 pl-1">
+              <button
+                className="w-5 h-5 flex items-center justify-center rounded border border-slate-600 hover:bg-slate-700 text-slate-300 text-[9px] transition-colors"
+                onClick={handleZoomIn}
+                title="ขยาย"
+              >
+                +
+              </button>
+              <button
+                className="w-5 h-5 flex items-center justify-center rounded border border-slate-600 hover:bg-slate-700 text-slate-300 text-[9px] transition-colors"
+                onClick={handleZoomOut}
+                title="ย่อ"
+              >
+                −
+              </button>
+              <button
+                className="w-5 h-5 flex items-center justify-center rounded border border-slate-600 hover:bg-slate-700 text-slate-300 text-[9px] transition-colors"
+                onClick={handleZoomReset}
+                title="รีเซ็ต"
+              >
+                ↻
+              </button>
+            </div>
           </div>
         </div>
       } 
       className="w-full"
+      compact={true}
     >
       {topologyError && (
         <div className="mb-3 p-3 bg-rose-50 dark:bg-rose-900/20 border border-rose-300 dark:border-rose-700 rounded-lg">
@@ -9338,33 +9288,6 @@ const TopologyGraph = ({ project, onOpenDevice, can, authedUser, setProjects }) 
               </Button>
             )}
           </div>
-          <div className="flex items-center gap-3 flex-wrap">
-            <span className="text-xs font-medium text-gray-600 dark:text-gray-300">ปรับมุมมอง:</span>
-            <Button 
-              variant="secondary" 
-              className="text-xs px-3 py-1.5"
-              onClick={handleZoomIn}
-            >
-              🔍+ ขยาย
-            </Button>
-            <Button 
-              variant="secondary" 
-              className="text-xs px-3 py-1.5"
-              onClick={handleZoomOut}
-            >
-              🔍- ย่อ
-            </Button>
-            <Button 
-              variant="secondary" 
-              className="text-xs px-3 py-1.5"
-              onClick={handleZoomReset}
-            >
-              🔄 รีเซ็ต
-            </Button>
-            <span className="text-xs text-gray-500 dark:text-gray-400">
-              (ใช้ Ctrl+ลากเพื่อเลื่อน • ใช้ล้อเมาส์เพื่อซูม)
-            </span>
-          </div>
           {linkMode === "add" && (
             <div className="mt-2 text-xs text-blue-600 dark:text-blue-400">
               💡 คลิก 2 โหนดเพื่อสร้างลิงก์
@@ -9382,7 +9305,7 @@ const TopologyGraph = ({ project, onOpenDevice, can, authedUser, setProjects }) 
           )}
         </div>
       )}
-      <div className="relative h-[280px] md:h-[360px] rounded-xl bg-[#0B1220] overflow-hidden">
+      <div className="relative h-[calc(100vh-380px)] min-h-[450px] rounded-xl bg-[#0B1220] overflow-hidden">
         <svg 
           viewBox="0 0 100 100" 
           className="w-full h-full"
@@ -9392,9 +9315,19 @@ const TopologyGraph = ({ project, onOpenDevice, can, authedUser, setProjects }) 
           onMouseDown={handlePanStart}
           onWheel={handleWheel}
           style={{
-            cursor: isPanning ? 'grabbing' : (editMode && !dragging ? 'grab' : 'default')
+            cursor: isPanning ? 'grabbing' : (!dragging ? 'grab' : 'default')
           }}
         >
+          <g transform={`translate(${pan.x}, ${pan.y}) scale(${zoom})`}>
+          {/* Background pan area - behind everything for panning */}
+          <rect 
+            x="-50" y="-50" 
+            width="200" height="200" 
+            fill="transparent" 
+            className="pan-area"
+            onMouseDown={handlePanStart}
+            style={{ cursor: isPanning ? 'grabbing' : (!dragging ? 'grab' : 'default'), pointerEvents: 'all' }}
+          />
           {/* edges */}
           {links.map((e, i) => {
             const A = getPos(e.a), B = getPos(e.b);
@@ -9480,6 +9413,7 @@ const TopologyGraph = ({ project, onOpenDevice, can, authedUser, setProjects }) 
               </g>
             );
           })}
+          </g>
         </svg>
         {/* Link tooltip */}
         {linkTooltip && (
@@ -9509,15 +9443,13 @@ const TopologyGraph = ({ project, onOpenDevice, can, authedUser, setProjects }) 
             </span>
           ) : (
             <span>
-              Tip: ชี้เมาส์เพื่อดูบทบาท/ข้อมูล • คลิกเพื่อเปิด More Details
+              Tip: คลิกที่โหนดเพื่อดูรายละเอียด • Ctrl+Shift+ลากเพื่อเลื่อน • ล้อเมาส์เพื่อซูม • ใช้ปุ่ม +/-/↻ เพื่อควบคุม
             </span>
           )}
         </div>
-        {editMode && (
-          <div className="absolute top-2 right-2 text-[10px] text-gray-500 dark:text-gray-400 bg-black/30 px-2 py-1 rounded">
-            Zoom: {(zoom * 100).toFixed(0)}%
-          </div>
-        )}
+        <div className="absolute top-2 right-2 text-[10px] text-gray-500 dark:text-gray-400 bg-black/30 px-2 py-1 rounded">
+          Zoom: {(zoom * 100).toFixed(0)}%
+        </div>
       </div>
 
       {/* Link Edit Dialog */}
