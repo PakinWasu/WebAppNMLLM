@@ -112,6 +112,25 @@
 
 ---
 
+## Summary / Dashboard (`/projects/{project_id}/summary`)
+
+### GET `/projects/{project_id}/summary`
+- **Description**: Get full device summary table (parsed configs)
+- **Response**: `{ "summaryRows": [...], "count": number }`
+- **Auth**: Required (must be member or admin)
+
+### GET `/projects/{project_id}/summary/metrics`
+- **Description**: Dashboard metrics for NOC (lightweight)
+- **Response**: `{ "total_devices", "healthy", "critical", "core", "dist", "access" }`
+- **Auth**: Required (must be member or admin)
+
+### GET `/projects/{project_id}/summary/{device_name}`
+- **Description**: Get detailed parsed config for one device
+- **Response**: Device parsed config object
+- **Auth**: Required (must be member or admin)
+
+---
+
 ## AI Test (`/ai/test`)
 
 ### GET `/ai/test`

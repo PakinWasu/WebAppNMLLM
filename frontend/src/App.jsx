@@ -1,6 +1,7 @@
 // src/App.jsx
 import React, { useMemo, useState, useEffect, useRef } from "react";
 import * as api from "./api";
+import MainLayout from "./components/layout/MainLayout";
 
 // Utility function to format date/time in local timezone (English)
 const formatDateTime = (dateString) => {
@@ -1046,6 +1047,66 @@ export default function App() {
   }, [route.name, route.device, route.projectId, authedUser]);
   // #endregion
 
+  /* Single-pane layout for Index and Project (above-the-fold, no outer scroll) */
+  if (authedUser && (route.name === "index" || route.name === "project")) {
+    const project = route.name === "project" ? projects.find((p) => (p.project_id || p.id) === route.projectId) : null;
+    return (
+      <MainLayout
+        topBar={
+          <div className="h-full flex items-center justify-between px-4">
+            <button
+              onClick={() => setRoute({ name: "index" })}
+              className="flex items-center gap-3 hover:opacity-80 transition-opacity cursor-pointer"
+            >
+              <div className="h-7 w-7 rounded-lg bg-blue-600 flex-shrink-0" />
+              <span className="text-sm font-semibold text-slate-200">Network Project Platform</span>
+            </button>
+            <div className="flex items-center gap-2">
+              <Button variant="ghost" className="text-slate-400 hover:text-slate-200" onClick={() => setDark(!dark)}>
+                {dark ? "🌙" : "☀️"}
+              </Button>
+              <span className="text-xs text-slate-400">{authedUser?.username}</span>
+              <Button variant="secondary" className="text-xs py-1.5 px-3" onClick={handleLogout}>
+                Sign out
+              </Button>
+            </div>
+          </div>
+        }
+        mainClassName="bg-slate-950 overflow-auto"
+      >
+        {route.name === "index" && (
+          <ProjectIndex
+            authedUser={authedUser}
+            can={can}
+            projects={projects}
+            openProject={(p) => setRoute({ name: "project", projectId: p.project_id || p.id, tab: "setting" })}
+            newProject={() => setRoute({ name: "newProject" })}
+            openUserAdmin={() => setRoute({ name: "userAdmin" })}
+            openChangePassword={() => setRoute({ name: "changePassword", username: authedUser.username, fromIndex: true })}
+            isMember={isMember}
+          />
+        )}
+        {route.name === "project" && project && (
+          <ProjectView
+            project={project}
+            tab={route.tab || "setting"}
+            onChangeTab={(tab) => setRoute({ ...route, tab })}
+            openDevice={(device) => setRoute({ name: "device", projectId: route.projectId, device })}
+            goIndex={() => setRoute({ name: "index" })}
+            setProjects={setProjects}
+            uploadHistory={uploadHistory}
+            setUploadHistory={setUploadHistory}
+            can={can}
+            authedUser={authedUser}
+          />
+        )}
+        {route.name === "project" && !project && (
+          <div className="p-6 text-sm text-rose-400">Project not found.</div>
+        )}
+      </MainLayout>
+    );
+  }
+
   return (
     <div
       className={`min-h-screen bg-slate-50 text-slate-900 dark:bg-[#0B0F19] dark:text-gray-100`}
@@ -2089,7 +2150,7 @@ const ProjectView = ({
   }
 
   return (
-    <div>
+    <div className="h-full flex min-h-0">
       <aside
         className={`fixed top-0 left-0 h-screen transition-all duration-300 bg-white dark:bg-[#090E17] border-r border-gray-200 dark:border-gray-800 text-gray-900 dark:text-gray-100 ${
           sidebarOpen ? "w-64" : "w-20"
@@ -2138,7 +2199,7 @@ const ProjectView = ({
       <main
         className={`${
           sidebarOpen ? "ml-64" : "ml-20"
-        } transition-all px-6 grid gap-6`}
+        } transition-all px-4 py-3 flex-1 min-h-0 overflow-hidden flex flex-col gap-3`}
       >
         {tab === "setting" && can("project-setting", project) && (
           <SettingPage
@@ -2149,13 +2210,15 @@ const ProjectView = ({
           />
         )}
         {tab === "summary" && can("view-documents", project) && (
-          <SummaryPage
-            project={project}
-            can={can}
-            authedUser={authedUser}
-            setProjects={setProjects}
-            openDevice={openDevice}
-          />
+          <div className="flex-1 min-h-0 overflow-hidden flex flex-col">
+            <SummaryPage
+              project={project}
+              can={can}
+              authedUser={authedUser}
+              setProjects={setProjects}
+              openDevice={openDevice}
+            />
+          </div>
         )}
         {tab === "analysis" && can("view-documents", project) && (
           <AnalysisPage
@@ -2375,6 +2438,7 @@ const SummaryPage = ({ project, can, authedUser, setProjects, openDevice }) => {
   const [q, setQ] = useState("");
   const [showUploadConfig, setShowUploadConfig] = useState(false);
   const [summaryRows, setSummaryRows] = useState([]);
+  const [dashboardMetrics, setDashboardMetrics] = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
   const [folderStructure, setFolderStructure] = useState(null);
@@ -2383,7 +2447,7 @@ const SummaryPage = ({ project, can, authedUser, setProjects, openDevice }) => {
   const [filterConfigWhat, setFilterConfigWhat] = useState("all");
   const [configUploadHistory, setConfigUploadHistory] = useState([]);
 
-  // Load summary data from API
+  // Load summary + dashboard metrics from API (NOC backend)
   useEffect(() => {
     const loadSummary = async () => {
       const projectId = project?.project_id || project?.id;
@@ -2394,17 +2458,17 @@ const SummaryPage = ({ project, can, authedUser, setProjects, openDevice }) => {
       setLoading(true);
       setError(null);
       try {
-        console.log('Loading summary for project:', projectId);
-        const summary = await api.getConfigSummary(projectId);
-        console.log('Summary loaded:', summary);
+        const [summary, metrics] = await Promise.all([
+          api.getConfigSummary(projectId),
+          api.getSummaryMetrics(projectId).catch(() => null),
+        ]);
         setSummaryRows(summary.summaryRows || []);
-        
-        // Update project summaryRows in parent state (only if needed)
+        setDashboardMetrics(metrics || null);
+
         setProjects(prev => {
           const updated = prev.map(p => {
             const pId = p.project_id || p.id;
             if (pId === projectId) {
-              // Only update if summaryRows actually changed
               const currentRows = p.summaryRows || [];
               const newRows = summary.summaryRows || [];
               if (JSON.stringify(currentRows) !== JSON.stringify(newRows)) {
@@ -2415,16 +2479,16 @@ const SummaryPage = ({ project, can, authedUser, setProjects, openDevice }) => {
           });
           return updated;
         });
-      } catch (error) {
-        console.error('Failed to load config summary:', error);
-        setError(error.message || 'Failed to load summary data');
+      } catch (err) {
+        console.error('Failed to load config summary:', err);
+        setError(err.message || 'Failed to load summary data');
         setSummaryRows([]);
+        setDashboardMetrics(null);
       } finally {
         setLoading(false);
       }
     };
     loadSummary();
-    // Only depend on project ID, not the whole project object or setProjects
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [project?.project_id || project?.id]);
 
@@ -2492,15 +2556,19 @@ const SummaryPage = ({ project, can, authedUser, setProjects, openDevice }) => {
   const handleUpload = async (uploadRecord, folderId) => {
     console.log('Upload completed:', uploadRecord);
     setShowUploadConfig(false);
-    // Reload summary after upload (wait a bit for backend to parse)
+    // Reload summary + metrics after upload (wait a bit for backend to parse)
     const projectId = project?.project_id || project?.id;
     if (!projectId) return;
     
     setLoading(true);
     setTimeout(async () => {
       try {
-        const summary = await api.getConfigSummary(projectId);
+        const [summary, metrics] = await Promise.all([
+          api.getConfigSummary(projectId),
+          api.getSummaryMetrics(projectId).catch(() => null),
+        ]);
         setSummaryRows(summary.summaryRows || []);
+        setDashboardMetrics(metrics || null);
         setProjects(prev => {
           const updated = prev.map(p => {
             const pId = p.project_id || p.id;
@@ -2614,20 +2682,26 @@ const SummaryPage = ({ project, can, authedUser, setProjects, openDevice }) => {
     downloadCSV([headers.join(","), ...rows].join("\n"), `summary_${project.name}.csv`);
   };
 
-  // ====== UI ======
+  /* Above-the-fold metrics: from backend dashboard API or fallback to summaryRows */
+  const totalDevices = dashboardMetrics?.total_devices ?? summaryRows.length;
+  const okCount = dashboardMetrics?.healthy ?? summaryRows.filter((r) => (r.status || "").toLowerCase() === "ok").length;
+  const criticalCount = dashboardMetrics?.critical ?? summaryRows.filter((r) => (r.status || "").toLowerCase() !== "ok").length;
+  const coreCount = dashboardMetrics?.core ?? summaryRows.filter((r) => /core/i.test(r.device || "")).length;
+  const distCount = dashboardMetrics?.dist ?? summaryRows.filter((r) => /dist|distribution/i.test(r.device || "")).length;
+  const accessCount = dashboardMetrics?.access ?? summaryRows.filter((r) => /access/i.test(r.device || "")).length;
+
+  // ====== UI: Single-pane, above-the-fold (1920x1080) ======
   return (
-    <div className="grid gap-4">
-      {/* Header line */}
-      <div className="flex items-center justify-between">
-        <h2 className="text-xl font-semibold">Summary Config</h2>
+    <div className="h-full flex flex-col gap-3 overflow-hidden min-h-0">
+      <div className="flex-shrink-0 flex items-center justify-between gap-2">
+        <h2 className="text-sm font-semibold text-slate-200">Summary Config</h2>
         <div className="flex gap-2">
-          <Input placeholder="Search by Device/Model/IP..." value={q} onChange={(e)=>setQ(e.target.value)} />
-          <Button variant="secondary" onClick={exportCSV}>Export CSV</Button>
-          {can("upload-config", project) && <Button variant="secondary" onClick={() => setShowUploadConfig(true)}>Upload Config</Button>}
+          <Input placeholder="Search by Device/Model/IP..." value={q} onChange={(e)=>setQ(e.target.value)} className="w-48 text-xs py-1.5" />
+          <Button variant="secondary" className="text-xs py-1.5 px-3" onClick={exportCSV}>Export CSV</Button>
+          {can("upload-config", project) && <Button variant="secondary" className="text-xs py-1.5 px-3" onClick={() => setShowUploadConfig(true)}>Upload Config</Button>}
         </div>
       </div>
 
-      {/* Upload Config Dialog */}
       {showUploadConfig && folderStructure && (
         <UploadDocumentForm
           project={project}
@@ -2639,91 +2713,84 @@ const SummaryPage = ({ project, can, authedUser, setProjects, openDevice }) => {
         />
       )}
 
-
-      {/* 1) Topology Graph – full width */}
-      <TopologyGraph project={project} onOpenDevice={(id)=>openDevice(id)} can={can} authedUser={authedUser} setProjects={setProjects} />
-
-      {/* 2) Narrative – full width, same card width */}
-      <Card title="Auto Summary (Narrative)" className="w-full">
-        <div className="text-sm leading-relaxed space-y-3">
-          <div>
-            <div className="font-semibold">สรุปภาพรวมโครงข่าย ({project.name})</div>
-            <ul className="list-disc ml-5">
-              <li>จำนวนอุปกรณ์รวม: {project.summaryRows.length} เครื่อง (Core: 1, Distribution: 1, Access/อื่นๆ: {Math.max(0, project.summaryRows.length-2)})</li>
-              <li>โครงแบบลอจิคัล: Core (core-sw1) เชื่อม Distribution (dist-sw2) และ Access (access-sw3)</li>
-            </ul>
-          </div>
-          <div>
-            <div className="font-semibold">HSRP (Virtual Gateway):</div>
-            <div>core-sw1: VLAN10→10.0.10.1, VLAN20→10.0.20.1</div>
-          </div>
-          <div>
-            <div className="font-semibold">Spanning Tree (STP):</div>
-            <ul className="list-disc ml-5">
-              <li>core-sw1: RPVST (Root: No)</li>
-              <li>dist-sw2: RPVST (Root: No)</li>
-              <li>access-sw3: — (Root —)</li>
-            </ul>
-          </div>
-          <div>
-            <div className="font-semibold">Routing:</div>
-            <ul className="list-disc ml-5">
-              <li>core-sw1: OSPF,BGP | OSPF 6 neigh | BGP 65001/4</li>
-              <li>dist-sw2: OSPF | OSPF 3 neigh | BGP —/0</li>
-              <li>access-sw3: — | OSPF — neigh | BGP —/—</li>
-            </ul>
-          </div>
-          <div className="text-xs text-gray-400">
-            การบิณฑบาตข้อมูล: ใช้ไฟล์ config โม็คล่าสุด 2 ไฟล์ • ล่าสุด: {project.lastBackup}
-          </div>
+      {/* Metrics row */}
+      <div className="flex-shrink-0 grid grid-cols-4 gap-2">
+        <div className="rounded-lg border border-slate-800 bg-slate-900/80 px-3 py-2 flex items-center justify-between">
+          <span className="text-xs text-slate-400">Total Devices</span>
+          <span className="text-lg font-semibold text-slate-200">{totalDevices}</span>
         </div>
-      </Card>
+        <div className="rounded-lg border border-slate-800 bg-slate-900/80 px-3 py-2 flex items-center justify-between">
+          <span className="text-xs text-slate-400">Healthy</span>
+          <span className="text-lg font-semibold text-emerald-400">{okCount}</span>
+        </div>
+        <div className="rounded-lg border border-slate-800 bg-slate-900/80 px-3 py-2 flex items-center justify-between">
+          <span className="text-xs text-slate-400">Critical</span>
+          <span className="text-lg font-semibold text-rose-400">{criticalCount}</span>
+        </div>
+        <div className="rounded-lg border border-slate-800 bg-slate-900/80 px-3 py-2 flex items-center justify-between">
+          <span className="text-xs text-slate-400">Core/Dist/Access</span>
+          <span className="text-xs font-semibold text-slate-200">{coreCount}/{distCount}/{accessCount}</span>
+        </div>
+      </div>
 
-      {/* 3) Recommendations – full width */}
-      <Card title="Recommendations (Config & Hygiene)" className="w-full">
-        <ul className="list-disc ml-5 text-sm space-y-1">
-          <li>[access-sw3] ตั้งค่า NTP ให้ Sync</li>
-          <li>HSRP: ยึด core-sw1 เป็น Active และกำหนด preempt/priority ให้เหมาะสม</li>
-          <li>STP: กำหนด root bridge ที่ core หรือ dist (priority) และตั้ง portfast/bpduguard ด้าน access</li>
-        </ul>
-      </Card>
+      {/* Topology (2/3) + Narrative (1/3) */}
+      <div className="flex-1 min-h-0 grid grid-cols-12 gap-3">
+        <div className="col-span-8 min-h-0 overflow-hidden rounded-xl border border-slate-800 bg-slate-900/50">
+          <TopologyGraph project={project} onOpenDevice={(id)=>openDevice(id)} can={can} authedUser={authedUser} setProjects={setProjects} />
+        </div>
+        <div className="col-span-4 min-h-0 overflow-auto rounded-xl border border-slate-800 bg-slate-900/50 p-3 text-xs text-slate-400 space-y-2">
+          <div className="font-semibold text-slate-300">Auto Summary</div>
+          <div>อุปกรณ์รวม: {project.summaryRows.length} เครื่อง (Core: {coreCount}, Dist: {distCount}, Access: {accessCount})</div>
+          <div>โครงแบบ: Core ↔ Distribution ↔ Access • HSRP/STP • OSPF/BGP</div>
+          <div className="text-slate-500">ล่าสุด: {project.lastBackup || "—"}</div>
+          <div className="font-semibold text-slate-300 pt-1">Recommendations</div>
+          <ul className="list-disc pl-4 space-y-0.5">
+            <li>ตั้งค่า NTP ให้ Sync</li>
+            <li>กำหนด HSRP/STP priority</li>
+            <li>portfast/bpduguard ด้าน access</li>
+          </ul>
+        </div>
+      </div>
 
-      {/* 4) Table – full width */}
+      {/* Table: fills remaining height, scrolls inside */}
       {loading ? (
-        <div className="flex items-center justify-center h-[70vh] rounded-2xl border border-gray-200 dark:border-[#1F2937] bg-white dark:bg-[#111827]">
-          <div className="text-gray-500 dark:text-gray-400">Loading summary data...</div>
+        <div className="flex-1 min-h-0 flex items-center justify-center rounded-xl border border-slate-800 bg-slate-900/50">
+          <div className="text-sm text-slate-400">Loading summary data...</div>
         </div>
       ) : error ? (
-        <div className="flex items-center justify-center h-[70vh] rounded-2xl border border-gray-200 dark:border-[#1F2937] bg-white dark:bg-[#111827]">
-          <div className="text-red-500 dark:text-red-400">
-            <div className="font-semibold mb-2">Error loading summary</div>
-            <div className="text-sm">{error}</div>
-            <Button variant="secondary" onClick={() => {
-              setError(null);
-              const projectId = project?.project_id || project?.id;
-              if (projectId) {
-                setLoading(true);
-                api.getConfigSummary(projectId)
-                  .then(summary => {
-                    setSummaryRows(summary.summaryRows || []);
-                    setLoading(false);
-                  })
-                  .catch(err => {
-                    setError(err.message || 'Failed to load summary data');
-                    setLoading(false);
-                  });
-              }
-            }} className="mt-4">Retry</Button>
-          </div>
+        <div className="flex-1 min-h-0 flex flex-col items-center justify-center rounded-xl border border-slate-800 bg-slate-900/50 p-4">
+          <div className="text-sm text-rose-400 font-semibold mb-2">Error loading summary</div>
+          <div className="text-xs text-slate-400 mb-3">{error}</div>
+          <Button variant="secondary" className="text-xs" onClick={() => {
+            setError(null);
+            const projectId = project?.project_id || project?.id;
+            if (projectId) {
+              setLoading(true);
+              Promise.all([
+                api.getConfigSummary(projectId),
+                api.getSummaryMetrics(projectId).catch(() => null),
+              ])
+                .then(([summary, metrics]) => {
+                  setSummaryRows(summary.summaryRows || []);
+                  setDashboardMetrics(metrics || null);
+                  setLoading(false);
+                })
+                .catch(err => { setError(err.message || 'Failed to load summary data'); setLoading(false); });
+            }
+          }}>Retry</Button>
         </div>
       ) : (
-        <div className="h-[70vh] overflow-auto rounded-2xl border border-gray-200 dark:border-[#1F2937] bg-white dark:bg-[#111827] p-1">
+        <div className="flex-1 min-h-0 overflow-auto rounded-xl border border-slate-800 bg-slate-900/50 p-1">
           <Table columns={columns} data={filtered} empty="No devices yet. Upload config files to see summary." minWidthClass="min-w-[1500px]" />
         </div>
       )}
 
-      {/* 5) Config Upload History */}
-      <Card title="Config Upload History">
+      {/* Config Upload History (compact, scrolls inside) */}
+      <div className="flex-shrink-0 max-h-[220px] overflow-hidden flex flex-col rounded-xl border border-slate-800 bg-slate-900/50">
+        <div className="flex items-center justify-between border-b border-slate-800 px-3 py-2">
+          <h3 className="text-xs font-semibold text-slate-200">Config Upload History</h3>
+        </div>
+        <div className="flex-1 min-h-0 overflow-auto p-2">
         {(() => {
           const projectId = project?.project_id || project?.id;
           const allConfigs = (configUploadHistory || []).filter(upload => upload.project === projectId);
@@ -2809,7 +2876,8 @@ const SummaryPage = ({ project, can, authedUser, setProjects, openDevice }) => {
             </>
           );
         })()}
-      </Card>
+        </div>
+      </div>
 
       {/* Upload Config Modal */}
       {showUploadConfig && (

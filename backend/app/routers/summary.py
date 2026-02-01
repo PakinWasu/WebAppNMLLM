@@ -10,6 +10,76 @@ from ..dependencies.auth import get_current_user, check_project_access
 router = APIRouter(prefix="/projects/{project_id}/summary", tags=["summary"])
 
 
+def _device_status(latest: dict) -> str:
+    """Derive status from parsed config (OK or not)."""
+    return "OK"  # Can add drift/warning logic later
+
+
+@router.get("/metrics")
+async def get_summary_metrics(
+    project_id: str,
+    user=Depends(get_current_user)
+):
+    """Dashboard metrics for NOC: total devices, healthy, critical, core/dist/access counts."""
+    await check_project_access(project_id, user)
+    device_names = set()
+    device_statuses = []  # list of (device_name, status)
+
+    async for doc in db()["parsed_configs"].find(
+        {"project_id": project_id},
+        sort=[("device_name", 1), ("upload_timestamp", -1)]
+    ):
+        device_name = doc.get("device_name")
+        if device_name and device_name not in device_names:
+            device_names.add(device_name)
+            latest = await db()["parsed_configs"].find_one(
+                {"project_id": project_id, "device_name": device_name},
+                sort=[("upload_timestamp", -1)]
+            )
+            if latest:
+                status = _device_status(latest)
+                device_statuses.append((device_name, status))
+
+    # Fallback: documents collection
+    async for doc in db()["documents"].find(
+        {"project_id": project_id, "is_latest": True, "parsed_config": {"$exists": True}},
+        sort=[("created_at", -1)]
+    ):
+        parsed_config = doc.get("parsed_config", {})
+        device_name = parsed_config.get("device_name")
+        if device_name and device_name not in device_names:
+            device_names.add(device_name)
+            status = _device_status(parsed_config)
+            device_statuses.append((device_name, status))
+
+    total_devices = len(device_statuses)
+    healthy = sum(1 for _, s in device_statuses if (s or "").lower() == "ok")
+    critical = total_devices - healthy
+
+    def role(name):
+        n = (name or "").lower()
+        if "core" in n:
+            return "core"
+        if "dist" in n or "distribution" in n:
+            return "dist"
+        if "access" in n:
+            return "access"
+        return None
+
+    core = sum(1 for name, _ in device_statuses if role(name) == "core")
+    dist = sum(1 for name, _ in device_statuses if role(name) == "dist")
+    access = sum(1 for name, _ in device_statuses if role(name) == "access")
+
+    return {
+        "total_devices": total_devices,
+        "healthy": healthy,
+        "critical": critical,
+        "core": core,
+        "dist": dist,
+        "access": access,
+    }
+
+
 @router.get("")
 async def get_summary(
     project_id: str,

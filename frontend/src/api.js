@@ -330,6 +330,11 @@ export async function getConfigSummary(projectId) {
   return api(`/projects/${projectId}/summary`);
 }
 
+/** Dashboard metrics for NOC (total_devices, healthy, critical, core, dist, access). */
+export async function getSummaryMetrics(projectId) {
+  return api(`/projects/${projectId}/summary/metrics`);
+}
+
 export async function getDeviceDetails(projectId, deviceName) {
   return api(`/projects/${projectId}/summary/${deviceName}`);
 }

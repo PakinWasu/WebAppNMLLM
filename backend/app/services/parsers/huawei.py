@@ -390,7 +390,7 @@ class HuaweiParser(BaseParser):
                 "mac_arp": {"mac_table": None, "arp_table": None},
                 "security": {"user_accounts": [], "acls": []},
                 "ha": {"etherchannel": [], "vrrp": []},
-            }
+        }
     
     def extract_device_overview(self, content: str) -> Dict[str, Any]:
         """2.3.2.1 Device Overview"""
@@ -440,7 +440,6 @@ class HuaweiParser(BaseParser):
         version_section = re.search(r'display\s+version(.*?)(?=display|#|$)', content, re.IGNORECASE | re.DOTALL)
         if version_section:
             version_output = version_section.group(1)
-            
             # Extract model - try multiple patterns
             model_patterns = [
                 r'Quidway\s+(\S+)\s+uptime',
@@ -741,8 +740,8 @@ class HuaweiParser(BaseParser):
                 # Validate IP address
                 if is_valid_ipv4(ip_candidate):
                     iface["ipv4_address"] = ip_candidate
-                    iface["port_mode"] = "routed"
-                    break
+                iface["port_mode"] = "routed"
+                break
         
         # Extract IPv6 address
         ipv6_match = re.search(r'ipv6\s+address\s+([\da-fA-F:]+/\d+)', iface_config, re.IGNORECASE)
@@ -987,8 +986,8 @@ class HuaweiParser(BaseParser):
                     if is_valid_interface_name(port):
                         stp["interfaces"].append({
                             "port": port,
-                            "role": role,
-                            "state": state,
+                        "role": role,
+                        "state": state,
                         })
         
         # Check for portfast (edged-port)
@@ -1244,17 +1243,14 @@ class HuaweiParser(BaseParser):
                     # Skip header lines
                     if any(kw in line.lower() for kw in ['local', 'neighbor', 'intf', 'dev']):
                         continue
-                    
                     parts = [p for p in line.split() if p]
                     if len(parts) >= 3:
                         local_port = parts[0]
                         device_name = parts[1]
                         remote_port = parts[2]
-                        
                         # Validate local_port is an interface name
                         if not is_valid_interface_name(local_port):
                             continue
-                        
                         # Check if already added (prevent duplicates)
                         if not any(n.get("device_name") == device_name and n.get("local_port") == local_port for n in neighbors):
                             neighbors.append({
@@ -1270,32 +1266,29 @@ class HuaweiParser(BaseParser):
                 for match in re.finditer(neighbor_pattern, lldp_output, re.IGNORECASE | re.DOTALL):
                     local_port = match.group(1)
                     neighbor_details = match.group(2)
-                    
                     # Validate local_port
                     if not is_valid_interface_name(local_port):
                         continue
-                    
                     # Extract system name
                     system_name_match = re.search(r'System\s+name\s*:\s*(\S+)', neighbor_details, re.IGNORECASE)
                     if system_name_match:
                         device_name = system_name_match.group(1)
-                        
-                        # Extract remote port
-                        port_id_match = re.search(r'Port\s+ID\s*:\s*(\S+)', neighbor_details, re.IGNORECASE)
-                        remote_port = port_id_match.group(1) if port_id_match else None
-                        
-                        # Extract IP address
-                        ip_match = re.search(r'Management\s+address\s*:\s*(\d+\.\d+\.\d+\.\d+)', neighbor_details, re.IGNORECASE)
-                        ip_address = ip_match.group(1) if ip_match and is_valid_ipv4(ip_match.group(1)) else None
-                        
-                        # Check if already added
-                        if not any(n.get("device_name") == device_name and n.get("local_port") == local_port for n in neighbors):
-                            neighbors.append({
-                                "device_name": device_name,
-                                "local_port": local_port,
-                                "remote_port": remote_port,
-                                "ip_address": ip_address,
-                            })
+                    else:
+                        continue
+                    # Extract remote port
+                    port_id_match = re.search(r'Port\s+ID\s*:\s*(\S+)', neighbor_details, re.IGNORECASE)
+                    remote_port = port_id_match.group(1) if port_id_match else None
+                    # Extract IP address
+                    ip_match = re.search(r'Management\s+address\s*:\s*(\d+\.\d+\.\d+\.\d+)', neighbor_details, re.IGNORECASE)
+                    ip_address = ip_match.group(1) if ip_match and is_valid_ipv4(ip_match.group(1)) else None
+                    # Check if already added
+                    if not any(n.get("device_name") == device_name and n.get("local_port") == local_port for n in neighbors):
+                        neighbors.append({
+                            "device_name": device_name,
+                            "local_port": local_port,
+                            "remote_port": remote_port,
+                            "ip_address": ip_address,
+                        })
         
         return neighbors
     
@@ -1321,15 +1314,13 @@ class HuaweiParser(BaseParser):
                     continue
                 if any(keyword in line for keyword in ['MAC Address', 'Total:', 'Dynamic:', 'Static:', 'Slot', 'Type']):
                     continue
-                
                 parts = line.split()
                 if len(parts) >= 3:
                     mac_addr = parts[0]
-                    
                     # CRITICAL: Validate MAC address format - reject garbage
                     if not is_valid_mac_address(mac_addr):
                         continue
-                    
+                
                     vlan = parts[1] if len(parts) > 1 and parts[1].isdigit() else None
                     
                     # Find interface/port dynamically - usually after VLAN column
@@ -1386,7 +1377,6 @@ class HuaweiParser(BaseParser):
                     # Strict IP validation - reject "Total:10" or similar
                     if not is_valid_ipv4(ip_candidate):
                         continue
-                    
                     # CRITICAL: Validate MAC address format - reject garbage
                     if not is_valid_mac_address(mac_addr):
                         continue
@@ -1442,7 +1432,7 @@ class HuaweiParser(BaseParser):
             
             # Validate username - filter out separators and garbage
             if not is_valid_username(username):
-                continue
+                    continue
             
             # Extract privilege level from user config block
             privilege_level = None
@@ -1574,7 +1564,6 @@ class HuaweiParser(BaseParser):
                             source = f"{source_network}/{source_mask}"
                         else:
                             source = source_network
-                    
                     if dest_network:
                         if dest_mask and is_valid_ipv4(dest_mask):
                             destination = f"{dest_network} {dest_mask}"
@@ -1692,14 +1681,12 @@ class HuaweiParser(BaseParser):
                         mode = "LACP"
                     elif "mode manual" in trunk_config.lower() or "mode manual-load-balance" in trunk_config.lower():
                         mode = "STATIC"
-                    
                     ether_trunk_map[current_trunk_id] = {
                         "id": current_trunk_id,
                         "name": f"Eth-Trunk{current_trunk_id}",
                         "mode": mode,
                         "members": set(),  # Use SET to prevent duplicate members
                     }
-                
                 # Start new trunk
                 current_trunk_id = trunk_match.group(1)
                 current_trunk_config = []
@@ -1712,7 +1699,6 @@ class HuaweiParser(BaseParser):
                         mode = "LACP"
                     elif "mode manual" in trunk_config.lower() or "mode manual-load-balance" in trunk_config.lower():
                         mode = "STATIC"
-                    
                     ether_trunk_map[current_trunk_id] = {
                         "id": current_trunk_id,
                         "name": f"Eth-Trunk{current_trunk_id}",
@@ -1737,7 +1723,7 @@ class HuaweiParser(BaseParser):
             ether_trunk_map[current_trunk_id] = {
                 "id": current_trunk_id,
                 "name": f"Eth-Trunk{current_trunk_id}",
-                "mode": mode,
+                    "mode": mode,
                 "members": set(),  # Use SET to prevent duplicate members
             }
         
