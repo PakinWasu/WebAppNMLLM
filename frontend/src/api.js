@@ -395,6 +395,19 @@ export async function getProjectRecommendations(projectId) {
   });
 }
 
+// Full Project Analysis API (combines overview + gap analysis)
+export async function analyzeProject(projectId) {
+  return api(`/projects/${projectId}/analyze/full-project`, {
+    method: 'POST',
+  });
+}
+
+export async function getFullProjectAnalysis(projectId) {
+  return api(`/projects/${projectId}/analyze/full-project`, {
+    method: 'GET',
+  });
+}
+
 // Folders API
 export async function getFolders(projectId) {
   const response = await api(`/projects/${projectId}/folders`);

@@ -234,6 +234,194 @@ async def analyze_project_overview(
         )
 
 
+@overview_router.post("/full-project")
+async def analyze_full_project(
+    project_id: str,
+    user=Depends(get_current_user)
+):
+    """
+    Full Project Analysis - Network Overview + Gap Analysis (Scope 2.3.5.1 & 2.3.5.2).
+    Analyzes ALL devices in the project collectively to provide:
+    - Network Overview: Architecture, topology style, key protocols (English)
+    - Gap Analysis: Missing configurations, errors, actionable fixes (English)
+    """
+    import logging
+    logger = logging.getLogger(__name__)
+    
+    try:
+        await check_project_access(project_id, user)
+        
+        # Fetch ALL devices in the project
+        devices_data = []
+        device_names = set()
+        
+        try:
+            # Get latest parsed config for each device
+            async for doc in db()["parsed_configs"].find(
+                {"project_id": project_id},
+                sort=[("device_name", 1), ("upload_timestamp", -1)]
+            ):
+                device_name = doc.get("device_name")
+                if device_name and device_name not in device_names:
+                    device_names.add(device_name)
+                    
+                    # Get latest config for this device
+                    latest = await db()["parsed_configs"].find_one(
+                        {"project_id": project_id, "device_name": device_name},
+                        sort=[("upload_timestamp", -1)]
+                    )
+                    
+                    if latest:
+                        # Remove MongoDB _id
+                        latest.pop("_id", None)
+                        devices_data.append(latest)
+        except Exception as db_error:
+            logger.exception(f"Database error while fetching devices for project {project_id}: {db_error}")
+            raise HTTPException(
+                status_code=500,
+                detail=f"Failed to fetch device configurations from database: {str(db_error)}"
+            )
+        
+        if not devices_data:
+            raise HTTPException(
+                status_code=404,
+                detail="No devices found in project. Upload configuration files first."
+            )
+        
+        logger.info(f"Calling LLM service for full project analysis. Project: {project_id}, Devices: {len(devices_data)}")
+        
+        # Call LLM service for full project analysis
+        try:
+            result = await llm_service.analyze_full_project(
+                devices_data=devices_data,
+                project_id=project_id
+            )
+        except Exception as llm_error:
+            logger.exception(f"LLM service error for project {project_id}: {llm_error}")
+            raise HTTPException(
+                status_code=500,
+                detail=f"LLM analysis failed: {str(llm_error)}"
+            )
+        
+        # Check for errors in the result
+        parsed_response = result.get("parsed_response", {})
+        if "error" in parsed_response:
+            error_message = result.get("content", "LLM analysis failed")
+            logger.error(f"LLM returned error for project {project_id}: {error_message}")
+            raise HTTPException(
+                status_code=500,
+                detail=error_message
+            )
+        
+        # Extract parsed response
+        network_overview = parsed_response.get("network_overview", "Analysis completed.")
+        gap_analysis = parsed_response.get("gap_analysis", [])
+        
+        # Ensure gap_analysis is a list
+        if not isinstance(gap_analysis, list):
+            logger.warning(f"LLM returned non-list gap_analysis for project {project_id}: {type(gap_analysis)}")
+            gap_analysis = []
+        
+        # Validate gap_analysis structure
+        validated_gap_analysis = []
+        for item in gap_analysis:
+            if isinstance(item, dict):
+                validated_gap_analysis.append({
+                    "severity": item.get("severity", "Medium"),
+                    "device": item.get("device", "all"),
+                    "issue": item.get("issue", ""),
+                    "recommendation": item.get("recommendation", "")
+                })
+            else:
+                logger.warning(f"Invalid gap_analysis item format: {item}")
+        
+        # Save to database for persistence
+        try:
+            from ..services.topology_service import topology_service
+            await topology_service._save_llm_result(
+                project_id=project_id,
+                result_type="full_project_analysis",
+                result_data={
+                    "network_overview": network_overview,
+                    "gap_analysis": validated_gap_analysis
+                },
+                analysis_summary=network_overview,
+                metrics=result.get("metrics", {}),
+                llm_used=True
+            )
+            logger.info(f"Saved full project analysis to database for project {project_id}")
+        except Exception as save_error:
+            logger.warning(f"Failed to save full project analysis to database: {save_error}")
+            # Continue even if save fails
+        
+        logger.info(f"Successfully generated full project analysis for project {project_id}")
+        
+        return {
+            "network_overview": network_overview,
+            "gap_analysis": validated_gap_analysis,
+            "metrics": result.get("metrics", {}),
+            "devices_analyzed": len(devices_data),
+            "project_id": project_id
+        }
+    
+    except HTTPException:
+        # Re-raise HTTP exceptions as-is
+        raise
+    except Exception as e:
+        logger.exception(f"Unexpected error in analyze_full_project for project {project_id}: {e}")
+        raise HTTPException(
+            status_code=500,
+            detail=f"Internal server error: {str(e)}"
+        )
+
+
+@overview_router.get("/full-project")
+async def get_full_project_analysis(
+    project_id: str,
+    user=Depends(get_current_user)
+):
+    """Get saved full project analysis from database."""
+    import logging
+    logger = logging.getLogger(__name__)
+    
+    try:
+        await check_project_access(project_id, user)
+        
+        # Get saved result from database
+        saved_result = await db()["llm_results"].find_one(
+            {"project_id": project_id, "result_type": "full_project_analysis"},
+            sort=[("generated_at", -1)]
+        )
+        
+        if not saved_result:
+            raise HTTPException(
+                status_code=404,
+                detail="No saved full project analysis found. Generate one first."
+            )
+        
+        result_data = saved_result.get("result_data", {})
+        network_overview = result_data.get("network_overview", "No overview available.")
+        gap_analysis = result_data.get("gap_analysis", [])
+        
+        return {
+            "network_overview": network_overview,
+            "gap_analysis": gap_analysis,
+            "metrics": saved_result.get("metrics", {}),
+            "devices_analyzed": saved_result.get("result_data", {}).get("devices_analyzed", 0),
+            "project_id": project_id,
+            "generated_at": saved_result.get("generated_at")
+        }
+    
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.exception(f"Error fetching full project analysis for project {project_id}: {e}")
+        raise HTTPException(
+            status_code=500,
+            detail=f"Failed to fetch analysis: {str(e)}"
+        )
+
+
 @overview_router.post("/recommendations")
 async def analyze_project_recommendations(
     project_id: str,

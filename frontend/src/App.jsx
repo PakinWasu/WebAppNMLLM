@@ -51,7 +51,7 @@ const Button = ({
   className = "",
 }) => {
   const base =
-    "inline-flex items-center justify-center rounded-2xl px-4 py-2 text-sm font-semibold shadow-sm transition focus:outline-none focus:ring-2 focus:ring-offset-2 disabled:opacity-50 disabled:cursor-not-allowed";
+    "inline-flex items-center justify-center rounded-lg px-3 py-1.5 text-xs font-medium shadow-sm transition focus:outline-none focus:ring-2 focus:ring-offset-2 disabled:opacity-50 disabled:cursor-not-allowed whitespace-nowrap";
   const styles = {
     primary:
       "bg-blue-600 text-white hover:bg-blue-700 focus:ring-blue-500 dark:bg-blue-500 dark:hover:bg-blue-400",
@@ -71,21 +71,25 @@ const Button = ({
     </button>
   );
 };
-const Card = ({ title, actions, children, className = "", compact = false }) => (
-  <div
-    className={`rounded-2xl border border-gray-200 dark:border-[#1F2937] bg-white dark:bg-[#111827] shadow-sm ${className}`}
-  >
-    {(title || actions) && (
-      <div className={`flex items-center justify-between border-b border-gray-100 dark:border-[#1F2937] ${compact ? 'px-2 py-1' : 'px-5 py-3'}`}>
-        <h3 className={`${compact ? 'text-[10px]' : 'text-sm'} font-semibold text-gray-700 dark:text-gray-200`}>
-          {title}
-        </h3>
-        <div className="flex gap-2">{actions}</div>
-      </div>
-    )}
-    <div className={compact ? "p-1" : "p-5"}>{children}</div>
-  </div>
-);
+const Card = ({ title, actions, children, className = "", compact = false }) => {
+  const isFlexCard = className.includes('flex flex-col') || className.includes('flex-1');
+  const isFullScreen = className.includes('overflow-hidden') && isFlexCard;
+  return (
+    <div
+      className={`rounded-2xl border border-gray-200 dark:border-[#1F2937] bg-white dark:bg-[#111827] shadow-sm ${className}`}
+    >
+      {(title || actions) && (
+        <div className={`flex items-center justify-between border-b border-gray-100 dark:border-[#1F2937] flex-shrink-0 ${compact ? 'px-2 py-1' : 'px-5 py-3'}`}>
+          <h3 className={`${compact ? 'text-[10px]' : 'text-sm'} font-semibold text-gray-700 dark:text-gray-200`}>
+            {title}
+          </h3>
+          <div className="flex gap-2">{actions}</div>
+        </div>
+      )}
+      <div className={isFlexCard ? (isFullScreen ? "flex-1 min-h-0 flex flex-col overflow-hidden" : (compact ? "p-1 flex-1 min-h-0 flex flex-col overflow-hidden" : "p-5 flex-1 min-h-0 flex flex-col overflow-hidden")) : (compact ? "p-1" : "p-5")}>{children}</div>
+    </div>
+  );
+};
 const Field = ({ label, children }) => (
   <label className="grid gap-1.5">
     <span className="text-xs font-medium text-gray-600 dark:text-gray-300">
@@ -305,17 +309,17 @@ const Table = ({
   
   return (
     <div
-      className={`overflow-auto rounded-2xl border border-gray-200 dark:border-[#1F2937] ${containerClassName}`}
+      className={`overflow-auto ${containerClassName}`}
     >
       <table
-        className={`${minWidthClass} divide-y divide-gray-200 dark:divide-[#1F2937]`}
+        className={`${minWidthClass} w-full divide-y divide-gray-200 dark:divide-gray-700`}
       >
-        <thead className="bg-gray-50 dark:bg-[#111827] sticky top-0 z-10">
+        <thead className="bg-gray-100 dark:bg-gray-800 sticky top-0 z-10">
           <tr>
             {columns.map((c) => (
               <th
                 key={c.key || c.header}
-                className={`px-2 py-1.5 text-left ${headerTextSize} font-semibold uppercase tracking-wider text-gray-600 dark:text-gray-300`}
+                className={`px-2 py-1.5 text-left ${headerTextSize} font-semibold uppercase tracking-wider text-gray-700 dark:text-gray-200 border-b border-gray-200 dark:border-gray-700 whitespace-nowrap`}
                 style={{ width: c.width }}
               >
                 {c.header}
@@ -323,11 +327,11 @@ const Table = ({
             ))}
           </tr>
         </thead>
-        <tbody className="divide-y divide-gray-100 dark:divide-[#1F2937] bg-white dark:bg-[#0F172A]">
+        <tbody className="bg-white dark:bg-gray-900 divide-y divide-gray-200 dark:divide-gray-700">
           {data.length === 0 && (
             <tr>
               <td
-                className={`px-2 py-4 ${tableTextSize} text-gray-500 dark:text-gray-400`}
+                className={`px-4 py-8 ${tableTextSize} text-center text-gray-500 dark:text-gray-400`}
                 colSpan={columns.length}
               >
                 {empty}
@@ -337,16 +341,19 @@ const Table = ({
           {data.map((row, i) => (
             <tr
               key={i}
-              className="odd:bg-white even:bg-gray-50 dark:odd:bg-[#0F172A] dark:even:bg-[#0D1422] hover:bg-gray-50 dark:hover:bg-[#1A2231]"
+              className="hover:bg-gray-50 dark:hover:bg-gray-800/50 transition-colors"
             >
-              {columns.map((c) => (
-                <td
-                  key={c.key || c.header}
-                  className={`px-2 py-1 ${tableTextSize} text-gray-800 dark:text-gray-100 align-top ${c.key === 'more' ? 'text-center' : ''}`}
-                >
-                  {typeof c.cell === "function" ? c.cell(row) : row[c.key]}
-                </td>
-              ))}
+              {columns.map((c) => {
+                const cellContent = c.cell ? c.cell(row, i) : row[c.key];
+                return (
+                  <td
+                    key={c.key || c.header}
+                    className={`px-2 py-1.5 ${tableTextSize} text-gray-900 dark:text-gray-100 whitespace-nowrap`}
+                  >
+                    {cellContent}
+                  </td>
+                );
+              })}
             </tr>
           ))}
         </tbody>
@@ -1072,7 +1079,7 @@ export default function App() {
       if (can("view-documents", project)) {
         projectTabs.push({ id: "summary", label: "Summary", icon: "📊" });
         projectTabs.push({ id: "documents", label: "Documents", icon: "📄" });
-        projectTabs.push({ id: "analysis", label: "AI Analysis", icon: "🤖" });
+        projectTabs.push({ id: "history", label: "History", icon: "📜" });
       }
     }
     
@@ -1309,9 +1316,19 @@ export default function App() {
                 setUploadHistory={setUploadHistory}
               />
             )}
+            {authedUser && route.name === "device" && (
+              <DeviceDetailsPage
+                project={projects.find((p) => (p.project_id || p.id) === route.projectId)}
+                deviceId={route.device}
+                goBack={() => setRoute({ name: "project", projectId: route.projectId, tab: "summary" })}
+                goIndex={() => setRoute({ name: "index" })}
+                uploadHistory={uploadHistory}
+                authedUser={authedUser}
+                setProjects={setProjects}
+              />
+            )}
           </div>
         </div>
-      )}
     </div>
   );
 }
@@ -1605,11 +1622,14 @@ const ProjectIndex = ({
             }
           >
             {(p.topoUrl || p.topo_url) ? (
-              <img
-                src={p.topoUrl || p.topo_url}
-                alt="topology"
-                className="h-48 w-full object-contain rounded-xl mb-4 border border-gray-200 dark:border-[#1F2937] shadow-sm bg-gray-50 dark:bg-gray-900"
-              />
+              <div className="h-48 w-full rounded-xl mb-4 border border-gray-200 dark:border-[#1F2937] shadow-sm bg-gray-50 dark:bg-gray-900 overflow-hidden flex items-center justify-center">
+                <img
+                  src={p.topoUrl || p.topo_url}
+                  alt="topology"
+                  className="max-w-full max-h-full w-auto h-auto object-contain"
+                  style={{ imageRendering: 'auto' }}
+                />
+              </div>
             ) : (
               <div className="h-48 w-full bg-gradient-to-br from-gray-100 to-gray-200 dark:from-gray-800 dark:to-gray-900 rounded-xl mb-4 border border-gray-200 dark:border-[#1F2937] flex items-center justify-center">
                 <div className="text-center text-gray-400 dark:text-gray-500">
@@ -1790,7 +1810,7 @@ const NewProjectPage = ({ onCancel, onCreate }) => {
             />
           </Field>
           <div className="md:col-span-2 grid gap-2">
-            <Field label="Topology Image (Recommended: ≤1.5MB, 1600×900 for best display)">
+            <Field label="Topology Image">
               <input
                 type="file"
                 accept="image/*"
@@ -2181,7 +2201,7 @@ const ProjectView = ({
   if (can("view-documents", project)) {
     tabs.push({ id: "summary", label: "Summary", icon: "📊" });
     tabs.push({ id: "documents", label: "Documents", icon: "📄" });
-    tabs.push({ id: "analysis", label: "AI Analysis", icon: "🤖" });
+    tabs.push({ id: "history", label: "History", icon: "📜" });
   }
 
   return (
@@ -2207,22 +2227,26 @@ const ProjectView = ({
             />
           </div>
         )}
-        {tab === "analysis" && can("view-documents", project) && (
-          <AnalysisPage
-            project={project}
-            authedUser={authedUser}
-            onChangeTab={onChangeTab}
-          />
-        )}
         {tab === "documents" && can("view-documents", project) && (
-          <DocumentsPage
-            project={project}
-            can={can}
-            authedUser={authedUser}
-            uploadHistory={uploadHistory}
-            setUploadHistory={setUploadHistory}
-            setProjects={setProjects}
-          />
+          <div className="flex-1 min-h-0 overflow-hidden flex flex-col">
+            <DocumentsPage
+              project={project}
+              can={can}
+              authedUser={authedUser}
+              uploadHistory={uploadHistory}
+              setUploadHistory={setUploadHistory}
+              setProjects={setProjects}
+            />
+          </div>
+        )}
+        {tab === "history" && can("view-documents", project) && (
+          <div className="flex-1 min-h-0 overflow-hidden flex flex-col">
+            <HistoryPage
+              project={project}
+              can={can}
+              authedUser={authedUser}
+            />
+          </div>
         )}
       </main>
     </div>
@@ -2301,9 +2325,16 @@ const OverviewPage = ({ project, uploadHistory }) => {
     </div>
 
     {/* Topology (ถ้ามี) */}
-    {project.topoUrl && (
+    {(project.topoUrl || project.topo_url) && (
       <Card title="Topology Diagram">
-        <img src={project.topoUrl} alt="Topology" className="w-full h-72 object-cover rounded-xl" />
+        <div className="w-full rounded-xl border border-gray-200 dark:border-gray-700 overflow-hidden bg-gray-50 dark:bg-gray-900/50 flex items-center justify-center p-4">
+          <img 
+            src={project.topoUrl || project.topo_url} 
+            alt="Topology" 
+            className="max-w-full max-h-96 w-auto h-auto object-contain rounded-lg"
+            style={{ imageRendering: 'auto' }}
+          />
+        </div>
       </Card>
     )}
 
@@ -2443,30 +2474,91 @@ const NetworkOverviewCard = ({ project, summaryRows }) => {
   
   const projectId = project?.project_id || project?.id;
   
-  // Load saved overview on mount
+  // Load saved full project analysis on mount (use network_overview from full analysis)
   React.useEffect(() => {
     if (!projectId) {
       setLoading(false);
       return;
     }
     
-    const loadSavedOverview = async () => {
+    let isMounted = true;
+    
+    const loadSavedAnalysis = async () => {
       try {
-        const result = await api.getProjectOverview(projectId);
-        setOverviewText(result.overview_text || null);
-        setLlmMetrics(result.metrics || null);
-      } catch (err) {
-        // Ignore 404 - no saved overview yet
-        if (err.message && !err.message.includes("404")) {
-          console.warn("Failed to load saved overview:", err);
+        // Try to load from full project analysis first
+        const fullResult = await api.getFullProjectAnalysis(projectId);
+        if (isMounted) {
+          setOverviewText(fullResult.network_overview || null);
+          setLlmMetrics(fullResult.metrics || null);
+          setLoading(false);
+          return;
         }
-      } finally {
-        setLoading(false);
+      } catch (err) {
+        // Fallback to old overview endpoint if full analysis not available
+        try {
+          const result = await api.getProjectOverview(projectId);
+          if (isMounted) {
+            setOverviewText(result.overview_text || null);
+            setLlmMetrics(result.metrics || null);
+            setLoading(false);
+          }
+        } catch (err2) {
+          // Ignore 404 - no saved overview yet
+          if (err2.message && !err2.message.includes("404")) {
+            console.warn("Failed to load saved overview:", err2);
+          }
+          if (isMounted) {
+            setLoading(false);
+          }
+        }
       }
     };
     
-    loadSavedOverview();
+    loadSavedAnalysis();
+    
+    return () => {
+      isMounted = false;
+    };
   }, [projectId]);
+  
+  // Poll for updates when generating
+  React.useEffect(() => {
+    if (!projectId || !generating) return;
+    
+    let pollInterval = null;
+    let isMounted = true;
+    let lastGeneratedAt = null;
+    
+    const checkForUpdates = async () => {
+      try {
+        const result = await api.getFullProjectAnalysis(projectId);
+        if (isMounted && result.generated_at) {
+          // Check if we got a new result
+          if (!lastGeneratedAt || result.generated_at !== lastGeneratedAt) {
+            setOverviewText(result.network_overview || null);
+            setLlmMetrics(result.metrics || null);
+            setGenerating(false);
+            lastGeneratedAt = result.generated_at;
+          }
+        }
+      } catch (err) {
+        // Ignore errors during polling
+        if (err.message && !err.message.includes("404")) {
+          console.warn("Failed to poll for overview updates:", err);
+        }
+      }
+    };
+    
+    // Poll every 3 seconds
+    pollInterval = setInterval(checkForUpdates, 3000);
+    
+    return () => {
+      isMounted = false;
+      if (pollInterval) {
+        clearInterval(pollInterval);
+      }
+    };
+  }, [projectId, generating]);
   
   const handleGenerate = async () => {
     if (!projectId) return;
@@ -2474,16 +2566,19 @@ const NetworkOverviewCard = ({ project, summaryRows }) => {
     setGenerating(true);
     setError(null);
     
-    try {
-      const result = await api.analyzeProjectOverview(projectId);
-      setOverviewText(result.overview_text || "Analysis completed.");
-      setLlmMetrics(result.metrics || null);
-    } catch (err) {
-      console.error("Network overview analysis failed:", err);
-      setError(err.message || "Failed to generate network overview");
-    } finally {
-      setGenerating(false);
-    }
+    // Start full project analysis in background - don't wait for it
+    // The polling will pick up the result when it's ready
+    api.analyzeProject(projectId)
+      .then((result) => {
+        setOverviewText(result.network_overview || "Analysis completed.");
+        setLlmMetrics(result.metrics || null);
+        setGenerating(false);
+      })
+      .catch((err) => {
+        console.error("Full project analysis failed:", err);
+        setError(err.message || "Failed to generate project analysis");
+        setGenerating(false);
+      });
   };
   
   return (
@@ -2530,7 +2625,7 @@ const NetworkOverviewCard = ({ project, summaryRows }) => {
 
 /* ========= Recommendations Card Component ========= */
 const RecommendationsCard = ({ project, summaryRows }) => {
-  const [recommendations, setRecommendations] = React.useState([]);
+  const [gapAnalysis, setGapAnalysis] = React.useState([]);
   const [llmMetrics, setLlmMetrics] = React.useState(null);
   const [generating, setGenerating] = React.useState(false);
   const [error, setError] = React.useState(null);
@@ -2538,30 +2633,79 @@ const RecommendationsCard = ({ project, summaryRows }) => {
   
   const projectId = project?.project_id || project?.id;
   
-  // Load saved recommendations on mount
+  // Load saved full project analysis on mount
   React.useEffect(() => {
     if (!projectId) {
       setLoading(false);
       return;
     }
     
-    const loadSavedRecommendations = async () => {
+    let isMounted = true;
+    
+    const loadSavedAnalysis = async () => {
       try {
-        const result = await api.getProjectRecommendations(projectId);
-        setRecommendations(result.recommendations || []);
-        setLlmMetrics(result.metrics || null);
-      } catch (err) {
-        // Ignore 404 - no saved recommendations yet
-        if (err.message && !err.message.includes("404")) {
-          console.warn("Failed to load saved recommendations:", err);
+        const result = await api.getFullProjectAnalysis(projectId);
+        if (isMounted) {
+          setGapAnalysis(result.gap_analysis || []);
+          setLlmMetrics(result.metrics || null);
+          setLoading(false);
         }
-      } finally {
-        setLoading(false);
+      } catch (err) {
+        // Ignore 404 - no saved analysis yet
+        if (err.message && !err.message.includes("404")) {
+          console.warn("Failed to load saved full project analysis:", err);
+        }
+        if (isMounted) {
+          setLoading(false);
+        }
       }
     };
     
-    loadSavedRecommendations();
+    loadSavedAnalysis();
+    
+    return () => {
+      isMounted = false;
+    };
   }, [projectId]);
+  
+  // Poll for updates when generating
+  React.useEffect(() => {
+    if (!projectId || !generating) return;
+    
+    let pollInterval = null;
+    let isMounted = true;
+    let lastGeneratedAt = null;
+    
+    const checkForUpdates = async () => {
+      try {
+        const result = await api.getFullProjectAnalysis(projectId);
+        if (isMounted && result.generated_at) {
+          // Check if we got a new result
+          if (!lastGeneratedAt || result.generated_at !== lastGeneratedAt) {
+            setGapAnalysis(result.gap_analysis || []);
+            setLlmMetrics(result.metrics || null);
+            setGenerating(false);
+            lastGeneratedAt = result.generated_at;
+          }
+        }
+      } catch (err) {
+        // Ignore errors during polling
+        if (err.message && !err.message.includes("404")) {
+          console.warn("Failed to poll for full project analysis updates:", err);
+        }
+      }
+    };
+    
+    // Poll every 3 seconds
+    pollInterval = setInterval(checkForUpdates, 3000);
+    
+    return () => {
+      isMounted = false;
+      if (pollInterval) {
+        clearInterval(pollInterval);
+      }
+    };
+  }, [projectId, generating]);
   
   const handleGenerate = async () => {
     if (!projectId) return;
@@ -2569,16 +2713,19 @@ const RecommendationsCard = ({ project, summaryRows }) => {
     setGenerating(true);
     setError(null);
     
-    try {
-      const result = await api.analyzeProjectRecommendations(projectId);
-      setRecommendations(result.recommendations || []);
-      setLlmMetrics(result.metrics || null);
-    } catch (err) {
-      console.error("Recommendations analysis failed:", err);
-      setError(err.message || "Failed to generate recommendations");
-    } finally {
-      setGenerating(false);
-    }
+    // Start generation in background - don't wait for it
+    // The polling will pick up the result when it's ready
+    api.analyzeProject(projectId)
+      .then((result) => {
+        setGapAnalysis(result.gap_analysis || []);
+        setLlmMetrics(result.metrics || null);
+        setGenerating(false);
+      })
+      .catch((err) => {
+        console.error("Full project analysis failed:", err);
+        setError(err.message || "Failed to generate project analysis");
+        setGenerating(false);
+      });
   };
   
   return (
@@ -2607,23 +2754,41 @@ const RecommendationsCard = ({ project, summaryRows }) => {
               </div>
             )}
             
-            {recommendations.length > 0 ? (
-              <ul className="list-disc pl-4 space-y-1.5 break-words">
-                {recommendations.map((rec, idx) => (
-                  <li key={idx} className="break-words">
-                    <span className={rec.severity === "high" ? "text-rose-400" : rec.severity === "medium" ? "text-yellow-400" : "text-slate-300"}>
-                      [{rec.severity?.toUpperCase() || "MEDIUM"}]
-                    </span>{" "}
-                    <span className="text-slate-300">
-                      {rec.device && rec.device !== "all" ? `[${rec.device}] ` : ""}
-                      {rec.message}
-                    </span>
-                  </li>
+            {gapAnalysis.length > 0 ? (
+              <div className="space-y-2">
+                {gapAnalysis.map((item, idx) => (
+                  <div key={idx} className="p-2 rounded border break-words" style={{
+                    borderColor: item.severity === "High" ? "#ef4444" : item.severity === "Medium" ? "#eab308" : "#64748b",
+                    backgroundColor: item.severity === "High" ? "rgba(239, 68, 68, 0.1)" : item.severity === "Medium" ? "rgba(234, 179, 8, 0.1)" : "rgba(100, 116, 139, 0.1)"
+                  }}>
+                    <div className="flex items-start gap-2 mb-1">
+                      <span className={`text-xs font-semibold px-1.5 py-0.5 rounded ${
+                        item.severity === "High" ? "bg-rose-500 text-white" : 
+                        item.severity === "Medium" ? "bg-yellow-500 text-white" : 
+                        "bg-slate-500 text-white"
+                      }`}>
+                        {item.severity?.toUpperCase() || "MEDIUM"}
+                      </span>
+                      {item.device && item.device !== "all" && (
+                        <span className="text-xs font-medium text-slate-300">[{item.device}]</span>
+                      )}
+                    </div>
+                    {item.issue && (
+                      <div className="text-xs text-slate-300 mb-1">
+                        <span className="font-semibold">Issue:</span> {item.issue}
+                      </div>
+                    )}
+                    {item.recommendation && (
+                      <div className="text-xs text-slate-200">
+                        <span className="font-semibold">Recommendation:</span> {item.recommendation}
+                      </div>
+                    )}
+                  </div>
                 ))}
-              </ul>
+              </div>
             ) : (
               <div className="text-slate-500 italic">
-                Click "LLM Analysis" to get recommendations.
+                Click "LLM Analysis" to get gap analysis and recommendations.
               </div>
             )}
           </>
@@ -2796,25 +2961,25 @@ const SummaryPage = ({ project, can, authedUser, setProjects, openDevice }) => {
   }, [summaryRows, q]);
 
   const columns = [
-    { header: "DEVICE", key: "device" },
-    { header: "MODEL", key: "model" },
-    { header: "SERIAL", key: "serial" },
-    { header: "OS/VER", key: "os_ver" },
-    { header: "MGMT IP", key: "mgmt_ip" },
-    { header: "IFACES (T/U/D/A)", key: "ifaces" },
-    { header: "ACCESS", key: "access" },
-    { header: "TRUNK", key: "trunk" },
-    { header: "UNUSED", key: "unused" },
-    { header: "VLANS", key: "vlans" },
-    { header: "NATIVE VLAN", key: "native_vlan" },
-    { header: "TRUNK ALLOWED", key: "trunk_allowed" },
-    { header: "STP", key: "stp" },
-    { header: "STP ROLE", key: "stp_role" },
-    { header: "OSPF NEIGH", key: "ospf_neigh" },
-    { header: "BGP ASN/NEIGH", key: "bgp_asn_neigh" },
-    { header: "RT-PROTO", key: "rt_proto" },
-    { header: "CPU%", key: "cpu" },
-    { header: "MEM%", key: "mem" },
+    { header: "DEVICE", key: "device", width: "80px" },
+    { header: "MODEL", key: "model", width: "100px" },
+    { header: "SERIAL", key: "serial", width: "100px" },
+    { header: "OS/VER", key: "os_ver", width: "90px" },
+    { header: "MGMT IP", key: "mgmt_ip", width: "90px" },
+    { header: "IFACES (T/U/D/A)", key: "ifaces", width: "110px" },
+    { header: "ACCESS", key: "access", width: "60px" },
+    { header: "TRUNK", key: "trunk", width: "60px" },
+    { header: "UNUSED", key: "unused", width: "70px" },
+    { header: "VLANS", key: "vlans", width: "60px" },
+    { header: "NATIVE VLAN", key: "native_vlan", width: "90px" },
+    { header: "TRUNK ALLOWED", key: "trunk_allowed", width: "100px" },
+    { header: "STP", key: "stp", width: "70px" },
+    { header: "STP ROLE", key: "stp_role", width: "80px" },
+    { header: "OSPF NEIGH", key: "ospf_neigh", width: "90px" },
+    { header: "BGP ASN/NEIGH", key: "bgp_asn_neigh", width: "110px" },
+    { header: "RT-PROTO", key: "rt_proto", width: "80px" },
+    { header: "CPU%", key: "cpu", width: "60px" },
+    { header: "MEM%", key: "mem", width: "60px" },
     { header: "STATUS", key: "status", cell: (r) => {
         const status = r.status || "OK";
         if (status === "OK") {
@@ -2844,11 +3009,35 @@ const SummaryPage = ({ project, can, authedUser, setProjects, openDevice }) => {
   ];
 
   const exportCSV = () => {
-    const headers = columns.map(c => c.header);
+    // Filter out "MORE" column
+    const exportColumns = columns.filter(c => c.key !== "more");
+    const headers = exportColumns.map(c => c.header);
     const rows = (filtered || []).map(r =>
-      columns.map(c => {
-        const value = c.cell ? c.cell(r) : (r[c.key] ?? "");
-        return `"${value.toString().replaceAll('"','""')}"`;
+      exportColumns.map(c => {
+        let value;
+        
+        // For columns with cell function (like STATUS), get the raw value from row data
+        if (c.key === "status") {
+          // STATUS column: use the actual status value, not the React element
+          value = r.status || "OK";
+        } else if (c.key === "ifaces") {
+          // IFACES column: format the object as T/U/D/A
+          const ifaces = r.ifaces || {};
+          value = `${ifaces.total || 0}/${ifaces.up || 0}/${ifaces.down || 0}/${ifaces.adminDown || 0}`;
+        } else {
+          // For other columns, get the value directly
+          value = r[c.key] ?? "";
+        }
+        
+        // Handle different value types
+        if (value === null || value === undefined) {
+          value = "";
+        } else if (typeof value === 'object' && !Array.isArray(value)) {
+          // For other objects, convert to JSON string
+          value = JSON.stringify(value);
+        }
+        
+        return `"${String(value).replaceAll('"','""')}"`;
       }).join(","));
     downloadCSV([headers.join(","), ...rows].join("\n"), `summary_${project.name}.csv`);
   };
@@ -2911,7 +3100,7 @@ const SummaryPage = ({ project, can, authedUser, setProjects, openDevice }) => {
       )}
 
       {/* Topology (2/3) + Project Analysis (1/3) */}
-      <div className="flex-1 min-h-0 grid grid-cols-12 gap-3">
+      <div className="flex-shrink-0 grid grid-cols-12 gap-3" style={{ height: '60%' }}>
         <div className="col-span-6 min-h-0 overflow-hidden rounded-xl border border-slate-800 bg-slate-900/50">
           <TopologyGraph project={project} onOpenDevice={(id)=>openDevice(id)} can={can} authedUser={authedUser} setProjects={setProjects} setTopologyLLMMetrics={setTopologyLLMMetrics} topologyLLMMetrics={topologyLLMMetrics} />
         </div>
@@ -2952,8 +3141,8 @@ const SummaryPage = ({ project, can, authedUser, setProjects, openDevice }) => {
           }}>Retry</Button>
         </div>
       ) : (
-        <div className="flex-1 min-h-0 overflow-auto rounded-xl border border-slate-800 bg-slate-900/50 p-1" style={{ maxHeight: 'calc(100vh - 575px)' }}>
-          <Table columns={columns} data={filtered} empty="No devices yet. Upload config files to see summary." minWidthClass="min-w-full" containerClassName="text-[12px]" />
+        <div className="flex-1 min-h-0 overflow-auto rounded-xl border border-slate-800 bg-slate-900/50 p-1">
+          <Table columns={columns} data={filtered} empty="No devices yet. Upload config files to see summary." minWidthClass="min-w-full" containerClassName="text-[10px]" />
         </div>
       )}
 
@@ -3290,46 +3479,45 @@ const DeviceDetailsView = ({ project, deviceId, goBack, uploadHistory, authedUse
     return parts.join("\n");
   }, [deviceData, facts, loading]);
 
-  // Recommendations - use facts from API data only
-  const deviceRecs = React.useMemo(() => {
-    if (!deviceData) return [];
-    
-    const recs = [];
-    
-    // NTP
-    if (!facts.ntpStatus || facts.ntpStatus === "—" || !/sync/i.test(facts.ntpStatus)) {
-      recs.push("ตั้งค่า NTP ให้ Sync เพื่อความถูกต้องของ Time (ตรวจสอบ server, key, timezone)");
+  // Project-level gap analysis (AI-generated, not hardcoded)
+  const [projectGapAnalysis, setProjectGapAnalysis] = React.useState([]);
+  const [projectAnalysisLoading, setProjectAnalysisLoading] = React.useState(true);
+  
+  React.useEffect(() => {
+    const projectId = project?.project_id || project?.id;
+    if (!projectId) {
+      setProjectAnalysisLoading(false);
+      return;
     }
     
-    // Syslog
-    if (!facts.syslog || facts.syslog === "—") {
-      recs.push("กำหนด logging host/syslog server เพื่อบันทึกเหตุการณ์ส่วนกลาง");
-    }
-    
-    // STP
-    if (facts.stpMode && facts.stpMode !== "—" && /pvst|rpvst|mstp/i.test(facts.stpMode)) {
-      const role = classifyRoleByName(facts.device);
-      if (role === "core") {
-        recs.push("กำหนด STP priority (เช่น 4096) ให้ Core เป็น Root Primary สำหรับ VLAN หลัก");
-      } else if (role === "distribution") {
-        recs.push("กำหนด STP priority (เช่น 8192/12288) เป็น Root Secondary ตาม Policy และเปิด UplinkFast (ถ้ารองรับ)");
-      } else if (role === "access") {
-        recs.push("เปิด portfast และ bpduguard บนพอร์ต access เพื่อลด Time convergence และป้องกัน loop");
+    const loadProjectAnalysis = async () => {
+      try {
+        const result = await api.getFullProjectAnalysis(projectId);
+        // Filter gap analysis for this specific device
+        const deviceGaps = (result.gap_analysis || []).filter(
+          item => item.device === facts.device || item.device === "all"
+        );
+        setProjectGapAnalysis(deviceGaps);
+      } catch (err) {
+        // Ignore 404 - no saved analysis yet
+        if (err.message && !err.message.includes("404")) {
+          console.warn("Failed to load project gap analysis:", err);
+        }
+      } finally {
+        setProjectAnalysisLoading(false);
       }
-    }
+    };
     
-    // Interfaces health
-    if (facts.ifaces && facts.ifaces.down > 10) {
-      recs.push(`ตรวจสอบพอร์ตที่ Down จำนวน ${facts.ifaces.down} พอร์ต อาจมีปัญหาทางกายภาพหรือการตั้งค่า`);
-    }
-    
-    // Security
-    if (!facts.snmp || facts.snmp === "—") {
-      recs.push("พิจารณาตั้งค่า SNMP สำหรับการตรวจสอบและจัดการอุปกรณ์");
-    }
-    
-    return recs;
-  }, [deviceData, facts]);
+    loadProjectAnalysis();
+  }, [project, facts.device]);
+  
+  // Use AI-generated gap analysis instead of hardcoded recommendations
+  const deviceRecs = projectGapAnalysis.map(item => {
+    const parts = [];
+    if (item.issue) parts.push(`Issue: ${item.issue}`);
+    if (item.recommendation) parts.push(`Fix: ${item.recommendation}`);
+    return parts.length > 0 ? parts.join(" | ") : item.recommendation || item.issue || "";
+  });
 
   // VLANs - transform from API data
   const vlans = React.useMemo(() => {
@@ -3666,16 +3854,45 @@ const DeviceDetailsView = ({ project, deviceId, goBack, uploadHistory, authedUse
         </div>
       </Card>
 
-      {/* Recommendations — per device */}
+      {/* Recommendations — per device (from AI Project Analysis) */}
       <Card
-        title="Recommendations (per-device)"
+        title="Recommendations (AI-Generated)"
       >
-        {deviceRecs.length ? (
-          <ul className="list-disc pl-5 text-sm space-y-1">
-            {deviceRecs.map((r)=>(<li key={r}>{r}</li>))}
-          </ul>
+        {projectAnalysisLoading ? (
+          <div className="text-sm text-gray-500 dark:text-gray-400">Loading AI analysis...</div>
+        ) : deviceRecs.length ? (
+          <div className="space-y-2">
+            {projectGapAnalysis.map((item, idx) => (
+              <div key={idx} className="p-2 rounded border text-sm break-words" style={{
+                borderColor: item.severity === "High" ? "#ef4444" : item.severity === "Medium" ? "#eab308" : "#64748b",
+                backgroundColor: item.severity === "High" ? "rgba(239, 68, 68, 0.1)" : item.severity === "Medium" ? "rgba(234, 179, 8, 0.1)" : "rgba(100, 116, 139, 0.1)"
+              }}>
+                <div className="flex items-start gap-2 mb-1">
+                  <span className={`text-xs font-semibold px-1.5 py-0.5 rounded ${
+                    item.severity === "High" ? "bg-rose-500 text-white" : 
+                    item.severity === "Medium" ? "bg-yellow-500 text-white" : 
+                    "bg-slate-500 text-white"
+                  }`}>
+                    {item.severity?.toUpperCase() || "MEDIUM"}
+                  </span>
+                </div>
+                {item.issue && (
+                  <div className="text-xs text-gray-700 dark:text-gray-300 mb-1">
+                    <span className="font-semibold">Issue:</span> {item.issue}
+                  </div>
+                )}
+                {item.recommendation && (
+                  <div className="text-xs text-gray-800 dark:text-gray-200">
+                    <span className="font-semibold">Recommendation:</span> {item.recommendation}
+                  </div>
+                )}
+              </div>
+            ))}
+          </div>
         ) : (
-          <div className="text-sm text-gray-500 dark:text-gray-400">No recommendations.</div>
+          <div className="text-sm text-gray-500 dark:text-gray-400">
+            No AI-generated recommendations available. Generate project analysis from the Summary page.
+          </div>
         )}
       </Card>
 
@@ -5837,6 +6054,271 @@ const PerformanceMetricsView = ({ metrics }) => {
   );
 };
 
+/* ========= HISTORY PAGE ========= */
+const HistoryPage = ({ project, can, authedUser }) => {
+  const [documents, setDocuments] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [searchDoc, setSearchDoc] = useState("");
+  const [filterWho, setFilterWho] = useState("all");
+  const [filterWhat, setFilterWhat] = useState("all");
+  const [versions, setVersions] = useState([]);
+  const [showVersions, setShowVersions] = useState(false);
+  const [versionDocument, setVersionDocument] = useState(null);
+  const isOpeningVersions = useRef(false);
+
+  // Load documents from API
+  useEffect(() => {
+    const loadDocuments = async () => {
+      if (!project?.project_id && !project?.id) {
+        setLoading(false);
+        return;
+      }
+      setLoading(true);
+      try {
+        const projectId = project.project_id || project.id;
+        const docs = await api.getDocuments(projectId);
+        setDocuments(Array.isArray(docs) ? docs : []);
+      } catch (error) {
+        console.error('Failed to load documents:', error);
+        setDocuments([]);
+      } finally {
+        setLoading(false);
+      }
+    };
+    loadDocuments();
+  }, [project]);
+
+  // Load versions for selected document
+  const loadVersions = async (documentId, documentInfo = null) => {
+    try {
+      isOpeningVersions.current = true;
+      setVersions([]);
+      const docInfo = documentInfo || null;
+      if (!docInfo) {
+        console.error('No document info provided for loadVersions');
+        isOpeningVersions.current = false;
+        return;
+      }
+      setVersionDocument(docInfo);
+      setShowVersions(true);
+      
+      await new Promise(resolve => setTimeout(resolve, 50));
+      
+      const projectId = project.project_id || project.id;
+      const versionData = await api.getDocumentVersions(projectId, documentId);
+      
+      if (versionData && versionData.versions && Array.isArray(versionData.versions)) {
+        setVersions(versionData.versions);
+        if (versionData.filename) {
+          setVersionDocument(prev => ({
+            ...(prev || docInfo),
+            filename: versionData.filename
+          }));
+        }
+      } else {
+        setVersions([]);
+      }
+      
+      setTimeout(() => {
+        isOpeningVersions.current = false;
+      }, 200);
+    } catch (error) {
+      console.error('Failed to load versions:', error);
+      setVersions([]);
+      isOpeningVersions.current = false;
+      alert('Failed to load version history: ' + (error.message || 'Unknown error'));
+    }
+  };
+
+  if (!project) {
+    return (
+      <div className="text-sm text-rose-400">Project not found</div>
+    );
+  }
+
+  if (!Array.isArray(documents)) {
+    return (
+      <div className="text-center py-8 text-gray-500">No documents found</div>
+    );
+  }
+
+  // Show ALL files (including config files) - no filtering
+  const allFiles = documents;
+  const uniqueWhos = [...new Set(allFiles.map(d => d.metadata?.who || d.uploader))];
+  const uniqueWhats = [...new Set(allFiles.map(d => d.metadata?.what || "—"))];
+
+  const filteredDocs = allFiles.filter(doc => {
+    const matchSearch = !searchDoc.trim() || 
+      [doc.filename, 
+       doc.metadata?.who || doc.uploader,
+       doc.metadata?.what || "—",
+       doc.metadata?.where || "—",
+       doc.metadata?.description || "—"].some(v => 
+        v.toLowerCase().includes(searchDoc.toLowerCase())
+      );
+    const matchWho = filterWho === "all" || (doc.metadata?.who || doc.uploader) === filterWho;
+    const matchWhat = filterWhat === "all" || (doc.metadata?.what || "—") === filterWhat;
+    return matchSearch && matchWho && matchWhat;
+  });
+
+  return (
+    <div className="h-full flex flex-col min-h-0 overflow-hidden">
+      <Card title="Upload History" className="flex-1 min-h-0 flex flex-col overflow-hidden">
+        {loading ? (
+          <div className="flex-1 flex items-center justify-center text-gray-500 dark:text-gray-400">
+            <div className="text-center">
+              <div className="text-lg mb-2">Loading documents...</div>
+            </div>
+          </div>
+        ) : (
+          <div className="flex-1 min-h-0 flex flex-col overflow-hidden gap-4">
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-3 flex-shrink-0">
+              <Input 
+                placeholder="ค้นหา (ชื่อไฟล์, ผู้ใช้, คำอธิบาย...)" 
+                value={searchDoc} 
+                onChange={(e) => setSearchDoc(e.target.value)}
+                className="w-full"
+              />
+              <Select 
+                value={filterWho} 
+                onChange={setFilterWho} 
+                options={[{value: "all", label: "ทั้งหมด (Responsible User)"}, ...uniqueWhos.map(w => ({value: w, label: w}))]} 
+              />
+              <Select 
+                value={filterWhat} 
+                onChange={setFilterWhat} 
+                options={[{value: "all", label: "ทั้งหมด (Activity Type)"}, ...uniqueWhats.map(w => ({value: w, label: w}))]} 
+              />
+            </div>
+            <div className="flex-1 min-h-0 overflow-y-auto overflow-x-auto">
+              <div className="rounded-lg border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-900/50">
+                <Table
+                  columns={[
+                    { header: "Time", key: "created_at", cell: (r) => <span className="text-xs">{formatDateTime(r.created_at)}</span> },
+                    { header: "Name", key: "filename", cell: (r) => <span className="font-medium text-sm">{r.filename}</span> },
+                    { header: "Responsible User", key: "who", cell: (r) => <span className="text-sm">{r.metadata?.who || r.uploader}</span> },
+                    { header: "Activity Type", key: "what", cell: (r) => <span className="text-sm">{r.metadata?.what || "—"}</span> },
+                    { header: "Site", key: "where", cell: (r) => <span className="text-sm">{r.metadata?.where || "—"}</span> },
+                    { header: "Operational Timing", key: "when", cell: (r) => <span className="text-sm">{r.metadata?.when || "—"}</span> },
+                    { header: "Purpose", key: "why", cell: (r) => <span className="text-sm">{r.metadata?.why || "—"}</span> },
+                    { header: "Version", key: "version", cell: (r) => <span className="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-blue-100 dark:bg-blue-900/30 text-blue-800 dark:text-blue-200">{`v${r.version} ${r.is_latest ? '(Latest)' : ''}`}</span> },
+                    {
+                      header: "Actions",
+                      key: "actions",
+                      cell: (r) => (
+                        <div className="flex gap-2">
+                          <Button 
+                            variant="secondary" 
+                            size="sm"
+                            onClick={async () => {
+                              try {
+                                const projectId = project.project_id || project.id;
+                                await api.downloadDocument(projectId, r.document_id);
+                              } catch (error) {
+                                alert('Download failed: ' + error.message);
+                              }
+                            }}
+                          >
+                            ⬇ Download
+                          </Button>
+                          <Button 
+                            variant="secondary"
+                            size="sm"
+                            onClick={async (e) => {
+                              e.stopPropagation();
+                              await loadVersions(r.document_id, r);
+                            }}
+                          >
+                            📜 Versions
+                          </Button>
+                        </div>
+                      ),
+                    },
+                  ]}
+                  data={filteredDocs}
+                  empty="No document uploads yet"
+                  minWidthClass="min-w-[1200px]"
+                />
+              </div>
+            </div>
+          </div>
+        )}
+      </Card>
+
+      {/* Version History Modal */}
+      {showVersions && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+          <div 
+            className="absolute inset-0 bg-black/50" 
+            onClick={(e) => {
+              e.stopPropagation();
+              if (isOpeningVersions.current) {
+                return;
+              }
+              setShowVersions(false);
+              setVersionDocument(null);
+            }} 
+          />
+          <div 
+            className="relative z-10 w-full max-w-4xl"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <Card
+              title={`Version History — ${versionDocument?.filename || 'Unknown'}`}
+              actions={<Button variant="secondary" onClick={() => {
+                setShowVersions(false);
+                setVersionDocument(null);
+              }}>Close</Button>}
+            >
+              <div className="max-h-[70vh] overflow-auto">
+                {versions.length === 0 ? (
+                  <div className="text-center py-8 text-gray-500 dark:text-gray-400">
+                    No versions found for this document.
+                  </div>
+                ) : (
+                  <Table
+                    columns={[
+                      { header: "Version", key: "version", cell: (v) => `v${v.version} ${v.is_latest ? '(Latest)' : ''}` },
+                      { header: "Uploaded By", key: "uploader", cell: (v) => v.uploader },
+                      { header: "Uploaded At", key: "created_at", cell: (v) => formatDateTime(v.created_at) },
+                      { header: "Size", key: "size", cell: (v) => `${(v.size / 1024).toFixed(1)} KB` },
+                      { header: "Hash", key: "file_hash", cell: (v) => <span className="font-mono text-xs">{v.file_hash ? v.file_hash.substring(0, 16) + '...' : 'N/A'}</span> },
+                      { 
+                        header: "Actions", 
+                        key: "actions", 
+                        cell: (v) => (
+                          <div className="flex gap-2">
+                            <Button
+                              variant="secondary"
+                              size="sm"
+                              onClick={async () => {
+                                try {
+                                  const projectId = project.project_id || project.id;
+                                  const docId = versionDocument?.document_id;
+                                  await api.downloadDocument(projectId, docId, v.version);
+                                } catch (error) {
+                                  alert('Download failed: ' + error.message);
+                                }
+                              }}
+                            >
+                              Download
+                            </Button>
+                          </div>
+                        )
+                      },
+                    ]}
+                    data={versions}
+                  />
+                )}
+              </div>
+            </Card>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+};
+
 const DocumentsPage = ({ project, can, authedUser, uploadHistory, setUploadHistory, setProjects }) => {
   const [selectedFile, setSelectedFile] = useState(null);
   const [selectedDocument, setSelectedDocument] = useState(null); // Document from API
@@ -5854,9 +6336,6 @@ const DocumentsPage = ({ project, can, authedUser, uploadHistory, setUploadHisto
   const [showFileRenameDialog, setShowFileRenameDialog] = useState(false);
   const [fileRenameName, setFileRenameName] = useState("");
   const [fileToRename, setFileToRename] = useState(null);
-  const [searchDoc, setSearchDoc] = useState("");
-  const [filterWho, setFilterWho] = useState("all");
-  const [filterWhat, setFilterWhat] = useState("all");
   const [documents, setDocuments] = useState([]); // Documents from API
   const [loading, setLoading] = useState(true);
   const [previewContent, setPreviewContent] = useState(null);
@@ -6594,7 +7073,7 @@ const DocumentsPage = ({ project, can, authedUser, uploadHistory, setUploadHisto
   const PreviewPane = (
     <Card
       title={
-        <div className="text-xs font-medium text-gray-600 dark:text-gray-400">
+        <div className="text-sm font-semibold text-gray-700 dark:text-gray-200">
           {selectedFile ? selectedFile.name : "Preview"}
         </div>
       }
@@ -6679,62 +7158,51 @@ const DocumentsPage = ({ project, can, authedUser, uploadHistory, setUploadHisto
           </div>
         ) : null
       }
+      className="flex-1 min-h-0 flex flex-col overflow-hidden"
     >
-      <div className={layout === "side" ? "h-[85vh]" : "h-[80vh]"}>
-
+      <div className="flex-1 min-h-0 flex flex-col">
         {!selectedFile && (
-          <div
-            className={`${
-              layout === "side"
-                ? "h-[calc(85vh-1.5rem)]"
-                : "h-[calc(80vh-1.5rem)]"
-            } grid place-items-center text-sm text-gray-500 dark:text-gray-400`}
-          >
-            Select a file to preview. Supported: <b>.txt, .pdf, .png, .jpg</b>
+          <div className="flex-1 flex items-center justify-center text-sm text-gray-500 dark:text-gray-400">
+            <div className="text-center">
+              <div className="text-4xl mb-3">📄</div>
+              <div>Select a file to preview</div>
+              <div className="text-xs mt-2 text-gray-400 dark:text-gray-500">Supported: .txt, .pdf, .png, .jpg</div>
+            </div>
           </div>
         )}
 
         {previewLoading && (
-          <div
-            className={`${
-              layout === "side"
-                ? "h-[calc(85vh-2rem)]"
-                : "h-[calc(80vh-2rem)]"
-            } grid place-items-center text-sm text-gray-500 dark:text-gray-400`}
-          >
-            Loading preview...
+          <div className="flex-1 flex items-center justify-center text-sm text-gray-500 dark:text-gray-400">
+            <div className="text-center">
+              <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-gray-400 mx-auto mb-3"></div>
+              <div>Loading preview...</div>
+            </div>
           </div>
         )}
 
         {!previewLoading && previewContent && (
           <>
             {previewContent.error ? (
-              <div className="text-sm text-rose-500 dark:text-rose-400 p-4">
-                Error loading preview: {previewContent.error}
+              <div className="flex-1 flex items-center justify-center p-4">
+                <div className="text-center">
+                  <div className="text-rose-500 dark:text-rose-400 text-lg mb-2">⚠️</div>
+                  <div className="text-sm text-rose-500 dark:text-rose-400">
+                    Error loading preview: {previewContent.error}
+                  </div>
+                </div>
               </div>
             ) : previewContent.preview_type === "text" ? (
-          <div
-            className={`${
-              layout === "side"
-                    ? "h-[calc(85vh-2rem)]"
-                    : "h-[calc(80vh-2rem)]"
-                } rounded-xl border border-gray-200 dark:border-[#1F2937] p-4 bg-gray-50 dark:bg-[#0F172A] text-sm overflow-auto`}
-          >
-                <pre className="whitespace-pre-wrap text-[13px] leading-relaxed">
+              <div className="flex-1 min-h-0 overflow-y-auto overflow-x-auto rounded-lg border border-gray-200 dark:border-gray-700 p-4 bg-gray-50 dark:bg-[#0F172A]">
+                <pre className="whitespace-pre-wrap text-sm leading-relaxed text-gray-800 dark:text-gray-200 font-mono">
                   {previewContent.preview_data || "(empty file)"}
                 </pre>
-          </div>
+              </div>
             ) : previewContent.preview_type === "image" ? (
-              // Regular image preview with size constraints - images are already resized by backend
-              <div className="flex items-center justify-center p-4 min-h-[200px]">
+              <div className="flex-1 min-h-0 overflow-y-auto overflow-x-auto flex items-center justify-center p-4 bg-gray-50 dark:bg-gray-900/50">
                 <img
                   src={previewContent.preview_data}
                   alt={selectedFile?.name || "Preview"}
-                  className={`${
-                    layout === "side"
-                      ? "max-h-[calc(85vh-2rem)] max-w-[calc(50vw-4rem)]"
-                      : "max-h-[calc(80vh-2rem)] max-w-[calc(90vw-4rem)]"
-                  } w-auto h-auto object-contain rounded-xl shadow-lg`}
+                  className="max-h-full max-w-full w-auto h-auto object-contain rounded-lg shadow-lg"
                   style={{ 
                     maxWidth: '100%', 
                     maxHeight: '100%',
@@ -6744,13 +7212,8 @@ const DocumentsPage = ({ project, can, authedUser, uploadHistory, setUploadHisto
                 />
               </div>
             ) : previewContent.preview_type === "pdf" || previewContent.blob_url ? (
-              // PDF preview using blob URL
               previewContent.blob_url ? (
-                <div className={`${
-                  layout === "side"
-                    ? "h-[calc(85vh-1.5rem)]"
-                    : "h-[calc(80vh-1.5rem)]"
-                } rounded-xl border border-gray-200 dark:border-[#1F2937] overflow-hidden bg-gray-50 dark:bg-gray-900`}>
+                <div className="flex-1 min-h-0 overflow-hidden rounded-lg border border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-900">
                   <iframe
                     src={`${previewContent.blob_url}#toolbar=1&navpanes=1&scrollbar=1`}
                     className="w-full h-full"
@@ -6759,13 +7222,7 @@ const DocumentsPage = ({ project, can, authedUser, uploadHistory, setUploadHisto
                   />
                 </div>
               ) : (
-                <div
-                  className={`${
-                    layout === "side"
-                      ? "h-[calc(85vh-1.5rem)]"
-                      : "h-[calc(80vh-1.5rem)]"
-                  } grid place-items-center text-gray-500 dark:text-gray-300 border border-gray-200 dark:border-[#1F2937] rounded-xl`}
-                >
+                <div className="flex-1 flex items-center justify-center text-gray-500 dark:text-gray-300 border border-gray-200 dark:border-gray-700 rounded-lg">
                   <div className="text-center">
                     <div className="text-4xl mb-2">📄</div>
                     <div>{previewContent.preview_data || "PDF Preview"}</div>
@@ -6774,8 +7231,10 @@ const DocumentsPage = ({ project, can, authedUser, uploadHistory, setUploadHisto
                 </div>
               )
             ) : (
-              <div className="text-sm text-gray-500 dark:text-gray-400 p-4">
-                {previewContent.preview_data || "Preview not available"}
+              <div className="flex-1 flex items-center justify-center p-4">
+                <div className="text-sm text-gray-500 dark:text-gray-400">
+                  {previewContent.preview_data || "Preview not available"}
+                </div>
               </div>
             )}
           </>
@@ -6795,13 +7254,21 @@ const DocumentsPage = ({ project, can, authedUser, uploadHistory, setUploadHisto
   }
 
   return (
-    <div className="grid gap-4">
-      <div className="flex items-center justify-between">
-        <h2 className="text-xl font-semibold">Documents</h2>
-        <div className="flex items-center gap-2">
+    <div className="h-full flex flex-col min-h-0 overflow-hidden">
+      {/* Header - fixed height */}
+      <div className="flex-shrink-0 flex items-center justify-between mb-4 px-1">
+        <h2 className="text-xl font-semibold text-gray-900 dark:text-gray-100">Documents</h2>
+        <div className="flex items-center gap-2 flex-wrap justify-end">
           <Button
             variant="secondary"
-            onClick={() => setLayout(layout === "side" ? "bottom" : "side")}
+            onClick={() => {
+              setLayout(layout === "side" ? "bottom" : "side");
+              if (layout === "side") {
+                setFilesPanelCollapsed(true);
+              } else {
+                setFilesPanelCollapsed(false);
+              }
+            }}
           >
             {layout === "side" ? "Preview Bottom" : "Preview Side"}
           </Button>
@@ -6829,99 +7296,132 @@ const DocumentsPage = ({ project, can, authedUser, uploadHistory, setUploadHisto
         </div>
       </div>
 
-      {layout === "side" ? (
-        <div className="grid grid-cols-1 lg:grid-cols-12 gap-4">
-          <Card 
-            className={filesPanelCollapsed ? "lg:col-span-1" : "lg:col-span-4"} 
-            title={
-              <div className="flex items-center justify-between w-full">
-                <span>Files</span>
-                <button
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    setFilesPanelCollapsed(!filesPanelCollapsed);
-                  }}
-                  className="p-1 hover:bg-gray-100 dark:hover:bg-gray-800 rounded"
-                  title={filesPanelCollapsed ? "Expand" : "Collapse"}
-                >
-                  {filesPanelCollapsed ? "▶" : "◀"}
-                </button>
-              </div>
-            }
-          >
-            {!filesPanelCollapsed && (
-              <div className="h-[85vh] overflow-auto pr-1">
-                <FileTree2
-                  node={tree}
-                  expanded={expanded}
-                  onToggle={onToggle}
-                  onSelectFile={(f) => {
-                    setSelectedFile(f);
-                    setSelectedFolder(null);
-                    // Find document from API
-                    const doc = documents.find(d => d.document_id === f.document_id);
-                    if (doc) {
-                      setSelectedDocument(doc);
-                    } else {
-                      setSelectedDocument(null);
-                    }
-                  }}
-                  onSelectFolder={(id, action) => {
-                    if (action === "edit") {
-                      handleEditFolder(id);
-                    } else {
-                      setSelectedFolder(id);
-                      setSelectedFile(null);
-                      setSelectedDocument(null);
-                      setPreviewContent(null);
-                    }
-                  }}
-                  selectedFile={selectedFile}
-                  selectedFolder={selectedFolder}
-                />
-              </div>
-            )}
-          </Card>
-          <div className={filesPanelCollapsed ? "lg:col-span-11" : "lg:col-span-8"}>{PreviewPane}</div>
-        </div>
-      ) : (
-        <div className="grid gap-4">
-          <Card title="Files">
-            <div className="h-[45vh] overflow-auto pr-1">
-              <FileTree2
-                node={tree}
-                expanded={expanded}
-                onToggle={onToggle}
-                onSelectFile={(f) => {
-                  setSelectedFile(f);
-                  setSelectedFolder(null);
-                  // Find document from API
-                  const doc = documents.find(d => d.document_id === f.document_id);
-                  if (doc) {
-                    setSelectedDocument(doc);
-                  } else {
-                    setSelectedDocument(null);
-                  }
-                }}
-                onSelectFolder={(id, action) => {
-                  if (action === "edit") {
-                    handleEditFolder(id);
-                  } else {
-                    setSelectedFolder(id);
-                    setSelectedFile(null);
-                    setSelectedDocument(null);
-                    setPreviewContent(null);
-                  }
-                }}
-                onEditFile={handleEditFile}
-                selectedFile={selectedFile}
-                selectedFolder={selectedFolder}
-              />
-            </div>
-          </Card>
-          {PreviewPane}
-        </div>
-      )}
+      {/* Content area - fills remaining space, no scroll */}
+      <div className="flex-1 min-h-0 flex flex-col gap-4 overflow-hidden">
+        {/* File Tree + Preview Section */}
+        {layout === "side" ? (
+          <div className="flex-1 min-h-0 flex gap-4 overflow-hidden" style={{ height: '100%' }}>
+            <Card 
+              className={filesPanelCollapsed ? "w-12 flex-shrink-0 flex flex-col min-h-0 overflow-hidden" : "w-1/3 flex-shrink-0 flex flex-col min-h-0 overflow-hidden"} 
+              title={
+                <div className={`flex ${filesPanelCollapsed ? 'items-center justify-center h-full' : 'items-center justify-between'} w-full`}>
+                  {!filesPanelCollapsed && <span className="text-sm font-semibold">Files</span>}
+                  <button
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      setFilesPanelCollapsed(!filesPanelCollapsed);
+                    }}
+                    className={`${filesPanelCollapsed ? 'w-full h-full flex items-center justify-center p-0' : 'p-2'} hover:bg-gray-100 dark:hover:bg-gray-800 rounded transition-colors`}
+                    title={filesPanelCollapsed ? "Expand" : "Collapse"}
+                  >
+                    {filesPanelCollapsed ? (
+                      <span className="text-xl font-bold text-gray-600 dark:text-gray-300">▶</span>
+                    ) : (
+                      "◀"
+                    )}
+                  </button>
+                </div>
+              }
+            >
+              {!filesPanelCollapsed && (
+                <div className="flex-1 min-h-0 overflow-y-auto overflow-x-hidden pr-2">
+                  <FileTree2
+                    node={tree}
+                    expanded={expanded}
+                    onToggle={onToggle}
+                    onSelectFile={(f) => {
+                      setSelectedFile(f);
+                      setSelectedFolder(null);
+                      // Find document from API
+                      const doc = documents.find(d => d.document_id === f.document_id);
+                      if (doc) {
+                        setSelectedDocument(doc);
+                      } else {
+                        setSelectedDocument(null);
+                      }
+                    }}
+                    onSelectFolder={(id, action) => {
+                      if (action === "edit") {
+                        handleEditFolder(id);
+                      } else {
+                        setSelectedFolder(id);
+                        setSelectedFile(null);
+                        setSelectedDocument(null);
+                        setPreviewContent(null);
+                      }
+                    }}
+                    selectedFile={selectedFile}
+                    selectedFolder={selectedFolder}
+                  />
+                </div>
+              )}
+            </Card>
+            <div className="flex-1 min-h-0 flex flex-col overflow-hidden">{PreviewPane}</div>
+          </div>
+        ) : (
+          <div className="flex-1 min-h-0 flex flex-col gap-4 overflow-hidden">
+            {/* File Tree on top when layout is bottom */}
+            <Card 
+              className={`${filesPanelCollapsed ? "h-12" : "h-1/2"} flex-shrink-0 flex flex-col overflow-hidden transition-all duration-300`}
+              title={
+                <div className={`flex ${filesPanelCollapsed ? 'items-center justify-center' : 'items-center justify-between'} w-full`}>
+                  {!filesPanelCollapsed && <span className="text-sm font-semibold">Files</span>}
+                  <button
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      setFilesPanelCollapsed(!filesPanelCollapsed);
+                    }}
+                    className={`${filesPanelCollapsed ? 'w-full h-full flex items-center justify-center p-0' : 'p-2'} hover:bg-gray-100 dark:hover:bg-gray-800 rounded transition-colors`}
+                    title={filesPanelCollapsed ? "Expand" : "Collapse"}
+                  >
+                    {filesPanelCollapsed ? (
+                      <span className="text-xl font-bold text-gray-600 dark:text-gray-300">▲</span>
+                    ) : (
+                      "▼"
+                    )}
+                  </button>
+                </div>
+              }
+            >
+              {!filesPanelCollapsed && (
+                <div className="flex-1 min-h-0 overflow-y-auto overflow-x-hidden pr-2">
+                  <FileTree2
+                    node={tree}
+                    expanded={expanded}
+                    onToggle={onToggle}
+                    onSelectFile={(f) => {
+                      setSelectedFile(f);
+                      setSelectedFolder(null);
+                      // Find document from API
+                      const doc = documents.find(d => d.document_id === f.document_id);
+                      if (doc) {
+                        setSelectedDocument(doc);
+                      } else {
+                        setSelectedDocument(null);
+                      }
+                    }}
+                    onSelectFolder={(id, action) => {
+                      if (action === "edit") {
+                        handleEditFolder(id);
+                      } else {
+                        setSelectedFolder(id);
+                        setSelectedFile(null);
+                        setSelectedDocument(null);
+                        setPreviewContent(null);
+                      }
+                    }}
+                    onEditFile={handleEditFile}
+                    selectedFile={selectedFile}
+                    selectedFolder={selectedFolder}
+                  />
+                </div>
+              )}
+            </Card>
+            {/* Preview at bottom when layout is bottom */}
+            <div className="flex-1 min-h-0 flex flex-col overflow-hidden">{PreviewPane}</div>
+          </div>
+        )}
+      </div>
 
       {/* Version History Modal */}
       {showVersions && (
@@ -6995,105 +7495,6 @@ const DocumentsPage = ({ project, can, authedUser, uploadHistory, setUploadHisto
         </div>
       )}
 
-      {/* Document Upload History */}
-      <Card title="Document Upload History">
-        {loading ? (
-          <div className="text-center py-8 text-gray-500">Loading documents...</div>
-        ) : (
-          (() => {
-            if (!Array.isArray(documents)) {
-              return <div className="text-center py-8 text-gray-500">No documents found</div>;
-            }
-            
-            const uniqueWhos = [...new Set(documents.map(d => d.metadata?.who || d.uploader))];
-            const uniqueWhats = [...new Set(documents.map(d => d.metadata?.what || "—"))];
-          
-            const filteredDocs = documents.filter(doc => {
-            const matchSearch = !searchDoc.trim() || 
-                [doc.filename, 
-                 doc.metadata?.who || doc.uploader,
-                 doc.metadata?.what || "—",
-                 doc.metadata?.where || "—",
-                 doc.metadata?.description || "—"].some(v => 
-                v.toLowerCase().includes(searchDoc.toLowerCase())
-              );
-              const matchWho = filterWho === "all" || (doc.metadata?.who || doc.uploader) === filterWho;
-              const matchWhat = filterWhat === "all" || (doc.metadata?.what || "—") === filterWhat;
-            return matchSearch && matchWho && matchWhat;
-          });
-          
-          return (
-            <>
-              <div className="mb-4 grid grid-cols-1 md:grid-cols-3 gap-2">
-                <Input 
-                  placeholder="ค้นหา (ชื่อไฟล์, ผู้ใช้, คำอธิบาย...)" 
-                  value={searchDoc} 
-                  onChange={(e) => setSearchDoc(e.target.value)} 
-                />
-                <Select 
-                  value={filterWho} 
-                  onChange={setFilterWho} 
-                  options={[{value: "all", label: "ทั้งหมด (Responsible User)"}, ...uniqueWhos.map(w => ({value: w, label: w}))]} 
-                />
-                <Select 
-                  value={filterWhat} 
-                  onChange={setFilterWhat} 
-                  options={[{value: "all", label: "ทั้งหมด (Activity Type)"}, ...uniqueWhats.map(w => ({value: w, label: w}))]} 
-                />
-              </div>
-              <Table
-                columns={[
-                    { header: "Time", key: "created_at", cell: (r) => formatDateTime(r.created_at) },
-                    { header: "Name", key: "filename", cell: (r) => r.filename },
-                    { header: "Responsible User", key: "who", cell: (r) => r.metadata?.who || r.uploader },
-                    { header: "Activity Type", key: "what", cell: (r) => r.metadata?.what || "—" },
-                  { header: "Site", key: "where", cell: (r) => r.metadata?.where || "—" },
-                  { header: "Operational Timing", key: "when", cell: (r) => r.metadata?.when || "—" },
-                  { header: "Purpose", key: "why", cell: (r) => r.metadata?.why || "—" },
-                  { header: "Version", key: "version", cell: (r) => `v${r.version} ${r.is_latest ? '(Latest)' : ''}` },
-                  {
-                    header: "Actions",
-                    key: "actions",
-                    cell: (r) => (
-                      <div className="flex gap-2">
-                        <Button 
-                          variant="secondary" 
-                          size="sm"
-                          onClick={async () => {
-                            try {
-                              const projectId = project.project_id || project.id;
-                              await api.downloadDocument(projectId, r.document_id);
-                            } catch (error) {
-                              alert('Download failed: ' + error.message);
-                            }
-                          }}
-                        >
-                          ⬇ Download
-                        </Button>
-                        <Button 
-                          variant="secondary"
-                          size="sm"
-                          onClick={async (e) => {
-                            e.stopPropagation();
-                            // Don't setSelectedDocument here to avoid re-render issues
-                            // Pass document info directly to loadVersions
-                            await loadVersions(r.document_id, r);
-                          }}
-                        >
-                          📜 Versions
-                        </Button>
-                      </div>
-                    ),
-                  },
-                ]}
-                data={filteredDocs}
-                empty="No document uploads yet"
-              />
-            </>
-          );
-        })()
-        )}
-      </Card>
 
       {/* Move Folder Dialog */}
       {showMoveFolder && moveFolderTarget && (
@@ -7508,31 +7909,24 @@ const SettingPage = ({ project, setProjects, authedUser, goIndex }) => {
     loadData();
   }, [project.project_id, project.id]);
 
-  const MAX_SIZE = 1.5 * 1024 * 1024,
-    MAX_W = 1600,
-    MAX_H = 900;
-
   const handleFile = async (file) => {
     setError("");
     if (!file) return;
 
-    // ✅ ตรวจขนาดก่อนโหลด (เร็วกว่า base64)
-    const MB = file.size / (1024 * 1024);
-    if (MB > 1.5) {
-      setError(`❌ ขนาดไฟล์ ${MB.toFixed(2)} MB — เกิน 1.5MB`);
-      return;
+    try {
+      const data = await fileToDataURL(file);
+      const img = new Image();
+      img.onload = () => {
+        setTopoUrl(data);
+        setError("");
+      };
+      img.onerror = () => {
+        setError("Failed to load image. Please try another file.");
+      };
+      img.src = data;
+    } catch (e) {
+      setError("Failed to process image: " + (e.message || "Unknown error"));
     }
-
-    const data = await fileToDataURL(file);
-    const img = new Image();
-    img.onload = () => {
-      let { width, height } = img;
-      if (width > 1600 || height > 900) {
-        setError(`⚠ ขนาดรูป ${width}×${height}px เกินขอบเขต (≤1600×900)`);
-      }
-      setTopoUrl(data);
-    };
-    img.src = data;
   };
 
   const save = async () => {
@@ -7665,154 +8059,181 @@ const SettingPage = ({ project, setProjects, authedUser, goIndex }) => {
   };
 
   return (
-    <div className="grid gap-6">
-      <h2 className="text-xl font-semibold">Setting</h2>
-      <Card title="Project Info">
-        <div className="grid gap-4 md:grid-cols-2">
-          <Field label="Project Name">
-            <Input value={name} onChange={(e) => setName(e.target.value)} />
-          </Field>
-          <Field label="Visibility">
-            <Select
-              value={visibility}
-              onChange={setVisibility}
-              options={[
-                { value: "Private", label: "Private" },
-                { value: "Shared", label: "Shared" },
-              ]}
-            />
-          </Field>
-          <Field label="Description">
-            <Input value={desc} onChange={(e) => setDesc(e.target.value)} />
-          </Field>
-          <Field label="Backup Interval">
-            <Select
-              value={backupInterval}
-              onChange={setBackupInterval}
-              options={[
-                { value: "Hourly", label: "Hourly" },
-                { value: "Daily", label: "Daily" },
-                { value: "Weekly", label: "Weekly" },
-              ]}
-            />
-          </Field>
-          <div className="md:col-span-2 grid gap-2">
-            <Field label="Topology Image (Recommended: ≤1.5MB, 1600×900 for best display)">
-              <input
-                type="file"
-                accept="image/*"
-                onChange={(e) => handleFile(e.target.files?.[0])}
-                className="block w-full text-sm text-gray-500 dark:text-gray-400
-                  file:mr-4 file:py-2 file:px-4
-                  file:rounded-lg file:border-0
-                  file:text-sm file:font-semibold
-                  file:bg-blue-50 file:text-blue-700
-                  hover:file:bg-blue-100
-                  dark:file:bg-blue-900 dark:file:text-blue-300
-                  dark:hover:file:bg-blue-800
-                  cursor-pointer"
+    <div className="h-full flex flex-col min-h-0 overflow-hidden">
+      <div className="flex-shrink-0 mb-6">
+        <h2 className="text-2xl font-bold text-gray-900 dark:text-gray-100 mb-2">Project Settings</h2>
+        <p className="text-sm text-gray-500 dark:text-gray-400">Manage your project configuration and team members</p>
+      </div>
+      
+      <div className="flex-1 min-h-0 overflow-y-auto overflow-x-hidden pr-2 space-y-6">
+        <Card title="Project Information" className="flex-shrink-0">
+          <div className="grid gap-6 md:grid-cols-2">
+            <Field label="Project Name">
+              <Input value={name} onChange={(e) => setName(e.target.value)} placeholder="Enter project name" />
+            </Field>
+            <Field label="Visibility">
+              <Select
+                value={visibility}
+                onChange={setVisibility}
+                options={[
+                  { value: "Private", label: "Private" },
+                  { value: "Shared", label: "Shared" },
+                ]}
               />
             </Field>
-            {error && <div className="text-sm text-red-400">{error}</div>}
-            {topoUrl && (
-              <img
-                src={topoUrl}
-                alt="topology preview"
-                className="w-full max-w-md h-48 object-contain rounded-xl border border-gray-200 dark:border-[#1F2937]"
+            <Field label="Description">
+              <Input value={desc} onChange={(e) => setDesc(e.target.value)} placeholder="Enter project description" />
+            </Field>
+            <Field label="Backup Interval">
+              <Select
+                value={backupInterval}
+                onChange={setBackupInterval}
+                options={[
+                  { value: "Hourly", label: "Hourly" },
+                  { value: "Daily", label: "Daily" },
+                  { value: "Weekly", label: "Weekly" },
+                ]}
               />
-            )}
-          </div>
-        </div>
-      </Card>
-
-      <Card title="Members" className="overflow-hidden">
-        <div className="mb-4 p-4 bg-gray-50 dark:bg-gray-800/50 rounded-lg border border-gray-200 dark:border-gray-700">
-          <AddMemberInline
-            members={members}
-            availableUsers={availableUsers}
-            onAdd={async (u, role) => {
-              try {
-                await api.addProjectMember(project.project_id || project.id, u, role);
-                setMembers([...members, { username: u, role }]);
-                setError("");
-              } catch (e) {
-                setError("Failed to add member: " + e.message);
-              }
-            }}
-          />
-          {error && (
-            <div className="mt-3 text-sm text-rose-500 dark:text-rose-400 bg-rose-50 dark:bg-rose-900/20 border border-rose-200 dark:border-rose-800 rounded-lg px-3 py-2">
-              {error}
+            </Field>
+            <div className="md:col-span-2">
+              <Field label="Topology Image">
+                <div className="space-y-3">
+                  <input
+                    type="file"
+                    accept="image/*"
+                    onChange={(e) => handleFile(e.target.files?.[0])}
+                    className="block w-full text-sm text-gray-500 dark:text-gray-400
+                      file:mr-4 file:py-2 file:px-4
+                      file:rounded-lg file:border-0
+                      file:text-sm file:font-semibold
+                      file:bg-blue-600 file:text-white
+                      hover:file:bg-blue-700
+                      dark:file:bg-blue-500 dark:file:text-white
+                      dark:hover:file:bg-blue-600
+                      cursor-pointer transition-colors"
+                  />
+                  {error && (
+                    <div className="text-sm text-rose-500 dark:text-rose-400 bg-rose-50 dark:bg-rose-900/20 border border-rose-200 dark:border-rose-800 rounded-lg px-3 py-2">
+                      {error}
+                    </div>
+                  )}
+                  {topoUrl && (
+                    <div className="mt-3">
+                      <p className="text-xs text-gray-500 dark:text-gray-400 mb-2">Preview:</p>
+                      <div className="relative rounded-lg border border-gray-200 dark:border-gray-700 overflow-hidden bg-gray-50 dark:bg-gray-900/50">
+                        <img
+                          src={topoUrl}
+                          alt="Topology preview"
+                          className="w-full max-w-full h-auto max-h-96 object-contain"
+                          style={{ imageRendering: 'auto' }}
+                        />
+                      </div>
+                    </div>
+                  )}
+                </div>
+              </Field>
             </div>
-          )}
-        </div>
-        <div className="mt-4">
-          <Table
-            columns={[
-              { 
-                header: "Username", 
-                key: "username",
-                cell: (r) => (
-                  <div className="font-medium text-gray-900 dark:text-gray-100">
-                    {r.username}
-                  </div>
-                )
-              },
-              {
-                header: "Role",
-                key: "role",
-                cell: (r) => {
-                  // Prevent changing admin role - show as text instead of dropdown
-                  const isAdmin = r.role === "admin";
-                  if (isAdmin) {
-                    return (
-                      <span className="text-sm text-gray-600 dark:text-gray-400 font-medium">
-                        {r.role}
-                      </span>
-                    );
-                  }
-                  return (
-                    <Select
-                      value={r.role}
-                      onChange={(val) => {
-                        changeRole(r.username, val);
-                      }}
-                      options={[
-                        { value: "manager", label: "manager" },
-                        { value: "engineer", label: "engineer" },
-                        { value: "viewer", label: "viewer" },
-                      ]}
-                      className="min-w-[120px]"
-                    />
-                  );
-                },
-              },
-              {
-                header: "Actions",
-                key: "x",
-                cell: (r) => (
-                  r.role === "admin" ? (
-                    <span className="text-xs text-gray-400 dark:text-gray-500 px-2 py-1 bg-gray-100 dark:bg-gray-800 rounded">Protected</span>
-                  ) : (
-                    <Button 
-                      variant="danger" 
-                      onClick={() => remove(r.username)}
-                      className="text-sm"
-                    >
-                      Remove
-                    </Button>
-                  )
-                ),
-              },
-            ]}
-            data={members}
-            empty="No members added yet"
-          />
-        </div>
-      </Card>
+          </div>
+        </Card>
 
-      <div className="flex gap-2">
-        <Button onClick={save}>Save Changes</Button>
+        <Card title="Team Members" className="flex-shrink-0">
+          <div className="space-y-4">
+            <div className="p-4 bg-gray-50 dark:bg-gray-800/50 rounded-lg border border-gray-200 dark:border-gray-700">
+              <h3 className="text-sm font-semibold text-gray-700 dark:text-gray-300 mb-3">Add New Member</h3>
+              <AddMemberInline
+                members={members}
+                availableUsers={availableUsers}
+                onAdd={async (u, role) => {
+                  try {
+                    await api.addProjectMember(project.project_id || project.id, u, role);
+                    setMembers([...members, { username: u, role }]);
+                    setError("");
+                  } catch (e) {
+                    setError("Failed to add member: " + e.message);
+                  }
+                }}
+              />
+            </div>
+            
+            {error && (
+              <div className="text-sm text-rose-500 dark:text-rose-400 bg-rose-50 dark:bg-rose-900/20 border border-rose-200 dark:border-rose-800 rounded-lg px-3 py-2">
+                {error}
+              </div>
+            )}
+            
+            <div>
+              <h3 className="text-sm font-semibold text-gray-700 dark:text-gray-300 mb-3">Current Members</h3>
+              <Table
+                columns={[
+                  { 
+                    header: "Username", 
+                    key: "username",
+                    cell: (r) => (
+                      <div className="font-medium text-gray-900 dark:text-gray-100">
+                        {r.username}
+                      </div>
+                    )
+                  },
+                  {
+                    header: "Role",
+                    key: "role",
+                    cell: (r) => {
+                      const isAdmin = r.role === "admin";
+                      if (isAdmin) {
+                        return (
+                          <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-200">
+                            {r.role}
+                          </span>
+                        );
+                      }
+                      return (
+                        <Select
+                          value={r.role}
+                          onChange={(val) => {
+                            changeRole(r.username, val);
+                          }}
+                          options={[
+                            { value: "manager", label: "Manager" },
+                            { value: "engineer", label: "Engineer" },
+                            { value: "viewer", label: "Viewer" },
+                          ]}
+                          className="min-w-[120px]"
+                        />
+                      );
+                    },
+                  },
+                  {
+                    header: "Actions",
+                    key: "x",
+                    cell: (r) => (
+                      r.role === "admin" ? (
+                        <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-gray-100 text-gray-600 dark:bg-gray-800 dark:text-gray-400">
+                          Protected
+                        </span>
+                      ) : (
+                        <Button 
+                          variant="danger" 
+                          onClick={() => remove(r.username)}
+                          className="text-xs"
+                        >
+                          Remove
+                        </Button>
+                      )
+                    ),
+                  },
+                ]}
+                data={members}
+                empty="No members added yet"
+              />
+            </div>
+          </div>
+        </Card>
+      </div>
+
+      <div className="flex-shrink-0 flex items-center justify-between pt-4 border-t border-gray-200 dark:border-gray-700 mt-6">
+        <div className="flex gap-3">
+          <Button onClick={save} variant="primary">Save Changes</Button>
+        </div>
         {authedUser?.role === "admin" && (
           <Button variant="danger" onClick={() => setShowDeleteModal(true)}>
             Delete Project
@@ -10095,59 +10516,14 @@ function buildDeviceNarrative(project, row) {
   return parts.join("\n");
 }
 
-/* ===== คำแนะนำรายอุปกรณ์ (Config & Hygiene) ===== */
+/* ===== DEPRECATED: Hardcoded Device Recommendations ===== */
+/* 
+ * This function has been replaced with AI-generated gap analysis from full project analysis.
+ * Kept for reference but no longer used.
+ * Use api.getFullProjectAnalysis() and filter gap_analysis by device instead.
+ */
 function buildDeviceRecommendations(project, row) {
-  if (!row) return [];
-  const links = deriveLinksFromProject(project);
-  const neighbors = links.flatMap(e => (e.a === row.device ? [e.b] : e.b === row.device ? [e.a] : []));
-  const uniqNeigh = Array.from(new Set(neighbors));
-  const recs = [];
-  const role = classifyRoleByName(row.device);
-
-  // NTP
-  if (!row.ntpStatus || !/sync/i.test(row.ntpStatus)) {
-    recs.push("ตั้งค่า NTP ให้ Sync เพื่อความถูกต้องของTime (ตรวจสอบ server, key, timezone)");
-  }
-  // Syslog
-  if (!row.syslog || row.syslog === "—") {
-    recs.push("กำหนด logging host/syslog server เพื่อบันทึกเหตุการณ์ส่วนกลาง");
-  }
-  // STP
-  if (row.stpMode && /pvst|rpvst/i.test(row.stpMode)) {
-    if (role === "core") {
-      recs.push("กำหนด STP priority (เช่น 4096) ให้ Core เป็น Root Primary สำหรับ VLAN หลัก");
-    } else if (role === "distribution") {
-      recs.push("กำหนด STP priority (เช่น 8192/12288) เป็น Root Secondary ตาม Policy และเปิด UplinkFast (ถ้ารองรับ)");
-    } else if (role === "access") {
-      recs.push("เปิด portfast และ bpduguard บนพอร์ต access เพื่อลดTime convergence และป้องกัน loop");
-    }
-  }
-  // Trunk pruning
-  if (row.allowedVlansShort && /,/.test(row.allowedVlansShort) && (row.trunkCount || 0) > 0) {
-    recs.push("Prune VLAN บนลิงก์ trunk ให้เฉพาะ VLAN ที่ใช้งานจริง ลด broadcast domain");
-  }
-  // Interfaces health
-  if (row.ifaces && row.ifaces.down > 10) {
-    recs.push("ตรวจสอบพอร์ต Down จำนวนมาก: ยืนยันว่าเป็น admin down (ปิดใช้งาน) พร้อมคำอธิบาย/label");
-  }
-  // Routing sanity
-  if (/BGP/i.test(row.routing || "") && (row.bgpAsn == null || row.bgpNeighbors == null)) {
-    recs.push("ทบทวน BGP: ระบุ ASN/neighbor อย่างชัดเจน และจำกัด prefix ด้วย prefix-list/route-map");
-  }
-  if (/OSPF/i.test(row.routing || "") && (row.ospfNeighbors == null || row.ospfNeighbors === 0)) {
-    recs.push("ตรวจสอบ OSPF neighbor บนลิงก์ที่ควรติด (area, network type, auth)");
-  }
-  // HSRP best-practice
-  const hasHsrp = (project.vlanDetails?.[row.device] || []).some(v => v.hsrpVip);
-  if (hasHsrp) {
-    recs.push("ตรวจสอบ HSRP ให้มีการตั้ง preempt/priority ที่เหมาะสม และ track interface/obj เพื่อ failover ที่ถูกต้อง");
-  }
-  // AAA/SSH (ทั่วไป)
-  recs.push("ยืนยัน AAA/SSHv2/SNMPv3/ACL management ตามมาตรฐานความปลอดภัยขององค์กร");
-
-  // สัมพันธ์กับเพื่อนบ้าน
-  if (uniqNeigh.length) {
-    recs.push(`ทบทวนลิงก์กับ ${uniqNeigh.join(", ")}: ตรวจสอบความเร็ว/duplex/MTU/allowed VLAN ให้ตรงกันทั้งสองฝั่ง`);
-  }
-  return recs;
+  // DEPRECATED: This hardcoded logic has been replaced with AI analysis
+  // See DeviceDetailsView component which now uses projectGapAnalysis from api.getFullProjectAnalysis()
+  return [];
 }
