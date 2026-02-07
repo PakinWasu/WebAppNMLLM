@@ -778,38 +778,6 @@ synchronized
 18% / 62%
 `;
 
-/* ========= MOCK DATA ========= */
-const seedUsers = [
-  {
-    id: "u1",
-    username: "admin",
-    email: "admin@net.app",
-    role: "admin",
-    lastLogin: "2025-10-04",
-  },
-  {
-    id: "u2",
-    username: "managerA",
-    email: "mA@net.app",
-    role: "manager",
-    lastLogin: "2025-10-05",
-  },
-  {
-    id: "u3",
-    username: "operatorB",
-    email: "opB@net.app",
-    role: "operator",
-    lastLogin: "2025-10-05",
-  },
-  {
-    id: "u4",
-    username: "viewerC",
-    email: "vC@net.app",
-    role: "viewer",
-    lastLogin: "2025-10-02",
-  },
-];
-
 // Upload history tracking
 const createUploadRecord = (type, files, user, project, details) => ({
   id: `upload_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
@@ -831,348 +799,6 @@ const createUploadRecord = (type, files, user, project, details) => ({
     description: details.description || ''
   }
 });
-
-const seedProjects = [
-  {
-    id: "p1",
-    name: "Network ABC",
-    desc: "Core Campus Network",
-    manager: "managerA",
-    updated: "2025-10-05 14:23",
-    status: "Active",
-    members: [
-      { username: "admin", role: "admin" },
-      { username: "managerA", role: "manager" },
-      { username: "operatorB", role: "operator" },
-      { username: "viewerC", role: "viewer" },
-    ],
-    devices: 12,
-    lastBackup: "2025-10-05 10:00",
-    services: 8,
-    visibility: "Private",
-    topoUrl: new URL("./assets/topo1.png", import.meta.url).href,
-
-    logs: [
-      {
-        time: "2025-10-05 14:23",
-        user: "operatorB",
-        action: "Upload Config",
-        target: "core-sw1.txt",
-        result: "Success",
-      },
-      {
-        time: "2025-10-04 17:05",
-        user: "managerA",
-        action: "Edit Project",
-        target: "Network ABC",
-        result: "Updated",
-      },
-      {
-        time: "2025-10-04 11:40",
-        user: "operatorB",
-        action: "Upload Config",
-        target: "access-sw2.txt",
-        result: "Error",
-      },
-    ],
-    uploadHistory: [
-      {
-        id: "upload_1",
-        type: "config",
-        files: [{ name: "HQ_CORE-SW1_20251006.txt", size: 28672, type: "text/plain" }],
-        user: "operatorB",
-        project: "p1",
-        timestamp: "2025-10-05T14:23:00.000Z",
-        details: {
-          who: "operatorB",
-          what: "Backup Configuration",
-          where: "Data Center A",
-          when: "Monthly Backup",
-          why: "Regular Backup Schedule",
-          description: "Regular monthly configuration backup for core switch"
-        }
-      },
-      {
-        id: "upload_2",
-        type: "config",
-        files: [{ name: "HQ_DIST-SW2_20251006.txt", size: 20480, type: "text/plain" }],
-        user: "operatorB",
-        project: "p1",
-        timestamp: "2025-10-05T14:20:00.000Z",
-        details: {
-          who: "operatorB",
-          what: "Backup Configuration",
-          where: "Data Center A",
-          when: "Monthly Backup",
-          why: "Regular Backup Schedule",
-          description: "Regular monthly configuration backup for distribution switch"
-        }
-      },
-      {
-        id: "upload_3",
-        type: "document",
-        files: [{ name: "PhysicalDiagram.pdf", size: 327680, type: "application/pdf" }],
-        user: "managerA",
-        project: "p1",
-        timestamp: "2025-10-01T10:15:00.000Z",
-        details: {
-          who: "managerA",
-          what: "Update Network Documentation",
-          where: "Office",
-          when: "Project Update",
-          why: "Project Documentation",
-          description: "Updated physical network diagram after equipment changes"
-        }
-      },
-      {
-        id: "upload_4",
-        type: "document",
-        files: [{ name: "LogicalDiagram.pdf", size: 280000, type: "application/pdf" }],
-        user: "managerA",
-        project: "p1",
-        timestamp: "2025-10-01T10:10:00.000Z",
-        details: {
-          who: "managerA",
-          what: "Update Network Documentation",
-          where: "Office",
-          when: "Project Update",
-          why: "Project Documentation",
-          description: "Updated logical network diagram"
-        }
-      },
-      {
-        id: "upload_5",
-        type: "config",
-        files: [{ name: "core-sw1_running-config.txt", size: 35000, type: "text/plain" }],
-        user: "admin",
-        project: "p1",
-        timestamp: "2025-09-28T16:30:00.000Z",
-        details: {
-          who: "admin",
-          what: "Update Running Config",
-          where: "Data Center A",
-          when: "Before Change",
-          why: "Before System Changes",
-          description: "Backup before implementing new VLAN configuration"
-        }
-      }
-    ],
-    /* Summary enriched */
-    summaryRows: [
-      {
-        device: "core-sw1",
-        model: "C9500-24Y4C",
-        osVersion: "IOS-XE 17.9.4",
-        serial: "FTX12345AAA",
-        mgmtIp: "10.0.0.11",
-        ifaces: { total: 96, up: 92, down: 2, adminDown: 2 },
-        accessCount: 40,
-        trunkCount: 6,
-        vlanCount: 38,
-        stpMode: "RPVST",
-        stpRoot: "No",
-        routing: "OSPF,BGP",
-        ospfNeighbors: 6,
-        bgpAsn: 65001,
-        bgpNeighbors: 4,
-        cdpNeighbors: 8,
-        lldpNeighbors: 3,
-        cpu: 21,
-        mem: 58,
-        ntpStatus: "Sync",
-        snmp: "Yes",
-        syslog: "10.10.1.10",
-        allowedVlansShort: "1,10,20,30,99,100-120…(42)",
-      },
-      {
-        device: "dist-sw2",
-        model: "C9300-48P",
-        osVersion: "IOS-XE 17.6.5",
-        serial: "FTX12345BBB",
-        mgmtIp: "10.0.1.21",
-        ifaces: { total: 56, up: 54, down: 2, adminDown: 0 },
-        accessCount: 44,
-        trunkCount: 4,
-        vlanCount: 24,
-        stpMode: "RPVST",
-        stpRoot: "No",
-        routing: "OSPF",
-        ospfNeighbors: 3,
-        bgpAsn: null,
-        bgpNeighbors: 0,
-        cdpNeighbors: 5,
-        lldpNeighbors: 2,
-        cpu: 18,
-        mem: 62,
-        ntpStatus: "Sync",
-        snmp: "Yes",
-        syslog: "10.10.1.10",
-        allowedVlansShort: "1,10,20,30…(24)",
-      },
-      {
-        device: "access-sw3",
-        serial: "FTX12345CCC",
-        vlan: "10,20",
-        services: "-",
-        status: "Drift",
-      },
-    ],
-    documents: {
-      config: [
-        {
-          name: "HQ_CORE-SW1_20251006.txt",
-          size: "28 KB",
-          modified: "2025-10-06",
-          content: SAMPLE_CORE_SW1,
-        },
-        {
-          name: "HQ_DIST-SW2_20251006.txt",
-          size: "20 KB",
-          modified: "2025-10-06",
-          content: SAMPLE_DIST_SW2,
-        },
-      ],
-      others: [
-        { name: "PhysicalDiagram.pdf", size: "320 KB", modified: "2025-10-01" },
-        { name: "LogicalDiagram.pdf", size: "280 KB", modified: "2025-10-01" },
-      ],
-    },
-    vlanDetails: {
-      "core-sw1": [
-        {
-          vlanId: 1,
-          name: "default",
-          status: "active",
-          ports: "-",
-          sviIp: null,
-          hsrpVip: null,
-        },
-        {
-          vlanId: 10,
-          name: "USERS",
-          status: "active",
-          ports: "Gi1/0/4-5,10-12",
-          sviIp: "10.0.0.11/24",
-          hsrpVip: "10.0.10.1",
-        },
-        {
-          vlanId: 20,
-          name: "CCTV",
-          status: "active",
-          ports: "Gi1/0/3,6-7",
-          sviIp: "10.0.20.1/24",
-          hsrpVip: "10.0.20.1",
-        },
-        {
-          vlanId: 30,
-          name: "IOT",
-          status: "active",
-          ports: "Gi1/0/8-9",
-          sviIp: "10.0.30.1/24",
-          hsrpVip: null,
-        },
-        {
-          vlanId: 99,
-          name: "NATIVE",
-          status: "active",
-          ports: "trunk(native)",
-          sviIp: "10.0.99.1/24",
-          hsrpVip: null,
-        },
-      ],
-      "dist-sw2": [
-        {
-          vlanId: 1,
-          name: "default",
-          status: "active",
-          ports: "-",
-          sviIp: null,
-          hsrpVip: null,
-        },
-        {
-          vlanId: 10,
-          name: "USERS",
-          status: "active",
-          ports: "Gi1/0/1-3",
-          sviIp: "10.0.1.21/24",
-          hsrpVip: null,
-        },
-        {
-          vlanId: 20,
-          name: "CCTV",
-          status: "active",
-          ports: "Gi1/0/4-5",
-          sviIp: "10.0.21.1/24",
-          hsrpVip: null,
-        },
-        {
-          vlanId: 30,
-          name: "IOT",
-          status: "active",
-          ports: "Gi1/0/6",
-          sviIp: "10.0.31.1/24",
-          hsrpVip: null,
-        },
-      ],
-    },
-  },
-  {
-    id: "p2",
-    name: "Branch B",
-    desc: "Edge / WAN Link",
-    manager: "managerA",
-    updated: "2025-10-03 09:10",
-    status: "Pending",
-    members: [
-      { username: "managerA", role: "manager" },
-      { username: "operatorB", role: "operator" },
-    ],
-    devices: 5,
-    lastBackup: "2025-10-03 02:00",
-    services: 3,
-    visibility: "Shared",
-    topoUrl: new URL("./assets/topo2.png", import.meta.url).href,
-
-    logs: [],
-    summaryRows: [],
-    documents: { config: [], others: [] },
-    vlanDetails: {},
-    uploadHistory: [
-      {
-        id: "upload_branch_1",
-        type: "config",
-        files: [{ name: "branch-router_config.txt", size: 15000, type: "text/plain" }],
-        user: "operatorB",
-        project: "p2",
-        timestamp: "2025-10-03T09:00:00.000Z",
-        details: {
-          who: "operatorB",
-          what: "Backup Configuration",
-          where: "Branch Office",
-          when: "Weekly Backup",
-          why: "Regular Backup Schedule",
-          description: "Weekly configuration backup for branch router"
-        }
-      },
-      {
-        id: "upload_branch_2",
-        type: "document",
-        files: [{ name: "BranchNetworkDiagram.pdf", size: 250000, type: "application/pdf" }],
-        user: "managerA",
-        project: "p2",
-        timestamp: "2025-10-02T14:30:00.000Z",
-        details: {
-          who: "managerA",
-          what: "Create Network Diagram",
-          where: "Branch Office",
-          when: "New Implementation",
-          why: "Project Documentation",
-          description: "Initial network diagram for branch office setup"
-        }
-      }
-    ],
-  },
-];
 
 /* ========= ROOT APP ========= */
 export default function App() {
@@ -2674,7 +2300,7 @@ const OverviewPage = ({ project, uploadHistory }) => {
                       const file = r.uploadRecord.files[0];
                       if (!file) return;
                       const blob = new Blob(
-                        [file.content || `# ${r.uploadRecord.type === 'config' ? 'Configuration' : 'Document'} Backup\n# File: ${file.name}\n# Uploaded: ${r.time}\n# User: ${r.who}\n\n(mock file content - actual file would be here)`],
+                        [file.content || `# ${r.uploadRecord.type === 'config' ? 'Configuration' : 'Document'} Backup\n# File: ${file.name}\n# Uploaded: ${r.time}\n# User: ${r.who}\n\nContent not available. Download from Documents if needed.`],
                         { type: file.type || (r.uploadRecord.type === 'config' ? "text/plain;charset=utf-8" : "application/octet-stream") }
                       );
                       const url = URL.createObjectURL(blob);
@@ -3905,12 +3531,6 @@ const DeviceDetailsView = ({ project, deviceId, goBack, uploadHistory, authedUse
   const leftFile = deviceBackups.find((f) => f.filename === leftFileName);
   const rightFile = deviceBackups.find((f) => f.filename === rightFileName);
 
-  // modal preview สำหรับกดจากตาราง Backup
-  const [bkPreview, setBkPreview] = React.useState(null);
-  const [searchBackup, setSearchBackup] = React.useState("");
-  const [filterBackupWho, setFilterBackupWho] = React.useState("all");
-  const [filterBackupWhat, setFilterBackupWhat] = React.useState("all");
-
   // diff แบบง่าย (บรรทัดต่อบรรทัด)
   const simpleDiff = React.useCallback((aText = "", bText = "") => {
     const a = (aText || "").split(/\r?\n/);
@@ -4205,333 +3825,207 @@ const DeviceDetailsView = ({ project, deviceId, goBack, uploadHistory, authedUse
     };
   }, [facts.device, lastTwo]);
 
-  // ตาราง Backup Config History (ใช้ deviceConfigHistory จาก API)
-  const uniqueBackupWhos = React.useMemo(() => 
-    [...new Set(deviceConfigHistory.map(d => d.details?.who || d.user))],
-    [deviceConfigHistory]
-  );
-  const uniqueBackupWhats = React.useMemo(() => 
-    [...new Set(deviceConfigHistory.map(d => d.details?.what || "—"))],
-    [deviceConfigHistory]
-  );
-  
-  const filteredBackupHistory = React.useMemo(() => {
-    return deviceConfigHistory.filter(backup => {
-      const matchSearch = !searchBackup.trim() || 
-        [backup.files.map(f => f.name).join(', '), 
-         backup.details?.who || backup.user,
-         backup.details?.what || "—",
-         backup.details?.where || "—",
-         backup.details?.description || "—"].some(v => 
-          v.toLowerCase().includes(searchBackup.toLowerCase())
-        );
-      const matchWho = filterBackupWho === "all" || (backup.details?.who || backup.user) === filterBackupWho;
-      const matchWhat = filterBackupWhat === "all" || (backup.details?.what || "—") === filterBackupWhat;
-      return matchSearch && matchWho && matchWhat;
-    });
-  }, [deviceConfigHistory, searchBackup, filterBackupWho, filterBackupWhat]);
-  
-  const backupCols = [
-    { header: "Time", key: "timestamp", cell: (r) => formatDateTime(r.timestamp) },
-    { header: "Name", key: "files", cell: (r) => r.files.map(f => f.name).join(', ') },
-    { header: "Responsible User", key: "who", cell: (r) => r.details?.who || r.user },
-    { header: "Activity Type", key: "what", cell: (r) => r.details?.what || "—" },
-    { header: "Site", key: "where", cell: (r) => r.details?.where || "—" },
-    { header: "Operational Timing", key: "when", cell: (r) => r.details?.when || "—" },
-    { header: "Purpose", key: "why", cell: (r) => r.details?.why || "—" },
-    { header: "Description", key: "description", cell: (r) => r.details?.description || "—" },
-    {
-      header: "Action",
-      key: "act",
-      cell: (r) => {
-        const file = r.files[0];
-        const documentId = file?.document_id;
-        const projectId = project?.project_id || project?.id;
-        
-        return (
-          <div className="flex gap-2">
-            {documentId && projectId ? (
-              <>
-                <Button 
-                  variant="secondary" 
-                  onClick={async () => {
-                    try {
-                      const preview = await api.getDocumentPreview(projectId, documentId);
-                      setBkPreview({ 
-                        name: file.name || "config.txt", 
-                        content: preview.preview_data || "(Preview not available)" 
-                      });
-                    } catch (err) {
-                      console.error('Failed to load preview:', err);
-                      alert('Failed to load preview');
-                    }
-                  }}
-                >
-                  Preview
-                </Button>
-                <Button 
-                  variant="secondary" 
-                  onClick={async () => {
-                    try {
-                      await api.downloadDocument(projectId, documentId);
-                    } catch (err) {
-                      console.error('Failed to download:', err);
-                      alert('Failed to download file');
-                    }
-                  }}
-                >
-                  ⬇ Download
-                </Button>
-              </>
-            ) : (
-              <span className="text-sm text-gray-400">No file available</span>
-            )}
-          </div>
-        );
-      },
-    },
-  ];
-
   return (
-    <div className="grid gap-6">
-      {/* Header + Tabs */}
-      <div className="flex items-center justify-between">
-        <div>
-          <h2 className="text-xl font-semibold">More Details — {facts.device}</h2>
-          <div className="text-sm text-gray-500 dark:text-gray-400">
+    <div className="h-full flex flex-col gap-0 overflow-hidden min-h-0">
+      {/* Header + Tabs: single row, compact */}
+      <div className="flex-shrink-0 flex items-center justify-between gap-2 py-0.5 px-2 flex-wrap">
+        <div className="flex items-center gap-2 flex-wrap min-w-0">
+          <h2 className="text-xs font-semibold text-slate-300 flex items-center gap-1.5 whitespace-nowrap">
+            <span className="w-0.5 h-3 bg-blue-500/70 rounded-full"></span>
+            More Details — {facts.device}
+          </h2>
+          <span className="text-[10px] text-slate-500 dark:text-slate-400 whitespace-nowrap">
             From config/show parsing • Mgmt IP: {facts.mgmtIp || "—"}
-          </div>
+          </span>
+          {!loading && !error && (
+            <div className="flex gap-1 flex-wrap">
+              {[
+                { id: "overview", label: "Overview" },
+                { id: "interfaces", label: "Interfaces" },
+                { id: "vlans", label: "VLANs" },
+                { id: "stp", label: "STP" },
+                { id: "routing", label: "Routing" },
+                { id: "neighbors", label: "Neighbors" },
+                { id: "macarp", label: "MAC/ARP" },
+                { id: "security", label: "Security" },
+                { id: "ha", label: "HA" },
+                { id: "raw", label: "Raw" }
+              ].map((t) => (
+                <button
+                  key={t.id}
+                  onClick={() => setTab(t.id)}
+                  className={`px-2 py-1 rounded-md text-[10px] font-medium ${
+                    tab === t.id
+                      ? "bg-blue-600 text-white"
+                      : "bg-slate-800 border border-slate-700 text-slate-400 hover:bg-slate-700 hover:text-slate-300"
+                  }`}
+                >
+                  {t.label}
+                </button>
+              ))}
+            </div>
+          )}
         </div>
-        <Button variant="secondary" onClick={goBack}>← Back to Summary</Button>
+        <Button variant="secondary" onClick={goBack} className="text-[10px] py-1 px-2 h-6 flex-shrink-0">← Back to Summary</Button>
       </div>
 
       {loading && (
-        <div className="text-center py-8 text-gray-500 dark:text-gray-400">
+        <div className="flex-1 flex items-center justify-center text-slate-400 text-xs py-8">
           Loading device details...
         </div>
       )}
 
       {error && (
-        <div className="rounded-xl border border-rose-300 dark:border-rose-700 bg-rose-50 dark:bg-rose-900/20 p-4 text-sm text-rose-700 dark:text-rose-400">
+        <div className="rounded-xl border border-rose-300 dark:border-rose-700 bg-rose-50 dark:bg-rose-900/20 p-4 text-xs text-rose-700 dark:text-rose-400">
           Error: {safeDisplay(error)}
         </div>
       )}
 
-      {!loading && !error && (
-        <>
-          <div className="flex gap-2 flex-wrap">
-            {[
-              { id: "overview", label: "Overview" },
-              { id: "interfaces", label: "Interfaces" },
-              { id: "vlans", label: "VLANs" },
-              { id: "stp", label: "STP" },
-              { id: "routing", label: "Routing" },
-              { id: "neighbors", label: "Neighbors" },
-              { id: "macarp", label: "MAC/ARP" },
-              { id: "security", label: "Security" },
-              { id: "ha", label: "HA" },
-              { id: "raw", label: "Raw" }
-            ].map((t) => (
-              <button
-                key={t.id}
-                onClick={() => setTab(t.id)}
-                className={`px-4 py-2 rounded-xl text-sm font-semibold ${
-                  tab === t.id
-                    ? "bg-blue-600 text-white"
-                    : "bg-gray-100 dark:bg-gray-800 hover:bg-gray-200 dark:hover:bg-gray-700"
-                }`}
-              >
-                {t.label}
-              </button>
-            ))}
-          </div>
-        </>
-      )}
-
       {/* OVERVIEW */}
       {!loading && !error && tab === "overview" && (
-        <div className="grid gap-6">
-          {/* Device Image Upload */}
-          <Card title="Device Image">
-            <DeviceImageUpload 
-              project={project}
-              deviceName={deviceId}
-              authedUser={authedUser}
-              setProjects={setProjects}
-            />
-          </Card>
-          
-          <Card title="Device Facts">
-            <div className="grid gap-4 md:grid-cols-3 text-sm">
-              <Metric k="Model" v={facts.model || "—"} />
-              <Metric k="OS / Version" v={facts.osVersion || "—"} />
-              <Metric k="Serial" v={facts.serial || "—"} />
-              <Metric k="Mgmt IP" v={facts.mgmtIp || "—"} />
-              <Metric k="Role" v={facts.role || "—"} />
-              <Metric k="Uptime" v={facts.uptime || "—"} />
-              <Metric k="VLAN Count" v={facts.vlanCount ?? "—"} />
-              <Metric k="Allowed VLANs (short)" v={facts.allowedVlansShort || "—"} />
-              <Metric k="STP Mode" v={facts.stpMode || "—"} />
-              <Metric k="STP Root" v={facts.stpRoot || "—"} />
-              <Metric k="SVIs" v={facts.sviCount ?? "—"} />
-              <Metric k="HSRP Groups" v={facts.hsrpGroups ?? "—"} />
-              <Metric k="Routing" v={facts.routing || "—"} />
-              <Metric k="OSPF Neighbors" v={facts.ospfNeighbors ?? "—"} />
-              <Metric k="BGP ASN" v={facts.bgpAsn ?? "—"} />
-              <Metric k="BGP Neighbors" v={facts.bgpNeighbors ?? "—"} />
-              <Metric k="CDP / LLDP" v={`${facts.cdpNeighbors ?? "—"} / ${facts.lldpNeighbors ?? "—"}`} />
-              <Metric k="NTP" v={facts.ntpStatus || "—"} />
-              <Metric k="SNMP" v={facts.snmp || "—"} />
-              <Metric k="Syslog" v={facts.syslog || "—"} />
-              <Metric k="CPU %" v={facts.cpu != null && facts.cpu !== "—" ? `${facts.cpu}%` : "—"} />
-              <Metric k="Memory %" v={facts.mem != null && facts.mem !== "—" ? `${facts.mem}%` : "—"} />
-              <Metric k="Hostname" v={overview.hostname || "—"} />
-              <Metric k="Management IP" v={overview.management_ip || overview.mgmt_ip || "—"} />
-              {overview.device_status && Object.keys(overview.device_status).length > 0 && (
-                <>
-                  <Metric k="Device Slot" v={overview.device_status.slot || "—"} />
-                  <Metric k="Device Type" v={overview.device_status.type || "—"} />
-                  <Metric k="Device Status" v={overview.device_status.status || "—"} />
-                  <Metric k="Device Role" v={overview.device_status.role || "—"} />
-                </>
-              )}
-              <Metric
-                k="Ifaces (T/U/D/A)"
-                v={
-                  facts.ifaces
-                    ? `${facts.ifaces.total} / ${facts.ifaces.up} / ${facts.ifaces.down} / ${facts.ifaces.adminDown}`
-                    : "—"
-                }
-              />
-              <Metric k="Ports (Access/Trunk)" v={`${facts.accessCount ?? "—"}/${facts.trunkCount ?? "—"}`} />
+        <div className="flex-1 min-h-0 grid grid-cols-12 gap-3 overflow-hidden">
+          {/* Left: Topo zone — Device Image (like Summary topology area) */}
+          <div className="col-span-6 min-h-0 overflow-hidden rounded-xl border border-slate-800 bg-slate-900/50 flex flex-col">
+            <Card title="Device Image" className="flex-1 min-h-0 flex flex-col overflow-hidden">
+              <div className="flex-1 min-h-0 overflow-auto">
+                <DeviceImageUpload 
+                  project={project}
+                  deviceName={deviceId}
+                  authedUser={authedUser}
+                  setProjects={setProjects}
+                />
+              </div>
+            </Card>
+          </div>
+
+          {/* Right: Device Facts (summary table zone) + LLM section */}
+          <div className="col-span-6 min-h-0 flex flex-col gap-3 overflow-hidden">
+            {/* Device Facts — summary table zone */}
+            <div className="flex-shrink-0 rounded-xl border border-slate-800 bg-slate-900/50 overflow-hidden">
+              <Card title="Device Facts">
+                <div className="grid gap-2 grid-cols-3 text-[10px] max-h-[200px] overflow-auto">
+                  <Metric k="Model" v={facts.model || "—"} />
+                  <Metric k="OS / Version" v={facts.osVersion || "—"} />
+                  <Metric k="Serial" v={facts.serial || "—"} />
+                  <Metric k="Mgmt IP" v={facts.mgmtIp || "—"} />
+                  <Metric k="Role" v={facts.role || "—"} />
+                  <Metric k="Uptime" v={facts.uptime || "—"} />
+                  <Metric k="VLAN Count" v={facts.vlanCount ?? "—"} />
+                  <Metric k="Allowed VLANs (short)" v={facts.allowedVlansShort || "—"} />
+                  <Metric k="STP Mode" v={facts.stpMode || "—"} />
+                  <Metric k="STP Root" v={facts.stpRoot || "—"} />
+                  <Metric k="SVIs" v={facts.sviCount ?? "—"} />
+                  <Metric k="HSRP Groups" v={facts.hsrpGroups ?? "—"} />
+                  <Metric k="Routing" v={facts.routing || "—"} />
+                  <Metric k="OSPF Neighbors" v={facts.ospfNeighbors ?? "—"} />
+                  <Metric k="BGP ASN" v={facts.bgpAsn ?? "—"} />
+                  <Metric k="BGP Neighbors" v={facts.bgpNeighbors ?? "—"} />
+                  <Metric k="CDP / LLDP" v={`${facts.cdpNeighbors ?? "—"} / ${facts.lldpNeighbors ?? "—"}`} />
+                  <Metric k="NTP" v={facts.ntpStatus || "—"} />
+                  <Metric k="SNMP" v={facts.snmp || "—"} />
+                  <Metric k="Syslog" v={facts.syslog || "—"} />
+                  <Metric k="CPU %" v={facts.cpu != null && facts.cpu !== "—" ? `${facts.cpu}%` : "—"} />
+                  <Metric k="Memory %" v={facts.mem != null && facts.mem !== "—" ? `${facts.mem}%` : "—"} />
+                  <Metric k="Hostname" v={overview.hostname || "—"} />
+                  <Metric k="Management IP" v={overview.management_ip || overview.mgmt_ip || "—"} />
+                  {overview.device_status && Object.keys(overview.device_status).length > 0 && (
+                    <>
+                      <Metric k="Device Slot" v={overview.device_status.slot || "—"} />
+                      <Metric k="Device Type" v={overview.device_status.type || "—"} />
+                      <Metric k="Device Status" v={overview.device_status.status || "—"} />
+                      <Metric k="Device Role" v={overview.device_status.role || "—"} />
+                    </>
+                  )}
+                  <Metric
+                    k="Ifaces (T/U/D/A)"
+                    v={
+                      facts.ifaces
+                        ? `${facts.ifaces.total} / ${facts.ifaces.up} / ${facts.ifaces.down} / ${facts.ifaces.adminDown}`
+                        : "—"
+                    }
+                  />
+                  <Metric k="Ports (Access/Trunk)" v={`${facts.accessCount ?? "—"}/${facts.trunkCount ?? "—"}`} />
+                </div>
+              </Card>
             </div>
-          </Card>
 
-                {/* AI Summary — per device */}
-                {/* AI Summary — per device (ความสัมพันธ์+STP) */}
-      <Card
-        title="AI Summary (per-device)"
-      >
-        <div className="rounded-xl border border-gray-200 dark:border-[#1F2937] p-4 bg-gray-50 dark:bg-[#0F172A]">
-          <pre className="whitespace-pre-wrap text-[13px] leading-relaxed">{safeDisplay(deviceNarrative)}</pre>
-        </div>
-      </Card>
-
-      {/* Recommendations — per device (from AI Project Analysis) */}
-      <Card
-        title="Recommendations (AI-Generated)"
-      >
-        {projectAnalysisLoading ? (
-          <div className="text-sm text-gray-500 dark:text-gray-400">Loading AI analysis...</div>
-        ) : deviceRecs.length ? (
-          <div className="space-y-2">
-            {projectGapAnalysis.map((item, idx) => (
-              <div key={idx} className="p-2 rounded border text-sm break-words" style={{
-                borderColor: item.severity === "High" ? "#ef4444" : item.severity === "Medium" ? "#eab308" : "#64748b",
-                backgroundColor: item.severity === "High" ? "rgba(239, 68, 68, 0.1)" : item.severity === "Medium" ? "rgba(234, 179, 8, 0.1)" : "rgba(100, 116, 139, 0.1)"
-              }}>
-                <div className="flex items-start gap-2 mb-1">
-                  <span className={`text-xs font-semibold px-1.5 py-0.5 rounded ${
-                    item.severity === "High" ? "bg-rose-500 text-white" : 
-                    item.severity === "Medium" ? "bg-yellow-500 text-white" : 
-                    "bg-slate-500 text-white"
-                  }`}>
-                    {item.severity?.toUpperCase() || "MEDIUM"}
-                  </span>
+            {/* LLM section: AI Summary, Recommendations, Drift (stacked) */}
+            <div className="flex-1 min-h-0 overflow-y-auto flex flex-col gap-3 rounded-xl border border-slate-800 bg-slate-900/50 p-2">
+              <Card title="AI Summary (per-device)">
+                <div className="rounded-lg border border-slate-700 p-3 bg-slate-800/50">
+                  <pre className="whitespace-pre-wrap text-[11px] leading-relaxed text-slate-300">{safeDisplay(deviceNarrative)}</pre>
                 </div>
-                {item.issue && (
-                  <div className="text-xs text-gray-700 dark:text-gray-300 mb-1">
-                    <span className="font-semibold">Issue:</span> {item.issue}
+              </Card>
+              <Card title="Recommendations (AI-Generated)">
+                {projectAnalysisLoading ? (
+                  <div className="text-xs text-slate-500">Loading AI analysis...</div>
+                ) : deviceRecs.length ? (
+                  <div className="space-y-2">
+                    {projectGapAnalysis.map((item, idx) => (
+                      <div key={idx} className="p-2 rounded border text-xs break-words" style={{
+                        borderColor: item.severity === "High" ? "#ef4444" : item.severity === "Medium" ? "#eab308" : "#64748b",
+                        backgroundColor: item.severity === "High" ? "rgba(239, 68, 68, 0.1)" : item.severity === "Medium" ? "rgba(234, 179, 8, 0.1)" : "rgba(100, 116, 139, 0.1)"
+                      }}>
+                        <div className="flex items-start gap-2 mb-1">
+                          <span className={`text-[10px] font-semibold px-1.5 py-0.5 rounded ${
+                            item.severity === "High" ? "bg-rose-500 text-white" : 
+                            item.severity === "Medium" ? "bg-yellow-500 text-white" : 
+                            "bg-slate-500 text-white"
+                          }`}>
+                            {item.severity?.toUpperCase() || "MEDIUM"}
+                          </span>
+                        </div>
+                        {item.issue && (
+                          <div className="text-[10px] text-slate-300 mb-1">
+                            <span className="font-semibold">Issue:</span> {item.issue}
+                          </div>
+                        )}
+                        {item.recommendation && (
+                          <div className="text-[10px] text-slate-200">
+                            <span className="font-semibold">Recommendation:</span> {item.recommendation}
+                          </div>
+                        )}
+                      </div>
+                    ))}
+                  </div>
+                ) : (
+                  <div className="text-xs text-slate-500">
+                    No AI-generated recommendations available. Generate project analysis from the Summary page.
                   </div>
                 )}
-                {item.recommendation && (
-                  <div className="text-xs text-gray-800 dark:text-gray-200">
-                    <span className="font-semibold">Recommendation:</span> {item.recommendation}
+              </Card>
+              <Card title="Drift & Changes (30 days)">
+                {loadingBackups ? (
+                  <div className="text-xs text-slate-400">Loading backup history...</div>
+                ) : deviceBackups.length < 2 ? (
+                  <div className="text-xs text-slate-400">Not enough backups to compare. Upload at least 2 config files for this device.</div>
+                ) : (
+                  <div className="grid gap-2">
+                    <div className="text-xs">
+                      <b>Device:</b> {safeDisplay(facts?.device)} <br />
+                      <b>Available backups:</b> {deviceBackups.length} file(s) <br />
+                      <b>Latest files:</b>{" "}
+                      <span className="text-blue-300">{safeDisplay(driftSummary?.from)}</span>{" "}
+                      <span className="mx-1">→</span>
+                      <span className="text-blue-300">{safeDisplay(driftSummary?.to)}</span>
+                    </div>
+                    <div className="text-xs text-slate-400">
+                      To view detailed diff, use the &quot;Compare Backups&quot; button below or download files to compare locally.
+                    </div>
+                    <div>
+                      <Button variant="secondary" onClick={() => setCompareOpen(true)} className="text-[10px] py-1 px-2">Compare Backups</Button>
+                    </div>
                   </div>
                 )}
-              </div>
-            ))}
+              </Card>
+            </div>
           </div>
-        ) : (
-          <div className="text-sm text-gray-500 dark:text-gray-400">
-            No AI-generated recommendations available. Generate project analysis from the Summary page.
-          </div>
-        )}
-      </Card>
-
-
-          {/* Drift & Changes (30 days) */}
-          <Card title="Drift & Changes (30 days)">
-            {loadingBackups ? (
-              <div className="text-sm text-gray-400">Loading backup history...</div>
-            ) : deviceBackups.length < 2 ? (
-              <div className="text-sm text-gray-400">Not enough backups to compare. Upload at least 2 config files for this device.</div>
-            ) : (
-              <div className="grid gap-3">
-                <div className="text-sm">
-                  <b>Device:</b> {safeDisplay(facts?.device)} <br />
-                  <b>Available backups:</b> {deviceBackups.length} file(s) <br />
-                  <b>Latest files:</b>{" "}
-                  <span className="text-blue-300">{safeDisplay(driftSummary?.from)}</span>{" "}
-                  <span className="mx-1">→</span>
-                  <span className="text-blue-300">{safeDisplay(driftSummary?.to)}</span>
-                </div>
-                <div className="text-sm text-gray-400">
-                  To view detailed diff, use the "Compare Backups" button below or download files to compare locally.
-                </div>
-                <div>
-                  <Button variant="secondary" onClick={() => setCompareOpen(true)}>Compare Backups</Button>
-                </div>
-              </div>
-            )}
-          </Card>
-
-          {/* Backup history */}
-          <Card
-            title="Backup Config History"
-            actions={
-              deviceConfigHistory.length >= 2 ? (
-                <Button variant="secondary" onClick={() => setCompareOpen(true)}>Compare Backups</Button>
-              ) : null
-            }
-          >
-            {loadingBackups ? (
-              <div className="text-sm text-gray-400">Loading backup history...</div>
-            ) : (
-              <>
-                <div className="mb-4 grid grid-cols-1 md:grid-cols-3 gap-2">
-                  <Input 
-                    placeholder="ค้นหา (ชื่อไฟล์, ผู้ใช้, คำอธิบาย...)" 
-                    value={searchBackup} 
-                    onChange={(e) => setSearchBackup(e.target.value)} 
-                  />
-                  <Select 
-                    value={filterBackupWho} 
-                    onChange={setFilterBackupWho} 
-                    options={[{value: "all", label: "ทั้งหมด (Responsible User)"}, ...uniqueBackupWhos.map(w => ({value: w, label: w}))]} 
-                  />
-                  <Select 
-                    value={filterBackupWhat} 
-                    onChange={setFilterBackupWhat} 
-                    options={[{value: "all", label: "ทั้งหมด (Activity Type)"}, ...uniqueBackupWhats.map(w => ({value: w, label: w}))]} 
-                  />
-                </div>
-                <div className="rounded-2xl border border-gray-200 dark:border-[#1F2937]">
-                  <Table
-                    columns={backupCols}
-                    data={filteredBackupHistory}
-                    empty="No config uploads for this device"
-                    minWidthClass="min-w-[1200px]"
-                  />
-                </div>
-              </>
-            )}
-          </Card>
         </div>
       )}
 
       {/* INTERFACES */}
       {!loading && !error && tab === "interfaces" && (
+        <div className="flex-1 min-h-0 overflow-auto">
         <Card
           title="Interfaces Explorer"
           actions={<div className="flex items-center gap-2"><Button variant="secondary" onClick={onExportIfaces}>Export CSV</Button></div>}
@@ -4563,6 +4057,7 @@ const DeviceDetailsView = ({ project, deviceId, goBack, uploadHistory, authedUse
             <Table columns={ifaceColumns} data={filteredIfaces} empty="No interfaces" minWidthClass="min-w-[1400px]" />
           </div>
         </Card>
+        </div>
       )}
 
       {/* VLANS */}
@@ -5288,26 +4783,6 @@ const DeviceDetailsView = ({ project, deviceId, goBack, uploadHistory, authedUse
         </div>
       )}
 
-      {/* Modal preview (จากตาราง) */}
-      {bkPreview && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
-          <div className="absolute inset-0 bg-black/50" onClick={() => setBkPreview(null)} />
-          <div className="relative z-10 w-full max-w-3xl">
-            <Card
-              title={`Preview — ${bkPreview.name}`}
-              actions={
-                <div className="flex gap-2">
-                  <Button variant="secondary" onClick={() => setBkPreview(null)}>Close</Button>
-                </div>
-              }
-            >
-              <div className="rounded-xl border border-gray-200 dark:border-[#1F2937] p-3 bg-gray-50 dark:bg-[#0F172A] text-sm overflow-auto max-h-[70vh]">
-                <pre className="whitespace-pre-wrap text-[13px] leading-relaxed">{bkPreview.content}</pre>
-              </div>
-            </Card>
-          </div>
-        </div>
-      )}
     </div>
   );
 };
@@ -9352,7 +8827,7 @@ const LogsPage = ({ project, uploadHistory }) => {
                     const file = r.uploadRecord.files[0];
                     if (!file) return;
                     const blob = new Blob(
-                      [file.content || `# ${r.uploadRecord.type === 'config' ? 'Configuration' : 'Document'} Backup\n# File: ${file.name}\n# Uploaded: ${r.time}\n# User: ${r.who}\n\n(mock file content - actual file would be here)`],
+                      [file.content || `# ${r.uploadRecord.type === 'config' ? 'Configuration' : 'Document'} Backup\n# File: ${file.name}\n# Uploaded: ${r.time}\n# User: ${r.who}\n\nContent not available. Download from Documents if needed.`],
                       { type: file.type || (r.uploadRecord.type === 'config' ? "text/plain;charset=utf-8" : "application/octet-stream") }
                     );
                     const url = URL.createObjectURL(blob);
@@ -9398,36 +8873,18 @@ function downloadCSV(csv, filename) {
   a.remove();
   URL.revokeObjectURL(url);
 }
-/* ===== MOCK helpers for Overview Drift (UI only) ===== */
+/* ===== Helpers for Overview Drift (UI only) ===== */
 function getComparePair(project, device) {
-  // UI-only: เลือก 2 ไฟล์ล่าสุด (ถ้าไม่มี ใช้ชื่อ mock)
   const hits = (project.documents?.config || [])
     .filter(f => f.name.toLowerCase().includes(device.replace(/-/g, "_")))
     .sort((a,b)=> (b.modified||"").localeCompare(a.modified||""));
 
   if (hits.length >= 2) return [hits[1].name, hits[0].name]; // เก่ากว่า -> ใหม่กว่า
-  // fallback mock
-  return ["backup-2025-09-05.txt", "backup-2025-10-01.txt"];
+  return ["—", "—"];
 }
 
 function getDriftLines(device) {
-  // UI-only: สร้างตัวอย่าง diff ต่ออุปกรณ์
-  const preset = {
-    "core-sw1": [
-      "+ Added VLAN 30 on dist-sw2",
-      "~ Gi1/0/24: access → trunk",
-      "− Removed logging host 10.10.1.10",
-    ],
-    "dist-sw2": [
-      "+ Enabled port-security on Gi1/0/5",
-      "− Removed VLAN 40",
-      "~ NTP server 10.10.1.10 → 10.10.1.11",
-    ],
-    "access-sw3": [
-      "~ Updated description on Gi1/0/7",
-    ],
-  };
-  return preset[device] || ["No config changes detected"];
+  return ["No config changes detected"];
 }
 /* ===== Topology helpers & Graph (no extra libs) ===== */
 
@@ -9521,11 +8978,7 @@ const TopoGraph = ({ nodes = [], links = [], getNodeTooltip, onNodeClick }) => {
 
 
 
-/** Simple rule-based edges for mock:
- * - connect core ↔ distribution
- * - connect core ↔ access
- * - if any interface description contains 'Uplink to core' -> connect to core
- */
+/** Rule-based fallback edges from summary (core/dist/access). */
 
 
 /* ===== Device Image Upload Component ===== */
