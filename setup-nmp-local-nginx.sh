@@ -1,11 +1,18 @@
 #!/bin/bash
 # Setup nginx on host for nmp.local domain
-# Run this script with sudo
+# Run: sudo ./setup-nmp-local-nginx.sh
 
+set -e
 DOMAIN="nmp.local"
 NGINX_CONFIG="/etc/nginx/sites-available/mnp"
 
 echo "Setting up nginx for domain: $DOMAIN"
+
+# ติดตั้ง nginx ถ้ายังไม่มี
+if ! command -v nginx >/dev/null 2>&1; then
+    echo "Installing nginx..."
+    apt-get update && apt-get install -y nginx
+fi
 
 # Create nginx config
 sudo tee "$NGINX_CONFIG" > /dev/null <<EOF
@@ -27,9 +34,9 @@ server {
     add_header X-Content-Type-Options "nosniff" always;
     add_header X-XSS-Protection "1; mode=block" always;
     
-    # API proxy - proxy all API endpoints to backend
-    location ~ ^/(auth|users|projects|ai|docs|openapi\.json|folders|summary|project-options) {
-        proxy_pass http://127.0.0.1:8000;
+    # API proxy - proxy all API endpoints to backend (backend ใช้ port 8001 บน host)
+    location ~ ^/(auth|users|projects|ai|docs|openapi\.json|folders|summary|project-options|topology|analysis) {
+        proxy_pass http://127.0.0.1:8001;
         proxy_http_version 1.1;
         proxy_set_header Upgrade \$http_upgrade;
         proxy_set_header Connection 'upgrade';

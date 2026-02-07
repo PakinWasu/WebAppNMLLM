@@ -74,30 +74,29 @@ SYSTEM_PROMPT_FULL_PROJECT_ANALYSIS = """You are a Network Solution Architect. A
 - Each gap_analysis item must include severity, device, issue, and recommendation fields."""
 
 # Project-Level Analysis System Prompt - Recommendations (Scope 2.3.5.2)
-SYSTEM_PROMPT_PROJECT_RECOMMENDATIONS = """You are a Network Solution Architect. Review the configuration summaries of these devices collectively.
+# Network-wide: gaps, missing configs, what to add; may mention devices but NOT per-device list.
+SYSTEM_PROMPT_PROJECT_RECOMMENDATIONS = """You are a Network Solution Architect. Review the configuration summaries of ALL devices in this project as ONE network.
 
-**Task: Gap & Integrity Analysis (Scope 2.3.5.2)**
-- Identify MISSING configurations, security issues, and configuration inconsistencies that prevent a complete/safe topology.
-- Detect patterns of error and potential problems (e.g., 'Switch A defines VLAN 10, but the Core Switch does not have VLAN 10 created', 'STP is disabled globally - risk of Loops', 'Missing NTP configuration on device X', 'Weak password policy detected').
-- Provide SPECIFIC, ACTIONABLE recommendations with clear explanation of:
-  1. What the issue is (problem description)
-  2. Why it matters (impact/risk)
-  3. How to fix it (specific configuration steps or actions)
-- **Constraint:** Each recommendation must be detailed and actionable. Be specific (mention device names). Format each message as: "Issue: [description]. Impact: [why it matters]. Fix: [specific steps]"
+**Task: Network-wide gap and improvement analysis (Scope 2.3.5.2)**
+- Think at NETWORK level: what is missing across the project? What should be added or fixed for the whole network?
+- Identify: missing or inconsistent configurations (e.g. VLAN not defined on core but used on access), security gaps (e.g. no NTP, weak auth), redundancy or best-practice gaps (e.g. no HSRP, STP disabled).
+- You MAY mention specific device names when relevant (e.g. "Core-SW has no VLAN 10") but do NOT produce one recommendation per device. Output a short list of network-wide issues and what to do.
+- For each item give: (1) clear issue description, (2) concrete recommendation (what to add or change). Be concise but actionable.
 
 **Output Format:** Return ONLY valid JSON:
 {
   "recommendations": [
     {
       "severity": "high|medium|low",
-      "message": "string (detailed recommendation with issue description, impact, and fix steps)",
-      "device": "string (device name or 'all' if global)"
+      "issue": "Short description of the gap or problem (network-wide or which device).",
+      "recommendation": "What to add or do (specific, actionable).",
+      "device": "device name if relevant, or \"all\" for network-wide"
     }
   ]
 }
 
-**CRITICAL:** 
-- Each message must be comprehensive and include problem description, impact, and fix steps.
+**CRITICAL:**
+- You MUST fill both "issue" and "recommendation" for every item. Never leave them empty.
 - Output ONLY JSON, no markdown, no code blocks. Parseable directly as JSON object."""
 
 
@@ -106,8 +105,8 @@ class LLMService:
 
     def __init__(self):
         # Environment configuration — remote Ollama on Windows
-        self.base_url = os.getenv("OLLAMA_BASE_URL", "http://10.4.15.152:11434").rstrip("/")
-        self.model_name = os.getenv("OLLAMA_MODEL", "deepseek-coder-v2:16b")
+        self.base_url = os.getenv("OLLAMA_BASE_URL", "http://10.4.15.52:11434").rstrip("/")
+        self.model_name = os.getenv("OLLAMA_MODEL", "qwen2.5:7b")
         self.timeout_seconds = int(os.getenv("OLLAMA_TIMEOUT", "300"))  # 5 minutes for 16B model
 
     def _filter_relevant_data(self, parsed_data: Dict[str, Any], analysis_type: str) -> Dict[str, Any]:
@@ -204,7 +203,7 @@ class LLMService:
             "options": {
                 "temperature": 0.3,
                 "top_p": 0.85,
-                "num_predict": 2048,
+                "num_predict": 1024,  # Reduced from 2048 to prevent timeout
             },
         }
 
@@ -261,35 +260,61 @@ class LLMService:
                 inference_time_ms,
             )
     
+    # Limits to keep prompt size and inference time manageable
+    MAX_DEVICES_AGGREGATED = 20
+    MAX_INTERFACES_PER_DEVICE = 12
+    MAX_NEIGHBORS_PER_DEVICE = 6
+    MAX_AGGREGATED_JSON_CHARS = 45000  # truncate if larger to avoid token overflow
+
     def _prepare_aggregated_data(self, devices_data: List[Dict[str, Any]], project_id: str) -> Dict[str, Any]:
-        """Helper method to prepare aggregated device data."""
+        """Prepare aggregated device data with size limits for stable LLM inference."""
+        devices_data = devices_data[: self.MAX_DEVICES_AGGREGATED]
         aggregated_data = {
             "project_id": project_id,
             "total_devices": len(devices_data),
-            "devices": []
+            "devices": [],
         }
-        
+
         for device in devices_data:
             try:
                 device_name = device.get("device_name")
                 if not device_name:
                     continue
-                
-                # Extract key configuration data for each device
+                interfaces = device.get("interfaces")
+                if isinstance(interfaces, list):
+                    interfaces = interfaces[: self.MAX_INTERFACES_PER_DEVICE]
+                else:
+                    interfaces = []
+                neighbors = device.get("neighbors")
+                if isinstance(neighbors, list):
+                    neighbors = neighbors[: self.MAX_NEIGHBORS_PER_DEVICE]
+                else:
+                    neighbors = []
+                vlans = device.get("vlans", {})
+                stp = device.get("stp", {})
+                routing = device.get("routing", {})
+                # Keep vlans/stp/routing compact: top-level keys only or first N entries if dict/list
+                if isinstance(vlans, dict) and len(vlans) > 15:
+                    vlans = dict(list(vlans.items())[:15])
+                if isinstance(stp, dict) and len(stp) > 10:
+                    stp = dict(list(stp.items())[:10])
+                if isinstance(routing, dict) and len(routing) > 10:
+                    routing = dict(list(routing.items())[:10])
+
                 device_summary = {
                     "device_name": device_name,
                     "device_overview": device.get("device_overview", {}),
-                    "interfaces": device.get("interfaces", [])[:20] if isinstance(device.get("interfaces"), list) else [],
-                    "vlans": device.get("vlans", {}),
-                    "stp": device.get("stp", {}),
-                    "routing": device.get("routing", {}),
-                    "neighbors": device.get("neighbors", [])[:10] if isinstance(device.get("neighbors"), list) else [],
+                    "interfaces": interfaces,
+                    "vlans": vlans,
+                    "stp": stp,
+                    "routing": routing,
+                    "neighbors": neighbors,
                 }
                 aggregated_data["devices"].append(device_summary)
             except Exception as e:
-                logger.warning(f"Error preparing device data for {device.get('device_name', 'unknown')}: {e}")
+                logger.warning("Error preparing device data for %s: %s", device.get("device_name", "unknown"), e)
                 continue
-        
+
         return aggregated_data
 
     async def analyze_project_overview(
@@ -315,18 +340,21 @@ class LLMService:
                 details=str(e),
             )
         
-        # Build user prompt
+        # Build user prompt (truncate if too large to avoid token overflow)
         try:
             aggregated_json = json.dumps(aggregated_data, separators=(",", ":"), ensure_ascii=False, indent=2, default=str)
+            if len(aggregated_json) > self.MAX_AGGREGATED_JSON_CHARS:
+                aggregated_json = aggregated_json[: self.MAX_AGGREGATED_JSON_CHARS] + "\n\n[Truncated for length.]"
+                logger.info("project_overview aggregated JSON truncated to %d chars", self.MAX_AGGREGATED_JSON_CHARS)
         except (TypeError, ValueError) as e:
-            logger.exception(f"Error serializing aggregated data to JSON for project {project_id}: {e}")
+            logger.exception("Error serializing aggregated data to JSON for project %s: %s", project_id, e)
             return self._error_result(
                 f"[ERROR] Failed to serialize device data to JSON: {str(e)}",
                 "json_serialization_failed",
                 0,
                 details=str(e),
             )
-        
+
         user_prompt = f"""Analyze the following network project with {len(devices_data)} devices.
 
 === AGGREGATED DEVICE CONFIGURATIONS ===
@@ -482,27 +510,28 @@ Return ONLY valid JSON with 'overview_text' key as specified in system prompt.""
                 details=str(e),
             )
         
-        # Build user prompt
+        # Build user prompt (truncate if too large)
         try:
             aggregated_json = json.dumps(aggregated_data, separators=(",", ":"), ensure_ascii=False, indent=2, default=str)
+            if len(aggregated_json) > self.MAX_AGGREGATED_JSON_CHARS:
+                aggregated_json = aggregated_json[: self.MAX_AGGREGATED_JSON_CHARS] + "\n\n[Truncated for length.]"
+                logger.info("project_recommendations aggregated JSON truncated to %d chars", self.MAX_AGGREGATED_JSON_CHARS)
         except (TypeError, ValueError) as e:
-            logger.exception(f"Error serializing aggregated data to JSON for project {project_id}: {e}")
+            logger.exception("Error serializing aggregated data to JSON for project %s: %s", project_id, e)
             return self._error_result(
                 f"[ERROR] Failed to serialize device data to JSON: {str(e)}",
                 "json_serialization_failed",
                 0,
                 details=str(e),
             )
-        
-        user_prompt = f"""Analyze the following network project with {len(devices_data)} devices.
+
+        user_prompt = f"""Analyze the following network project with {len(devices_data)} devices as ONE network.
 
 === AGGREGATED DEVICE CONFIGURATIONS ===
 {aggregated_json}
 
 === ANALYSIS REQUEST ===
-Perform Gap & Integrity Analysis: Identify missing configurations, errors, and suggest specific actionable fixes.
-
-Return ONLY valid JSON with 'recommendations' key as specified in system prompt."""
+Give a NETWORK-WIDE gap and improvement list: what is missing or should be added across the project (e.g. missing VLANs on core, no NTP, weak security). You may mention specific devices when relevant but do NOT list one item per device. For each item provide "issue" (what is wrong or missing) and "recommendation" (what to do). Return ONLY valid JSON with "recommendations" array; each item must have "severity", "issue", "recommendation", and "device" (or "all")."""
 
         url = f"{self.base_url}/api/chat"
         payload = {
@@ -515,7 +544,7 @@ Return ONLY valid JSON with 'recommendations' key as specified in system prompt.
             "options": {
                 "temperature": 0.3,
                 "top_p": 0.85,
-                "num_predict": 2048,
+                "num_predict": 1024,  # Reduced from 2048 to prevent timeout
             },
         }
 
@@ -684,7 +713,7 @@ Return ONLY valid JSON with 'network_overview' and 'gap_analysis' keys as specif
             "options": {
                 "temperature": 0.3,
                 "top_p": 0.85,
-                "num_predict": 3072,
+                "num_predict": 1536,  # Reduced from 3072 to prevent timeout
             },
         }
 

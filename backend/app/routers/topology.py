@@ -99,6 +99,8 @@ async def get_topology(
                 "node_roles": project.get("topoNodeRoles", {})
             },
             "llm_metrics": llm_result.get("metrics"),
+            "generated_at": llm_result.get("generated_at"),
+            "llm_metrics": llm_result.get("metrics"),
             "llm_summary": llm_result.get("analysis_summary"),
             "llm_used": llm_result.get("llm_used", False),
             "generated_at": llm_result.get("generated_at"),

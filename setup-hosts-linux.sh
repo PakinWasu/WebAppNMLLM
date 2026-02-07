@@ -3,8 +3,8 @@
 # Usage: ./setup-hosts-linux.sh [server-ip]
 # Example: ./setup-hosts-linux.sh 10.4.15.53
 
-SERVER_IP=${1:-"10.4.15.53"}
-DOMAIN="mnp.local"
+SERVER_IP=${1:-"127.0.0.1"}
+DOMAIN="nmp.local"
 HOSTS_FILE="/etc/hosts"
 
 echo "========================================"

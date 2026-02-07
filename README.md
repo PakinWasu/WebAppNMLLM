@@ -19,6 +19,8 @@ cd /path/to/WebAppNMLLM
 
 จากนั้นเปิดเบราว์เซอร์ที่ **http://localhost:8080** → Login: **admin** / **admin123**
 
+**ใช้ชื่อ nmp.local (Nginx port 80 + DNS):** รัน `./start-nmp-local.sh` แล้วตามด้วย `sudo ./setup-nmp-local-nginx.sh` และ `sudo ./setup-hosts-linux.sh 127.0.0.1` → เปิด **http://nmp.local** — รายละเอียด: **[NMP_LOCAL_SETUP.md](NMP_LOCAL_SETUP.md)**
+
 **⚠️ อัปเดตอะไรก็ตาม (โค้ด, .env, LLM config) ให้ restart Docker เสมอ:**  
 `./update-and-restart.sh` หรือ `./update-and-restart.sh --pull`
 

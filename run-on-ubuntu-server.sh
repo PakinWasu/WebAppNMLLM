@@ -28,6 +28,7 @@ if [ ! -f backend/.env ]; then
     cp backend/.env.example backend/.env
     JWT_SECRET=$(openssl rand -hex 32 2>/dev/null || echo "change-me-$(date +%s)")
     sed -i "s/your-very-secure-random-secret-key-minimum-32-characters/$JWT_SECRET/" backend/.env
+    # OLLAMA_BASE_URL ใช้ค่าจาก .env.example (เช่น http://10.4.15.152:11434) — แก้ใน backend/.env ได้ถ้าต้องการใช้ Ollama ใน Docker เป็น http://ollama:11434
     echo -e "${GREEN}✓ สร้าง backend/.env แล้ว${NC}"
 fi
 mkdir -p storage mongo-data mongo-backup backups

@@ -5,7 +5,7 @@ services:
       dockerfile: Dockerfile
     container_name: mnp-backend-prod
     ports:
-      - "8000:8000"
+      - "8001:8000"   # 8001 บน host (ถ้า 8000 ถูกใช้แล้ว)
     env_file:
       - ./backend/.env
     volumes:

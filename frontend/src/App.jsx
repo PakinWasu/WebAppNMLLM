@@ -3,6 +3,117 @@ import React, { useMemo, useState, useEffect, useRef } from "react";
 import * as api from "./api";
 import MainLayout from "./components/layout/MainLayout";
 
+// Global polling service for LLM results (works across page navigation)
+// Store in window object to persist across component unmounts
+if (!window.llmPollingService) {
+  window.llmPollingService = {
+    intervals: new Map(),
+    callbacks: new Map(),
+    
+    startPolling(key, projectId, endpoint, onUpdate, onError) {
+      // Stop existing polling for this key
+      this.stopPolling(key);
+      
+      let pollCount = 0;
+      const maxPolls = 120; // 10 minutes max
+      let lastGeneratedAt = null;
+      let lastCheckedAt = Date.now();
+      
+      const checkForUpdates = async () => {
+        pollCount++;
+        if (pollCount > maxPolls) {
+          this.stopPolling(key);
+          if (onError) onError("Analysis timeout. Please try again.");
+          return;
+        }
+        
+        try {
+          const result = await endpoint(projectId);
+          const currentGeneratedAt = result.generated_at;
+          
+          // Check if we got a new result (compare generated_at)
+          if (currentGeneratedAt && (!lastGeneratedAt || currentGeneratedAt !== lastGeneratedAt)) {
+            this.stopPolling(key);
+            if (onUpdate) onUpdate(result);
+            return;
+          }
+          
+          // For recommendations, check if recommendations array exists
+          if (result.recommendations && Array.isArray(result.recommendations)) {
+            // If we have recommendations and generated_at, it's a new result
+            if (currentGeneratedAt && (!lastGeneratedAt || currentGeneratedAt !== lastGeneratedAt)) {
+              this.stopPolling(key);
+              if (onUpdate) onUpdate(result);
+              return;
+            }
+            // If we have recommendations (even empty array) and generated_at exists, it's complete
+            if (currentGeneratedAt && !lastGeneratedAt) {
+              this.stopPolling(key);
+              if (onUpdate) onUpdate(result);
+              return;
+            }
+          }
+          
+          // For topology, check if topology data exists
+          if (result.topology && (result.topology.nodes?.length > 0 || result.topology.edges?.length > 0)) {
+            if (currentGeneratedAt && (!lastGeneratedAt || currentGeneratedAt !== lastGeneratedAt)) {
+              this.stopPolling(key);
+              if (onUpdate) onUpdate(result);
+              return;
+            }
+          }
+          
+          // For overview, check if overview_text exists
+          if (result.overview_text && currentGeneratedAt && (!lastGeneratedAt || currentGeneratedAt !== lastGeneratedAt)) {
+            this.stopPolling(key);
+            if (onUpdate) onUpdate(result);
+            return;
+          }
+          
+          if (currentGeneratedAt) {
+            lastGeneratedAt = currentGeneratedAt;
+          }
+          lastCheckedAt = Date.now();
+        } catch (err) {
+          // Ignore 404 during polling (still generating)
+          if (err.message && !err.message.includes("404")) {
+            console.warn(`Polling error for ${key}:`, err);
+          }
+        }
+      };
+      
+      // Start polling immediately, then every 5 seconds
+      checkForUpdates();
+      const interval = setInterval(checkForUpdates, 5000);
+      this.intervals.set(key, interval);
+      this.callbacks.set(key, { onUpdate, onError, projectId, endpoint });
+    },
+    
+    stopPolling(key) {
+      const interval = this.intervals.get(key);
+      if (interval) {
+        clearInterval(interval);
+        this.intervals.delete(key);
+        this.callbacks.delete(key);
+      }
+    },
+    
+    isPolling(key) {
+      return this.intervals.has(key);
+    },
+    
+    resumePolling(key, onUpdate, onError) {
+      // Resume polling with new callbacks (when component remounts)
+      const callback = this.callbacks.get(key);
+      if (callback) {
+        this.callbacks.set(key, { ...callback, onUpdate, onError });
+      }
+    }
+  };
+}
+
+const globalPollingService = window.llmPollingService;
+
 // Utility function to format date/time in local timezone (English)
 const formatDateTime = (dateString) => {
   if (!dateString) return "—";
@@ -90,6 +201,133 @@ const Button = ({
     </button>
   );
 };
+/* ========= Notification/Popup Component ========= */
+const NotificationModal = ({ show, onClose, title, message, metrics, type = "success", onRegenerate }) => {
+  if (!show) return null;
+
+  const handleRegenerate = () => {
+    if (onRegenerate) onRegenerate();
+    onClose();
+  };
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+      <div className="absolute inset-0 bg-black/50" onClick={onClose} />
+      <div className="relative bg-white dark:bg-gray-800 rounded-xl shadow-xl max-w-md w-full p-6 border border-gray-200 dark:border-gray-700">
+        <div className="flex items-start justify-between mb-4">
+          <h3 className={`text-lg font-semibold ${
+            type === "success" ? "text-green-600 dark:text-green-400" :
+            type === "error" ? "text-red-600 dark:text-red-400" :
+            "text-blue-600 dark:text-blue-400"
+          }`}>
+            {title}
+          </h3>
+          <button
+            onClick={onClose}
+            className="text-gray-400 hover:text-gray-600 dark:hover:text-gray-300"
+          >
+            <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+            </svg>
+          </button>
+        </div>
+
+        <div className="text-sm text-gray-700 dark:text-gray-300 mb-4">
+          {message}
+        </div>
+
+        {metrics && (
+          <div className="bg-gray-50 dark:bg-gray-900 rounded-lg p-3 mb-4 text-xs">
+            <div className="font-semibold text-gray-700 dark:text-gray-300 mb-2">Generation Metrics:</div>
+            <div className="space-y-1 text-gray-600 dark:text-gray-400">
+              {metrics.inference_time_ms !== undefined && (
+                <div>⏱️ Time: {(metrics.inference_time_ms / 1000).toFixed(1)}s</div>
+              )}
+              {metrics.token_usage && (
+                <div>
+                  📊 Tokens: {metrics.token_usage.total_tokens ||
+                    ((metrics.token_usage.prompt_tokens || 0) + (metrics.token_usage.completion_tokens || 0)) || 0}
+                  {metrics.token_usage.prompt_tokens !== undefined && (
+                    ` (Prompt: ${metrics.token_usage.prompt_tokens}, Completion: ${metrics.token_usage.completion_tokens || 0})`
+                  )}
+                </div>
+              )}
+              {metrics.model_name && (
+                <div>🤖 Model: {metrics.model_name}</div>
+              )}
+            </div>
+          </div>
+        )}
+
+        <div className="flex justify-end gap-2">
+          {onRegenerate && (
+            <button
+              onClick={handleRegenerate}
+              className="px-4 py-2 text-sm font-medium rounded-lg bg-slate-600 text-white hover:bg-slate-500 transition-colors"
+            >
+              Regenerate
+            </button>
+          )}
+          <button
+            onClick={onClose}
+            className="px-4 py-2 text-sm font-medium rounded-lg bg-blue-600 text-white hover:bg-blue-700 transition-colors"
+          >
+            OK
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+};
+
+/* ========= Confirmation Modal Component ========= */
+const ConfirmationModal = ({ show, onClose, onConfirm, title, message }) => {
+  if (!show) return null;
+  
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+      <div className="absolute inset-0 bg-black/50" onClick={onClose} />
+      <div className="relative bg-white dark:bg-gray-800 rounded-xl shadow-xl max-w-md w-full p-6 border border-gray-200 dark:border-gray-700">
+        <div className="flex items-start justify-between mb-4">
+          <h3 className="text-lg font-semibold text-yellow-600 dark:text-yellow-400">
+            {title}
+          </h3>
+          <button
+            onClick={onClose}
+            className="text-gray-400 hover:text-gray-600 dark:hover:text-gray-300"
+          >
+            <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+            </svg>
+          </button>
+        </div>
+        
+        <div className="text-sm text-gray-700 dark:text-gray-300 mb-6">
+          {message}
+        </div>
+        
+        <div className="flex justify-end gap-3">
+          <button
+            onClick={onClose}
+            className="px-4 py-2 text-sm font-medium rounded-lg bg-gray-200 dark:bg-gray-700 text-gray-700 dark:text-gray-300 hover:bg-gray-300 dark:hover:bg-gray-600 transition-colors"
+          >
+            Cancel
+          </button>
+          <button
+            onClick={() => {
+              onConfirm();
+              onClose();
+            }}
+            className="px-4 py-2 text-sm font-medium rounded-lg bg-blue-600 text-white hover:bg-blue-700 transition-colors"
+          >
+            Generate Again
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+};
+
 const Card = ({ title, actions, children, className = "", compact = false }) => {
   const isFlexCard = className.includes('flex flex-col') || className.includes('flex-1');
   const isFullScreen = className.includes('overflow-hidden') && isFlexCard;
@@ -2466,28 +2704,120 @@ const OverviewPage = ({ project, uploadHistory }) => {
 
 /* ========= Topology helpers (role + links) ========= */
 
-/* ========= Project Analysis Panel Component ========= */
+/* ========= Project Analysis Panel Component (tabbed) ========= */
 const ProjectAnalysisPanel = ({ project, summaryRows, coreCount, distCount, accessCount }) => {
+  const [activeTab, setActiveTab] = React.useState("overview");
   return (
-    <div className="col-span-6 min-h-0 flex flex-col gap-3 w-full">
-      {/* Network Overview Card */}
-      <NetworkOverviewCard project={project} summaryRows={summaryRows} />
-      
-      {/* Recommendations Card */}
-      <RecommendationsCard project={project} summaryRows={summaryRows} />
+    <div className="col-span-6 min-h-0 flex flex-col w-full">
+      {/* File-like tabs */}
+      <div className="flex flex-shrink-0 border-b border-slate-700 bg-slate-900/40">
+        <button
+          type="button"
+          onClick={() => setActiveTab("overview")}
+          className={`px-4 py-2.5 text-sm font-medium border-b-2 transition-colors ${
+            activeTab === "overview"
+              ? "border-emerald-500 text-slate-100 bg-slate-800/50"
+              : "border-transparent text-slate-400 hover:text-slate-300 hover:bg-slate-800/30"
+          }`}
+        >
+          Network Overview
+        </button>
+        <button
+          type="button"
+          onClick={() => setActiveTab("recommendations")}
+          className={`px-4 py-2.5 text-sm font-medium border-b-2 transition-colors ${
+            activeTab === "recommendations"
+              ? "border-emerald-500 text-slate-100 bg-slate-800/50"
+              : "border-transparent text-slate-400 hover:text-slate-300 hover:bg-slate-800/30"
+          }`}
+        >
+          Recommendations
+        </button>
+      </div>
+      <div className="flex-1 min-h-0 flex flex-col overflow-hidden">
+        {activeTab === "overview" && (
+          <NetworkOverviewCard project={project} summaryRows={summaryRows} fullHeight />
+        )}
+        {activeTab === "recommendations" && (
+          <RecommendationsCard project={project} summaryRows={summaryRows} fullHeight />
+        )}
+      </div>
     </div>
   );
 };
 
 /* ========= Network Overview Card Component ========= */
-const NetworkOverviewCard = ({ project, summaryRows }) => {
+const NetworkOverviewCard = ({ project, summaryRows, fullHeight }) => {
   const [overviewText, setOverviewText] = React.useState(null);
   const [llmMetrics, setLlmMetrics] = React.useState(null);
   const [generating, setGenerating] = React.useState(false);
   const [error, setError] = React.useState(null);
   const [loading, setLoading] = React.useState(true);
-  
+  const [showNotification, setShowNotification] = React.useState(false);
+  const [notificationData, setNotificationData] = React.useState(null);
+
   const projectId = project?.project_id || project?.id;
+
+  // Load generating state from localStorage on mount and start polling if needed
+  React.useEffect(() => {
+    if (!projectId) return;
+    const storageKey = `llm_generating_overview_${projectId}`;
+    const pollingKey = `overview_${projectId}`;
+    const saved = localStorage.getItem(storageKey);
+    if (saved === "true") {
+      setGenerating(true);
+      // If polling is not active but localStorage says generating, start polling immediately
+      if (!globalPollingService.isPolling(pollingKey)) {
+        // Start polling immediately (don't wait for generating state to trigger it)
+        globalPollingService.startPolling(
+          pollingKey,
+          projectId,
+          api.getProjectOverview,
+          (result) => {
+            setOverviewText(result.overview_text || null);
+            setLlmMetrics(result.metrics || null);
+            setGenerating(false);
+            localStorage.removeItem(storageKey);
+            setNotificationData({
+              title: "Network Overview Generated",
+              message: "LLM analysis completed successfully.",
+              metrics: result.metrics,
+              type: "success"
+            });
+            setShowNotification(true);
+          },
+          (errorMsg) => {
+            setGenerating(false);
+            setError(errorMsg);
+            localStorage.removeItem(storageKey);
+          }
+        );
+      } else {
+        // Resume existing polling with new callbacks
+        globalPollingService.resumePolling(
+          pollingKey,
+          (result) => {
+            setOverviewText(result.overview_text || null);
+            setLlmMetrics(result.metrics || null);
+            setGenerating(false);
+            localStorage.removeItem(storageKey);
+            setNotificationData({
+              title: "Network Overview Generated",
+              message: "LLM analysis completed successfully.",
+              metrics: result.metrics,
+              type: "success"
+            });
+            setShowNotification(true);
+          },
+          (errorMsg) => {
+            setGenerating(false);
+            setError(errorMsg);
+            localStorage.removeItem(storageKey);
+          }
+        );
+      }
+    }
+  }, [projectId]);
   
   // Load saved full project analysis on mount (use network_overview from full analysis)
   React.useEffect(() => {
@@ -2536,119 +2866,263 @@ const NetworkOverviewCard = ({ project, summaryRows }) => {
     };
   }, [projectId]);
   
-  // Poll for updates when generating
+  // Poll for updates when generating (works even when user navigates away)
   React.useEffect(() => {
-    if (!projectId || !generating) return;
+    if (!projectId) return;
     
-    let pollInterval = null;
-    let isMounted = true;
-    let lastGeneratedAt = null;
+    const storageKey = `llm_generating_overview_${projectId}`;
+    const pollingKey = `overview_${projectId}`;
+    const isGenerating = generating || localStorage.getItem(storageKey) === "true";
     
-    const checkForUpdates = async () => {
-      try {
-        const result = await api.getFullProjectAnalysis(projectId);
-        if (isMounted && result.generated_at) {
-          // Check if we got a new result
-          if (!lastGeneratedAt || result.generated_at !== lastGeneratedAt) {
-            setOverviewText(result.network_overview || null);
-            setLlmMetrics(result.metrics || null);
-            setGenerating(false);
-            lastGeneratedAt = result.generated_at;
-          }
+    if (!isGenerating) {
+      localStorage.removeItem(storageKey);
+      globalPollingService.stopPolling(pollingKey);
+      return;
+    }
+    
+    // Use global polling service (works across page navigation)
+    // Resume existing polling if it exists, otherwise start new one
+    if (globalPollingService.isPolling(pollingKey)) {
+      globalPollingService.resumePolling(
+        pollingKey,
+        (result) => {
+          setOverviewText(result.overview_text || null);
+          setLlmMetrics(result.metrics || null);
+          setGenerating(false);
+          localStorage.removeItem(storageKey);
+          setNotificationData({
+            title: "Network Overview Generated",
+            message: "LLM analysis completed successfully.",
+            metrics: result.metrics,
+            type: "success"
+          });
+          setShowNotification(true);
+        },
+        (errorMsg) => {
+          setGenerating(false);
+          setError(errorMsg);
+          localStorage.removeItem(storageKey);
         }
-      } catch (err) {
-        // Ignore errors during polling
-        if (err.message && !err.message.includes("404")) {
-          console.warn("Failed to poll for overview updates:", err);
+      );
+    } else {
+      globalPollingService.startPolling(
+        pollingKey,
+        projectId,
+        api.getProjectOverview,
+        (result) => {
+          setOverviewText(result.overview_text || null);
+          setLlmMetrics(result.metrics || null);
+          setGenerating(false);
+          localStorage.removeItem(storageKey);
+          setNotificationData({
+            title: "Network Overview Generated",
+            message: "LLM analysis completed successfully.",
+            metrics: result.metrics,
+            type: "success"
+          });
+          setShowNotification(true);
+        },
+        (errorMsg) => {
+          setGenerating(false);
+          setError(errorMsg);
+          localStorage.removeItem(storageKey);
         }
-      }
-    };
-    
-    // Poll every 3 seconds
-    pollInterval = setInterval(checkForUpdates, 3000);
+      );
+    }
     
     return () => {
-      isMounted = false;
-      if (pollInterval) {
-        clearInterval(pollInterval);
-      }
+      // Don't stop polling on unmount - let it continue in background
+      // Only stop if explicitly requested (when generating is false)
     };
   }, [projectId, generating]);
   
   const handleGenerate = async () => {
-    if (!projectId) return;
+    if (!projectId || generating) return;
+    await doGenerate();
+  };
+  
+  const doGenerate = async () => {
+    if (!projectId || generating) return;
     
     setGenerating(true);
     setError(null);
     
-    // Start full project analysis in background - don't wait for it
-    // The polling will pick up the result when it's ready
-    api.analyzeProject(projectId)
-      .then((result) => {
-        setOverviewText(result.network_overview || "Analysis completed.");
-        setLlmMetrics(result.metrics || null);
-        setGenerating(false);
-      })
+    // Store generating state in localStorage (persists across navigation)
+    const storageKey = `llm_generating_overview_${projectId}`;
+    localStorage.setItem(storageKey, "true");
+    
+    // Start analysis (don't wait for response - polling will pick it up)
+    api.analyzeProjectOverview(projectId)
       .catch((err) => {
-        console.error("Full project analysis failed:", err);
-        setError(err.message || "Failed to generate project analysis");
-        setGenerating(false);
+        console.error("Project overview analysis request failed:", err);
+        // Don't set error here - might be slow, polling will catch it
+        // Only set error if it's immediate failure (not timeout)
+        if (err.message && !err.message.includes("timeout")) {
+          setError(err.message || err.detail || "Failed to start analysis. Check backend/LLM server.");
+          setGenerating(false);
+          localStorage.removeItem(storageKey);
+        }
       });
+    // Note: We don't set generating=false here - polling will handle it
   };
   
   return (
-    <div className="flex-1 min-h-0 flex flex-col rounded-xl border border-slate-800 bg-slate-900/50 overflow-hidden w-full">
-      {/* Header with LLM Analysis button */}
-      <div className="flex-shrink-0 flex items-center justify-between px-3 py-2 border-b border-slate-700">
-        <div className="font-semibold text-slate-300 text-xs">Network Overview</div>
-        <button
-          onClick={handleGenerate}
-          disabled={generating || summaryRows.length === 0}
-          className="px-3 py-1 text-[10px] font-medium rounded-md bg-blue-600 hover:bg-blue-700 text-white transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+    <>
+      <NotificationModal
+        show={showNotification}
+        onClose={() => setShowNotification(false)}
+        title={notificationData?.title || "Analysis Complete"}
+        message={notificationData?.message || "LLM analysis completed."}
+        metrics={notificationData?.metrics}
+        type={notificationData?.type || "success"}
+        onRegenerate={() => {
+          setShowNotification(false);
+          doGenerate();
+        }}
+      />
+
+      <div className={`flex-1 min-h-0 flex flex-col rounded-b-xl border border-slate-800 border-t-0 bg-slate-900/50 overflow-hidden w-full ${fullHeight ? "min-h-0" : ""}`}>
+        <div className="flex-shrink-0 flex items-center justify-between px-3 py-2 border-b border-slate-700">
+          <div className="font-semibold text-slate-300 text-sm">Network Overview</div>
+          <button
+            onClick={handleGenerate}
+            disabled={generating || summaryRows.length === 0}
+            className="px-3 py-1.5 text-sm font-medium rounded-md bg-blue-600 hover:bg-blue-700 text-white transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+            title={generating ? "Analysis in progress. Please wait..." : "Generate network overview with LLM"}
+          >
+            {generating ? "⏳ Generating..." : "LLM Analysis"}
+          </button>
+        </div>
+        <div
+          className="flex-1 min-h-0 overflow-y-auto overflow-x-hidden p-4 text-slate-400"
+          style={fullHeight ? {} : { maxHeight: "calc(50vh - 100px)" }}
         >
-          {generating ? "Generating..." : "LLM Analysis"}
-        </button>
-      </div>
-      
-      {/* Content area - scrollable */}
-      <div className="flex-1 min-h-0 overflow-y-auto overflow-x-hidden p-3 text-[10px] text-slate-400" style={{ maxHeight: 'calc(50vh - 100px)' }}>
-        {loading ? (
-          <div className="text-slate-500 italic">Loading...</div>
-        ) : (
-          <>
-            {error && (
-              <div className="p-2 rounded bg-rose-900/20 border border-rose-700 text-rose-400 text-xs mb-2">
-                Error: {safeDisplay(error)}
-              </div>
-            )}
-            
-            {overviewText != null ? (
-              <div className="text-slate-300 leading-relaxed break-words whitespace-pre-wrap">
-                {safeDisplay(overviewText)}
-              </div>
+          <div className={fullHeight ? "text-base" : "text-sm"}>
+            {loading ? (
+              <div className="text-slate-500 italic">Loading...</div>
             ) : (
-              <div className="text-slate-500 italic">
-                Click "LLM Analysis" to analyze all devices in this project.
-              </div>
+              <>
+                {generating && (
+                  <div className="p-2 rounded bg-slate-700/50 border border-slate-600 text-slate-300 text-sm mb-2">
+                    Analyzing with LLM... This may take 1–2 minutes (depending on number of devices).
+                  </div>
+                )}
+                {error && (
+                  <div className="p-2 rounded bg-rose-900/20 border border-rose-700 text-rose-400 text-sm mb-2 break-words">
+                    Error: {safeDisplay(error)}
+                  </div>
+                )}
+                {overviewText != null ? (
+                  <div className="text-slate-300 leading-relaxed break-words whitespace-pre-wrap">
+                    {safeDisplay(overviewText)}
+                  </div>
+                ) : (
+                  <div className="text-slate-500 italic">
+                    Click &quot;LLM Analysis&quot; to generate network overview.
+                  </div>
+                )}
+              </>
             )}
-          </>
-        )}
+          </div>
+        </div>
       </div>
-    </div>
+    </>
   );
 };
 
+/* Normalize recommendations-only API format to gap_analysis display format */
+function recommendationsToGapAnalysis(recommendations) {
+  if (!Array.isArray(recommendations)) return [];
+  return recommendations.map((r) => ({
+    severity: r.severity || "Medium",
+    device: r.device || "all",
+    issue: r.issue ?? r.message ?? "",
+    recommendation: r.recommendation ?? r.message ?? "",
+  }));
+}
+
 /* ========= Recommendations Card Component ========= */
-const RecommendationsCard = ({ project, summaryRows }) => {
+const RecommendationsCard = ({ project, summaryRows, fullHeight }) => {
   const [gapAnalysis, setGapAnalysis] = React.useState([]);
   const [llmMetrics, setLlmMetrics] = React.useState(null);
-  const [generating, setGenerating] = React.useState(false);
+  const [generatingRecOnly, setGeneratingRecOnly] = React.useState(false);
   const [error, setError] = React.useState(null);
   const [loading, setLoading] = React.useState(true);
-  
+  const [showNotification, setShowNotification] = React.useState(false);
+  const [notificationData, setNotificationData] = React.useState(null);
+
   const projectId = project?.project_id || project?.id;
+
+  // Load generating state from localStorage on mount and start polling if needed
+  React.useEffect(() => {
+    if (!projectId) return;
+    const storageKeyRec = `llm_generating_rec_${projectId}`;
+    const pollingKey = `recommendations_${projectId}`;
+    const saved = localStorage.getItem(storageKeyRec);
+    
+    if (saved === "true") {
+      // Set generating state first to show loading UI immediately
+      setGeneratingRecOnly(true);
+      
+      // If polling is not active but localStorage says generating, start polling immediately
+      if (!globalPollingService.isPolling(pollingKey)) {
+        // Start polling immediately (don't wait for generatingRecOnly state to trigger it)
+        globalPollingService.startPolling(
+          pollingKey,
+          projectId,
+          api.getProjectRecommendations,
+          (result) => {
+            const recs = result.recommendations || [];
+            setGapAnalysis(recommendationsToGapAnalysis(recs));
+            setLlmMetrics(result.metrics || null);
+            setGeneratingRecOnly(false);
+            localStorage.removeItem(storageKeyRec);
+            setNotificationData({
+              title: "Recommendations Generated",
+              message: `LLM analysis completed. Found ${recs.length} recommendations.`,
+              metrics: result.metrics,
+              type: "success"
+            });
+            setShowNotification(true);
+          },
+          (errorMsg) => {
+            setGeneratingRecOnly(false);
+            setError(errorMsg);
+            localStorage.removeItem(storageKeyRec);
+          }
+        );
+      } else {
+        // Resume existing polling with new callbacks
+        globalPollingService.resumePolling(
+          pollingKey,
+          (result) => {
+            const recs = result.recommendations || [];
+            setGapAnalysis(recommendationsToGapAnalysis(recs));
+            setLlmMetrics(result.metrics || null);
+            setGeneratingRecOnly(false);
+            localStorage.removeItem(storageKeyRec);
+            setNotificationData({
+              title: "Recommendations Generated",
+              message: `LLM analysis completed. Found ${recs.length} recommendations.`,
+              metrics: result.metrics,
+              type: "success"
+            });
+            setShowNotification(true);
+          },
+          (errorMsg) => {
+            setGeneratingRecOnly(false);
+            setError(errorMsg);
+            localStorage.removeItem(storageKeyRec);
+          }
+        );
+      }
+    } else {
+      // Clear generating state if localStorage says not generating
+      setGeneratingRecOnly(false);
+    }
+  }, [projectId]);
   
-  // Load saved full project analysis on mount
+  // Load saved analysis on mount: recommendations-only
   React.useEffect(() => {
     if (!projectId) {
       setLoading(false);
@@ -2659,21 +3133,31 @@ const RecommendationsCard = ({ project, summaryRows }) => {
     
     const loadSavedAnalysis = async () => {
       try {
-        const result = await api.getFullProjectAnalysis(projectId);
+        const recResult = await api.getProjectRecommendations(projectId);
+        const recs = recResult?.recommendations || [];
         if (isMounted) {
-          setGapAnalysis(result.gap_analysis || []);
-          setLlmMetrics(result.metrics || null);
-          setLoading(false);
+          if (recs.length > 0) {
+            setGapAnalysis(recommendationsToGapAnalysis(recs));
+            setLlmMetrics(recResult.metrics || null);
+          }
+          // If we have generated_at, it means analysis is complete (even if no recommendations)
+          if (recResult.generated_at) {
+            // Clear any stale generating state
+            const storageKeyRec = `llm_generating_rec_${projectId}`;
+            const pollingKey = `recommendations_${projectId}`;
+            localStorage.removeItem(storageKeyRec);
+            setGeneratingRecOnly(false);
+            // Stop polling if it's running
+            globalPollingService.stopPolling(pollingKey);
+          }
         }
       } catch (err) {
-        // Ignore 404 - no saved analysis yet
+        // 404 is expected if no analysis yet - don't log as error
         if (err.message && !err.message.includes("404")) {
-          console.warn("Failed to load saved full project analysis:", err);
-        }
-        if (isMounted) {
-          setLoading(false);
+          console.warn("Failed to load saved recommendations:", err);
         }
       }
+      if (isMounted) setLoading(false);
     };
     
     loadSavedAnalysis();
@@ -2683,133 +3167,221 @@ const RecommendationsCard = ({ project, summaryRows }) => {
     };
   }, [projectId]);
   
-  // Poll for updates when generating
+  // Poll for updates when generating (works even when user navigates away)
   React.useEffect(() => {
-    if (!projectId || !generating) return;
-    
-    let pollInterval = null;
-    let isMounted = true;
-    let lastGeneratedAt = null;
-    
-    const checkForUpdates = async () => {
-      try {
-        const result = await api.getFullProjectAnalysis(projectId);
-        if (isMounted && result.generated_at) {
-          // Check if we got a new result
-          if (!lastGeneratedAt || result.generated_at !== lastGeneratedAt) {
-            setGapAnalysis(result.gap_analysis || []);
-            setLlmMetrics(result.metrics || null);
-            setGenerating(false);
-            lastGeneratedAt = result.generated_at;
-          }
-        }
-      } catch (err) {
-        // Ignore errors during polling
-        if (err.message && !err.message.includes("404")) {
-          console.warn("Failed to poll for full project analysis updates:", err);
-        }
-      }
-    };
-    
-    // Poll every 3 seconds
-    pollInterval = setInterval(checkForUpdates, 3000);
-    
-    return () => {
-      isMounted = false;
-      if (pollInterval) {
-        clearInterval(pollInterval);
-      }
-    };
-  }, [projectId, generating]);
-  
-  const handleGenerate = async () => {
     if (!projectId) return;
     
-    setGenerating(true);
+    const storageKeyRec = `llm_generating_rec_${projectId}`;
+    const pollingKey = `recommendations_${projectId}`;
+    const isGeneratingRec = generatingRecOnly || localStorage.getItem(storageKeyRec) === "true";
+    
+    if (!isGeneratingRec) {
+      localStorage.removeItem(storageKeyRec);
+      globalPollingService.stopPolling(pollingKey);
+      return;
+    }
+    
+    // Use global polling service (works across page navigation)
+    // Resume existing polling if it exists, otherwise start new one
+    if (globalPollingService.isPolling(pollingKey)) {
+      globalPollingService.resumePolling(
+        pollingKey,
+        (result) => {
+          const recs = result.recommendations || [];
+          setGapAnalysis(recommendationsToGapAnalysis(recs));
+          setLlmMetrics(result.metrics || null);
+          setGeneratingRecOnly(false);
+          localStorage.removeItem(storageKeyRec);
+          setNotificationData({
+            title: "Recommendations Generated",
+            message: `LLM analysis completed. Found ${recs.length} recommendations.`,
+            metrics: result.metrics,
+            type: "success"
+          });
+          setShowNotification(true);
+        },
+        (errorMsg) => {
+          setGeneratingRecOnly(false);
+          setError(errorMsg);
+          localStorage.removeItem(storageKeyRec);
+        }
+      );
+    } else {
+      globalPollingService.startPolling(
+        pollingKey,
+        projectId,
+        api.getProjectRecommendations,
+        (result) => {
+          const recs = result.recommendations || [];
+          setGapAnalysis(recommendationsToGapAnalysis(recs));
+          setLlmMetrics(result.metrics || null);
+          setGeneratingRecOnly(false);
+          localStorage.removeItem(storageKeyRec);
+          setNotificationData({
+            title: "Recommendations Generated",
+            message: `LLM analysis completed. Found ${recs.length} recommendations.`,
+            metrics: result.metrics,
+            type: "success"
+          });
+          setShowNotification(true);
+        },
+        (errorMsg) => {
+          setGeneratingRecOnly(false);
+          setError(errorMsg);
+          localStorage.removeItem(storageKeyRec);
+        }
+      );
+    }
+    
+    return () => {
+      // Don't stop polling on unmount - let it continue in background
+      // Only stop if explicitly requested (when generatingRecOnly is false)
+    };
+  }, [projectId, generatingRecOnly]);
+  
+  const handleGenerateRecommendationsOnly = async () => {
+    if (!projectId) return;
+    const storageKey = `llm_generating_rec_${projectId}`;
+    const isAlreadyGenerating = generatingRecOnly || localStorage.getItem(storageKey) === "true";
+    if (isAlreadyGenerating) {
+      console.log("Recommendations analysis already in progress, skipping duplicate request");
+      return;
+    }
+    await doGenerateRecommendations();
+  };
+  
+  const doGenerateRecommendations = async () => {
+    if (!projectId) return;
+    
+    const storageKey = `llm_generating_rec_${projectId}`;
+    const isAlreadyGenerating = generatingRecOnly || localStorage.getItem(storageKey) === "true";
+    if (isAlreadyGenerating) {
+      return;
+    }
+    
+    setGeneratingRecOnly(true);
     setError(null);
     
-    // Start generation in background - don't wait for it
-    // The polling will pick up the result when it's ready
-    api.analyzeProject(projectId)
-      .then((result) => {
-        setGapAnalysis(result.gap_analysis || []);
-        setLlmMetrics(result.metrics || null);
-        setGenerating(false);
+    // Store generating state in localStorage (persists across navigation)
+    localStorage.setItem(storageKey, "true");
+    
+    // Start analysis (don't wait for response - polling will pick it up)
+    api.analyzeProjectRecommendations(projectId)
+      .then(() => {
+        // Request sent successfully - polling will handle the result
+        console.log("Recommendations analysis request sent successfully");
       })
       .catch((err) => {
-        console.error("Full project analysis failed:", err);
-        setError(err.message || "Failed to generate project analysis");
-        setGenerating(false);
+        console.error("Recommendations analysis request failed:", err);
+        // Only set error for immediate failures (not timeout - that's expected)
+        if (err.message && !err.message.includes("timeout") && !err.message.includes("ECONNRESET")) {
+          setError(err.message || err.detail || "Failed to start analysis. Check backend/LLM server.");
+          setGeneratingRecOnly(false);
+          localStorage.removeItem(storageKey);
+        } else {
+          // Timeout or connection reset is expected - polling will handle it
+          console.log("Request timeout/reset (expected) - polling will continue");
+        }
       });
+    // Note: We don't set generatingRecOnly=false here - polling will handle it when result is ready
   };
   
   return (
-    <div className="flex-1 min-h-0 flex flex-col rounded-xl border border-slate-800 bg-slate-900/50 overflow-hidden w-full">
-      {/* Header with LLM Analysis button */}
-      <div className="flex-shrink-0 flex items-center justify-between px-3 py-2 border-b border-slate-700">
-        <div className="font-semibold text-slate-300 text-xs">Recommendations</div>
-        <button
-          onClick={handleGenerate}
-          disabled={generating || summaryRows.length === 0}
-          className="px-3 py-1 text-[10px] font-medium rounded-md bg-blue-600 hover:bg-blue-700 text-white transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+    <>
+      <NotificationModal
+        show={showNotification}
+        onClose={() => setShowNotification(false)}
+        title={notificationData?.title || "Analysis Complete"}
+        message={notificationData?.message || "LLM analysis completed."}
+        metrics={notificationData?.metrics}
+        type={notificationData?.type || "success"}
+        onRegenerate={() => {
+          setShowNotification(false);
+          doGenerateRecommendations();
+        }}
+      />
+
+      <div className={`flex-1 min-h-0 flex flex-col rounded-b-xl border border-slate-800 border-t-0 bg-slate-900/50 overflow-hidden w-full ${fullHeight ? "min-h-0" : ""}`}>
+        <div className="flex-shrink-0 flex items-center justify-between gap-2 px-3 py-2 border-b border-slate-700 flex-wrap">
+          <div className="font-semibold text-slate-300 text-sm">Recommendations</div>
+          <div className="flex items-center gap-1.5">
+            <button
+              onClick={handleGenerateRecommendationsOnly}
+              disabled={generatingRecOnly || summaryRows.length === 0}
+              className="px-3 py-1.5 text-sm font-medium rounded-md bg-emerald-600 hover:bg-emerald-700 text-white transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+              title={generatingRecOnly ? "Analysis in progress. Please wait..." : "Use LLM for recommendations"}
+            >
+              {generatingRecOnly ? "⏳ Generating..." : "LLM Analysis"}
+            </button>
+          </div>
+        </div>
+        <div
+          className="flex-1 min-h-0 overflow-y-auto overflow-x-hidden p-4 text-slate-400"
+          style={fullHeight ? {} : { maxHeight: "calc(50vh - 100px)" }}
         >
-          {generating ? "Generating..." : "LLM Analysis"}
-        </button>
-      </div>
-      
-      {/* Content area - scrollable */}
-      <div className="flex-1 min-h-0 overflow-y-auto overflow-x-hidden p-3 text-[10px] text-slate-400" style={{ maxHeight: 'calc(50vh - 100px)' }}>
-        {loading ? (
-          <div className="text-slate-500 italic">Loading...</div>
-        ) : (
-          <>
-            {error && (
-              <div className="p-2 rounded bg-rose-900/20 border border-rose-700 text-rose-400 text-xs mb-2">
-                Error: {safeDisplay(error)}
-              </div>
-            )}
-            
-            {gapAnalysis.length > 0 ? (
-              <div className="space-y-2">
-                {gapAnalysis.map((item, idx) => (
-                  <div key={idx} className="p-2 rounded border break-words" style={{
-                    borderColor: item.severity === "High" ? "#ef4444" : item.severity === "Medium" ? "#eab308" : "#64748b",
-                    backgroundColor: item.severity === "High" ? "rgba(239, 68, 68, 0.1)" : item.severity === "Medium" ? "rgba(234, 179, 8, 0.1)" : "rgba(100, 116, 139, 0.1)"
-                  }}>
-                    <div className="flex items-start gap-2 mb-1">
-                      <span className={`text-xs font-semibold px-1.5 py-0.5 rounded ${
-                        item.severity === "High" ? "bg-rose-500 text-white" : 
-                        item.severity === "Medium" ? "bg-yellow-500 text-white" : 
-                        "bg-slate-500 text-white"
-                      }`}>
-                        {item.severity?.toUpperCase() || "MEDIUM"}
-                      </span>
-                      {item.device && item.device !== "all" && (
-                        <span className="text-xs font-medium text-slate-300">[{item.device}]</span>
-                      )}
-                    </div>
-                    {item.issue != null && (
-                      <div className="text-xs text-slate-300 mb-1">
-                        <span className="font-semibold">Issue:</span> {safeDisplay(item.issue)}
-                      </div>
-                    )}
-                    {item.recommendation != null && (
-                      <div className="text-xs text-slate-200">
-                        <span className="font-semibold">Recommendation:</span> {safeDisplay(item.recommendation)}
-                      </div>
-                    )}
+          {(() => {
+            const storageKeyRec = `llm_generating_rec_${projectId}`;
+            const isGeneratingFromStorage = localStorage.getItem(storageKeyRec) === "true";
+            const isActuallyGenerating = generatingRecOnly || isGeneratingFromStorage;
+            const textSize = fullHeight ? "text-base" : "text-sm";
+            if (loading && !isActuallyGenerating) {
+              return <div className={`text-slate-500 italic ${textSize}`}>Loading...</div>;
+            }
+            return (
+              <div className={textSize}>
+                {isActuallyGenerating && (
+                  <div className="p-2 rounded bg-slate-700/50 border border-slate-600 text-slate-300 text-sm mb-2">
+                    ⏳ Analyzing with LLM... This may take 1–2 minutes (depending on number of devices). You can navigate away and return later.
                   </div>
-                ))}
+                )}
+                {error && (
+                  <div className="p-2 rounded bg-rose-900/20 border border-rose-700 text-rose-400 text-sm mb-2 break-words">
+                    Error: {safeDisplay(error)}
+                  </div>
+                )}
+                {gapAnalysis.length > 0 ? (
+                  <div className="space-y-3">
+                    {gapAnalysis.map((item, idx) => (
+                      <div key={idx} className="p-3 rounded border break-words" style={{
+                        borderColor: item.severity === "High" ? "#ef4444" : item.severity === "Medium" ? "#eab308" : "#64748b",
+                        backgroundColor: item.severity === "High" ? "rgba(239, 68, 68, 0.1)" : item.severity === "Medium" ? "rgba(234, 179, 8, 0.1)" : "rgba(100, 116, 139, 0.1)"
+                      }}>
+                        <div className="flex items-start gap-2 mb-1.5">
+                          <span className={`text-sm font-semibold px-2 py-0.5 rounded ${
+                            item.severity === "High" ? "bg-rose-500 text-white" :
+                            item.severity === "Medium" ? "bg-yellow-500 text-white" :
+                            "bg-slate-500 text-white"
+                          }`}>
+                            {item.severity?.toUpperCase() || "MEDIUM"}
+                          </span>
+                          {item.device && item.device !== "all" && (
+                            <span className="text-sm font-medium text-slate-300">[{item.device}]</span>
+                          )}
+                        </div>
+                        {item.issue != null && (
+                          <div className="text-slate-300 mb-1.5">
+                            <span className="font-semibold">Issue:</span> {safeDisplay(item.issue)}
+                          </div>
+                        )}
+                        {item.recommendation != null && (
+                          <div className="text-slate-200">
+                            <span className="font-semibold">Recommendation:</span> {safeDisplay(item.recommendation)}
+                          </div>
+                        )}
+                      </div>
+                    ))}
+                  </div>
+                ) : !isActuallyGenerating ? (
+                  <div className="text-slate-500 italic">
+                    Click &quot;LLM Analysis&quot; to analyze with LLM.
+                  </div>
+                ) : null}
               </div>
-            ) : (
-              <div className="text-slate-500 italic">
-                Click "LLM Analysis" to get gap analysis and recommendations.
-              </div>
-            )}
-          </>
-        )}
+            );
+          })()}
+        </div>
       </div>
-    </div>
+    </>
   );
 };
 
@@ -9327,6 +9899,8 @@ const TopologyGraph = ({ project, onOpenDevice, can, authedUser, setProjects, se
 
   const [generatingTopology, setGeneratingTopology] = React.useState(false);
   const [topologyError, setTopologyError] = React.useState(null);
+  const [showTopologyNotification, setShowTopologyNotification] = React.useState(false);
+  const [topologyNotificationData, setTopologyNotificationData] = React.useState(null);
   
   const rows = project.summaryRows || [];
   // Base nodes from project summary rows - compute first
@@ -9420,6 +9994,238 @@ const TopologyGraph = ({ project, onOpenDevice, can, authedUser, setProjects, se
     return deriveLinksFromProject(project);
   });
   
+  // Load generating state from localStorage on mount and start polling if needed
+  React.useEffect(() => {
+    const projectId = project.project_id || project.id;
+    if (!projectId) return;
+    const storageKey = `llm_generating_topology_${projectId}`;
+    const pollingKey = `topology_${projectId}`;
+    const saved = localStorage.getItem(storageKey);
+    
+    if (saved === "true") {
+      // Set generating state first to show loading UI immediately
+      setGeneratingTopology(true);
+      
+      // If polling is not active but localStorage says generating, start polling immediately
+      if (!globalPollingService.isPolling(pollingKey)) {
+        // Start polling immediately (don't wait for generatingTopology state to trigger it)
+        globalPollingService.startPolling(
+          pollingKey,
+          projectId,
+          api.getTopology,
+          (topologyData) => {
+            // Process topology result
+            const aiNodes = topologyData.topology?.nodes || [];
+            const aiEdges = topologyData.topology?.edges || [];
+            
+            if (aiNodes.length > 0 || aiEdges.length > 0) {
+              // Convert AI nodes to internal format
+              const nodeMap = new Map();
+              const currentNodes = topologyNodes.length > 0 ? topologyNodes : baseNodes;
+              currentNodes.forEach(n => {
+                nodeMap.set(n.id, { ...n });
+              });
+              
+              aiNodes.forEach(aiNode => {
+                const nodeId = aiNode.id;
+                const existingNode = nodeMap.get(nodeId);
+                if (existingNode) {
+                  nodeMap.set(nodeId, {
+                    ...existingNode,
+                    label: aiNode.label || existingNode.label,
+                    role: (aiNode.type || existingNode.role)?.toLowerCase() || existingNode.role,
+                    type: aiNode.type || existingNode.type
+                  });
+                } else {
+                  nodeMap.set(nodeId, {
+                    id: nodeId,
+                    label: aiNode.label || nodeId,
+                    role: (aiNode.type || "access")?.toLowerCase(),
+                    type: aiNode.type || "Switch",
+                    model: aiNode.model,
+                    mgmtIp: aiNode.ip || aiNode.management_ip
+                  });
+                }
+              });
+              
+              const updatedNodes = Array.from(nodeMap.values());
+              const convertedEdges = aiEdges.map(edge => ({
+                a: edge.from,
+                b: edge.to,
+                label: edge.label || "",
+                evidence: edge.evidence || "",
+                type: "trunk"
+              }));
+              
+              // Update positions for new nodes
+              const updatedPositions = { ...positions };
+              const roleCounts = {};
+              const roleIndices = {};
+              updatedNodes.forEach(node => {
+                const role = (node.role || "default").toLowerCase();
+                roleCounts[role] = (roleCounts[role] || 0) + 1;
+              });
+              
+              updatedNodes.forEach((node) => {
+                if (!updatedPositions[node.id]) {
+                  const role = (node.role || "access").toLowerCase();
+                  roleIndices[role] = (roleIndices[role] || 0);
+                  updatedPositions[node.id] = getDefaultPos(node.id, role, roleIndices[role], roleCounts);
+                  roleIndices[role]++;
+                }
+              });
+              
+              // Update states
+              setTopologyNodes(updatedNodes);
+              setLinks(convertedEdges);
+              setPositions(updatedPositions);
+              
+              // Update project state
+              setProjects(prev => prev.map(p => {
+                if ((p.project_id || p.id) === projectId) {
+                  return {
+                    ...p,
+                    topoLinks: convertedEdges,
+                    topoNodes: aiNodes,
+                    topoPositions: updatedPositions
+                  };
+                }
+                return p;
+              }));
+              
+              // Load LLM metrics
+              if (topologyData.llm_metrics) {
+                setTopologyLLMMetrics(topologyData.llm_metrics);
+              }
+            }
+            
+            setGeneratingTopology(false);
+            localStorage.removeItem(storageKey);
+            
+            // Show notification
+            setTopologyNotificationData({
+              title: "Topology Generated",
+              message: `LLM topology generation completed. Found ${aiNodes.length} nodes and ${aiEdges.length} links.`,
+              metrics: topologyData.llm_metrics,
+              type: "success"
+            });
+            setShowTopologyNotification(true);
+          },
+          (errorMsg) => {
+            setGeneratingTopology(false);
+            setTopologyError(errorMsg);
+            localStorage.removeItem(storageKey);
+          }
+        );
+      } else {
+        // Resume existing polling with new callbacks
+        globalPollingService.resumePolling(
+          pollingKey,
+          (topologyData) => {
+            // Process topology result (same as above)
+            const aiNodes = topologyData.topology?.nodes || [];
+            const aiEdges = topologyData.topology?.edges || [];
+            
+            if (aiNodes.length > 0 || aiEdges.length > 0) {
+              const nodeMap = new Map();
+              const currentNodes = topologyNodes.length > 0 ? topologyNodes : baseNodes;
+              currentNodes.forEach(n => {
+                nodeMap.set(n.id, { ...n });
+              });
+              
+              aiNodes.forEach(aiNode => {
+                const nodeId = aiNode.id;
+                const existingNode = nodeMap.get(nodeId);
+                if (existingNode) {
+                  nodeMap.set(nodeId, {
+                    ...existingNode,
+                    label: aiNode.label || existingNode.label,
+                    role: (aiNode.type || existingNode.role)?.toLowerCase() || existingNode.role,
+                    type: aiNode.type || existingNode.type
+                  });
+                } else {
+                  nodeMap.set(nodeId, {
+                    id: nodeId,
+                    label: aiNode.label || nodeId,
+                    role: (aiNode.type || "access")?.toLowerCase(),
+                    type: aiNode.type || "Switch",
+                    model: aiNode.model,
+                    mgmtIp: aiNode.ip || aiNode.management_ip
+                  });
+                }
+              });
+              
+              const updatedNodes = Array.from(nodeMap.values());
+              const convertedEdges = aiEdges.map(edge => ({
+                a: edge.from,
+                b: edge.to,
+                label: edge.label || "",
+                evidence: edge.evidence || "",
+                type: "trunk"
+              }));
+              
+              const updatedPositions = { ...positions };
+              const roleCounts = {};
+              const roleIndices = {};
+              updatedNodes.forEach(node => {
+                const role = (node.role || "default").toLowerCase();
+                roleCounts[role] = (roleCounts[role] || 0) + 1;
+              });
+              
+              updatedNodes.forEach((node) => {
+                if (!updatedPositions[node.id]) {
+                  const role = (node.role || "access").toLowerCase();
+                  roleIndices[role] = (roleIndices[role] || 0);
+                  updatedPositions[node.id] = getDefaultPos(node.id, role, roleIndices[role], roleCounts);
+                  roleIndices[role]++;
+                }
+              });
+              
+              setTopologyNodes(updatedNodes);
+              setLinks(convertedEdges);
+              setPositions(updatedPositions);
+              
+              setProjects(prev => prev.map(p => {
+                if ((p.project_id || p.id) === projectId) {
+                  return {
+                    ...p,
+                    topoLinks: convertedEdges,
+                    topoNodes: aiNodes,
+                    topoPositions: updatedPositions
+                  };
+                }
+                return p;
+              }));
+              
+              if (topologyData.llm_metrics) {
+                setTopologyLLMMetrics(topologyData.llm_metrics);
+              }
+            }
+            
+            setGeneratingTopology(false);
+            localStorage.removeItem(storageKey);
+            
+            setTopologyNotificationData({
+              title: "Topology Generated",
+              message: `LLM topology generation completed. Found ${aiNodes.length} nodes and ${aiEdges.length} links.`,
+              metrics: topologyData.llm_metrics,
+              type: "success"
+            });
+            setShowTopologyNotification(true);
+          },
+          (errorMsg) => {
+            setGeneratingTopology(false);
+            setTopologyError(errorMsg);
+            localStorage.removeItem(storageKey);
+          }
+        );
+      }
+    } else {
+      // Clear generating state if localStorage says not generating
+      setGeneratingTopology(false);
+    }
+  }, [project.project_id || project.id]);
+  
   // Load topology layout from backend on mount
   React.useEffect(() => {
     const loadTopologyLayout = async () => {
@@ -9464,6 +10270,247 @@ const TopologyGraph = ({ project, onOpenDevice, can, authedUser, setProjects, se
     loadTopologyLayout();
   }, [project.project_id || project.id]);
   
+  // Poll for topology updates when generating (works even when user navigates away)
+  React.useEffect(() => {
+    const projectId = project.project_id || project.id;
+    if (!projectId) return;
+    
+    const storageKey = `llm_generating_topology_${projectId}`;
+    const pollingKey = `topology_${projectId}`;
+    const isGenerating = generatingTopology || localStorage.getItem(storageKey) === "true";
+    
+    if (!isGenerating) {
+      localStorage.removeItem(storageKey);
+      globalPollingService.stopPolling(pollingKey);
+      return;
+    }
+    
+    // Use global polling service (works across page navigation)
+    // Resume existing polling if it exists, otherwise start new one
+    if (globalPollingService.isPolling(pollingKey)) {
+      globalPollingService.resumePolling(
+        pollingKey,
+        (topologyData) => {
+          // Process topology result
+          const aiNodes = topologyData.topology?.nodes || [];
+          const aiEdges = topologyData.topology?.edges || [];
+          
+          if (aiNodes.length > 0 || aiEdges.length > 0) {
+            // Convert AI nodes to internal format
+            const nodeMap = new Map();
+            const currentNodes = topologyNodes.length > 0 ? topologyNodes : baseNodes;
+            currentNodes.forEach(n => {
+              nodeMap.set(n.id, { ...n });
+            });
+            
+            aiNodes.forEach(aiNode => {
+              const nodeId = aiNode.id;
+              const existingNode = nodeMap.get(nodeId);
+              if (existingNode) {
+                nodeMap.set(nodeId, {
+                  ...existingNode,
+                  label: aiNode.label || existingNode.label,
+                  role: (aiNode.type || existingNode.role)?.toLowerCase() || existingNode.role,
+                  type: aiNode.type || existingNode.type
+                });
+              } else {
+                nodeMap.set(nodeId, {
+                  id: nodeId,
+                  label: aiNode.label || nodeId,
+                  role: (aiNode.type || "access")?.toLowerCase(),
+                  type: aiNode.type || "Switch",
+                  model: aiNode.model,
+                  mgmtIp: aiNode.ip || aiNode.management_ip
+                });
+              }
+            });
+            
+            const updatedNodes = Array.from(nodeMap.values());
+            const convertedEdges = aiEdges.map(edge => ({
+              a: edge.from,
+              b: edge.to,
+              label: edge.label || "",
+              evidence: edge.evidence || "",
+              type: "trunk"
+            }));
+            
+            // Update positions for new nodes
+            const updatedPositions = { ...positions };
+            const roleCounts = {};
+            const roleIndices = {};
+            updatedNodes.forEach(node => {
+              const role = (node.role || "default").toLowerCase();
+              roleCounts[role] = (roleCounts[role] || 0) + 1;
+            });
+            
+            updatedNodes.forEach((node) => {
+              if (!updatedPositions[node.id]) {
+                const role = (node.role || "access").toLowerCase();
+                roleIndices[role] = (roleIndices[role] || 0);
+                updatedPositions[node.id] = getDefaultPos(node.id, role, roleIndices[role], roleCounts);
+                roleIndices[role]++;
+              }
+            });
+            
+            // Update states
+            setTopologyNodes(updatedNodes);
+            setLinks(convertedEdges);
+            setPositions(updatedPositions);
+            
+            // Update project state
+            setProjects(prev => prev.map(p => {
+              if ((p.project_id || p.id) === projectId) {
+                return {
+                  ...p,
+                  topoLinks: convertedEdges,
+                  topoNodes: aiNodes,
+                  topoPositions: updatedPositions
+                };
+              }
+              return p;
+            }));
+            
+            // Load LLM metrics
+            if (topologyData.llm_metrics) {
+              setTopologyLLMMetrics(topologyData.llm_metrics);
+            }
+          }
+          
+          setGeneratingTopology(false);
+          localStorage.removeItem(storageKey);
+          
+          // Show notification
+          setTopologyNotificationData({
+            title: "Topology Generated",
+            message: `LLM topology generation completed. Found ${aiNodes.length} nodes and ${aiEdges.length} links.`,
+            metrics: topologyData.llm_metrics,
+            type: "success"
+          });
+          setShowTopologyNotification(true);
+        },
+        (errorMsg) => {
+          setGeneratingTopology(false);
+          setTopologyError(errorMsg);
+          localStorage.removeItem(storageKey);
+        }
+      );
+    } else {
+      globalPollingService.startPolling(
+        pollingKey,
+        projectId,
+        api.getTopology,
+        (topologyData) => {
+        // Process topology result
+        const aiNodes = topologyData.topology?.nodes || [];
+        const aiEdges = topologyData.topology?.edges || [];
+        
+        if (aiNodes.length > 0 || aiEdges.length > 0) {
+          // Convert AI nodes to internal format
+          const nodeMap = new Map();
+          const currentNodes = topologyNodes.length > 0 ? topologyNodes : baseNodes;
+          currentNodes.forEach(n => {
+            nodeMap.set(n.id, { ...n });
+          });
+          
+          aiNodes.forEach(aiNode => {
+            const nodeId = aiNode.id;
+            const existingNode = nodeMap.get(nodeId);
+            if (existingNode) {
+              nodeMap.set(nodeId, {
+                ...existingNode,
+                label: aiNode.label || existingNode.label,
+                role: (aiNode.type || existingNode.role)?.toLowerCase() || existingNode.role,
+                type: aiNode.type || existingNode.type
+              });
+            } else {
+              nodeMap.set(nodeId, {
+                id: nodeId,
+                label: aiNode.label || nodeId,
+                role: (aiNode.type || "access")?.toLowerCase(),
+                type: aiNode.type || "Switch",
+                model: aiNode.model,
+                mgmtIp: aiNode.ip || aiNode.management_ip
+              });
+            }
+          });
+          
+          const updatedNodes = Array.from(nodeMap.values());
+          const convertedEdges = aiEdges.map(edge => ({
+            a: edge.from,
+            b: edge.to,
+            label: edge.label || "",
+            evidence: edge.evidence || "",
+            type: "trunk"
+          }));
+          
+          // Update positions for new nodes
+          const updatedPositions = { ...positions };
+          const roleCounts = {};
+          const roleIndices = {};
+          updatedNodes.forEach(node => {
+            const role = (node.role || "default").toLowerCase();
+            roleCounts[role] = (roleCounts[role] || 0) + 1;
+          });
+          
+          updatedNodes.forEach((node) => {
+            if (!updatedPositions[node.id]) {
+              const role = (node.role || "access").toLowerCase();
+              roleIndices[role] = (roleIndices[role] || 0);
+              updatedPositions[node.id] = getDefaultPos(node.id, role, roleIndices[role], roleCounts);
+              roleIndices[role]++;
+            }
+          });
+          
+          // Update states
+          setTopologyNodes(updatedNodes);
+          setLinks(convertedEdges);
+          setPositions(updatedPositions);
+          
+          // Update project state
+          setProjects(prev => prev.map(p => {
+            if ((p.project_id || p.id) === projectId) {
+              return {
+                ...p,
+                topoLinks: convertedEdges,
+                topoNodes: aiNodes,
+                topoPositions: updatedPositions
+              };
+            }
+            return p;
+          }));
+          
+          // Load LLM metrics
+          if (topologyData.llm_metrics) {
+            setTopologyLLMMetrics(topologyData.llm_metrics);
+          }
+        }
+        
+        setGeneratingTopology(false);
+        localStorage.removeItem(storageKey);
+        
+        // Show notification
+        setTopologyNotificationData({
+          title: "Topology Generated",
+          message: `LLM topology generation completed. Found ${aiNodes.length} nodes and ${convertedEdges.length} links.`,
+          metrics: topologyData.llm_metrics,
+          type: "success"
+        });
+        setShowTopologyNotification(true);
+      },
+        (errorMsg) => {
+          setGeneratingTopology(false);
+          setTopologyError(errorMsg);
+          localStorage.removeItem(storageKey);
+        }
+      );
+    }
+    
+    return () => {
+      // Don't stop polling on unmount - let it continue in background
+      // Only stop if explicitly requested (when generatingTopology is false)
+    };
+  }, [project.project_id || project.id, generatingTopology]);
+  
   // Generate topology using AI
   const handleGenerateTopology = async () => {
     const projectId = project.project_id || project.id;
@@ -9472,133 +10519,55 @@ const TopologyGraph = ({ project, onOpenDevice, can, authedUser, setProjects, se
       return;
     }
     
+    // Check if already generating (from state or localStorage) - prevent duplicate requests
+    const storageKey = `llm_generating_topology_${projectId}`;
+    const isAlreadyGenerating = generatingTopology || localStorage.getItem(storageKey) === "true";
+    if (isAlreadyGenerating) {
+      console.log("Topology generation already in progress, skipping duplicate request");
+      return; // Prevent double-click and duplicate requests
+    }
+    
+    await doGenerateTopology();
+  };
+
+  const doGenerateTopology = async () => {
+    const projectId = project.project_id || project.id;
+    if (!projectId) {
+      setTopologyError("Project ID not found");
+      return;
+    }
+    
+    const storageKey = `llm_generating_topology_${projectId}`;
+    const isAlreadyGenerating = generatingTopology || localStorage.getItem(storageKey) === "true";
+    if (isAlreadyGenerating) {
+      return;
+    }
+    
     setGeneratingTopology(true);
     setTopologyError(null);
     
-    try {
-      const result = await api.generateTopology(projectId);
-      
-      // Check for errors first
-      if (result.analysis_summary && result.analysis_summary.includes("[ERROR]")) {
-        setTopologyError(result.analysis_summary);
-        return;
-      }
-      
-      if (result.topology && result.topology.nodes && result.topology.edges) {
-        // Convert AI-generated topology to internal format
-        const aiNodes = result.topology.nodes || [];
-        const aiEdges = result.topology.edges || [];
-        
-        console.log("[Topology] LLM Response:", {
-          nodes: aiNodes,
-          edges: aiEdges,
-          analysis_summary: result.analysis_summary,
-          metrics: result.metrics
-        });
-        
-        // Store LLM metrics for display (if setter provided)
-        if (result.metrics && setTopologyLLMMetrics) {
-          setTopologyLLMMetrics(result.metrics);
+    // Store generating state in localStorage (persists across navigation)
+    localStorage.setItem(storageKey, "true");
+    
+    // Start analysis (don't wait for response - polling will pick it up)
+    api.generateTopology(projectId)
+      .then(() => {
+        // Request sent successfully - polling will handle the result
+        console.log("Topology generation request sent successfully");
+      })
+      .catch((err) => {
+        console.error("Topology generation request failed:", err);
+        // Only set error for immediate failures (not timeout - that's expected for long-running LLM)
+        if (err.message && !err.message.includes("timeout") && !err.message.includes("ECONNRESET") && !err.message.includes("socket hang up")) {
+          setTopologyError(err.message || err.detail || "Failed to start topology generation. Check backend/LLM server.");
+          setGeneratingTopology(false);
+          localStorage.removeItem(storageKey);
+        } else {
+          // Timeout or connection reset is expected for long-running LLM - polling will handle it
+          console.log("Request timeout/reset (expected for LLM) - polling will continue");
         }
-        
-        if (aiNodes.length === 0 && aiEdges.length === 0) {
-          setTopologyError("ไม่พบข้อมูล topology จาก AI. กรุณาตรวจสอบว่า Ollama ทำงานอยู่และมีข้อมูล devices ใน project");
-          return;
-        }
-        
-        // Convert AI nodes to internal format and merge with existing
-        const nodeMap = new Map();
-        // First, add all existing nodes (from topologyNodes or baseNodes)
-        const currentNodes = topologyNodes.length > 0 ? topologyNodes : baseNodes;
-        currentNodes.forEach(n => {
-          nodeMap.set(n.id, { ...n });
-        });
-        // Then, update/add AI nodes
-        aiNodes.forEach(aiNode => {
-          const nodeId = aiNode.id;
-          const existingNode = nodeMap.get(nodeId);
-          if (existingNode) {
-            // Update existing node
-            nodeMap.set(nodeId, {
-              ...existingNode,
-              label: aiNode.label || existingNode.label,
-              role: (aiNode.type || existingNode.role)?.toLowerCase() || existingNode.role,
-              type: aiNode.type || existingNode.type
-            });
-          } else {
-            // Add new node from AI
-            nodeMap.set(nodeId, {
-              id: nodeId,
-              label: aiNode.label || nodeId,
-              role: (aiNode.type || "access")?.toLowerCase(),
-              type: aiNode.type || "Switch",
-              model: aiNode.model,
-              mgmtIp: aiNode.ip || aiNode.management_ip
-            });
-          }
-        });
-        
-        const updatedNodes = Array.from(nodeMap.values());
-        
-        // Convert edges to internal format (a/b instead of from/to)
-        const convertedEdges = aiEdges.map(edge => ({
-          a: edge.from,
-          b: edge.to,
-          label: edge.label || "",
-          evidence: edge.evidence || "",
-          type: "trunk" // Default type
-        }));
-        
-        // Create default positions for new nodes with better distribution
-        const updatedPositions = { ...positions };
-        
-        // Count nodes by role for better distribution
-        const roleCounts = {};
-        const roleIndices = {};
-        updatedNodes.forEach(node => {
-          const role = (node.role || "default").toLowerCase();
-          roleCounts[role] = (roleCounts[role] || 0) + 1;
-        });
-        
-        updatedNodes.forEach((node, idx) => {
-          if (!updatedPositions[node.id]) {
-            // Assign default position based on role with index
-            const role = (node.role || "access").toLowerCase();
-            roleIndices[role] = (roleIndices[role] || 0);
-            updatedPositions[node.id] = getDefaultPos(node.id, role, roleIndices[role], roleCounts);
-            roleIndices[role]++;
-          }
-        });
-        
-        // Update states
-        setTopologyNodes(updatedNodes);
-        setLinks(convertedEdges);
-        setPositions(updatedPositions);
-        
-        // Update project state (will be saved when user clicks Save)
-        setProjects(prev => prev.map(p => {
-          if (p.id === project.id) {
-            return {
-              ...p,
-              topoLinks: convertedEdges,
-              topoNodes: aiNodes,
-              topoPositions: updatedPositions
-            };
-          }
-          return p;
-        }));
-        
-        // Show success message
-        alert(`✅ Topology generated successfully!\n\n${result.analysis_summary || `Found ${aiNodes.length} nodes and ${convertedEdges.length} links.`}\n\nClick "แก้ไขกราฟ" แล้ว "บันทึก" to save the topology.`);
-      } else {
-        setTopologyError(result.analysis_summary || "Failed to generate topology. No topology data returned.");
-      }
-    } catch (error) {
-      console.error("Failed to generate topology:", error);
-      setTopologyError(error.message || "Failed to generate topology");
-    } finally {
-      setGeneratingTopology(false);
-    }
+      });
+    // Note: We don't set generatingTopology=false here - polling will handle it when result is ready
   };
 
   const [dragging, setDragging] = useState(null);
@@ -10034,14 +11003,28 @@ const TopologyGraph = ({ project, onOpenDevice, can, authedUser, setProjects, se
             {/* Action buttons - larger and clearer */}
             <div className="flex gap-1 items-center flex-shrink-0">
               {!editMode && (
-                <button
-                  className="w-6 h-6 flex items-center justify-center rounded bg-blue-600 hover:bg-blue-700 text-white text-xs transition-colors disabled:opacity-50"
-                  onClick={handleGenerateTopology}
-                  disabled={generatingTopology}
-                  title={generatingTopology ? "Generating..." : "Generate Topology"}
-                >
-                  {generatingTopology ? "⏳" : "🤖"}
-                </button>
+                <>
+                  <NotificationModal
+                    show={showTopologyNotification}
+                    onClose={() => setShowTopologyNotification(false)}
+                    title={topologyNotificationData?.title || "Topology Generated"}
+                    message={topologyNotificationData?.message || "LLM topology generation completed."}
+                    metrics={topologyNotificationData?.metrics}
+                    type={topologyNotificationData?.type || "success"}
+                    onRegenerate={() => {
+                      setShowTopologyNotification(false);
+                      doGenerateTopology();
+                    }}
+                  />
+                  <button
+                    onClick={handleGenerateTopology}
+                    disabled={generatingTopology}
+                    className="px-2 py-1 text-[10px] font-medium rounded-md bg-emerald-600 hover:bg-emerald-700 text-white transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                    title={generatingTopology ? "Analysis in progress. Please wait..." : "Use LLM for topology"}
+                  >
+                    {generatingTopology ? "⏳ Generating..." : "LLM Analysis"}
+                  </button>
+                </>
               )}
               {canEdit && (
                 <>
@@ -10104,13 +11087,28 @@ const TopologyGraph = ({ project, onOpenDevice, can, authedUser, setProjects, se
       className="w-full"
       compact={true}
     >
-      {topologyError && (
-        <div className="mb-3 p-3 bg-rose-50 dark:bg-rose-900/20 border border-rose-300 dark:border-rose-700 rounded-lg">
-          <div className="text-sm text-rose-700 dark:text-rose-400 whitespace-pre-line">
-            <strong>⚠️ Error:</strong> {topologyError}
-          </div>
-        </div>
-      )}
+      {/* Check localStorage for generating state (works even when component remounts) */}
+      {(() => {
+        const projectId = project.project_id || project.id;
+        const storageKey = `llm_generating_topology_${projectId}`;
+        const isGeneratingFromStorage = localStorage.getItem(storageKey) === "true";
+        const isActuallyGenerating = generatingTopology || isGeneratingFromStorage;
+        
+        return (
+          <>
+            {isActuallyGenerating && (
+              <div className="mb-3 p-2 rounded bg-slate-700/50 border border-slate-600 text-slate-300 text-xs">
+                ⏳ Analyzing with LLM... This may take 1–2 minutes (depending on number of devices). You can navigate away and return later.
+              </div>
+            )}
+            {topologyError && (
+              <div className="mb-2 p-2 rounded bg-rose-900/20 border border-rose-700 text-rose-400 text-xs break-words">
+                Error: {topologyError}
+              </div>
+            )}
+          </>
+        );
+      })()}
       {editMode && (
         <div className="mb-2 px-2 py-1 bg-gray-50 dark:bg-gray-800 rounded">
           <div className="flex items-center gap-1.5 flex-wrap">
