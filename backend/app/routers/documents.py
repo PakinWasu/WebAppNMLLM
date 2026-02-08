@@ -577,6 +577,7 @@ async def get_document_content(
     project_id: str,
     document_id: str,
     version: Optional[int] = Query(None, description="Specific version, or latest if not provided"),
+    extract_config: bool = Query(False, description="If true, extract only config block (Huawei/Cisco); strips banners, prompts, pagination"),
     user=Depends(get_current_user)
 ):
     """Get raw text content of a document (for config compare / diff). Returns plain text."""
@@ -588,6 +589,12 @@ async def get_document_content(
         text = content_bytes.decode("utf-8", errors="replace")
     except Exception:
         text = content_bytes.decode("latin-1", errors="replace")
+    if extract_config:
+        from ..services.config_extract import extract_config_content
+        cleaned = extract_config_content(text)
+        # If no config block found, fall back to raw content so the compare view shows something
+        if cleaned:
+            text = cleaned
     return PlainTextResponse(content=text, media_type="text/plain; charset=utf-8")
 
 

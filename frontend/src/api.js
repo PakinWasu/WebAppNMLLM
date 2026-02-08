@@ -272,12 +272,14 @@ export async function getDeviceConfigs(projectId, deviceId) {
  return res.configs || [];
 }
 
-/** Get raw text content of a document (for config diff). Returns string. */
-export async function getDocumentContentText(projectId, documentId, version = null) {
+/** Get raw text content of a document (for config diff). Returns string. Optionally extract only config block (Huawei/Cisco). */
+export async function getDocumentContentText(projectId, documentId, version = null, options = {}) {
  const token = getToken();
- const url = version != null
-  ? `${API_BASE || ''}/projects/${projectId}/documents/${documentId}/content?version=${version}`
-  : `${API_BASE || ''}/projects/${projectId}/documents/${documentId}/content`;
+ const params = new URLSearchParams();
+ if (version != null) params.append('version', String(version));
+ if (options.extractConfig === true) params.append('extract_config', 'true');
+ const qs = params.toString();
+ const url = `${API_BASE || ''}/projects/${projectId}/documents/${documentId}/content${qs ? `?${qs}` : ''}`;
  const response = await fetch(url, {
   headers: { Authorization: token ? `Bearer ${token}` : '' },
  });
@@ -399,6 +401,13 @@ export async function getDeviceImage(projectId, deviceName) {
 
 export async function deleteDeviceImage(projectId, deviceName) {
   return api(`/projects/${projectId}/devices/${deviceName}/image`, {
+    method: 'DELETE',
+  });
+}
+
+/** Delete device and all its data (configs, versions, parsed_configs, image, LLM results). Not allowed for viewer. */
+export async function deleteDevice(projectId, deviceName) {
+  return api(`/projects/${projectId}/devices/${deviceName}`, {
     method: 'DELETE',
   });
 }

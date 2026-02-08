@@ -264,13 +264,20 @@ async def delete_project(project_id: str, user=Depends(get_current_user)):
         folders_result = await db()["project_folders"].delete_many({"project_id": project_id})
     except Exception:
         folders_result = None
-    
-    # 6. Delete the project itself
+
+    # 6. Delete LLM results for this project (device overview, recommendations, topology, etc.)
+    try:
+        llm_results_deleted = await db()["llm_results"].delete_many({"project_id": project_id})
+        llm_results_count = llm_results_deleted.deleted_count
+    except Exception:
+        llm_results_count = 0
+
+    # 7. Delete the project itself (includes device_images, topoPositions, etc. in the doc)
     project_result = await db()["projects"].delete_one({"project_id": project_id})
-    
+
     # TODO: Also delete files from storage directory
     # Storage path: storage/{project_id}/
-    
+
     return {
         "message": "Project and all related data deleted",
         "deleted": {
@@ -280,5 +287,6 @@ async def delete_project(project_id: str, user=Depends(get_current_user)):
             "parsed_configs": parsed_configs_result.deleted_count if parsed_configs_result else 0,
             "options": options_result.deleted_count if options_result else 0,
             "folders": folders_result.deleted_count if folders_result else 0,
+            "llm_results": llm_results_count,
         }
     }

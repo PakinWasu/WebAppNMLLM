@@ -3,12 +3,13 @@
 from fastapi import APIRouter, Depends, HTTPException, UploadFile, File, Form
 from typing import List, Dict, Any, Optional
 from datetime import datetime, timezone
+import re
 import base64
 from PIL import Image
 import io
 
 from ..db.mongo import db
-from ..dependencies.auth import get_current_user, check_project_access
+from ..dependencies.auth import get_current_user, check_project_access, check_project_editor_or_admin
 
 router = APIRouter(prefix="/projects/{project_id}/summary", tags=["summary"])
 device_router = APIRouter(prefix="/projects/{project_id}/devices", tags=["devices"])
@@ -147,6 +148,107 @@ async def delete_device_image(
         )
     
     return {"success": True, "message": "Device image deleted successfully"}
+
+
+@device_router.delete("/{device_name}")
+async def delete_device(
+    project_id: str,
+    device_name: str,
+    user=Depends(get_current_user)
+):
+    """Delete a device and all its data: config documents (all versions), parsed_configs, device image, LLM results, and remove from topology. Viewer cannot delete."""
+    await check_project_access(project_id, user)
+    await check_project_editor_or_admin(project_id, user)
+
+    project = await db()["projects"].find_one({"project_id": project_id})
+    if not project:
+        raise HTTPException(status_code=404, detail="Project not found")
+
+    # 1. Delete all documents for this device (Config folder, all versions)
+    from bson.regex import Regex
+    name_pattern = Regex(f"^{re.escape(device_name)}(\\.|$|_)", "i")
+    docs_result = await db()["documents"].delete_many(
+        {
+            "project_id": project_id,
+            "folder_id": "Config",
+            "$or": [
+                {"device_name": device_name},
+                {"filename": name_pattern},
+            ],
+        }
+    )
+    documents_deleted = docs_result.deleted_count
+
+    # 2. Delete parsed_configs for this device
+    try:
+        parsed_result = await db()["parsed_configs"].delete_many(
+            {"project_id": project_id, "device_name": device_name}
+        )
+        parsed_deleted = parsed_result.deleted_count
+    except Exception:
+        parsed_deleted = 0
+
+    # 3. Remove device image from project
+    device_images = dict(project.get("device_images") or {})
+    if device_name in device_images:
+        del device_images[device_name]
+        await db()["projects"].update_one(
+            {"project_id": project_id},
+            {"$set": {"device_images": device_images, "updated_at": datetime.now(timezone.utc)}}
+        )
+
+    # 4. Delete LLM results for this device (device_overview, device_recommendations, device_config_drift)
+    try:
+        llm_result = await db()["llm_results"].delete_many(
+            {"project_id": project_id, "result_data.device_name": device_name}
+        )
+        llm_deleted = llm_result.deleted_count
+    except Exception:
+        llm_deleted = 0
+
+    # 5. Remove device from topology (positions, links, labels, roles)
+    positions = dict(project.get("topoPositions") or {})
+    links = list(project.get("topoLinks") or [])
+    labels = dict(project.get("topoNodeLabels") or {})
+    roles = dict(project.get("topoNodeRoles") or {})
+    updated = False
+    if device_name in positions:
+        del positions[device_name]
+        updated = True
+    if device_name in labels:
+        del labels[device_name]
+        updated = True
+    if device_name in roles:
+        del roles[device_name]
+        updated = True
+    # Links: list of { from, to, ... } — remove any edge that has this device
+    new_links = [e for e in links if e.get("from") != device_name and e.get("to") != device_name]
+    if len(new_links) != len(links):
+        links = new_links
+        updated = True
+    if updated:
+        await db()["projects"].update_one(
+            {"project_id": project_id},
+            {
+                "$set": {
+                    "topoPositions": positions,
+                    "topoLinks": links,
+                    "topoNodeLabels": labels,
+                    "topoNodeRoles": roles,
+                    "updated_at": datetime.now(timezone.utc),
+                }
+            }
+        )
+
+    return {
+        "success": True,
+        "message": f"Device '{device_name}' and all its data deleted",
+        "deleted": {
+            "documents": documents_deleted,
+            "parsed_configs": parsed_deleted,
+            "llm_results": llm_deleted,
+        },
+    }
 
 
 @device_router.get("/{device_id}/configs")

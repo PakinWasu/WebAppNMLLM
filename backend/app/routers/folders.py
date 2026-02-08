@@ -4,7 +4,7 @@ from pydantic import BaseModel
 from datetime import datetime, timezone
 
 from ..db.mongo import db
-from ..dependencies.auth import get_current_user, check_project_access, check_project_manager_or_admin
+from ..dependencies.auth import get_current_user, check_project_access, check_project_editor_or_admin
 
 router = APIRouter(prefix="/projects/{project_id}/folders", tags=["folders"])
 
@@ -41,8 +41,8 @@ async def create_folder(
     body: FolderCreate,
     user=Depends(get_current_user)
 ):
-    """Create a new custom folder. Only admin or project manager can do this."""
-    await check_project_manager_or_admin(project_id, user)
+    """Create a new custom folder. Admin, manager, or engineer can do this."""
+    await check_project_editor_or_admin(project_id, user)
     
     # Validate folder name
     if not body.name or not body.name.strip():
@@ -102,8 +102,8 @@ async def update_folder(
     body: FolderUpdate,
     user=Depends(get_current_user)
 ):
-    """Update a custom folder. Only admin or project manager can do this."""
-    await check_project_manager_or_admin(project_id, user)
+    """Update a custom folder. Admin, manager, or engineer can do this."""
+    await check_project_editor_or_admin(project_id, user)
     
     # Prevent editing Config folder
     if folder_id == "Config":
@@ -161,8 +161,8 @@ async def delete_folder(
     folder_id: str,
     user=Depends(get_current_user)
 ):
-    """Delete a custom folder (soft delete). Only admin or project manager can do this."""
-    await check_project_manager_or_admin(project_id, user)
+    """Delete a custom folder (soft delete). Admin, manager, or engineer can do this."""
+    await check_project_editor_or_admin(project_id, user)
     
     # Prevent deleting Config folder
     if folder_id == "Config":

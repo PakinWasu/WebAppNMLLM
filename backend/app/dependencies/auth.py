@@ -38,17 +38,32 @@ async def check_project_access(project_id: str, user: dict):
         raise HTTPException(status_code=403, detail="Not a member of this project")
 
 async def check_project_manager_or_admin(project_id: str, user: dict):
-    """Check if user is admin or project manager. Manager has same permissions as admin in the project."""
+    """Check if user is admin or project manager. Only they can access project settings (members, project update, options)."""
     if user.get("role") == "admin":
         return
-    
-    # Check if user is a manager in the project
+
     membership = await db()["project_members"].find_one(
         {"project_id": project_id, "username": user["username"]}
     )
     if not membership:
         raise HTTPException(status_code=403, detail="Not a member of this project")
-    
+
     if membership.get("role") != "manager":
         raise HTTPException(status_code=403, detail="Only admin or project manager can perform this action")
+
+
+async def check_project_editor_or_admin(project_id: str, user: dict):
+    """Check if user can write project content: admin, manager, or engineer. Viewer is read-only."""
+    if user.get("role") == "admin":
+        return
+
+    membership = await db()["project_members"].find_one(
+        {"project_id": project_id, "username": user["username"]}
+    )
+    if not membership:
+        raise HTTPException(status_code=403, detail="Not a member of this project")
+
+    role = membership.get("role")
+    if role not in ("manager", "engineer"):
+        raise HTTPException(status_code=403, detail="Only admin, manager, or engineer can perform this action")
 

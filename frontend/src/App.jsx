@@ -1134,6 +1134,8 @@ export default function App() {
             deviceId={route.device}
             goBack={() => setRoute({ name: "project", projectId: route.projectId, tab: "summary" })}
             goIndex={() => setRoute({ name: "index" })}
+            can={can}
+            loadProjects={loadProjects}
             uploadHistory={uploadHistory}
             authedUser={authedUser}
             setProjects={setProjects}
@@ -1254,6 +1256,8 @@ export default function App() {
                 deviceId={route.device}
                 goBack={() => setRoute({ name: "project", projectId: route.projectId, tab: "summary" })}
                 goIndex={() => setRoute({ name: "index" })}
+                can={can}
+                loadProjects={loadProjects}
                 uploadHistory={uploadHistory}
                 authedUser={authedUser}
                 setProjects={setProjects}
@@ -3305,9 +3309,13 @@ const ReactDiffViewer = React.lazy(() => import("react-diff-viewer-continued").t
 const CompareConfigModal = ({ project, deviceList = [], onClose }) => {
   const projectId = project?.project_id || project?.id;
   const devices = Array.isArray(deviceList) ? deviceList.filter(Boolean) : [];
-  const [selectedDevice, setSelectedDevice] = useState(devices[0] || "");
-  const [configs, setConfigs] = useState([]);
-  const [loadingConfigs, setLoadingConfigs] = useState(false);
+  const defaultDevice = devices[0] || "";
+  const [sourceDevice, setSourceDevice] = useState(defaultDevice);
+  const [targetDevice, setTargetDevice] = useState(defaultDevice);
+  const [leftConfigs, setLeftConfigs] = useState([]);
+  const [rightConfigs, setRightConfigs] = useState([]);
+  const [loadingLeftConfigs, setLoadingLeftConfigs] = useState(false);
+  const [loadingRightConfigs, setLoadingRightConfigs] = useState(false);
   const [leftConfigId, setLeftConfigId] = useState("");
   const [rightConfigId, setRightConfigId] = useState("");
   const [leftContent, setLeftContent] = useState(null);
@@ -3315,26 +3323,46 @@ const CompareConfigModal = ({ project, deviceList = [], onClose }) => {
   const [loadingDiff, setLoadingDiff] = useState(false);
   const [error, setError] = useState(null);
 
+  // When source device changes, default target to same device
   useEffect(() => {
-    if (!projectId || !selectedDevice) {
-      setConfigs([]);
+    setTargetDevice(sourceDevice);
+  }, [sourceDevice]);
+
+  useEffect(() => {
+    if (!projectId || !sourceDevice) {
+      setLeftConfigs([]);
       setLeftConfigId("");
-      setRightConfigId("");
       setLeftContent(null);
+      return;
+    }
+    setLoadingLeftConfigs(true);
+    setError(null);
+    api.getDeviceConfigs(projectId, sourceDevice)
+      .then((list) => {
+        setLeftConfigs(list);
+        if (list.length) setLeftConfigId(list[0].id);
+      })
+      .catch((err) => setError(err.message || "Failed to load config list"))
+      .finally(() => setLoadingLeftConfigs(false));
+  }, [projectId, sourceDevice]);
+
+  useEffect(() => {
+    if (!projectId || !targetDevice) {
+      setRightConfigs([]);
+      setRightConfigId("");
       setRightContent(null);
       return;
     }
-    setLoadingConfigs(true);
+    setLoadingRightConfigs(true);
     setError(null);
-    api.getDeviceConfigs(projectId, selectedDevice)
+    api.getDeviceConfigs(projectId, targetDevice)
       .then((list) => {
-        setConfigs(list);
-        if (list.length && !leftConfigId) setLeftConfigId(list[0].id);
-        if (list.length && !rightConfigId) setRightConfigId(list[list.length > 1 ? 1 : 0].id);
+        setRightConfigs(list);
+        if (list.length) setRightConfigId(list[0].id);
       })
       .catch((err) => setError(err.message || "Failed to load config list"))
-      .finally(() => setLoadingConfigs(false));
-  }, [projectId, selectedDevice]);
+      .finally(() => setLoadingRightConfigs(false));
+  }, [projectId, targetDevice]);
 
   const parseConfigId = (id) => {
     if (!id || typeof id !== "string") return { document_id: null, version: null };
@@ -3357,8 +3385,8 @@ const CompareConfigModal = ({ project, deviceList = [], onClose }) => {
     const left = parseConfigId(leftConfigId);
     const right = parseConfigId(rightConfigId);
     Promise.all([
-      api.getDocumentContentText(projectId, left.document_id, left.version),
-      api.getDocumentContentText(projectId, right.document_id, right.version),
+      api.getDocumentContentText(projectId, left.document_id, left.version, { extractConfig: true }),
+      api.getDocumentContentText(projectId, right.document_id, right.version, { extractConfig: true }),
     ])
       .then(([textLeft, textRight]) => {
         setLeftContent(textLeft ?? "");
@@ -3372,10 +3400,11 @@ const CompareConfigModal = ({ project, deviceList = [], onClose }) => {
       .finally(() => setLoadingDiff(false));
   }, [projectId, leftConfigId, rightConfigId]);
 
-  const leftConfig = configs.find((c) => c.id === leftConfigId);
-  const rightConfig = configs.find((c) => c.id === rightConfigId);
+  const leftConfig = leftConfigs.find((c) => c.id === leftConfigId);
+  const rightConfig = rightConfigs.find((c) => c.id === rightConfigId);
   const leftLabel = leftConfig ? leftConfig.filename : "—";
   const rightLabel = rightConfig ? rightConfig.filename : "—";
+  const loadingConfigs = loadingLeftConfigs || loadingRightConfigs;
 
   return (
     <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4" onClick={(e) => e.target === e.currentTarget && onClose()}>
@@ -3385,20 +3414,29 @@ const CompareConfigModal = ({ project, deviceList = [], onClose }) => {
           <button type="button" className="p-2 rounded-lg text-slate-500 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-800 hover:text-slate-700 dark:hover:text-slate-200 transition-colors" onClick={onClose} aria-label="Close">✕</button>
         </div>
         <div className="flex-shrink-0 p-4 space-y-3 border-b border-slate-300 dark:border-slate-700">
-          <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
             <div>
-              <label className="block text-xs font-medium text-slate-600 dark:text-slate-400 mb-1">Select Device</label>
+              <label className="block text-xs font-medium text-slate-600 dark:text-slate-400 mb-1">Source Device</label>
               <Select
                 options={devices.map((d) => ({ value: d, label: d }))}
-                value={selectedDevice}
-                onChange={setSelectedDevice}
+                value={sourceDevice}
+                onChange={setSourceDevice}
+                className="w-full"
+              />
+            </div>
+            <div>
+              <label className="block text-xs font-medium text-slate-600 dark:text-slate-400 mb-1">Target Device</label>
+              <Select
+                options={devices.map((d) => ({ value: d, label: d }))}
+                value={targetDevice}
+                onChange={setTargetDevice}
                 className="w-full"
               />
             </div>
             <div>
               <label className="block text-xs font-medium text-slate-600 dark:text-slate-400 mb-1">Left Config (Source)</label>
               <Select
-                options={configs.map((c) => ({
+                options={leftConfigs.map((c) => ({
                   value: c.id,
                   label: `${c.filename}${c.created_at ? ` — ${new Date(c.created_at).toLocaleString()}` : ""}`.trim(),
                 }))}
@@ -3410,7 +3448,7 @@ const CompareConfigModal = ({ project, deviceList = [], onClose }) => {
             <div>
               <label className="block text-xs font-medium text-slate-600 dark:text-slate-400 mb-1">Right Config (Target)</label>
               <Select
-                options={configs.map((c) => ({
+                options={rightConfigs.map((c) => ({
                   value: c.id,
                   label: `${c.filename}${c.created_at ? ` — ${new Date(c.created_at).toLocaleString()}` : ""}`.trim(),
                 }))}
@@ -3424,8 +3462,15 @@ const CompareConfigModal = ({ project, deviceList = [], onClose }) => {
             <div className="text-sm text-rose-600 dark:text-rose-400">{error}</div>
           )}
           {loadingConfigs && <div className="text-sm text-slate-500 dark:text-slate-400">Loading config list…</div>}
-          {!loadingConfigs && selectedDevice && configs.length === 0 && (
-            <div className="text-sm text-slate-500 dark:text-slate-400">No config versions for this device. Upload configs to the Config folder first.</div>
+          {!loadingConfigs && (
+            <>
+              {sourceDevice && leftConfigs.length === 0 && (
+                <div className="text-sm text-slate-500 dark:text-slate-400">No config versions for source device. Upload configs to the Config folder first.</div>
+              )}
+              {targetDevice && rightConfigs.length === 0 && (
+                <div className="text-sm text-slate-500 dark:text-slate-400">No config versions for target device. Upload configs to the Config folder first.</div>
+              )}
+            </>
           )}
         </div>
         <div className="flex-1 min-h-0 flex flex-col p-4 overflow-hidden">
@@ -3440,16 +3485,22 @@ const CompareConfigModal = ({ project, deviceList = [], onClose }) => {
                 <span className="truncate" title={leftLabel}>Left: {leftLabel}</span>
                 <span className="truncate" title={rightLabel}>Right: {rightLabel}</span>
               </div>
-              <div className="flex-1 min-h-0 overflow-auto rounded-xl border border-slate-300 dark:border-slate-700 bg-slate-50 dark:bg-slate-800/50 [&_.diff]:!font-mono [&_.diff]:!text-xs">
-                <React.Suspense fallback={<div className="p-4 text-slate-500">Loading diff viewer…</div>}>
-                  <ReactDiffViewer
-                    oldValue={leftContent}
-                    newValue={rightContent}
-                    splitView={true}
-                    showDiffOnly={false}
-                  />
-                </React.Suspense>
-              </div>
+              {!leftContent && !rightContent ? (
+                <div className="flex-1 flex items-center justify-center text-slate-500 dark:text-slate-400 text-sm">
+                  No content to compare (files may be empty).
+                </div>
+              ) : (
+                <div className="flex-1 min-h-0 overflow-auto rounded-xl border border-slate-300 dark:border-slate-700 bg-slate-50 dark:bg-slate-800/50 [&_.diff]:!font-mono [&_.diff]:!text-xs">
+                  <React.Suspense fallback={<div className="p-4 text-slate-500">Loading diff viewer…</div>}>
+                    <ReactDiffViewer
+                      oldValue={leftContent || " "}
+                      newValue={rightContent || " "}
+                      splitView={true}
+                      showDiffOnly={false}
+                    />
+                  </React.Suspense>
+                </div>
+              )}
             </>
           )}
         </div>
@@ -3843,7 +3894,7 @@ const SummaryPage = ({ project, can, authedUser, setProjects, openDevice, llmBus
 
 
 /* ========= DEVICE DETAILS PAGE (with header navigation) ========= */
-const DeviceDetailsPage = ({ project, deviceId, goBack, goIndex, uploadHistory, authedUser, setProjects, llmBusy, llmBusyMessage, requestRun, onComplete }) => {
+const DeviceDetailsPage = ({ project, deviceId, goBack, goIndex, can, loadProjects, uploadHistory, authedUser, setProjects, llmBusy, llmBusyMessage, requestRun, onComplete }) => {
   if (!project) {
     return <div className="text-sm text-rose-400">Project not found</div>;
   }
@@ -3854,6 +3905,8 @@ const DeviceDetailsPage = ({ project, deviceId, goBack, goIndex, uploadHistory, 
         project={project}
         deviceId={deviceId}
         goBack={goBack}
+        can={can}
+        loadProjects={loadProjects}
         uploadHistory={uploadHistory}
         authedUser={authedUser}
         setProjects={setProjects}
@@ -3868,8 +3921,13 @@ const DeviceDetailsPage = ({ project, deviceId, goBack, goIndex, uploadHistory, 
 
 /* ========= DEVICE DETAILS (Overview / Interfaces / VLANs / Raw) ========= */
 /* ========= DEVICE DETAILS (Overview / Interfaces / VLANs / Raw) ========= */
-const DeviceDetailsView = ({ project, deviceId, goBack, uploadHistory, authedUser, setProjects, llmBusy: globalLlmBusy, llmBusyMessage, requestRun, onComplete }) => {
+const DeviceDetailsView = ({ project, deviceId, goBack, can: canProp, loadProjects, uploadHistory, authedUser, setProjects, llmBusy: globalLlmBusy, llmBusyMessage, requestRun, onComplete }) => {
   console.log('[DeviceDetailsView] Rendering with props:', { project, deviceId, hasGoBack: !!goBack });
+  const [showDeleteDeviceModal, setShowDeleteDeviceModal] = React.useState(false);
+  const [deleteConfirmText, setDeleteConfirmText] = React.useState("");
+  const [deleteDeviceLoading, setDeleteDeviceLoading] = React.useState(false);
+  const can = typeof canProp === "function" ? canProp : () => false;
+  const canDeleteDevice = can("upload-config", project);
   
   // Early return if project or deviceId is missing
   if (!project) {
@@ -4649,9 +4707,66 @@ const DeviceDetailsView = ({ project, deviceId, goBack, uploadHistory, authedUse
               ))}
             </div>
             <Button variant="secondary" onClick={goBack} className="text-xs py-1.5 px-3 h-8 flex-shrink-0">← Back to Summary</Button>
+            {canDeleteDevice && (
+              <Button variant="danger" onClick={() => { setShowDeleteDeviceModal(true); setDeleteConfirmText(""); }} className="text-xs py-1.5 px-3 h-8 flex-shrink-0">
+                ลบอุปกรณ์
+              </Button>
+            )}
           </div>
         )}
       </div>
+
+      {/* Delete device confirmation modal */}
+      {showDeleteDeviceModal && (
+        <div className="fixed inset-0 z-[100] flex items-center justify-center p-4" role="dialog" aria-modal="true">
+          <div className="absolute inset-0 bg-black/50" onClick={() => !deleteDeviceLoading && setShowDeleteDeviceModal(false)} />
+          <div className="relative z-10 w-full max-w-md rounded-xl border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-900 shadow-xl p-5">
+            <h3 className="text-lg font-semibold text-slate-800 dark:text-slate-200 mb-2">ยืนยันการลบอุปกรณ์</h3>
+            <p className="text-sm text-slate-600 dark:text-slate-400 mb-3">
+              การลบจะทำให้ข้อมูล config ทุกเวอร์ชัน รูปอุปกรณ์ และผลวิเคราะห์ของอุปกรณ์ <strong>{safeDisplay(deviceId)}</strong> หายทั้งหมด และจะลบออกจาก topology ด้วย
+            </p>
+            <p className="text-sm text-slate-600 dark:text-slate-400 mb-2">
+              พิมพ์ชื่ออุปกรณ์ด้านล่างเพื่อยืนยัน:
+            </p>
+            <input
+              type="text"
+              value={deleteConfirmText}
+              onChange={(e) => setDeleteConfirmText(e.target.value)}
+              placeholder={deviceId}
+              className="w-full px-3 py-2 rounded-lg border border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-800 text-slate-900 dark:text-slate-100 text-sm mb-4"
+              disabled={deleteDeviceLoading}
+              autoFocus
+            />
+            <div className="flex gap-2 justify-end">
+              <Button variant="secondary" onClick={() => !deleteDeviceLoading && setShowDeleteDeviceModal(false)} disabled={deleteDeviceLoading}>
+                ยกเลิก
+              </Button>
+              <Button
+                variant="danger"
+                onClick={async () => {
+                  if (deleteConfirmText !== deviceId) return;
+                  setDeleteDeviceLoading(true);
+                  try {
+                    const projectId = project?.project_id || project?.id;
+                    await api.deleteDevice(projectId, deviceId);
+                    setShowDeleteDeviceModal(false);
+                    setDeleteConfirmText("");
+                    if (loadProjects) await loadProjects();
+                    if (goBack) goBack();
+                  } catch (e) {
+                    alert("ลบอุปกรณ์ไม่สำเร็จ: " + (e.message || e));
+                  } finally {
+                    setDeleteDeviceLoading(false);
+                  }
+                }}
+                disabled={deleteConfirmText !== deviceId || deleteDeviceLoading}
+              >
+                {deleteDeviceLoading ? "กำลังลบ…" : "ลบอุปกรณ์"}
+              </Button>
+            </div>
+          </div>
+        </div>
+      )}
 
       {loading && (
         <div className="flex-1 flex items-center justify-center text-slate-500 dark:text-slate-400 text-xs py-8">
@@ -4678,6 +4793,7 @@ const DeviceDetailsView = ({ project, deviceId, goBack, uploadHistory, authedUse
                     deviceName={deviceId}
                     authedUser={authedUser}
                     setProjects={setProjects}
+                    can={can}
                   />
                 </div>
               </Card>
@@ -9888,16 +10004,15 @@ const TopoGraph = ({ nodes = [], links = [], getNodeTooltip, onNodeClick }) => {
 
 
 /* ===== Device Image Upload Component ===== */
-const DeviceImageUpload = ({ project, deviceName, authedUser, setProjects }) => {
+const DeviceImageUpload = ({ project, deviceName, authedUser, setProjects, can: canProp }) => {
   const [imageUrl, setImageUrl] = React.useState(null);
   const [uploading, setUploading] = React.useState(false);
   const [error, setError] = React.useState(null);
   const fileInputRef = React.useRef(null);
   
-  // Check if user can edit
-  const projectMember = project?.members?.find(m => m.username === authedUser?.username);
-  const isManager = authedUser?.role === "admin" || projectMember?.role === "manager";
-  const canEdit = isManager;
+  // Check if user can edit (admin, manager, or engineer — viewer is read-only)
+  const can = typeof canProp === "function" ? canProp : () => false;
+  const canEdit = can("upload-config", project);
   
   // Load existing image from project state or API
   React.useEffect(() => {
@@ -10333,10 +10448,9 @@ const TopologyGraph = ({ project, onOpenDevice, can, authedUser, setProjects, se
   // Use topology nodes if available, otherwise use base nodes
   const nodes = topologyNodes.length > 0 ? topologyNodes : baseNodes;
 
-  // Check if user is manager in this project
+  // Check if user can edit topology (admin, manager, or engineer — viewer is read-only; settings stay manager-only)
   const projectMember = project?.members?.find(m => m.username === authedUser?.username);
-  const isManager = authedUser?.role === "admin" || projectMember?.role === "manager";
-  const canEdit = isManager && can("project-setting", project);
+  const canEdit = can("upload-config", project);
 
   const [editMode, setEditMode] = useState(false);
   
