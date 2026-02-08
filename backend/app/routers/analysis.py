@@ -42,6 +42,22 @@ async def _get_latest_configs_per_device(project_id: str):
         doc.pop("_id", None)
         devices_data.append(doc)
     return devices_data
+
+
+async def _get_latest_config_for_device(project_id: str, device_name: str):
+    """
+    Fetch latest parsed config for a single device. Returns one doc (dict) or None.
+    """
+    pipeline = [
+        {"$match": {"project_id": project_id, "device_name": device_name}},
+        {"$sort": {"upload_timestamp": -1}},
+        {"$limit": 1},
+    ]
+    cursor = db()["parsed_configs"].aggregate(pipeline)
+    async for doc in cursor:
+        doc.pop("_id", None)
+        return doc
+    return None
 from ..models.analysis import (
     AnalysisCreate,
     AnalysisInDB,
@@ -55,11 +71,22 @@ from ..models.analysis import (
 )
 from ..services.llm_service import llm_service
 from ..services.accuracy_tracker import accuracy_tracker
+from ..services.llm_lock import acquire_llm_lock, release_llm_lock, get_llm_status as get_llm_lock_status
 
 router = APIRouter(prefix="/projects/{project_id}/analysis", tags=["analysis"])
 
 # Project-Level Analysis Router
 overview_router = APIRouter(prefix="/projects/{project_id}/analyze", tags=["analyze"])
+
+
+@overview_router.get("/llm-status")
+async def get_project_llm_status(
+    project_id: str,
+    user=Depends(get_current_user),
+):
+    """Return whether an LLM job is currently running for this project (any user/device). Used to sync UI across clients."""
+    await check_project_access(project_id, user)
+    return await get_llm_lock_status(project_id)
 
 
 @overview_router.get("/overview")
@@ -105,6 +132,446 @@ async def get_project_overview(
             status_code=500,
             detail=f"Failed to fetch overview: {str(e)}"
         )
+
+
+@overview_router.get("/device-overview")
+async def get_device_overview(
+    project_id: str,
+    device_name: str,
+    user=Depends(get_current_user)
+):
+    """Get saved per-device overview from database."""
+    try:
+        await check_project_access(project_id, user)
+        saved_result = await db()["llm_results"].find_one(
+            {
+                "project_id": project_id,
+                "result_type": "device_overview",
+                "result_data.device_name": device_name,
+            },
+            sort=[("generated_at", -1)],
+        )
+        if not saved_result:
+            raise HTTPException(
+                status_code=404,
+                detail="No saved overview for this device. Generate one first.",
+            )
+        result_data = saved_result.get("result_data", {})
+        overview_text = result_data.get("overview_text", "No overview available.")
+        return {
+            "overview_text": overview_text,
+            "metrics": saved_result.get("metrics", {}),
+            "project_id": project_id,
+            "device_name": device_name,
+            "generated_at": _iso_generated_at(saved_result.get("generated_at")),
+        }
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.exception(f"Error fetching device overview for project {project_id} device {device_name}: {e}")
+        raise HTTPException(status_code=500, detail=f"Failed to fetch device overview: {str(e)}")
+
+
+@overview_router.post("/device-overview")
+async def analyze_device_overview(
+    project_id: str,
+    body: dict = Body(default=None),
+    user=Depends(get_current_user),
+):
+    """
+    Per-device analysis: LLM summary for a single device (More Detail page - Device Summary tab).
+    Body: { "device_name": "CORE1" }
+    """
+    device_name = (body or {}).get("device_name") or (body or {}).get("device_id")
+    if not device_name:
+        raise HTTPException(status_code=400, detail="device_name (or device_id) required in body.")
+    await check_project_access(project_id, user)
+    if not await acquire_llm_lock(project_id, user.get("username"), "device_overview"):
+        raise HTTPException(
+            status_code=409,
+            detail="An LLM job is already running for this project (another user or tab). Please wait until it finishes.",
+        )
+    try:
+        doc = await _get_latest_config_for_device(project_id, device_name)
+        if not doc:
+            raise HTTPException(
+                status_code=404,
+                detail=f"No configuration found for device '{device_name}'. Upload config first.",
+            )
+        # Build same shape as _get_latest_configs_per_device for LLM
+        device_data = {
+            "device_name": doc.get("device_name"),
+            "device_overview": doc.get("device_overview", {}),
+            "interfaces": doc.get("interfaces", []),
+            "neighbors": doc.get("neighbors", []),
+            "routing": doc.get("routing", {}),
+            "vlans": doc.get("vlans", {}),
+            "stp": doc.get("stp", {}),
+        }
+        result = await llm_service.analyze_device_overview(
+            [device_data],
+            project_id=project_id,
+            device_name=device_name,
+        )
+        if "error" in result.get("parsed_response", {}):
+            raise HTTPException(
+                status_code=500,
+                detail=result.get("content", "LLM device analysis failed."),
+            )
+        overview_text = (result.get("parsed_response") or {}).get("overview_text", "Analysis completed.")
+        metrics = result.get("metrics", {})
+        # Save per-device (one doc per project + device)
+        from ..services.topology_service import topology_service
+        await topology_service._save_llm_result(
+            project_id=project_id,
+            result_type="device_overview",
+            result_data={"overview_text": overview_text, "device_name": device_name},
+            analysis_summary=overview_text[:500],
+            metrics=metrics,
+            llm_used=True,
+        )
+        # Device overview stores one per device; update the doc so GET can find it by result_data.device_name
+        await db()["llm_results"].update_one(
+            {
+                "project_id": project_id,
+                "result_type": "device_overview",
+                "result_data.device_name": device_name,
+            },
+            {
+                "$set": {
+                    "result_data": {"overview_text": overview_text, "device_name": device_name},
+                    "analysis_summary": overview_text[:500],
+                    "metrics": metrics,
+                    "llm_used": True,
+                    "generated_at": datetime.utcnow(),
+                }
+            },
+            upsert=True,
+        )
+        return {
+            "overview_text": overview_text,
+            "metrics": metrics,
+            "project_id": project_id,
+            "device_name": device_name,
+        }
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.exception(f"Error in analyze_device_overview for project {project_id} device {device_name}: {e}")
+        raise HTTPException(status_code=500, detail=f"Device overview analysis failed: {str(e)}")
+    finally:
+        await release_llm_lock(project_id)
+
+
+@overview_router.get("/device-recommendations")
+async def get_device_recommendations(
+    project_id: str,
+    device_name: str,
+    user=Depends(get_current_user),
+):
+    """Get saved per-device recommendations from database."""
+    try:
+        await check_project_access(project_id, user)
+        saved_result = await db()["llm_results"].find_one(
+            {
+                "project_id": project_id,
+                "result_type": "device_recommendations",
+                "result_data.device_name": device_name,
+            },
+            sort=[("generated_at", -1)],
+        )
+        if not saved_result:
+            raise HTTPException(
+                status_code=404,
+                detail="No saved recommendations for this device. Generate one first.",
+            )
+        result_data = saved_result.get("result_data", {})
+        recommendations = result_data.get("recommendations", [])
+        return {
+            "recommendations": recommendations,
+            "metrics": saved_result.get("metrics", {}),
+            "project_id": project_id,
+            "device_name": device_name,
+            "generated_at": _iso_generated_at(saved_result.get("generated_at")),
+        }
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.exception(f"Error fetching device recommendations for project {project_id} device {device_name}: {e}")
+        raise HTTPException(status_code=500, detail=f"Failed to fetch device recommendations: {str(e)}")
+
+
+@overview_router.post("/device-recommendations")
+async def analyze_device_recommendations(
+    project_id: str,
+    body: dict = Body(default=None),
+    user=Depends(get_current_user),
+):
+    """
+    Per-device recommendations: LLM finds flaws and recommends improvements (More Detail - AI Recommendations tab).
+    Body: { "device_name": "CORE1" }
+    """
+    device_name = (body or {}).get("device_name") or (body or {}).get("device_id")
+    if not device_name:
+        raise HTTPException(status_code=400, detail="device_name (or device_id) required in body.")
+    await check_project_access(project_id, user)
+    if not await acquire_llm_lock(project_id, user.get("username"), "device_recommendations"):
+        raise HTTPException(
+            status_code=409,
+            detail="An LLM job is already running for this project (another user or tab). Please wait until it finishes.",
+        )
+    try:
+        doc = await _get_latest_config_for_device(project_id, device_name)
+        if not doc:
+            raise HTTPException(
+                status_code=404,
+                detail=f"No configuration found for device '{device_name}'. Upload config first.",
+            )
+        device_data = {
+            "device_name": doc.get("device_name"),
+            "device_overview": doc.get("device_overview", {}),
+            "interfaces": doc.get("interfaces", []),
+            "neighbors": doc.get("neighbors", []),
+            "routing": doc.get("routing", {}),
+            "vlans": doc.get("vlans", {}),
+            "stp": doc.get("stp", {}),
+        }
+        result = await llm_service.analyze_device_recommendations(
+            [device_data],
+            project_id=project_id,
+            device_name=device_name,
+        )
+        if "error" in result.get("parsed_response", {}):
+            raise HTTPException(
+                status_code=500,
+                detail=result.get("content", "LLM device recommendations failed."),
+            )
+        recommendations = (result.get("parsed_response") or {}).get("recommendations", [])
+        metrics = result.get("metrics", {})
+        validated = []
+        for rec in recommendations:
+            if isinstance(rec, dict):
+                validated.append({
+                    "severity": (rec.get("severity") or "medium").lower(),
+                    "issue": (rec.get("issue") or "").strip(),
+                    "recommendation": (rec.get("recommendation") or "").strip(),
+                })
+        from ..services.topology_service import topology_service
+        await topology_service._save_llm_result(
+            project_id=project_id,
+            result_type="device_recommendations",
+            result_data={"recommendations": validated, "device_name": device_name},
+            analysis_summary=f"{len(validated)} recommendations",
+            metrics=metrics,
+            llm_used=True,
+        )
+        await db()["llm_results"].update_one(
+            {
+                "project_id": project_id,
+                "result_type": "device_recommendations",
+                "result_data.device_name": device_name,
+            },
+            {
+                "$set": {
+                    "result_data": {"recommendations": validated, "device_name": device_name},
+                    "analysis_summary": f"{len(validated)} recommendations",
+                    "metrics": metrics,
+                    "llm_used": True,
+                    "generated_at": datetime.utcnow(),
+                }
+            },
+            upsert=True,
+        )
+        return {
+            "recommendations": validated,
+            "metrics": metrics,
+            "project_id": project_id,
+            "device_name": device_name,
+        }
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.exception(f"Error in analyze_device_recommendations for project {project_id} device {device_name}: {e}")
+        raise HTTPException(status_code=500, detail=f"Device recommendations analysis failed: {str(e)}")
+    finally:
+        await release_llm_lock(project_id)
+
+
+@overview_router.get("/device-config-drift")
+async def get_device_config_drift(
+    project_id: str,
+    device_name: str,
+    user=Depends(get_current_user),
+):
+    """Get saved config drift summary for device (latest vs previous config)."""
+    try:
+        await check_project_access(project_id, user)
+        saved_result = await db()["llm_results"].find_one(
+            {
+                "project_id": project_id,
+                "result_type": "device_config_drift",
+                "result_data.device_name": device_name,
+            },
+            sort=[("generated_at", -1)],
+        )
+        if not saved_result:
+            raise HTTPException(
+                status_code=404,
+                detail="No saved config drift for this device. Generate one first.",
+            )
+        result_data = saved_result.get("result_data", {})
+        return {
+            "device_name": device_name,
+            "from_filename": result_data.get("from_filename"),
+            "to_filename": result_data.get("to_filename"),
+            "changes": result_data.get("changes", []),
+            "metrics": saved_result.get("metrics", {}),
+            "project_id": project_id,
+            "generated_at": _iso_generated_at(saved_result.get("generated_at")),
+        }
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.exception(f"Error fetching device config drift for project {project_id} device {device_name}: {e}")
+        raise HTTPException(status_code=500, detail=f"Failed to fetch config drift: {str(e)}")
+
+
+@overview_router.post("/device-config-drift")
+async def analyze_device_config_drift(
+    project_id: str,
+    body: dict = Body(default=None),
+    user=Depends(get_current_user),
+):
+    """
+    Summarize config drift between two raw config files (More Detail - Config Drift tab).
+    Uses raw uploaded file content, not parsed data.
+    Body (option A - two versions of same document):
+      { "device_name": "CORE1", "document_id": "...", "from_version": 1, "to_version": 2 }
+      from_version = older, to_version = newer (e.g. v1 and v2).
+    Body (option B - two documents):
+      { "device_name": "CORE1", "from_document_id": "...", "to_document_id": "..." }
+    """
+    data = body or {}
+    device_name = data.get("device_name") or data.get("device_id")
+    if not device_name:
+        raise HTTPException(status_code=400, detail="device_name (or device_id) required in body.")
+    await check_project_access(project_id, user)
+    if not await acquire_llm_lock(project_id, user.get("username"), "device_config_drift"):
+        raise HTTPException(
+            status_code=409,
+            detail="An LLM job is already running for this project (another user or tab). Please wait until it finishes.",
+        )
+    try:
+        from ..services.document_storage import read_document_file
+
+        document_id = data.get("document_id")
+        from_version = data.get("from_version")
+        to_version = data.get("to_version")
+        from_doc_id = data.get("from_document_id")
+        to_doc_id = data.get("to_document_id")
+
+        if document_id is not None and from_version is not None and to_version is not None:
+            # Option A: two versions of the same document (raw config from version history)
+            old_raw = await read_document_file(project_id, document_id, int(from_version))
+            new_raw = await read_document_file(project_id, document_id, int(to_version))
+            if not old_raw or not new_raw:
+                raise HTTPException(
+                    status_code=404,
+                    detail="Could not read one or both document versions. Check document_id and version numbers.",
+                )
+            old_content = old_raw.decode("utf-8", errors="replace")
+            new_content = new_raw.decode("utf-8", errors="replace")
+            doc = await db()["documents"].find_one({"project_id": project_id, "document_id": document_id})
+            base_name = (doc or {}).get("filename", "config")
+            from_filename = f"{base_name} (v{from_version})"
+            to_filename = f"{base_name} (v{to_version})"
+        elif from_doc_id and to_doc_id:
+            # Option B: two different documents (legacy)
+            old_raw = await read_document_file(project_id, from_doc_id)
+            new_raw = await read_document_file(project_id, to_doc_id)
+            if not old_raw or not new_raw:
+                raise HTTPException(
+                    status_code=404,
+                    detail="Could not read one or both document files. Check document IDs.",
+                )
+            old_content = old_raw.decode("utf-8", errors="replace")
+            new_content = new_raw.decode("utf-8", errors="replace")
+            from_doc = await db()["documents"].find_one({"project_id": project_id, "document_id": from_doc_id})
+            to_doc = await db()["documents"].find_one({"project_id": project_id, "document_id": to_doc_id})
+            from_filename = (from_doc or {}).get("filename", "backup-old.txt")
+            to_filename = (to_doc or {}).get("filename", "backup-new.txt")
+        else:
+            raise HTTPException(
+                status_code=400,
+                detail="Provide either (document_id, from_version, to_version) for version history, or (from_document_id, to_document_id).",
+            )
+
+        result = await llm_service.analyze_config_drift(
+            old_content,
+            new_content,
+            device_name,
+            from_filename=from_filename,
+            to_filename=to_filename,
+        )
+        if "error" in result.get("parsed_response", {}):
+            raise HTTPException(
+                status_code=500,
+                detail=result.get("content", "LLM config drift analysis failed."),
+            )
+        changes = (result.get("parsed_response") or {}).get("changes", [])
+        metrics = result.get("metrics", {})
+
+        from ..services.topology_service import topology_service
+        await topology_service._save_llm_result(
+            project_id=project_id,
+            result_type="device_config_drift",
+            result_data={
+                "device_name": device_name,
+                "from_filename": from_filename,
+                "to_filename": to_filename,
+                "changes": changes,
+            },
+            analysis_summary=f"{len(changes)} changes",
+            metrics=metrics,
+            llm_used=True,
+        )
+        await db()["llm_results"].update_one(
+            {
+                "project_id": project_id,
+                "result_type": "device_config_drift",
+                "result_data.device_name": device_name,
+            },
+            {
+                "$set": {
+                    "result_data": {
+                        "device_name": device_name,
+                        "from_filename": from_filename,
+                        "to_filename": to_filename,
+                        "changes": changes,
+                    },
+                    "analysis_summary": f"{len(changes)} changes",
+                    "metrics": metrics,
+                    "llm_used": True,
+                    "generated_at": datetime.utcnow(),
+                }
+            },
+            upsert=True,
+        )
+        return {
+            "device_name": device_name,
+            "from_filename": from_filename,
+            "to_filename": to_filename,
+            "changes": changes,
+            "metrics": metrics,
+            "project_id": project_id,
+        }
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.exception(f"Error in analyze_device_config_drift for project {project_id} device {device_name}: {e}")
+        raise HTTPException(status_code=500, detail=f"Config drift analysis failed: {str(e)}")
+    finally:
+        await release_llm_lock(project_id)
 
 
 @overview_router.get("/recommendations")
@@ -165,9 +632,13 @@ async def analyze_project_overview(
     import logging
     logger = logging.getLogger(__name__)
     
+    await check_project_access(project_id, user)
+    if not await acquire_llm_lock(project_id, user.get("username"), "project_overview"):
+        raise HTTPException(
+            status_code=409,
+            detail="An LLM job is already running for this project (another user or tab). Please wait until it finishes.",
+        )
     try:
-        await check_project_access(project_id, user)
-        
         try:
             devices_data = await _get_latest_configs_per_device(project_id)
         except Exception as db_error:
@@ -249,6 +720,8 @@ async def analyze_project_overview(
             status_code=500,
             detail=f"Internal server error: {str(e)}"
         )
+    finally:
+        await release_llm_lock(project_id)
 
 
 # Full Project Analysis endpoints removed - use /analyze/overview and /analyze/recommendations separately
@@ -266,9 +739,13 @@ async def analyze_project_recommendations(
     import logging
     logger = logging.getLogger(__name__)
     
+    await check_project_access(project_id, user)
+    if not await acquire_llm_lock(project_id, user.get("username"), "project_recommendations"):
+        raise HTTPException(
+            status_code=409,
+            detail="An LLM job is already running for this project (another user or tab). Please wait until it finishes.",
+        )
     try:
-        await check_project_access(project_id, user)
-        
         try:
             devices_data = await _get_latest_configs_per_device(project_id)
         except Exception as db_error:
@@ -361,9 +838,7 @@ async def analyze_project_recommendations(
             "devices_analyzed": len(devices_data),
             "project_id": project_id
         }
-    
     except HTTPException:
-        # Re-raise HTTP exceptions as-is
         raise
     except Exception as e:
         logger.exception(f"Unexpected error in analyze_project_recommendations for project {project_id}: {e}")
@@ -371,6 +846,8 @@ async def analyze_project_recommendations(
             status_code=500,
             detail=f"Internal server error: {str(e)}"
         )
+    finally:
+        await release_llm_lock(project_id)
 
 
 @router.post("", response_model=AnalysisPublic)

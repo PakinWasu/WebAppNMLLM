@@ -149,6 +149,55 @@ async def delete_device_image(
     return {"success": True, "message": "Device image deleted successfully"}
 
 
+@device_router.get("/{device_id}/configs")
+async def list_device_configs(
+    project_id: str,
+    device_id: str,
+    user=Depends(get_current_user)
+):
+    """List available config versions for a device (for Compare Config UI). Returns flattened list of document_id, version, filename, created_at."""
+    await check_project_access(project_id, user)
+    device_lower = (device_id or "").strip().lower()
+    if not device_lower:
+        return {"configs": []}
+    # Match filenames that contain device name (with common variants)
+    key_variants = [
+        device_lower,
+        device_lower.replace("-", "_"),
+        device_lower.replace("_", "-"),
+        device_lower.replace("-", "").replace("_", ""),
+    ]
+    configs = []
+    seen_doc_ids = set()
+    async for doc in db()["documents"].find(
+        {"project_id": project_id, "folder_id": "Config", "is_latest": True},
+        {"document_id": 1, "filename": 1}
+    ):
+        name = (doc.get("filename") or "").lower()
+        if not any(k in name for k in key_variants):
+            continue
+        document_id = doc["document_id"]
+        if document_id in seen_doc_ids:
+            continue
+        seen_doc_ids.add(document_id)
+        # Get all versions for this document
+        async for v in db()["documents"].find(
+            {"project_id": project_id, "document_id": document_id},
+            {"version": 1, "filename": 1, "created_at": 1},
+            sort=[("version", -1)]
+        ):
+            created = v.get("created_at")
+            configs.append({
+                "id": f"{document_id}_v{v['version']}",
+                "document_id": document_id,
+                "version": v["version"],
+                "filename": v.get("filename", doc.get("filename", "")),
+                "created_at": created.isoformat() if isinstance(created, datetime) else (created or ""),
+            })
+    configs.sort(key=lambda x: (x["filename"], -(x["version"])))
+    return {"configs": configs}
+
+
 def _device_status(latest: dict) -> str:
     """Derive status from parsed config (OK or not)."""
     return "OK"  # Can add drift/warning logic later

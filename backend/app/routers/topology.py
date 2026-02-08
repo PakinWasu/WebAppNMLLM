@@ -16,6 +16,7 @@ def _iso_generated_at(dt) -> Optional[str]:
     return str(dt)
 from ..dependencies.auth import get_current_user, check_project_access, check_project_manager_or_admin
 from ..services.topology_service import topology_service
+from ..services.llm_lock import acquire_llm_lock, release_llm_lock
 from ..models.topology import TopologyLayoutUpdate
 
 router = APIRouter(prefix="/projects/{project_id}/topology", tags=["topology"])
@@ -61,36 +62,38 @@ async def generate_topology(
         - metrics: Performance metrics
     """
     await check_project_access(project_id, user)
-    
-    # Verify project exists
-    project = await db()["projects"].find_one({"project_id": project_id})
-    if not project:
-        raise HTTPException(status_code=404, detail="Project not found")
-    
-    # Generate topology using LLM
-    result = await topology_service.generate_topology(project_id)
-    
-    # Auto-save topology result to project (nodes and edges) - for backward compatibility
-    if result.get("topology") and (result["topology"].get("nodes") or result["topology"].get("edges")):
-        try:
-            update_data = {
-                "topoNodes": result["topology"].get("nodes", []),
-                "topoEdges": result["topology"].get("edges", []),
-                "topology_llm_metrics": result.get("metrics"),  # Save LLM metrics to project (backward compat)
-                "topology_llm_summary": result.get("analysis_summary"),  # Save LLM summary (backward compat)
-                "updated_at": datetime.now(timezone.utc),
-                "updated_by": user["username"]
-            }
-            await db()["projects"].update_one(
-                {"project_id": project_id},
-                {"$set": update_data}
-            )
-            print(f"[Topology] Auto-saved topology result: {len(result['topology'].get('nodes', []))} nodes, {len(result['topology'].get('edges', []))} edges")
-        except Exception as e:
-            print(f"[Topology] Warning: Failed to auto-save topology result: {e}")
-            # Don't fail the request if save fails
-    
-    return result
+    if not await acquire_llm_lock(project_id, user.get("username"), "topology"):
+        raise HTTPException(
+            status_code=409,
+            detail="An LLM job is already running for this project (another user or tab). Please wait until it finishes.",
+        )
+    try:
+        project = await db()["projects"].find_one({"project_id": project_id})
+        if not project:
+            raise HTTPException(status_code=404, detail="Project not found")
+        result = await topology_service.generate_topology(project_id)
+        # Auto-save topology result to project (nodes and edges) - for backward compatibility
+        if result.get("topology") and (result["topology"].get("nodes") or result["topology"].get("edges")):
+            try:
+                update_data = {
+                    "topoNodes": result["topology"].get("nodes", []),
+                    "topoEdges": result["topology"].get("edges", []),
+                    "topology_llm_metrics": result.get("metrics"),  # Save LLM metrics to project (backward compat)
+                    "topology_llm_summary": result.get("analysis_summary"),  # Save LLM summary (backward compat)
+                    "updated_at": datetime.now(timezone.utc),
+                    "updated_by": user["username"]
+                }
+                await db()["projects"].update_one(
+                    {"project_id": project_id},
+                    {"$set": update_data}
+                )
+                print(f"[Topology] Auto-saved topology result: {len(result['topology'].get('nodes', []))} nodes, {len(result['topology'].get('edges', []))} edges")
+            except Exception as e:
+                print(f"[Topology] Warning: Failed to auto-save topology result: {e}")
+                # Don't fail the request if save fails
+        return result
+    finally:
+        await release_llm_lock(project_id)
 
 
 @router.get("")

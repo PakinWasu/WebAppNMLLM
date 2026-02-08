@@ -217,7 +217,7 @@ const Button = ({
     "inline-flex items-center justify-center rounded-lg px-3 py-1.5 text-xs font-medium shadow-sm transition focus:outline-none focus:ring-2 focus:ring-offset-2 disabled:opacity-50 disabled:cursor-not-allowed whitespace-nowrap";
   const styles = {
     primary:
-      "bg-blue-600 text-white hover:bg-blue-700 focus:ring-blue-500 dark:bg-blue-500 dark:hover:bg-blue-400",
+      "bg-white/90 dark:bg-white/10 backdrop-blur-sm border border-slate-300/80 dark:border-slate-600/80 text-slate-800 dark:text-slate-100 shadow-sm hover:bg-white dark:hover:bg-white/15 focus:ring-slate-400 dark:focus:ring-slate-500",
     secondary:
       "bg-white text-gray-900 ring-1 ring-gray-300 hover:bg-gray-50 focus:ring-blue-500 dark:bg-gray-800 dark:text-gray-100 dark:ring-gray-600 dark:hover:bg-gray-700",
     ghost:
@@ -246,12 +246,12 @@ const NotificationModal = ({ show, onClose, title, message, metrics, type = "suc
   return (
     <div className="fixed inset-0 z-[100] flex items-center justify-center p-4" role="dialog" aria-modal="true" aria-labelledby="notification-modal-title">
       <div className="absolute inset-0 bg-black/50" onClick={onClose} aria-hidden="true" />
-      <div className="relative z-10 bg-white dark:bg-gray-800 rounded-xl shadow-xl max-w-md w-full p-6 border border-gray-200 dark:border-gray-700">
+      <div className="relative z-10 bg-white dark:bg-gray-800 rounded-xl shadow-xl max-w-md w-full p-6 border border-slate-300 dark:border-gray-700">
         <div className="flex items-start justify-between mb-4">
           <h3 id="notification-modal-title" className={`text-lg font-semibold ${
             type === "success" ? "text-green-600 dark:text-green-400" :
             type === "error" ? "text-red-600 dark:text-red-400" :
-            "text-blue-600 dark:text-blue-400"
+            "text-slate-700 dark:text-slate-300"
           }`}>
             {title}
           </h3>
@@ -305,7 +305,7 @@ const NotificationModal = ({ show, onClose, title, message, metrics, type = "suc
           )}
           <button
             onClick={onClose}
-            className="px-4 py-2 text-sm font-medium rounded-lg bg-blue-600 text-white hover:bg-blue-700 transition-colors"
+            className="px-4 py-2 text-sm font-medium rounded-xl bg-white/90 dark:bg-white/10 backdrop-blur-sm border border-slate-300/80 dark:border-slate-600/80 text-slate-800 dark:text-slate-100 shadow-sm hover:bg-white dark:hover:bg-white/15 transition-colors"
           >
             OK
           </button>
@@ -322,7 +322,7 @@ const ConfirmationModal = ({ show, onClose, onConfirm, title, message }) => {
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
       <div className="absolute inset-0 bg-black/50" onClick={onClose} />
-      <div className="relative bg-white dark:bg-gray-800 rounded-xl shadow-xl max-w-md w-full p-6 border border-gray-200 dark:border-gray-700">
+      <div className="relative bg-white dark:bg-gray-800 rounded-xl shadow-xl max-w-md w-full p-6 border border-slate-300 dark:border-gray-700">
         <div className="flex items-start justify-between mb-4">
           <h3 className="text-lg font-semibold text-yellow-600 dark:text-yellow-400">
             {title}
@@ -353,7 +353,7 @@ const ConfirmationModal = ({ show, onClose, onConfirm, title, message }) => {
               onConfirm();
               onClose();
             }}
-            className="px-4 py-2 text-sm font-medium rounded-lg bg-blue-600 text-white hover:bg-blue-700 transition-colors"
+            className="px-4 py-2 text-sm font-medium rounded-xl bg-white/90 dark:bg-white/10 backdrop-blur-sm border border-slate-300/80 dark:border-slate-600/80 text-slate-800 dark:text-slate-100 shadow-sm hover:bg-white dark:hover:bg-white/15 transition-colors"
           >
             Generate Again
           </button>
@@ -368,7 +368,7 @@ const Card = ({ title, actions, children, className = "", compact = false }) => 
   const isFullScreen = className.includes('overflow-hidden') && isFlexCard;
   return (
     <div
-      className={`rounded-2xl border border-gray-200 dark:border-[#1F2937] bg-white dark:bg-[#111827] shadow-sm ${className}`}
+      className={`rounded-2xl border border-slate-300 dark:border-[#1F2937] bg-white dark:bg-[#111827] shadow-sm ${className}`}
     >
       {(title || actions) && (
         <div className={`flex items-center justify-between border-b border-gray-100 dark:border-[#1F2937] flex-shrink-0 ${compact ? 'px-2 py-1' : 'px-5 py-3'}`}>
@@ -416,7 +416,7 @@ const PasswordInput = ({ value, onChange, placeholder, disabled, className = "" 
         placeholder={placeholder}
         disabled={disabled}
         autoComplete="current-password"
-        className={`w-full rounded-xl border border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-800 px-3 py-2 pr-10 text-sm text-gray-900 dark:text-gray-100 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 ${
+        className={`w-full rounded-xl border border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-800 px-3 py-2 pr-10 text-sm text-gray-900 dark:text-gray-100 focus:outline-none focus:ring-2 focus:ring-slate-400 dark:focus:ring-slate-500 focus:border-slate-400 dark:focus:border-slate-500 ${
           className || ""
         }`}
       />
@@ -575,7 +575,7 @@ const SelectWithOther = ({ options = [], value, onChange, className = "", placeh
           {inputValue.trim() !== "" && !options.find(o => o.value === inputValue) && (
             <div
               onClick={() => handleOptionClick(inputValue)}
-              className="px-3 py-2 hover:bg-gray-100 dark:hover:bg-gray-700 cursor-pointer text-sm border-t border-gray-300 dark:border-gray-700 text-blue-600 dark:text-blue-400"
+              className="px-3 py-2 hover:bg-gray-100 dark:hover:bg-gray-700 cursor-pointer text-sm border-t border-gray-300 dark:border-gray-700 text-slate-700 dark:text-slate-300"
             >
               Use "{inputValue}" (custom)
             </div>
@@ -596,30 +596,32 @@ const Table = ({
   const textSizeClass = containerClassName.includes('text-[') 
     ? containerClassName.match(/text-\[[^\]]+\]/)?.[0] 
     : null;
-  const tableTextSize = textSizeClass || "text-[11px]";
+  const tableTextSize = textSizeClass || "text-xs";
   const headerTextSize = textSizeClass ? textSizeClass.replace('text-', 'text-').replace('px]', 'px]') : "text-[10px]";
-  
+  const headerAtLeastXs = headerTextSize === "text-[10px]" ? "text-xs" : headerTextSize;
+
   return (
     <div
-      className={`overflow-auto ${containerClassName}`}
+      className={`overflow-auto w-full ${containerClassName}`}
     >
       <table
-        className={`${minWidthClass} w-full divide-y divide-gray-200 dark:divide-gray-700`}
+        className={`${minWidthClass} w-full divide-y divide-slate-300 dark:divide-gray-700`}
+        style={{ tableLayout: "auto", width: "100%" }}
       >
-        <thead className="bg-gray-100 dark:bg-gray-800 sticky top-0 z-10">
+        <thead className="bg-slate-100 dark:bg-gray-800 sticky top-0 z-10">
           <tr>
             {columns.map((c) => (
               <th
                 key={c.key || c.header}
-                className={`px-2 py-1.5 text-left ${headerTextSize} font-semibold uppercase tracking-wider text-gray-700 dark:text-gray-200 border-b border-gray-200 dark:border-gray-700 whitespace-nowrap`}
-                style={{ width: c.width }}
+                className={`px-2 py-1.5 text-left ${headerAtLeastXs} font-semibold uppercase tracking-wider text-slate-800 dark:text-gray-200 border-b border-slate-300 dark:border-gray-700 whitespace-nowrap`}
+                style={c.width ? { minWidth: c.width } : undefined}
               >
                 {safeDisplay(c.header)}
               </th>
             ))}
           </tr>
         </thead>
-        <tbody className="bg-white dark:bg-gray-900 divide-y divide-gray-200 dark:divide-gray-700">
+        <tbody className="bg-white dark:bg-gray-900 divide-y divide-slate-300 dark:divide-gray-700">
           {data.length === 0 && (
             <tr>
               <td
@@ -664,6 +666,7 @@ const Table = ({
                   <td
                     key={c.key || c.header}
                     className={`px-2 py-1.5 ${tableTextSize} text-gray-900 dark:text-gray-100 whitespace-nowrap`}
+                    style={c.width ? { minWidth: c.width } : undefined}
                   >
                     {cellContent}
                   </td>
@@ -849,6 +852,10 @@ export default function App() {
   const [uploadHistory, setUploadHistory] = useState([]);
   const [loading, setLoading] = useState(false);
 
+  // Global LLM queue: one job at a time per project (Summary + More Detail + Topology share this)
+  const projectIdForLLM = (route.name === "project" || route.name === "device") ? (route.projectId || "") : "";
+  const { llmBusy, requestRun, onComplete, llmBusyMessage } = useLLMQueue(projectIdForLLM);
+
   // Apply dark mode class on mount and when dark changes
   useEffect(() => {
     const root = document.documentElement;
@@ -1019,53 +1026,51 @@ export default function App() {
     return (
       <MainLayout
         topBar={
-          <div className="h-full flex items-center justify-between px-4 border-b border-slate-800">
+          <div className="h-full flex items-center justify-between gap-2 px-3 sm:px-4 border-b border-slate-300 dark:border-slate-800">
             {/* Left: Logo + Platform Name + Breadcrumb */}
-            <div className="flex items-center gap-4 flex-1 min-w-0">
+            <div className="flex items-center gap-2 sm:gap-4 flex-1 min-w-0">
               <button
                 onClick={() => setRoute({ name: "index" })}
-                className="flex items-center gap-3 hover:opacity-80 transition-opacity cursor-pointer flex-shrink-0"
+                className="flex items-center gap-2 sm:gap-3 hover:opacity-85 transition-opacity cursor-pointer flex-shrink-0"
               >
-                <div className="h-7 w-7 rounded-lg bg-blue-600 flex-shrink-0" />
-                <span className="text-sm font-semibold text-slate-200 whitespace-nowrap">Network Project Platform</span>
+                <div className="h-7 w-7 rounded-xl bg-white/90 dark:bg-white/10 backdrop-blur-sm border border-slate-300/80 dark:border-slate-600/80 flex-shrink-0 shadow-sm" />
+                <span className="text-xs sm:text-sm font-semibold text-slate-800 dark:text-slate-200 whitespace-nowrap truncate">Network Project Platform</span>
               </button>
-              
               {/* Breadcrumb and Tabs (show when in project or device) */}
               {project && (
                 <>
-                  <span className="text-slate-600 dark:text-slate-400">/</span>
-                  <div className="flex items-center gap-4 flex-1 min-w-0">
+                  <span className="text-slate-400 dark:text-slate-500 flex-shrink-0">/</span>
+                  <div className="flex items-center gap-2 sm:gap-4 flex-1 min-w-0">
                     {route.name === "device" ? (
                       <>
                         <button
                           onClick={() => setRoute({ name: "project", projectId: route.projectId, tab: "summary" })}
-                          className="text-sm font-medium text-slate-300 hover:text-blue-400 truncate"
+                          className="text-xs sm:text-sm font-medium text-slate-600 dark:text-slate-300 hover:text-slate-900 dark:hover:text-slate-100 truncate"
                         >
                           {safeDisplay(project?.name)}
                         </button>
-                        <span className="text-slate-600 dark:text-slate-400">/</span>
-                        <span className="text-sm font-medium text-slate-300 truncate">{safeDisplay(route?.device)}</span>
+                        <span className="text-slate-400 dark:text-slate-500 flex-shrink-0">/</span>
+                        <span className="text-xs sm:text-sm font-medium text-slate-700 dark:text-slate-300 truncate">{safeDisplay(route?.device)}</span>
                       </>
                     ) : (
                       <>
-                        <span className="text-sm font-medium text-slate-300 truncate">{safeDisplay(project?.name)}</span>
-                        {/* Tabs integrated in header */}
+                        <span className="text-xs sm:text-sm font-medium text-slate-700 dark:text-slate-300 truncate">{safeDisplay(project?.name)}</span>
                         {projectTabs.length > 0 && (
-                          <nav className="flex items-center gap-1 ml-4" aria-label="Project tabs (always clickable)">
+                          <nav className="flex items-center gap-1 ml-2 sm:ml-4 flex-wrap" aria-label="Project tabs">
                             {projectTabs.map((t) => (
                               <button
                                 key={t.id}
                                 type="button"
                                 onClick={() => setRoute({ ...route, tab: t.id })}
-                                className={`flex items-center gap-2 px-3 py-1.5 text-xs font-medium transition rounded-lg whitespace-nowrap ${
+                                className={`flex items-center gap-1.5 px-2.5 py-1.5 text-xs font-medium transition rounded-xl whitespace-nowrap border ${
                                   (route.tab || "setting") === t.id
-                                    ? "bg-blue-600 text-white"
-                                    : "hover:bg-slate-700 hover:text-blue-400 text-slate-400"
+                                    ? "bg-white/90 dark:bg-white/10 backdrop-blur-sm border-slate-300/80 dark:border-slate-600/80 text-slate-800 dark:text-slate-100 shadow-sm"
+                                    : "bg-transparent dark:bg-transparent border-transparent text-slate-600 dark:text-slate-400 hover:bg-slate-100/90 dark:hover:bg-slate-800/60 hover:border-slate-300 dark:hover:border-slate-700"
                                 }`}
                                 title={`Go to ${t.label}`}
                               >
                                 <span>{safeDisplay(t.icon)}</span>
-                                <span>{safeDisplay(t.label)}</span>
+                                <span className="hidden xs:inline">{safeDisplay(t.label)}</span>
                               </button>
                             ))}
                           </nav>
@@ -1076,20 +1081,19 @@ export default function App() {
                 </>
               )}
             </div>
-            
             {/* Right: Dark mode + User + Sign out */}
             <div className="flex items-center gap-2 flex-shrink-0">
-              <Button variant="ghost" className="text-slate-400 hover:text-slate-200" onClick={() => setDark(!dark)}>
+              <Button variant="ghost" className="text-slate-500 dark:text-slate-400 hover:text-slate-800 dark:hover:text-slate-200" onClick={() => setDark(!dark)} title={dark ? "Light mode" : "Dark mode"}>
                 {dark ? "🌙" : "☀️"}
               </Button>
-              <span className="text-xs text-slate-400">{safeDisplay(authedUser?.username)}</span>
+              <span className="text-xs text-slate-500 dark:text-slate-400 hidden sm:inline truncate max-w-[100px]">{safeDisplay(authedUser?.username)}</span>
               <Button variant="secondary" className="text-xs py-1.5 px-3" onClick={handleLogout}>
                 Sign out
               </Button>
             </div>
           </div>
         }
-        mainClassName="bg-slate-950 overflow-auto"
+        mainClassName="bg-slate-50 dark:bg-slate-950 overflow-auto"
       >
         {route.name === "index" && (
           <ProjectIndex
@@ -1115,6 +1119,10 @@ export default function App() {
             setUploadHistory={setUploadHistory}
             can={can}
             authedUser={authedUser}
+            llmBusy={llmBusy}
+            llmBusyMessage={llmBusyMessage}
+            requestRun={requestRun}
+            onComplete={onComplete}
           />
         )}
         {route.name === "project" && !project && (
@@ -1129,6 +1137,10 @@ export default function App() {
             uploadHistory={uploadHistory}
             authedUser={authedUser}
             setProjects={setProjects}
+            llmBusy={llmBusy}
+            llmBusyMessage={llmBusyMessage}
+            requestRun={requestRun}
+            onComplete={onComplete}
           />
         )}
       </MainLayout>
@@ -1137,9 +1149,9 @@ export default function App() {
 
   return (
     <div
-      className={`min-h-screen bg-slate-50 text-slate-900 dark:bg-[#0B0F19] dark:text-gray-100`}
+      className="min-h-screen bg-slate-50 text-slate-900 dark:bg-[#0B0F19] dark:text-slate-100"
     >
-      <div className="mx-auto max-w-[1440px] px-6 py-6">
+      <div className="mx-auto max-w-[1440px] px-4 py-4 sm:px-6 sm:py-6">
         <Header
           dark={dark}
           setDark={setDark}
@@ -1149,8 +1161,8 @@ export default function App() {
           onLogout={handleLogout}
         />
       </div>
-      <div className="mx-auto max-w-[1440px] px-6 py-6">
-          <div className="mt-6">
+      <div className="mx-auto max-w-[1440px] px-4 py-4 sm:px-6 sm:py-6">
+          <div className="mt-4 sm:mt-6">
             {route.name === "login" && (
               <Login
                 onLogin={handleLogin}
@@ -1230,6 +1242,10 @@ export default function App() {
                 setProjects={setProjects}
                 uploadHistory={uploadHistory}
                 setUploadHistory={setUploadHistory}
+                llmBusy={llmBusy}
+                llmBusyMessage={llmBusyMessage}
+                requestRun={requestRun}
+                onComplete={onComplete}
               />
             )}
             {authedUser && route.name === "device" && (
@@ -1241,6 +1257,10 @@ export default function App() {
                 uploadHistory={uploadHistory}
                 authedUser={authedUser}
                 setProjects={setProjects}
+                llmBusy={llmBusy}
+                llmBusyMessage={llmBusyMessage}
+                requestRun={requestRun}
+                onComplete={onComplete}
               />
             )}
           </div>
@@ -1251,7 +1271,7 @@ export default function App() {
 
 /* ========= HEADER ========= */
 const Header = ({ dark, setDark, authedUser, setRoute, can, onLogout }) => (
-  <div className="flex items-center justify-between">
+  <div className="flex items-center justify-between gap-4 w-full flex-wrap sm:flex-nowrap">
     <button
       onClick={() => {
         if (authedUser) {
@@ -1260,22 +1280,19 @@ const Header = ({ dark, setDark, authedUser, setRoute, can, onLogout }) => (
           setRoute({ name: "login" });
         }
       }}
-      className="flex items-center gap-3 hover:opacity-80 transition-opacity cursor-pointer"
+      className="flex items-center gap-3 hover:opacity-85 transition-opacity cursor-pointer min-w-0"
     >
-      <div className="h-8 w-8 rounded-xl bg-blue-600"></div>
-      <div className="text-lg font-semibold">Network Project Platform</div>
+      <div className="h-8 w-8 sm:h-9 sm:w-9 rounded-xl bg-white/90 dark:bg-white/10 backdrop-blur-sm border border-slate-300/80 dark:border-slate-600/80 flex-shrink-0 shadow-sm" />
+      <span className="text-base sm:text-lg font-semibold text-slate-800 dark:text-slate-100 truncate">Network Project Platform</span>
     </button>
-    <div className="flex items-center gap-2">
-      <Button variant="ghost" onClick={() => setDark(!dark)}>
+    <div className="flex items-center gap-2 flex-shrink-0">
+      <Button variant="ghost" onClick={() => setDark(!dark)} className="text-slate-600 dark:text-slate-400" title={dark ? "Switch to light mode" : "Switch to dark mode"}>
         {dark ? "🌙 Dark" : "☀️ Light"}
       </Button>
       {authedUser ? (
         <>
-          <div className="text-sm text-gray-300">{safeDisplay(authedUser?.username)}</div>
-          <Button
-            variant="secondary"
-            onClick={onLogout}
-          >
+          <span className="text-sm text-slate-600 dark:text-slate-400 hidden xs:inline">{safeDisplay(authedUser?.username)}</span>
+          <Button variant="secondary" onClick={onLogout}>
             Sign out
           </Button>
         </>
@@ -1352,7 +1369,7 @@ const Login = ({ onLogin, goChange }) => {
           )}
           <div className="flex items-center justify-between">
             <a
-              className="text-sm text-blue-600 dark:text-blue-400 hover:underline"
+              className="text-sm text-slate-700 dark:text-slate-300 hover:underline"
               href="#"
               onClick={(e) => {
                 e.preventDefault();
@@ -1538,7 +1555,7 @@ const ProjectIndex = ({
             }
           >
             {(p.topoUrl || p.topo_url) ? (
-              <div className="h-48 w-full rounded-xl mb-4 border border-gray-200 dark:border-[#1F2937] shadow-sm bg-gray-50 dark:bg-gray-900 overflow-hidden flex items-center justify-center">
+              <div className="h-48 w-full rounded-xl mb-4 border border-slate-300 dark:border-[#1F2937] shadow-sm bg-gray-50 dark:bg-gray-900 overflow-hidden flex items-center justify-center">
                 <img
                   src={p.topoUrl || p.topo_url}
                   alt="topology"
@@ -1547,7 +1564,7 @@ const ProjectIndex = ({
                 />
               </div>
             ) : (
-              <div className="h-48 w-full bg-gradient-to-br from-gray-100 to-gray-200 dark:from-gray-800 dark:to-gray-900 rounded-xl mb-4 border border-gray-200 dark:border-[#1F2937] flex items-center justify-center">
+              <div className="h-48 w-full bg-gradient-to-br from-gray-100 to-gray-200 dark:from-gray-800 dark:to-gray-900 rounded-xl mb-4 border border-slate-300 dark:border-[#1F2937] flex items-center justify-center">
                 <div className="text-center text-gray-400 dark:text-gray-500">
                   <svg className="w-12 h-12 mx-auto mb-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" />
@@ -1562,7 +1579,7 @@ const ProjectIndex = ({
                   {safeDisplay(p.desc)}
                 </div>
               )}
-              <div className="flex flex-wrap gap-x-4 gap-y-2 text-xs text-gray-500 dark:text-gray-400 pt-1 border-t border-gray-200 dark:border-[#1F2937]">
+              <div className="flex flex-wrap gap-x-4 gap-y-2 text-xs text-gray-500 dark:text-gray-400 pt-1 border-t border-slate-300 dark:border-[#1F2937]">
                 <span className="flex items-center gap-1.5">
                   <svg className="w-4 h-4 text-gray-400 dark:text-gray-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
@@ -1736,10 +1753,10 @@ const NewProjectPage = ({ onCancel, onCreate }) => {
                   file:mr-4 file:py-2 file:px-4
                   file:rounded-lg file:border-0
                   file:text-sm file:font-semibold
-                  file:bg-blue-50 file:text-blue-700
-                  hover:file:bg-blue-100
-                  dark:file:bg-blue-900 dark:file:text-blue-300
-                  dark:hover:file:bg-blue-800
+                  file:bg-slate-100 file:text-slate-800 file:border file:border-slate-300 file:rounded-lg file:px-3 file:py-1.5 file:text-sm
+                  hover:file:bg-slate-200
+                  dark:file:bg-slate-800 dark:file:text-slate-200 dark:file:border-slate-600
+                  dark:hover:file:bg-slate-700
                   cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
               />
             </Field>
@@ -1748,7 +1765,7 @@ const NewProjectPage = ({ onCancel, onCreate }) => {
               <img
                 src={topoUrl}
                 alt="topology preview"
-                className="w-full max-w-md h-48 object-contain rounded-xl border border-gray-200 dark:border-[#1F2937]"
+                className="w-full max-w-md h-48 object-contain rounded-xl border border-slate-300 dark:border-[#1F2937]"
               />
             )}
           </div>
@@ -2105,12 +2122,15 @@ const ProjectView = ({
   setProjects,
   uploadHistory,
   setUploadHistory,
+  llmBusy,
+  llmBusyMessage,
+  requestRun,
+  onComplete,
 }) => {
   if (!project)
     return <div className="text-sm text-rose-400">Project not found</div>;
 
   const projectId = project?.project_id || project?.id;
-  const { llmBusy, requestRun, onComplete } = useLLMQueue(projectId);
   const [llmNotification, setLlmNotification] = React.useState(null);
   
   // Show tabs based on permissions
@@ -2157,6 +2177,7 @@ const ProjectView = ({
               setProjects={setProjects}
               openDevice={openDevice}
               llmBusy={llmBusy}
+              llmBusyMessage={llmBusyMessage}
               requestRun={requestRun}
               onComplete={onComplete}
               setLlmNotification={setLlmNotification}
@@ -2263,7 +2284,7 @@ const OverviewPage = ({ project, uploadHistory }) => {
     {/* Topology (ถ้ามี) */}
     {(project.topoUrl || project.topo_url) && (
       <Card title="Topology Diagram">
-        <div className="w-full rounded-xl border border-gray-200 dark:border-gray-700 overflow-hidden bg-gray-50 dark:bg-gray-900/50 flex items-center justify-center p-4">
+        <div className="w-full rounded-xl border border-slate-300 dark:border-gray-700 overflow-hidden bg-gray-50 dark:bg-gray-900/50 flex items-center justify-center p-4">
           <img 
             src={project.topoUrl || project.topo_url} 
             alt="Topology" 
@@ -2283,7 +2304,7 @@ const OverviewPage = ({ project, uploadHistory }) => {
           return (
             <div
               key={r.device}
-              className="rounded-xl border border-gray-200 dark:border-[#1F2937] bg-white dark:bg-[#0F172A] p-4"
+              className="rounded-xl border border-slate-300 dark:border-[#1F2937] bg-white dark:bg-[#0F172A] p-4"
             >
               <div className="flex items-center justify-between gap-4">
                 <div className="text-sm">
@@ -2388,7 +2409,7 @@ const OverviewPage = ({ project, uploadHistory }) => {
 /* ========= Topology helpers (role + links) ========= */
 
 /* ========= Project Analysis Panel Component (tabbed) ========= */
-const ProjectAnalysisPanel = ({ project, summaryRows, coreCount, distCount, accessCount, llmBusy, requestRun, onComplete, setLlmNotification }) => {
+const ProjectAnalysisPanel = ({ project, summaryRows, coreCount, distCount, accessCount, llmBusy, llmBusyMessage, requestRun, onComplete, setLlmNotification }) => {
   const [activeTab, setActiveTab] = React.useState("overview");
   const [overviewGenerating, setOverviewGenerating] = React.useState(false);
   const [recGenerating, setRecGenerating] = React.useState(false);
@@ -2416,21 +2437,21 @@ const ProjectAnalysisPanel = ({ project, summaryRows, coreCount, distCount, acce
   const title = summaryRows.length === 0
     ? "Upload configs first"
     : llmBusy
-      ? (tabGenerating ? "Analysis in progress. Please wait..." : "Another task is running. Please wait...")
+      ? (llmBusyMessage || (tabGenerating ? "Analysis in progress. Please wait..." : "Another task is running. Please wait."))
       : "Generate with AI (for current tab)";
 
   return (
-    <div className="col-span-6 min-h-0 flex flex-col w-full">
-      {/* Tabs + AI button on top (no duplicate header below) */}
-      <div className="flex flex-shrink-0 flex items-center justify-between border-b border-slate-700 bg-slate-900/40">
-        <div className="flex">
+    <div className="lg:col-span-6 min-h-0 flex flex-col w-full rounded-xl border border-slate-300 dark:border-slate-800 bg-white dark:bg-slate-900/50 overflow-hidden shadow-sm dark:shadow-none">
+      {/* Tabs + AI button on top */}
+      <div className="flex flex-shrink-0 flex items-center justify-between border-b border-slate-300 dark:border-slate-700/80 bg-slate-50/95 dark:bg-slate-900/50 backdrop-blur-sm">
+        <div className="flex min-w-0">
           <button
             type="button"
             onClick={() => setActiveTab("overview")}
-            className={`px-4 py-2.5 text-sm font-medium border-b-2 transition-colors ${
+            className={`px-3 py-2.5 text-xs sm:text-sm font-medium rounded-t-lg border transition-colors ${
               activeTab === "overview"
-                ? "border-emerald-500 text-slate-100 bg-slate-800/50"
-                : "border-transparent text-slate-400 hover:text-slate-300 hover:bg-slate-800/30"
+                ? "bg-white/85 dark:bg-white/10 border-slate-300/70 dark:border-slate-600/70 border-b-white dark:border-b-slate-900/50 text-slate-800 dark:text-slate-100 shadow-sm -mb-px"
+                : "border-transparent text-slate-700 dark:text-slate-400 hover:bg-slate-100/80 dark:hover:bg-slate-800/40 hover:text-slate-900 dark:hover:text-slate-300"
             }`}
           >
             Network Overview
@@ -2438,10 +2459,10 @@ const ProjectAnalysisPanel = ({ project, summaryRows, coreCount, distCount, acce
           <button
             type="button"
             onClick={() => setActiveTab("recommendations")}
-            className={`px-4 py-2.5 text-sm font-medium border-b-2 transition-colors ${
+            className={`px-3 py-2.5 text-xs sm:text-sm font-medium rounded-t-lg border transition-colors ${
               activeTab === "recommendations"
-                ? "border-emerald-500 text-slate-100 bg-slate-800/50"
-                : "border-transparent text-slate-400 hover:text-slate-300 hover:bg-slate-800/30"
+                ? "bg-white/85 dark:bg-white/10 border-slate-300/70 dark:border-slate-600/70 border-b-white dark:border-b-slate-900/50 text-slate-800 dark:text-slate-100 shadow-sm -mb-px"
+                : "border-transparent text-slate-700 dark:text-slate-400 hover:bg-slate-100/80 dark:hover:bg-slate-800/40 hover:text-slate-900 dark:hover:text-slate-300"
             }`}
           >
             Recommendations
@@ -2451,7 +2472,7 @@ const ProjectAnalysisPanel = ({ project, summaryRows, coreCount, distCount, acce
           type="button"
           onClick={handleAiClick}
           disabled={buttonDisabled}
-          className="w-8 h-8 flex items-center justify-center rounded-md bg-blue-600 hover:bg-blue-700 text-white transition-colors disabled:opacity-50 disabled:cursor-not-allowed mr-2 text-base flex-shrink-0"
+          className="w-8 h-8 flex items-center justify-center rounded-xl bg-white/90 dark:bg-white/10 backdrop-blur-sm border border-slate-300/80 dark:border-slate-600/80 text-slate-700 dark:text-slate-200 shadow-sm hover:bg-white dark:hover:bg-white/15 transition-colors disabled:opacity-50 disabled:cursor-not-allowed mr-2 text-base flex-shrink-0"
           title={title}
           aria-label="AI Analysis"
         >
@@ -2772,32 +2793,32 @@ const NetworkOverviewCard = ({ project, summaryRows, fullHeight, onRegisterGener
         }}
       />
 
-      <div className={`flex-1 min-h-0 flex flex-col rounded-b-xl border border-slate-800 border-t-0 bg-slate-900/50 overflow-hidden w-full ${fullHeight ? "min-h-0" : ""}`}>
+      <div className={`flex-1 min-h-0 flex flex-col rounded-b-xl border border-slate-300 dark:border-slate-800 border-t-0 bg-slate-50/95 dark:bg-slate-900/50 overflow-hidden w-full ${fullHeight ? "min-h-0" : ""}`}>
         <div
-          className="flex-1 min-h-0 overflow-y-auto overflow-x-hidden p-4 text-slate-400"
+          className="flex-1 min-h-0 overflow-y-auto overflow-x-hidden p-4 text-slate-700 dark:text-slate-400"
           style={fullHeight ? {} : { maxHeight: "calc(50vh - 100px)" }}
         >
           <div className={fullHeight ? "text-base" : "text-sm"}>
             {loading && !generating ? (
-              <div className="text-slate-500 italic">Loading...</div>
+              <div className="text-slate-600 dark:text-slate-400 italic">Loading...</div>
             ) : (
               <>
                 {generating && (
-                  <div className="p-2 rounded bg-slate-700/50 border border-slate-600 text-slate-300 text-sm mb-2">
+                  <div className="p-2 rounded-lg bg-slate-200/90 dark:bg-slate-700/50 border border-slate-300 dark:border-slate-600 text-slate-700 dark:text-slate-300 text-sm mb-2">
                     Analyzing with LLM... This may take 1–2 minutes (depending on number of devices). You can switch to Documents or other tabs meanwhile.
                   </div>
                 )}
                 {error && (
-                  <div className="p-2 rounded bg-rose-900/20 border border-rose-700 text-rose-400 text-sm mb-2 break-words">
+                  <div className="p-2 rounded-lg bg-rose-50 dark:bg-rose-900/20 border border-rose-300 dark:border-rose-700 text-rose-700 dark:text-rose-400 text-sm mb-2 break-words">
                     Error: {safeDisplay(error)}
                   </div>
                 )}
                 {overviewText != null ? (
-                  <div className="text-slate-300 leading-relaxed break-words whitespace-pre-wrap">
+                  <div className="text-slate-800 dark:text-slate-300 leading-relaxed break-words whitespace-pre-wrap">
                     {safeDisplay(overviewText)}
                   </div>
                 ) : (
-                  <div className="text-slate-500 italic">
+                  <div className="text-slate-600 dark:text-slate-400 italic">
                     Click the AI button above to generate network overview.
                   </div>
                 )}
@@ -3120,9 +3141,9 @@ const RecommendationsCard = ({ project, summaryRows, fullHeight, onRegisterGener
         }}
       />
 
-      <div className={`flex-1 min-h-0 flex flex-col rounded-b-xl border border-slate-800 border-t-0 bg-slate-900/50 overflow-hidden w-full ${fullHeight ? "min-h-0" : ""}`}>
+      <div className={`flex-1 min-h-0 flex flex-col rounded-b-xl border border-slate-300 dark:border-slate-800 border-t-0 bg-slate-50/95 dark:bg-slate-900/50 overflow-hidden w-full ${fullHeight ? "min-h-0" : ""}`}>
         <div
-          className="flex-1 min-h-0 overflow-y-auto overflow-x-hidden p-4 text-slate-400"
+          className="flex-1 min-h-0 overflow-y-auto overflow-x-hidden p-4 text-slate-700 dark:text-slate-400"
           style={fullHeight ? {} : { maxHeight: "calc(50vh - 100px)" }}
         >
           {(() => {
@@ -3131,26 +3152,26 @@ const RecommendationsCard = ({ project, summaryRows, fullHeight, onRegisterGener
             const isActuallyGenerating = generatingRecOnly || isGeneratingFromStorage;
             const textSize = fullHeight ? "text-base" : "text-sm";
             if (loading && !isActuallyGenerating) {
-              return <div className={`text-slate-500 italic ${textSize}`}>Loading...</div>;
+              return <div className={`text-slate-600 dark:text-slate-400 italic ${textSize}`}>Loading...</div>;
             }
             return (
               <div className={textSize}>
                 {isActuallyGenerating && (
-                  <div className="p-2 rounded bg-slate-700/50 border border-slate-600 text-slate-300 text-sm mb-2">
+                  <div className="p-2 rounded-lg bg-slate-200/90 dark:bg-slate-700/50 border border-slate-300 dark:border-slate-600 text-slate-700 dark:text-slate-300 text-sm mb-2">
                     ⏳ Analyzing with LLM... This may take 1–2 minutes. You can switch to Documents or other tabs meanwhile.
                   </div>
                 )}
                 {error && (
-                  <div className="p-2 rounded bg-rose-900/20 border border-rose-700 text-rose-400 text-sm mb-2 break-words">
+                  <div className="p-2 rounded-lg bg-rose-50 dark:bg-rose-900/20 border border-rose-300 dark:border-rose-700 text-rose-700 dark:text-rose-400 text-sm mb-2 break-words">
                     Error: {safeDisplay(error)}
                   </div>
                 )}
                 {gapAnalysis.length > 0 ? (
                   <div className="space-y-3">
                     {gapAnalysis.map((item, idx) => (
-                      <div key={idx} className="p-3 rounded border break-words" style={{
+                      <div key={idx} className="p-3 rounded-lg border break-words" style={{
                         borderColor: item.severity === "High" ? "#ef4444" : item.severity === "Medium" ? "#eab308" : "#64748b",
-                        backgroundColor: item.severity === "High" ? "rgba(239, 68, 68, 0.1)" : item.severity === "Medium" ? "rgba(234, 179, 8, 0.1)" : "rgba(100, 116, 139, 0.1)"
+                        backgroundColor: item.severity === "High" ? "rgba(239, 68, 68, 0.08)" : item.severity === "Medium" ? "rgba(234, 179, 8, 0.1)" : "rgba(100, 116, 139, 0.08)"
                       }}>
                         <div className="flex items-start gap-2 mb-1.5">
                           <span className={`text-sm font-semibold px-2 py-0.5 rounded ${
@@ -3161,16 +3182,16 @@ const RecommendationsCard = ({ project, summaryRows, fullHeight, onRegisterGener
                             {item.severity?.toUpperCase() || "MEDIUM"}
                           </span>
                           {item.device && item.device !== "all" && (
-                            <span className="text-sm font-medium text-slate-300">[{item.device}]</span>
+                            <span className="text-sm font-medium text-slate-600 dark:text-slate-300">[{item.device}]</span>
                           )}
                         </div>
                         {item.issue != null && (
-                          <div className="text-slate-300 mb-1.5">
+                          <div className="text-slate-700 dark:text-slate-300 mb-1.5">
                             <span className="font-semibold">Issue:</span> {safeDisplay(item.issue)}
                           </div>
                         )}
                         {item.recommendation != null && (
-                          <div className="text-slate-200">
+                          <div className="text-slate-700 dark:text-slate-200">
                             <span className="font-semibold">Recommendation:</span> {safeDisplay(item.recommendation)}
                           </div>
                         )}
@@ -3178,7 +3199,7 @@ const RecommendationsCard = ({ project, summaryRows, fullHeight, onRegisterGener
                     ))}
                   </div>
                 ) : !isActuallyGenerating ? (
-                  <div className="text-slate-500 italic">
+                  <div className="text-slate-500 dark:text-slate-400 italic">
                     Click the AI button above to generate recommendations.
                   </div>
                 ) : null}
@@ -3191,23 +3212,59 @@ const RecommendationsCard = ({ project, summaryRows, fullHeight, onRegisterGener
   );
 };
 
-/* ========= LLM queue: one job at a time, run next when current completes ========= */
+/* ========= LLM queue: one job at a time system-wide, run next when current completes ========= */
 /* Sync with localStorage: after refresh, if any LLM job was "generating", treat as busy until that job completes (polling will call onComplete). */
+/* Server-side lock: poll llm-status so all users/devices see the same "busy" state (no overlapping LLM jobs). */
 function isAnyLLMGenerating(projectId) {
   if (!projectId) return false;
   return (
     localStorage.getItem(`llm_generating_overview_${projectId}`) === "true" ||
     localStorage.getItem(`llm_generating_rec_${projectId}`) === "true" ||
-    localStorage.getItem(`llm_generating_topology_${projectId}`) === "true"
+    localStorage.getItem(`llm_generating_topology_${projectId}`) === "true" ||
+    localStorage.getItem(`llm_generating_device_${projectId}`) === "true"
   );
 }
+
+const LLM_STATUS_POLL_INTERVAL_MS = 3500;
 
 function useLLMQueue(projectId) {
   const initialBusy = isAnyLLMGenerating(projectId);
   const [llmBusy, setLlmBusy] = useState(initialBusy);
+  const [serverLlmBusy, setServerLlmBusy] = useState(false);
+  const [serverLlmJobLabel, setServerLlmJobLabel] = useState(null);
   const busyRef = React.useRef(initialBusy);
   const queueRef = React.useRef([]);
   busyRef.current = initialBusy;
+
+  // Poll server so every client (other users, other devices) sees the same busy state
+  useEffect(() => {
+    if (!projectId) {
+      setServerLlmBusy(false);
+      setServerLlmJobLabel(null);
+      return;
+    }
+    let cancelled = false;
+    const poll = async () => {
+      try {
+        const status = await api.getProjectLlmStatus(projectId);
+        if (cancelled) return;
+        const busy = status && typeof status.busy === "boolean" && status.busy;
+        setServerLlmBusy(!!busy);
+        setServerLlmJobLabel(busy && status.job_label ? status.job_label : null);
+      } catch (_) {
+        if (!cancelled) {
+          setServerLlmBusy(false);
+          setServerLlmJobLabel(null);
+        }
+      }
+    };
+    poll();
+    const interval = setInterval(poll, LLM_STATUS_POLL_INTERVAL_MS);
+    return () => {
+      cancelled = true;
+      clearInterval(interval);
+    };
+  }, [projectId]);
 
   const requestRun = React.useCallback((runFn) => {
     if (typeof runFn !== "function") return;
@@ -3233,16 +3290,185 @@ function useLLMQueue(projectId) {
     }
   }, []);
 
-  return { llmBusy, requestRun, onComplete };
+  const effectiveBusy = llmBusy || serverLlmBusy;
+  const llmBusyMessage = effectiveBusy
+    ? (serverLlmBusy && serverLlmJobLabel
+        ? `Waiting for LLM: ${serverLlmJobLabel} is running. Please wait.`
+        : "An LLM task is running. Please wait.")
+    : null;
+  return { llmBusy: effectiveBusy, requestRun, onComplete, llmBusyMessage };
 }
 
+/* ========= Compare Config Modal (side-by-side diff, device → Left/Right config versions) ========= */
+const ReactDiffViewer = React.lazy(() => import("react-diff-viewer-continued").then((m) => ({ default: m.default })));
+
+const CompareConfigModal = ({ project, deviceList = [], onClose }) => {
+  const projectId = project?.project_id || project?.id;
+  const devices = Array.isArray(deviceList) ? deviceList.filter(Boolean) : [];
+  const [selectedDevice, setSelectedDevice] = useState(devices[0] || "");
+  const [configs, setConfigs] = useState([]);
+  const [loadingConfigs, setLoadingConfigs] = useState(false);
+  const [leftConfigId, setLeftConfigId] = useState("");
+  const [rightConfigId, setRightConfigId] = useState("");
+  const [leftContent, setLeftContent] = useState(null);
+  const [rightContent, setRightContent] = useState(null);
+  const [loadingDiff, setLoadingDiff] = useState(false);
+  const [error, setError] = useState(null);
+
+  useEffect(() => {
+    if (!projectId || !selectedDevice) {
+      setConfigs([]);
+      setLeftConfigId("");
+      setRightConfigId("");
+      setLeftContent(null);
+      setRightContent(null);
+      return;
+    }
+    setLoadingConfigs(true);
+    setError(null);
+    api.getDeviceConfigs(projectId, selectedDevice)
+      .then((list) => {
+        setConfigs(list);
+        if (list.length && !leftConfigId) setLeftConfigId(list[0].id);
+        if (list.length && !rightConfigId) setRightConfigId(list[list.length > 1 ? 1 : 0].id);
+      })
+      .catch((err) => setError(err.message || "Failed to load config list"))
+      .finally(() => setLoadingConfigs(false));
+  }, [projectId, selectedDevice]);
+
+  const parseConfigId = (id) => {
+    if (!id || typeof id !== "string") return { document_id: null, version: null };
+    const last = id.lastIndexOf("_v");
+    if (last === -1) return { document_id: id, version: null };
+    const ver = id.slice(last + 2);
+    const num = parseInt(ver, 10);
+    if (String(num) !== ver) return { document_id: id, version: null };
+    return { document_id: id.slice(0, last), version: num };
+  };
+
+  useEffect(() => {
+    if (!projectId || !leftConfigId || !rightConfigId || leftConfigId === rightConfigId) {
+      setLeftContent(null);
+      setRightContent(null);
+      return;
+    }
+    setLoadingDiff(true);
+    setError(null);
+    const left = parseConfigId(leftConfigId);
+    const right = parseConfigId(rightConfigId);
+    Promise.all([
+      api.getDocumentContentText(projectId, left.document_id, left.version),
+      api.getDocumentContentText(projectId, right.document_id, right.version),
+    ])
+      .then(([textLeft, textRight]) => {
+        setLeftContent(textLeft ?? "");
+        setRightContent(textRight ?? "");
+      })
+      .catch((err) => {
+        setError(err.message || "Failed to load config content");
+        setLeftContent(null);
+        setRightContent(null);
+      })
+      .finally(() => setLoadingDiff(false));
+  }, [projectId, leftConfigId, rightConfigId]);
+
+  const leftConfig = configs.find((c) => c.id === leftConfigId);
+  const rightConfig = configs.find((c) => c.id === rightConfigId);
+  const leftLabel = leftConfig ? leftConfig.filename : "—";
+  const rightLabel = rightConfig ? rightConfig.filename : "—";
+
+  return (
+    <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4" onClick={(e) => e.target === e.currentTarget && onClose()}>
+      <div className="bg-white dark:bg-slate-900 rounded-2xl shadow-xl border border-slate-300 dark:border-slate-700 w-[90%] max-w-6xl max-h-[90vh] flex flex-col" onClick={(e) => e.stopPropagation()}>
+        <div className="flex-shrink-0 flex items-center justify-between p-4 border-b border-slate-300 dark:border-slate-700">
+          <h3 className="text-lg font-semibold text-slate-800 dark:text-slate-100">Compare Configurations</h3>
+          <button type="button" className="p-2 rounded-lg text-slate-500 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-800 hover:text-slate-700 dark:hover:text-slate-200 transition-colors" onClick={onClose} aria-label="Close">✕</button>
+        </div>
+        <div className="flex-shrink-0 p-4 space-y-3 border-b border-slate-300 dark:border-slate-700">
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+            <div>
+              <label className="block text-xs font-medium text-slate-600 dark:text-slate-400 mb-1">Select Device</label>
+              <Select
+                options={devices.map((d) => ({ value: d, label: d }))}
+                value={selectedDevice}
+                onChange={setSelectedDevice}
+                className="w-full"
+              />
+            </div>
+            <div>
+              <label className="block text-xs font-medium text-slate-600 dark:text-slate-400 mb-1">Left Config (Source)</label>
+              <Select
+                options={configs.map((c) => ({
+                  value: c.id,
+                  label: `${c.filename}${c.created_at ? ` — ${new Date(c.created_at).toLocaleString()}` : ""}`.trim(),
+                }))}
+                value={leftConfigId}
+                onChange={setLeftConfigId}
+                className="w-full"
+              />
+            </div>
+            <div>
+              <label className="block text-xs font-medium text-slate-600 dark:text-slate-400 mb-1">Right Config (Target)</label>
+              <Select
+                options={configs.map((c) => ({
+                  value: c.id,
+                  label: `${c.filename}${c.created_at ? ` — ${new Date(c.created_at).toLocaleString()}` : ""}`.trim(),
+                }))}
+                value={rightConfigId}
+                onChange={setRightConfigId}
+                className="w-full"
+              />
+            </div>
+          </div>
+          {error && !leftContent && (
+            <div className="text-sm text-rose-600 dark:text-rose-400">{error}</div>
+          )}
+          {loadingConfigs && <div className="text-sm text-slate-500 dark:text-slate-400">Loading config list…</div>}
+          {!loadingConfigs && selectedDevice && configs.length === 0 && (
+            <div className="text-sm text-slate-500 dark:text-slate-400">No config versions for this device. Upload configs to the Config folder first.</div>
+          )}
+        </div>
+        <div className="flex-1 min-h-0 flex flex-col p-4 overflow-hidden">
+          {loadingDiff && (
+            <div className="flex-1 flex items-center justify-center text-slate-500 dark:text-slate-400">
+              <span className="animate-pulse">Loading…</span>
+            </div>
+          )}
+          {!loadingDiff && leftContent != null && rightContent != null && (
+            <>
+              <div className="flex-shrink-0 flex gap-4 text-xs font-medium text-slate-600 dark:text-slate-400 mb-2">
+                <span className="truncate" title={leftLabel}>Left: {leftLabel}</span>
+                <span className="truncate" title={rightLabel}>Right: {rightLabel}</span>
+              </div>
+              <div className="flex-1 min-h-0 overflow-auto rounded-xl border border-slate-300 dark:border-slate-700 bg-slate-50 dark:bg-slate-800/50 [&_.diff]:!font-mono [&_.diff]:!text-xs">
+                <React.Suspense fallback={<div className="p-4 text-slate-500">Loading diff viewer…</div>}>
+                  <ReactDiffViewer
+                    oldValue={leftContent}
+                    newValue={rightContent}
+                    splitView={true}
+                    showDiffOnly={false}
+                  />
+                </React.Suspense>
+              </div>
+            </>
+          )}
+        </div>
+        <div className="flex-shrink-0 flex justify-end p-4 border-t border-slate-300 dark:border-slate-700">
+          <Button variant="secondary" onClick={onClose}>Close</Button>
+        </div>
+      </div>
+    </div>
+  );
+};
+
 /* ========= SUMMARY (network-focused) + CSV ========= */
-const SummaryPage = ({ project, can, authedUser, setProjects, openDevice, llmBusy, requestRun, onComplete, setLlmNotification }) => {
+const SummaryPage = ({ project, can, authedUser, setProjects, openDevice, llmBusy, llmBusyMessage, requestRun, onComplete, setLlmNotification }) => {
   const projectId = project?.project_id || project?.id;
   // LLM metrics state for topology generation (shared with TopologyGraph)
   const [topologyLLMMetrics, setTopologyLLMMetrics] = React.useState(null);
   const [q, setQ] = useState("");
   const [showUploadConfig, setShowUploadConfig] = useState(false);
+  const [showCompareConfig, setShowCompareConfig] = useState(false);
   // Use cached project.summaryRows when returning to page so we never show "no data" while refetching
   const [summaryRows, setSummaryRows] = useState(() => project?.summaryRows ?? []);
   const [dashboardMetrics, setDashboardMetrics] = useState(null);
@@ -3427,7 +3653,7 @@ const SummaryPage = ({ project, can, authedUser, setProjects, openDevice, llmBus
       }},
     { header: "MORE", key: "more", width: "40px", cell: (r) => (
       <button
-        className="w-6 h-6 flex items-center justify-center rounded border border-slate-600 hover:bg-slate-700 text-slate-300 text-[10px] transition-colors mx-auto"
+        className="w-6 h-6 flex items-center justify-center rounded-lg border border-slate-300 dark:border-slate-600 bg-slate-100/80 dark:bg-slate-800/50 hover:bg-slate-200 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-300 text-[10px] transition-colors mx-auto"
         onClick={(e) => handleDeviceClick(r.device, e)}
         title="Open Details"
       >
@@ -3483,9 +3709,9 @@ const SummaryPage = ({ project, can, authedUser, setProjects, openDevice, llmBus
   return (
     <div className="h-full flex flex-col gap-0 overflow-hidden min-h-0" style={{ pointerEvents: 'auto' }}>
       {/* Content section header - integrated design */}
-      <div className="flex-shrink-0 flex items-center justify-between gap-2 py-0.5 px-2">
-        <h2 className="text-xs font-semibold text-slate-300 flex items-center gap-1.5">
-          <span className="w-0.5 h-3 bg-blue-500/70 rounded-full"></span>
+      <div className="flex-shrink-0 flex items-center justify-between gap-2 py-1 px-2">
+        <h2 className="text-base font-bold text-slate-800 dark:text-slate-200 flex items-center gap-2">
+          <span className="w-1 h-4 bg-slate-500 dark:bg-slate-400 rounded-full" />
           Summary Config
         </h2>
         <div className="flex gap-1.5 items-center">
@@ -3494,20 +3720,27 @@ const SummaryPage = ({ project, can, authedUser, setProjects, openDevice, llmBus
               placeholder="Search..." 
               value={q} 
               onChange={(e)=>setQ(e.target.value)} 
-              className="w-28 text-[9px] py-1 px-2.5 h-6 bg-slate-900/80 border-slate-700 focus:border-blue-500 focus:ring-1 focus:ring-blue-500/50 rounded-md" 
+              className="w-28 text-[9px] py-1 px-2.5 h-6 bg-slate-100 dark:bg-slate-900/80 border-slate-300 dark:border-slate-700 focus:border-slate-400 dark:focus:border-slate-500 focus:ring-1 focus:ring-slate-400/50 dark:focus:ring-slate-500/50 rounded-lg text-slate-800 dark:text-slate-200 placeholder:text-slate-600 dark:placeholder:text-slate-500" 
             />
-            <span className="absolute right-2.5 top-1/2 -translate-y-1/2 text-[9px] text-slate-500 pointer-events-none">🔍</span>
+            <span className="absolute right-2.5 top-1/2 -translate-y-1/2 text-[9px] text-slate-600 dark:text-slate-500 pointer-events-none">🔍</span>
           </div>
           <button
-            className="px-2.5 py-0.5 h-6 flex items-center justify-center rounded-md border border-slate-700 bg-slate-900/80 hover:bg-slate-800 hover:border-slate-600 text-slate-300 text-[9px] font-medium transition-all duration-150 whitespace-nowrap"
+            className="px-2.5 py-0.5 h-6 flex items-center justify-center rounded-lg border border-slate-300 dark:border-slate-700 bg-slate-100 dark:bg-slate-900/80 hover:bg-slate-200 dark:hover:bg-slate-800 text-slate-700 dark:text-slate-300 text-[9px] font-medium transition-colors whitespace-nowrap"
             onClick={exportCSV}
             title="Export CSV"
           >
             CSV
           </button>
+          <button
+            className="px-2.5 py-0.5 h-6 flex items-center justify-center rounded-lg border border-slate-300 dark:border-slate-700 bg-slate-100 dark:bg-slate-900/80 hover:bg-slate-200 dark:hover:bg-slate-800 text-slate-700 dark:text-slate-300 text-[9px] font-medium transition-colors whitespace-nowrap"
+            onClick={() => setShowCompareConfig(true)}
+            title="Compare two config files line by line"
+          >
+            Compare Config
+          </button>
           {can("upload-config", project) && (
             <button
-              className="px-2.5 py-0.5 h-6 flex items-center justify-center rounded-md border border-slate-700 bg-slate-900/80 hover:bg-slate-800 hover:border-slate-600 text-slate-300 text-[9px] font-medium transition-all duration-150 whitespace-nowrap"
+              className="px-2.5 py-0.5 h-6 flex items-center justify-center rounded-lg border border-slate-300 dark:border-slate-700 bg-slate-100 dark:bg-slate-900/80 hover:bg-slate-200 dark:hover:bg-slate-800 text-slate-700 dark:text-slate-300 text-[9px] font-medium transition-colors whitespace-nowrap"
               onClick={() => setShowUploadConfig(true)}
               title="Upload Config"
             >
@@ -3530,14 +3763,14 @@ const SummaryPage = ({ project, can, authedUser, setProjects, openDevice, llmBus
 
       {/* When LLM is running, tabs (Summary/Documents/History) in the header stay clickable — no overlay */}
       {llmBusy && (
-        <div className="flex-shrink-0 px-2 py-0.5 text-[10px] text-slate-500 bg-slate-800/30 rounded">
-          Waiting for LLM — You can click Summary / Documents / History tabs above to switch pages.
+        <div className="flex-shrink-0 px-2 py-0.5 text-[10px] text-slate-600 dark:text-slate-500 bg-slate-200 dark:bg-slate-800/30 rounded-lg" title={llmBusyMessage || undefined}>
+          {llmBusyMessage ? `⏳ ${llmBusyMessage}` : "Waiting for LLM — You can click Summary / Documents / History tabs above to switch pages."}
         </div>
       )}
       {/* Topology (2/3) + Project Analysis (1/3) */}
-      <div className="flex-shrink-0 grid grid-cols-12 gap-3" style={{ height: '60%' }}>
-        <div className="col-span-6 min-h-0 overflow-hidden rounded-xl border border-slate-800 bg-slate-900/50">
-          <TopologyGraph project={project} onOpenDevice={(id)=>openDevice(id)} can={can} authedUser={authedUser} setProjects={setProjects} setTopologyLLMMetrics={setTopologyLLMMetrics} topologyLLMMetrics={topologyLLMMetrics} llmBusy={llmBusy} requestRun={requestRun} onComplete={onComplete} setLlmNotification={setLlmNotification} />
+      <div className="flex-shrink-0 grid grid-cols-1 lg:grid-cols-12 gap-3" style={{ height: '60%', minHeight: '320px' }}>
+        <div className="lg:col-span-6 min-h-0 overflow-hidden rounded-xl border border-slate-300 dark:border-slate-800 bg-white dark:bg-slate-900/50 shadow-sm dark:shadow-none">
+          <TopologyGraph project={project} onOpenDevice={(id)=>openDevice(id)} can={can} authedUser={authedUser} setProjects={setProjects} setTopologyLLMMetrics={setTopologyLLMMetrics} topologyLLMMetrics={topologyLLMMetrics} llmBusy={llmBusy} llmBusyMessage={llmBusyMessage} requestRun={requestRun} onComplete={onComplete} setLlmNotification={setLlmNotification} />
         </div>
         <ProjectAnalysisPanel 
           project={project}
@@ -3546,6 +3779,7 @@ const SummaryPage = ({ project, can, authedUser, setProjects, openDevice, llmBus
           distCount={distCount}
           accessCount={accessCount}
           llmBusy={llmBusy}
+          llmBusyMessage={llmBusyMessage}
           requestRun={requestRun}
           onComplete={onComplete}
           setLlmNotification={setLlmNotification}
@@ -3554,13 +3788,13 @@ const SummaryPage = ({ project, can, authedUser, setProjects, openDevice, llmBus
 
       {/* Table: fills remaining height, scrolls inside */}
       {loading ? (
-        <div className="flex-1 min-h-0 flex items-center justify-center rounded-xl border border-slate-800 bg-slate-900/50">
-          <div className="text-sm text-slate-400">Loading summary data...</div>
+        <div className="flex-1 min-h-0 flex items-center justify-center rounded-xl border border-slate-300 dark:border-slate-800 bg-slate-50 dark:bg-slate-900/50">
+          <div className="text-sm text-slate-500 dark:text-slate-400">Loading summary data...</div>
         </div>
       ) : error ? (
-        <div className="flex-1 min-h-0 flex flex-col items-center justify-center rounded-xl border border-slate-800 bg-slate-900/50 p-4">
-          <div className="text-sm text-rose-400 font-semibold mb-2">Error loading summary</div>
-          <div className="text-xs text-slate-400 mb-3">{safeDisplay(error)}</div>
+        <div className="flex-1 min-h-0 flex flex-col items-center justify-center rounded-xl border border-slate-300 dark:border-slate-800 bg-slate-50 dark:bg-slate-900/50 p-4">
+          <div className="text-sm text-rose-600 dark:text-rose-400 font-semibold mb-2">Error loading summary</div>
+          <div className="text-xs text-slate-500 dark:text-slate-400 mb-3">{safeDisplay(error)}</div>
           <Button variant="secondary" className="text-xs" onClick={() => {
             setError(null);
             const projectId = project?.project_id || project?.id;
@@ -3580,8 +3814,8 @@ const SummaryPage = ({ project, can, authedUser, setProjects, openDevice, llmBus
           }}>Retry</Button>
         </div>
       ) : (
-        <div className="flex-1 min-h-0 overflow-auto rounded-xl border border-slate-800 bg-slate-900/50 p-1">
-          <Table columns={columns} data={filtered} empty="No devices yet. Upload config files to see summary." minWidthClass="min-w-full" containerClassName="text-[10px]" />
+        <div className="flex-1 min-h-0 overflow-auto rounded-xl border border-slate-300 dark:border-slate-800 bg-white dark:bg-slate-900/50 p-1 shadow-sm dark:shadow-none">
+          <Table columns={columns} data={filtered} empty="No devices yet. Upload config files to see summary." minWidthClass="min-w-full" containerClassName="text-xs" />
         </div>
       )}
 
@@ -3595,13 +3829,21 @@ const SummaryPage = ({ project, can, authedUser, setProjects, openDevice, llmBus
           onUpload={handleUpload}
         />
       )}
+      {/* Compare Config Modal */}
+      {showCompareConfig && (
+        <CompareConfigModal
+          project={project}
+          deviceList={(summaryRows || []).map((r) => r.device).filter(Boolean)}
+          onClose={() => setShowCompareConfig(false)}
+        />
+      )}
     </div>
   );
 };
 
 
 /* ========= DEVICE DETAILS PAGE (with header navigation) ========= */
-const DeviceDetailsPage = ({ project, deviceId, goBack, goIndex, uploadHistory, authedUser, setProjects }) => {
+const DeviceDetailsPage = ({ project, deviceId, goBack, goIndex, uploadHistory, authedUser, setProjects, llmBusy, llmBusyMessage, requestRun, onComplete }) => {
   if (!project) {
     return <div className="text-sm text-rose-400">Project not found</div>;
   }
@@ -3615,6 +3857,10 @@ const DeviceDetailsPage = ({ project, deviceId, goBack, goIndex, uploadHistory, 
         uploadHistory={uploadHistory}
         authedUser={authedUser}
         setProjects={setProjects}
+        llmBusy={llmBusy}
+        llmBusyMessage={llmBusyMessage}
+        requestRun={requestRun}
+        onComplete={onComplete}
       />
     </div>
   );
@@ -3622,7 +3868,7 @@ const DeviceDetailsPage = ({ project, deviceId, goBack, goIndex, uploadHistory, 
 
 /* ========= DEVICE DETAILS (Overview / Interfaces / VLANs / Raw) ========= */
 /* ========= DEVICE DETAILS (Overview / Interfaces / VLANs / Raw) ========= */
-const DeviceDetailsView = ({ project, deviceId, goBack, uploadHistory, authedUser, setProjects }) => {
+const DeviceDetailsView = ({ project, deviceId, goBack, uploadHistory, authedUser, setProjects, llmBusy: globalLlmBusy, llmBusyMessage, requestRun, onComplete }) => {
   console.log('[DeviceDetailsView] Rendering with props:', { project, deviceId, hasGoBack: !!goBack });
   
   // Early return if project or deviceId is missing
@@ -3691,21 +3937,21 @@ const DeviceDetailsView = ({ project, deviceId, goBack, uploadHistory, authedUse
   const [deviceBackups, setDeviceBackups] = React.useState([]);
   const [deviceConfigHistory, setDeviceConfigHistory] = React.useState([]);
   const [loadingBackups, setLoadingBackups] = React.useState(true);
+  // Version history for Config Drift: one document's versions (raw config files, 2 latest compared)
+  const [deviceConfigVersions, setDeviceConfigVersions] = React.useState(null);
+  const [loadingVersions, setLoadingVersions] = React.useState(false);
 
-  // Fetch device backups and config history from API
+  // Fetch device config documents (Config folder, filename matches device)
   React.useEffect(() => {
     const fetchDeviceBackups = async () => {
       if (!project?.project_id && !project?.id) return;
       if (!deviceId) return;
       
       setLoadingBackups(true);
+      setDeviceConfigVersions(null);
       try {
         const projectId = project.project_id || project.id;
-        
-        // Get all config documents for this project
         const docs = await api.getDocuments(projectId, { folder_id: "Config" });
-        
-        // Filter documents that match this device
         const devBase = deviceId.toLowerCase();
         const keyVariants = [
           devBase,
@@ -3713,42 +3959,24 @@ const DeviceDetailsView = ({ project, deviceId, goBack, uploadHistory, authedUse
           devBase.replace(/_/g, "-"),
           devBase.replace(/[-_]/g, ""),
         ];
-        
         const matchingDocs = docs.filter((doc) => {
           const name = (doc.filename || "").toLowerCase();
           return keyVariants.some((k) => name.includes(k));
         });
-        
-        // Sort by created_at descending (newest first)
         const sorted = matchingDocs.sort((a, b) => {
           const dateA = new Date(a.created_at || 0);
           const dateB = new Date(b.created_at || 0);
           return dateB - dateA;
         });
-        
         setDeviceBackups(sorted);
-        
-        // Transform to config history format
         const history = sorted.map(doc => ({
           timestamp: doc.created_at,
-          files: [{ 
-            name: doc.filename,
-            document_id: doc.document_id,
-            version: doc.version
-          }],
+          files: [{ name: doc.filename, document_id: doc.document_id, version: doc.version }],
           user: doc.uploader || "Unknown",
-          details: {
-            who: doc.metadata?.who || doc.uploader || "Unknown",
-            what: doc.metadata?.what || "—",
-            where: doc.metadata?.where || "—",
-            when: doc.metadata?.when || "—",
-            why: doc.metadata?.why || "—",
-            description: doc.metadata?.description || "—",
-          },
+          details: { who: doc.metadata?.who || doc.uploader || "Unknown", what: doc.metadata?.what || "—", where: doc.metadata?.where || "—", when: doc.metadata?.when || "—", why: doc.metadata?.why || "—", description: doc.metadata?.description || "—" },
           type: "config",
           project: projectId,
         }));
-        
         setDeviceConfigHistory(history);
       } catch (err) {
         console.error('Failed to load device backups:', err);
@@ -3758,9 +3986,38 @@ const DeviceDetailsView = ({ project, deviceId, goBack, uploadHistory, authedUse
         setLoadingBackups(false);
       }
     };
-
     fetchDeviceBackups();
   }, [project?.project_id || project?.id, deviceId]);
+
+  // Fetch version history for first device config document (for Config Drift — raw file versions)
+  React.useEffect(() => {
+    if (!project?.project_id && !project?.id) return;
+    if (!deviceId || deviceBackups.length === 0) {
+      setDeviceConfigVersions(null);
+      return;
+    }
+    let cancelled = false;
+    setLoadingVersions(true);
+    const projectId = project.project_id || project.id;
+    const doc = deviceBackups[0];
+    api.getDocumentVersions(projectId, doc.document_id)
+      .then((res) => {
+        if (cancelled) return;
+        const versions = (res.versions || []).sort((a, b) => (b.version - a.version));
+        setDeviceConfigVersions({
+          document_id: doc.document_id,
+          filename: res.filename || doc.filename,
+          versions,
+        });
+      })
+      .catch(() => {
+        if (!cancelled) setDeviceConfigVersions(null);
+      })
+      .finally(() => {
+        if (!cancelled) setLoadingVersions(false);
+      });
+    return () => { cancelled = true; };
+  }, [project?.project_id || project?.id, deviceId, deviceBackups]);
 
   // default: 2 ไฟล์ล่าสุด
   const [compareOpen, setCompareOpen] = React.useState(false);
@@ -3877,17 +4134,17 @@ const DeviceDetailsView = ({ project, deviceId, goBack, uploadHistory, authedUse
     if (!deviceData) return "No device data available.";
     
     const parts = [];
-    parts.push(`สรุปอัตโนมัติของอุปกรณ์: ${facts.device}`);
+    parts.push(`Device summary: ${facts.device}`);
     parts.push([
-      `• รุ่น/แพลตฟอร์ม: ${facts.model} • OS/Version: ${facts.osVersion}`,
+      `• Model/Platform: ${facts.model} • OS/Version: ${facts.osVersion}`,
       `• Serial: ${facts.serial} • Mgmt IP: ${facts.mgmtIp}`
     ].join("  |  "));
     
     if (facts.ifaces) {
-      parts.push(`• พอร์ตทั้งหมด ${facts.ifaces.total} (Up ${facts.ifaces.up}, Down ${facts.ifaces.down}, AdminDown ${facts.ifaces.adminDown})`);
+      parts.push(`• Ports total ${facts.ifaces.total} (Up ${facts.ifaces.up}, Down ${facts.ifaces.down}, AdminDown ${facts.ifaces.adminDown})`);
       parts.push(`• Access ≈ ${facts.accessCount}  |  Trunk ≈ ${facts.trunkCount}`);
     }
-    parts.push(`• VLAN ทั้งหมด: ${facts.vlanCount}  |  STP: ${facts.stpMode}${facts.stpRoot && facts.stpRoot !== "—" ? ` (Root: ${facts.stpRoot})` : ""}`);
+    parts.push(`• VLANs: ${facts.vlanCount}  |  STP: ${facts.stpMode}${facts.stpRoot && facts.stpRoot !== "—" ? ` (Root: ${facts.stpRoot})` : ""}`);
     
     // L3
     const l3 = [];
@@ -3912,27 +4169,291 @@ const DeviceDetailsView = ({ project, deviceId, goBack, uploadHistory, authedUse
     return parts.join("\n");
   }, [deviceData, facts, loading]);
 
-  // Project-level gap analysis (AI-generated, not hardcoded)
+  // Project-level gap analysis (fallback when per-device recs not generated)
   const [projectGapAnalysis, setProjectGapAnalysis] = React.useState([]);
   const [projectAnalysisLoading, setProjectAnalysisLoading] = React.useState(true);
-  
+
+  // ----- Per-device LLM (Device Summary / AI Recommendations / Config Drift) -----
+  const projectId = project?.project_id || project?.id;
+  const deviceStorageKey = projectId ? `llm_generating_device_${projectId}` : null;
+  const [deviceOverviewText, setDeviceOverviewText] = React.useState(null);
+  const [deviceOverviewLoading, setDeviceOverviewLoading] = React.useState(true);
+  const [deviceOverviewGenerating, setDeviceOverviewGenerating] = React.useState(false);
+  const [deviceOverviewError, setDeviceOverviewError] = React.useState(null);
+
+  const [deviceRecsList, setDeviceRecsList] = React.useState([]);
+  const [deviceRecsLoading, setDeviceRecsLoading] = React.useState(true);
+  const [deviceRecsGenerating, setDeviceRecsGenerating] = React.useState(false);
+  const [deviceRecsError, setDeviceRecsError] = React.useState(null);
+
+  const [deviceDriftData, setDeviceDriftData] = React.useState(null);
+  const [deviceDriftLoading, setDeviceDriftLoading] = React.useState(false);
+  const [deviceDriftGenerating, setDeviceDriftGenerating] = React.useState(false);
+  const [deviceDriftError, setDeviceDriftError] = React.useState(null);
+  const [deviceLlmNotification, setDeviceLlmNotification] = React.useState(null);
+
+  // Load device overview on mount
+  React.useEffect(() => {
+    if (!projectId || !deviceId) {
+      setDeviceOverviewLoading(false);
+      return;
+    }
+    let cancelled = false;
+    api.getDeviceOverview(projectId, deviceId)
+      .then((r) => { if (!cancelled) setDeviceOverviewText(r.overview_text || null); })
+      .catch(() => { if (!cancelled) setDeviceOverviewText(null); })
+      .finally(() => { if (!cancelled) setDeviceOverviewLoading(false); });
+    return () => { cancelled = true; };
+  }, [projectId, deviceId]);
+
+  // Load device recommendations on mount
+  React.useEffect(() => {
+    if (!projectId || !deviceId) {
+      setDeviceRecsLoading(false);
+      return;
+    }
+    let cancelled = false;
+    api.getDeviceRecommendations(projectId, deviceId)
+      .then((r) => { if (!cancelled) setDeviceRecsList(r.recommendations || []); })
+      .catch(() => { if (!cancelled) setDeviceRecsList([]); })
+      .finally(() => { if (!cancelled) setDeviceRecsLoading(false); });
+    return () => { cancelled = true; };
+  }, [projectId, deviceId]);
+
+  // Load saved config drift result when we have 2+ versions
+  React.useEffect(() => {
+    if (!projectId || !deviceId) {
+      setDeviceDriftLoading(false);
+      return;
+    }
+    setDeviceDriftLoading(true);
+    let cancelled = false;
+    api.getDeviceConfigDrift(projectId, deviceId)
+      .then((r) => { if (!cancelled) setDeviceDriftData(r); })
+      .catch(() => { if (!cancelled) setDeviceDriftData(null); })
+      .finally(() => { if (!cancelled) setDeviceDriftLoading(false); });
+    return () => { cancelled = true; };
+  }, [projectId, deviceId]);
+
+  // Polling for device overview when generating
+  React.useEffect(() => {
+    if (!projectId || !deviceId || !deviceOverviewGenerating) return;
+    const key = `device_overview_${projectId}_${deviceId}`;
+    const endpoint = (pid) => api.getDeviceOverview(pid, deviceId);
+    const onUpdate = (result) => {
+      setDeviceOverviewText(result.overview_text || null);
+      setDeviceOverviewGenerating(false);
+      if (deviceStorageKey) localStorage.removeItem(deviceStorageKey);
+      onComplete?.();
+    };
+    const onError = (msg) => {
+      setDeviceOverviewError(msg);
+      setDeviceOverviewGenerating(false);
+      if (deviceStorageKey) localStorage.removeItem(deviceStorageKey);
+      onComplete?.();
+    };
+    if (globalPollingService.isPolling(key)) {
+      globalPollingService.resumePolling(key, onUpdate, onError);
+    } else {
+      globalPollingService.startPolling(key, projectId, endpoint, onUpdate, onError);
+    }
+    return () => {
+      if (!deviceOverviewGenerating) globalPollingService.stopPolling(key);
+    };
+  }, [projectId, deviceId, deviceOverviewGenerating, deviceStorageKey, onComplete]);
+
+  // Polling for device recommendations when generating
+  React.useEffect(() => {
+    if (!projectId || !deviceId || !deviceRecsGenerating) return;
+    const key = `device_recs_${projectId}_${deviceId}`;
+    const endpoint = (pid) => api.getDeviceRecommendations(pid, deviceId);
+    const onUpdate = (result) => {
+      setDeviceRecsList(result.recommendations || []);
+      setDeviceRecsGenerating(false);
+      if (deviceStorageKey) localStorage.removeItem(deviceStorageKey);
+      onComplete?.();
+    };
+    const onError = (msg) => {
+      setDeviceRecsError(msg);
+      setDeviceRecsGenerating(false);
+      if (deviceStorageKey) localStorage.removeItem(deviceStorageKey);
+      onComplete?.();
+    };
+    if (globalPollingService.isPolling(key)) {
+      globalPollingService.resumePolling(key, onUpdate, onError);
+    } else {
+      globalPollingService.startPolling(key, projectId, endpoint, onUpdate, onError);
+    }
+    return () => {
+      if (!deviceRecsGenerating) globalPollingService.stopPolling(key);
+    };
+  }, [projectId, deviceId, deviceRecsGenerating, deviceStorageKey, onComplete]);
+
+  // Local polling for config drift (result has "changes", not overview_text)
+  const deviceDriftPollRef = React.useRef(null);
+  React.useEffect(() => {
+    if (!projectId || !deviceId || !deviceDriftGenerating) return;
+    let cancelled = false;
+    const poll = async () => {
+      try {
+        const r = await api.getDeviceConfigDrift(projectId, deviceId);
+        if (!cancelled && r.changes && Array.isArray(r.changes)) {
+          setDeviceDriftData(r);
+          setDeviceDriftGenerating(false);
+          if (deviceStorageKey) localStorage.removeItem(deviceStorageKey);
+          onComplete?.();
+          if (deviceDriftPollRef.current) {
+            clearInterval(deviceDriftPollRef.current);
+            deviceDriftPollRef.current = null;
+          }
+        }
+      } catch (_) {}
+    };
+    poll();
+    const id = setInterval(poll, 4000);
+    deviceDriftPollRef.current = id;
+    return () => {
+      cancelled = true;
+      if (deviceDriftPollRef.current) {
+        clearInterval(deviceDriftPollRef.current);
+        deviceDriftPollRef.current = null;
+      }
+    };
+  }, [projectId, deviceId, deviceDriftGenerating, deviceStorageKey, onComplete]);
+
+  const localLlmBusy = deviceOverviewGenerating || deviceRecsGenerating || deviceDriftGenerating;
+  const llmBusy = (globalLlmBusy != null ? globalLlmBusy : false) || localLlmBusy;
+
+  const clearDeviceLlmAndComplete = () => {
+    if (deviceStorageKey) localStorage.removeItem(deviceStorageKey);
+    onComplete?.();
+  };
+
+  // When data exists, AI button shows popup first (like Summary); Regenerate in popup runs LLM via queue
+  const getDeviceLlmAction = () => {
+    const closeAndRun = (fn) => {
+      setDeviceLlmNotification((n) => (n ? { ...n, show: false } : null));
+      if (typeof requestRun === "function") requestRun(fn);
+      else fn();
+    };
+    if (llmPanelTab === "summary" && deviceOverviewText != null) {
+      return {
+        action: "show",
+        data: {
+          show: true,
+          type: "success",
+          title: "Device Summary Generated",
+          message: "LLM analysis completed successfully.",
+          metrics: null,
+          onRegenerate: () => closeAndRun(handleDeviceSummaryGenerate),
+        },
+      };
+    }
+    if (llmPanelTab === "recommendations" && deviceRecsList.length > 0) {
+      return {
+        action: "show",
+        data: {
+          show: true,
+          type: "success",
+          title: "AI Recommendations Generated",
+          message: `LLM analysis completed. Found ${deviceRecsList.length} recommendation(s).`,
+          metrics: null,
+          onRegenerate: () => closeAndRun(handleDeviceRecsGenerate),
+        },
+      };
+    }
+    if (llmPanelTab === "drift" && deviceDriftData) {
+      return {
+        action: "show",
+        data: {
+          show: true,
+          type: "success",
+          title: "Config Drift Generated",
+          message: "LLM analysis completed successfully.",
+          metrics: deviceDriftData.metrics || null,
+          onRegenerate: () => closeAndRun(handleDeviceDriftGenerate),
+        },
+      };
+    }
+    return null;
+  };
+
+  const handleDeviceAiClick = () => {
+    const result = getDeviceLlmAction();
+    if (result?.action === "show" && result.data) {
+      setDeviceLlmNotification(result.data);
+      return;
+    }
+    const run = () => {
+      if (llmPanelTab === "summary") handleDeviceSummaryGenerate();
+      else if (llmPanelTab === "recommendations") handleDeviceRecsGenerate();
+      else if (llmPanelTab === "drift") handleDeviceDriftGenerate();
+    };
+    if (typeof requestRun === "function") requestRun(run);
+    else run();
+  };
+
+  const handleDeviceSummaryGenerate = async () => {
+    if (!projectId || !deviceId || deviceOverviewGenerating) return;
+    if (deviceStorageKey) localStorage.setItem(deviceStorageKey, "true");
+    setDeviceOverviewError(null);
+    setDeviceOverviewGenerating(true);
+    api.analyzeDeviceOverview(projectId, deviceId).catch((err) => {
+      if (err.message && (err.message.includes("timeout") || err.message.includes("abort"))) return;
+      setDeviceOverviewError(err.message || "Failed to start analysis.");
+      setDeviceOverviewGenerating(false);
+      clearDeviceLlmAndComplete();
+    });
+  };
+
+  const handleDeviceRecsGenerate = async () => {
+    if (!projectId || !deviceId || deviceRecsGenerating) return;
+    if (deviceStorageKey) localStorage.setItem(deviceStorageKey, "true");
+    setDeviceRecsError(null);
+    setDeviceRecsGenerating(true);
+    api.analyzeDeviceRecommendations(projectId, deviceId).catch((err) => {
+      if (err.message && (err.message.includes("timeout") || err.message.includes("abort"))) return;
+      setDeviceRecsError(err.message || "Failed to start analysis.");
+      setDeviceRecsGenerating(false);
+      clearDeviceLlmAndComplete();
+    });
+  };
+
+  const handleDeviceDriftGenerate = async () => {
+    if (!projectId || !deviceId || !hasEnoughVersionsForDrift || deviceDriftGenerating) return;
+    const v = deviceConfigVersions?.versions;
+    if (!v || v.length < 2) return;
+    const older = v[1];
+    const newer = v[0];
+    if (deviceStorageKey) localStorage.setItem(deviceStorageKey, "true");
+    setDeviceDriftError(null);
+    setDeviceDriftGenerating(true);
+    api.analyzeDeviceConfigDrift(projectId, deviceId, {
+      documentId: deviceConfigVersions.document_id,
+      fromVersion: older.version,
+      toVersion: newer.version,
+    }).catch((err) => {
+      if (err.message && (err.message.includes("timeout") || err.message.includes("abort"))) return;
+      setDeviceDriftError(err.message || "Failed to start analysis.");
+      setDeviceDriftGenerating(false);
+      clearDeviceLlmAndComplete();
+    });
+  };
+
   React.useEffect(() => {
     const projectId = project?.project_id || project?.id;
     if (!projectId) {
       setProjectAnalysisLoading(false);
       return;
     }
-    
     const loadProjectAnalysis = async () => {
       try {
         const result = await api.getFullProjectAnalysis(projectId);
-        // Filter gap analysis for this specific device
         const deviceGaps = (result.gap_analysis || []).filter(
           item => item.device === facts.device || item.device === "all"
         );
         setProjectGapAnalysis(deviceGaps);
       } catch (err) {
-        // Ignore 404 - no saved analysis yet
         if (err.message && !err.message.includes("404")) {
           console.warn("Failed to load project gap analysis:", err);
         }
@@ -3940,11 +4461,10 @@ const DeviceDetailsView = ({ project, deviceId, goBack, uploadHistory, authedUse
         setProjectAnalysisLoading(false);
       }
     };
-    
     loadProjectAnalysis();
   }, [project, facts.device]);
-  
-  // Use AI-generated gap analysis instead of hardcoded recommendations
+
+  // Legacy: use for display only when per-device recs not used
   const deviceRecs = projectGapAnalysis.map(item => {
     const parts = [];
     if (item.issue) parts.push(`Issue: ${item.issue}`);
@@ -4061,31 +4581,42 @@ const DeviceDetailsView = ({ project, deviceId, goBack, uploadHistory, authedUse
   const [rawSubTab, setRawSubTab] = React.useState("parsed"); // parsed | original
   const [llmPanelTab, setLlmPanelTab] = React.useState("summary"); // summary | recommendations | drift — folder-like selection for LLM section
 
-  // คำนวณ drift summary จาก 2 ไฟล์ล่าสุดถ้ามี (ใช้ข้อมูลจาก API)
-  const lastTwo = deviceBackups.slice(0, 2);
+  // Config drift: compare two latest versions from version history (raw config files)
   const driftSummary = React.useMemo(() => {
-    if (lastTwo.length < 2) return null;
-    const [newF, oldF] = [lastTwo[0], lastTwo[1]]; // ใหม่ ← เก่า
-    // Note: We don't have file content here, so we can't calculate diff
-    // This would require fetching file content from API
+    const v = deviceConfigVersions?.versions;
+    if (!v || v.length < 2) return null;
+    const older = v[1];
+    const newer = v[0];
+    const fn = deviceConfigVersions.filename || "config";
     return {
       device: facts.device,
-      from: oldF.filename || oldF.name,
-      to: newF.filename || newF.name,
-      lines: [], // Would need to fetch file content to calculate diff
+      from: `${fn} (v${older.version})`,
+      to: `${fn} (v${newer.version})`,
     };
-  }, [facts.device, lastTwo]);
+  }, [facts.device, deviceConfigVersions]);
+  const hasEnoughVersionsForDrift = (deviceConfigVersions?.versions?.length ?? 0) >= 2;
 
   return (
     <div className="h-full flex flex-col gap-0 overflow-hidden min-h-0">
+      {deviceLlmNotification?.show && (
+        <NotificationModal
+          show={true}
+          onClose={() => setDeviceLlmNotification((n) => (n ? { ...n, show: false } : null))}
+          title={deviceLlmNotification.title || "LLM Complete"}
+          message={deviceLlmNotification.message || ""}
+          metrics={deviceLlmNotification.metrics}
+          type={deviceLlmNotification.type || "success"}
+          onRegenerate={deviceLlmNotification.onRegenerate}
+        />
+      )}
       {/* Header: title larger, tabs and back button */}
-      <div className="flex-shrink-0 flex items-center justify-between gap-4 py-3 px-3 flex-wrap border-b border-slate-700/80">
+      <div className="flex-shrink-0 flex items-center justify-between gap-4 py-3 px-3 flex-wrap border-b border-slate-300 dark:border-slate-700/80 bg-slate-50/80 dark:bg-transparent">
         <div className="flex flex-col gap-0.5 min-w-0">
-          <h2 className="text-lg font-semibold text-slate-200 flex items-center gap-2">
-            <span className="w-1 h-4 bg-blue-500/70 rounded-full flex-shrink-0"></span>
+          <h2 className="text-lg font-semibold text-slate-800 dark:text-slate-200 flex items-center gap-2">
+            <span className="w-1 h-4 bg-slate-400 dark:bg-slate-500 rounded-full flex-shrink-0" />
             More Details — {facts.device}
           </h2>
-          <span className="text-sm text-slate-500 dark:text-slate-400">
+          <span className="text-sm text-slate-600 dark:text-slate-400">
             From config/show parsing • Mgmt IP: {facts.mgmtIp || "—"}
           </span>
         </div>
@@ -4107,10 +4638,10 @@ const DeviceDetailsView = ({ project, deviceId, goBack, uploadHistory, authedUse
                 <button
                   key={t.id}
                   onClick={() => setTab(t.id)}
-                  className={`px-3 py-1.5 rounded-lg text-xs font-medium transition-colors ${
+                  className={`px-3 py-1.5 rounded-xl text-xs font-medium transition-all border ${
                     tab === t.id
-                      ? "bg-blue-600 text-white"
-                      : "bg-slate-800 border border-slate-700 text-slate-400 hover:bg-slate-700 hover:text-slate-300"
+                      ? "bg-white/90 dark:bg-white/10 backdrop-blur-sm border-slate-300/80 dark:border-slate-600/80 text-slate-800 dark:text-slate-100 shadow-sm"
+                      : "bg-slate-100/80 dark:bg-slate-800/50 border-slate-300 dark:border-slate-700/60 text-slate-700 dark:text-slate-400 hover:bg-slate-200/80 dark:hover:bg-slate-700/50 hover:text-slate-900 dark:hover:text-slate-300"
                   }`}
                 >
                   {t.label}
@@ -4123,7 +4654,7 @@ const DeviceDetailsView = ({ project, deviceId, goBack, uploadHistory, authedUse
       </div>
 
       {loading && (
-        <div className="flex-1 flex items-center justify-center text-slate-400 text-xs py-8">
+        <div className="flex-1 flex items-center justify-center text-slate-500 dark:text-slate-400 text-xs py-8">
           Loading device details...
         </div>
       )}
@@ -4139,8 +4670,8 @@ const DeviceDetailsView = ({ project, deviceId, goBack, uploadHistory, authedUse
         <div className="flex-1 min-h-0 flex flex-col gap-3 overflow-hidden p-2">
           {/* Top row: Device Image (left) + LLM section (right) */}
           <div className="grid grid-cols-12 gap-3 min-h-0 flex-1" style={{ minHeight: "280px" }}>
-            <div className="col-span-5 min-h-0 overflow-hidden rounded-xl border border-slate-800 bg-slate-900/50 flex flex-col">
-              <Card title="Device Image" className="flex-1 min-h-0 flex flex-col overflow-hidden">
+            <div className="col-span-5 min-h-0 overflow-hidden rounded-xl border border-slate-300 dark:border-slate-800 bg-white dark:bg-slate-900/50 flex flex-col shadow-sm dark:shadow-none">
+              <Card className="flex-1 min-h-0 flex flex-col overflow-hidden">
                 <div className="flex-1 min-h-0 overflow-auto">
                   <DeviceImageUpload 
                     project={project}
@@ -4151,113 +4682,195 @@ const DeviceDetailsView = ({ project, deviceId, goBack, uploadHistory, authedUse
                 </div>
               </Card>
             </div>
-            {/* LLM panel: folder-like tabs (like image 2) + content */}
-            <div className="col-span-7 min-h-0 flex flex-col rounded-xl border border-slate-800 bg-slate-900/50 overflow-hidden">
-              <div className="flex-shrink-0 flex border-b border-slate-700 bg-slate-900/80">
+            {/* LLM panel: folder-like tabs (like summary page) + AI button + content */}
+            <div className="col-span-7 min-h-0 flex flex-col rounded-xl border border-slate-300 dark:border-slate-800 bg-white/95 dark:bg-slate-900/50 overflow-hidden shadow-sm dark:shadow-none backdrop-blur-sm">
+              <div className="flex-shrink-0 flex items-center justify-between border-b border-slate-300 dark:border-slate-700/80 bg-slate-50/90 dark:bg-slate-900/60 backdrop-blur-sm">
+                <div className="flex">
+                  <button
+                    type="button"
+                    onClick={() => setLlmPanelTab("summary")}
+                    className={`px-4 py-2.5 text-sm font-medium rounded-t-lg border transition-colors ${
+                      llmPanelTab === "summary"
+                        ? "bg-white/90 dark:bg-white/10 border-slate-300/70 dark:border-slate-600/70 border-b-white dark:border-b-slate-900/50 text-slate-800 dark:text-slate-100 shadow-sm -mb-px"
+                        : "border-transparent text-slate-700 dark:text-slate-400 hover:bg-slate-100/80 dark:hover:bg-slate-800/40 hover:text-slate-900 dark:hover:text-slate-300"
+                    }`}
+                  >
+                    Device Summary
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setLlmPanelTab("recommendations")}
+                    className={`px-4 py-2.5 text-sm font-medium rounded-t-lg border transition-colors ${
+                      llmPanelTab === "recommendations"
+                        ? "bg-white/90 dark:bg-white/10 border-slate-300/70 dark:border-slate-600/70 border-b-white dark:border-b-slate-900/50 text-slate-800 dark:text-slate-100 shadow-sm -mb-px"
+                        : "border-transparent text-slate-700 dark:text-slate-400 hover:bg-slate-100/80 dark:hover:bg-slate-800/40 hover:text-slate-900 dark:hover:text-slate-300"
+                    }`}
+                  >
+                    AI Recommendations
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setLlmPanelTab("drift")}
+                    className={`px-4 py-2.5 text-sm font-medium rounded-t-lg border transition-colors ${
+                      llmPanelTab === "drift"
+                        ? "bg-white/90 dark:bg-white/10 border-slate-300/70 dark:border-slate-600/70 border-b-white dark:border-b-slate-900/50 text-slate-800 dark:text-slate-100 shadow-sm -mb-px"
+                        : "border-transparent text-slate-700 dark:text-slate-400 hover:bg-slate-100/80 dark:hover:bg-slate-800/40 hover:text-slate-900 dark:hover:text-slate-300"
+                    }`}
+                  >
+                    Config Drift
+                  </button>
+                </div>
                 <button
                   type="button"
-                  onClick={() => setLlmPanelTab("summary")}
-                  className={`px-4 py-2.5 text-sm font-medium border-b-2 transition-colors ${
-                    llmPanelTab === "summary"
-                      ? "border-emerald-500 text-slate-100 bg-slate-800/50"
-                      : "border-transparent text-slate-400 hover:text-slate-300 hover:bg-slate-800/30"
-                  }`}
+                  onClick={handleDeviceAiClick}
+                  disabled={llmBusy || (llmPanelTab === "drift" && !hasEnoughVersionsForDrift)}
+                  className="w-8 h-8 flex items-center justify-center rounded-xl bg-white/90 dark:bg-white/10 backdrop-blur-sm border border-slate-300/80 dark:border-slate-600/80 text-slate-700 dark:text-slate-200 shadow-sm hover:bg-white dark:hover:bg-white/15 transition-colors disabled:opacity-50 disabled:cursor-not-allowed mr-2 text-base flex-shrink-0"
+                  title={llmPanelTab === "drift" && !hasEnoughVersionsForDrift ? "At least 2 versions in version history required" : (llmBusy && llmBusyMessage ? llmBusyMessage : "Generate with AI (current tab)")}
+                  aria-label="AI Analysis"
                 >
-                  Device Summary (LLM)
-                </button>
-                <button
-                  type="button"
-                  onClick={() => setLlmPanelTab("recommendations")}
-                  className={`px-4 py-2.5 text-sm font-medium border-b-2 transition-colors ${
-                    llmPanelTab === "recommendations"
-                      ? "border-emerald-500 text-slate-100 bg-slate-800/50"
-                      : "border-transparent text-slate-400 hover:text-slate-300 hover:bg-slate-800/30"
-                  }`}
-                >
-                  AI Recommendations
-                </button>
-                <button
-                  type="button"
-                  onClick={() => setLlmPanelTab("drift")}
-                  className={`px-4 py-2.5 text-sm font-medium border-b-2 transition-colors ${
-                    llmPanelTab === "drift"
-                      ? "border-emerald-500 text-slate-100 bg-slate-800/50"
-                      : "border-transparent text-slate-400 hover:text-slate-300 hover:bg-slate-800/30"
-                  }`}
-                >
-                  Config Drift (30d)
+                  {llmBusy ? "⏳" : "✨"}
                 </button>
               </div>
               <div className="flex-1 min-h-0 overflow-y-auto p-3">
                 {llmPanelTab === "summary" && (
-                  <div className="rounded-lg border border-slate-700 p-3 bg-slate-800/50">
-                    <div className="text-[10px] text-slate-500 uppercase tracking-wide mb-2">Per-device summary for LLM</div>
-                    <pre className="whitespace-pre-wrap text-xs leading-relaxed text-slate-300">{safeDisplay(deviceNarrative)}</pre>
+                  <div>
+                    {deviceOverviewLoading && !deviceOverviewGenerating ? (
+                      <div className="text-xs text-slate-500 italic">Loading...</div>
+                    ) : (
+                      <>
+                        {deviceOverviewGenerating && (
+                          <div className="p-2 rounded-lg bg-slate-200/90 dark:bg-slate-700/50 border border-slate-300 dark:border-slate-600 text-slate-700 dark:text-slate-300 text-xs mb-2">
+                            Analyzing with LLM... This may take 1–2 minutes. You can switch tabs meanwhile.
+                          </div>
+                        )}
+                        {deviceOverviewError && (
+                          <div className="p-2 rounded-lg bg-rose-50 dark:bg-rose-900/20 border border-rose-300 dark:border-rose-700 text-rose-700 dark:text-rose-400 text-xs mb-2 break-words">
+                            Error: {safeDisplay(deviceOverviewError)}
+                          </div>
+                        )}
+                        {deviceOverviewText != null ? (
+                          <pre className="whitespace-pre-wrap text-xs leading-relaxed text-slate-700 dark:text-slate-300">{safeDisplay(deviceOverviewText)}</pre>
+                        ) : (
+                          <div className="text-slate-500 dark:text-slate-400 italic text-xs">
+                            Click the AI button above to generate summary.
+                          </div>
+                        )}
+                      </>
+                    )}
                   </div>
                 )}
                 {llmPanelTab === "recommendations" && (
                   <div>
-                    <div className="text-[10px] text-slate-500 uppercase tracking-wide mb-2">AI-generated recommendations for this device</div>
-                    {projectAnalysisLoading ? (
-                      <div className="text-xs text-slate-500">Loading AI analysis...</div>
-                    ) : deviceRecs.length ? (
-                      <div className="space-y-2">
-                        {projectGapAnalysis.map((item, idx) => (
-                          <div key={idx} className="p-2 rounded border text-xs break-words" style={{
-                            borderColor: item.severity === "High" ? "#ef4444" : item.severity === "Medium" ? "#eab308" : "#64748b",
-                            backgroundColor: item.severity === "High" ? "rgba(239, 68, 68, 0.1)" : item.severity === "Medium" ? "rgba(234, 179, 8, 0.1)" : "rgba(100, 116, 139, 0.1)"
-                          }}>
-                            <div className="flex items-start gap-2 mb-1">
-                              <span className={`text-[10px] font-semibold px-1.5 py-0.5 rounded ${
-                                item.severity === "High" ? "bg-rose-500 text-white" : 
-                                item.severity === "Medium" ? "bg-yellow-500 text-white" : 
-                                "bg-slate-500 text-white"
-                              }`}>
-                                {item.severity?.toUpperCase() || "MEDIUM"}
-                              </span>
-                            </div>
-                            {item.issue && (
-                              <div className="text-[10px] text-slate-300 mb-1">
-                                <span className="font-semibold">Issue:</span> {item.issue}
-                              </div>
-                            )}
-                            {item.recommendation && (
-                              <div className="text-[10px] text-slate-200">
-                                <span className="font-semibold">Recommendation:</span> {item.recommendation}
-                              </div>
-                            )}
-                          </div>
-                        ))}
-                      </div>
+                    <div className="text-xs font-semibold text-slate-800 dark:text-slate-400 uppercase tracking-wide mb-2">AI-generated recommendations for this device</div>
+                    {deviceRecsLoading && !deviceRecsGenerating ? (
+                      <div className="text-xs text-slate-500">Loading...</div>
                     ) : (
-                      <div className="text-xs text-slate-500">
-                        No AI recommendations yet. Run project analysis from the Summary page to generate.
-                      </div>
+                      <>
+                        {deviceRecsGenerating && (
+                          <div className="p-2 rounded bg-slate-700/50 border border-slate-600 text-slate-300 text-xs mb-2">
+                            Analyzing with LLM... Finding flaws and recommending improvements.
+                          </div>
+                        )}
+                        {deviceRecsError && (
+                          <div className="p-2 rounded bg-rose-900/20 border border-rose-700 text-rose-400 text-xs mb-2 break-words">
+                            Error: {safeDisplay(deviceRecsError)}
+                          </div>
+                        )}
+                        {deviceRecsList.length ? (
+                          <div className="space-y-2">
+                            {deviceRecsList.map((item, idx) => (
+                              <div key={idx} className="p-2 rounded border text-xs break-words" style={{
+                                borderColor: item.severity === "high" ? "#ef4444" : item.severity === "medium" ? "#eab308" : "#64748b",
+                                backgroundColor: item.severity === "high" ? "rgba(239, 68, 68, 0.1)" : item.severity === "medium" ? "rgba(234, 179, 8, 0.1)" : "rgba(100, 116, 139, 0.1)"
+                              }}>
+                                <div className="flex items-start gap-2 mb-1">
+                                  <span className={`text-[10px] font-semibold px-1.5 py-0.5 rounded ${
+                                    item.severity === "high" ? "bg-rose-500 text-white" :
+                                    item.severity === "medium" ? "bg-yellow-500 text-white" :
+                                    "bg-slate-500 text-white"
+                                  }`}>
+                                    {(item.severity || "medium").toUpperCase()}
+                                  </span>
+                                </div>
+                                {item.issue && (
+                                  <div className="text-xs text-slate-800 dark:text-slate-300 mb-1">
+                                    <span className="font-semibold">Issue:</span> {item.issue}
+                                  </div>
+                                )}
+                                {item.recommendation && (
+                                  <div className="text-xs text-slate-800 dark:text-slate-300">
+                                    <span className="font-semibold">Recommendation:</span> {item.recommendation}
+                                  </div>
+                                )}
+                              </div>
+                            ))}
+                          </div>
+                        ) : (
+                          <div className="text-xs text-slate-700 dark:text-slate-500">
+                            No AI recommendations yet. Click the AI button above to generate (LLM will find flaws and recommend config improvements).
+                          </div>
+                        )}
+                      </>
                     )}
                   </div>
                 )}
                 {llmPanelTab === "drift" && (
                   <div>
-                    <div className="text-[10px] text-slate-500 uppercase tracking-wide mb-2">Configuration drift vs. previous backups</div>
-                    {loadingBackups ? (
-                      <div className="text-xs text-slate-400">Loading backup history...</div>
-                    ) : deviceBackups.length < 2 ? (
-                      <div className="text-xs text-slate-400">Upload at least 2 config files for this device to compare.</div>
+                    {!deviceDriftData && (
+                      <div className="text-xs font-semibold text-slate-800 dark:text-slate-400 uppercase tracking-wide mb-2">Configuration drift (raw config — 2 latest versions)</div>
+                    )}
+                    {loadingBackups || loadingVersions ? (
+                      <div className="text-xs text-slate-500 dark:text-slate-400">Loading version history...</div>
+                    ) : !deviceConfigVersions ? (
+                      <div className="text-xs text-slate-500 dark:text-slate-400">No config file for this device in the Config folder.</div>
+                    ) : !hasEnoughVersionsForDrift ? (
+                      <div className="text-xs text-slate-500 dark:text-slate-400">Use files from this device&apos;s version history — at least 2 versions required to compare (currently {deviceConfigVersions.versions?.length ?? 0} version(s)).</div>
                     ) : (
-                      <div className="grid gap-2">
-                        <div className="text-xs">
-                          <b>Device:</b> {safeDisplay(facts?.device)} <br />
-                          <b>Available backups:</b> {deviceBackups.length} file(s) <br />
-                          <b>Latest files:</b>{" "}
-                          <span className="text-blue-300">{safeDisplay(driftSummary?.from)}</span>{" "}
-                          <span className="mx-1">→</span>
-                          <span className="text-blue-300">{safeDisplay(driftSummary?.to)}</span>
-                        </div>
-                        <div className="text-xs text-slate-400">
-                          Use &quot;Compare Backups&quot; for detailed diff or download files to compare locally.
-                        </div>
-                        <Button variant="secondary" onClick={() => setCompareOpen(true)} className="text-xs py-1.5 px-2">Compare Backups</Button>
-                      </div>
+                      <>
+                        {deviceDriftGenerating && (
+                          <div className="p-2 rounded-lg bg-slate-200/90 dark:bg-slate-700/50 border border-slate-300 dark:border-slate-600 text-slate-700 dark:text-slate-300 text-xs mb-2">
+                            Comparing latest 2 config versions with LLM (configuration section only)...
+                          </div>
+                        )}
+                        {deviceDriftError && (
+                          <div className="p-2 rounded-lg bg-rose-50 dark:bg-rose-900/20 border border-rose-300 dark:border-rose-700 text-rose-700 dark:text-rose-400 text-xs mb-2 break-words">
+                            Error: {safeDisplay(deviceDriftError)}
+                          </div>
+                        )}
+                        {deviceDriftData ? (
+                          <div className="text-xs text-slate-700 dark:text-slate-300 space-y-2">
+                            <div className="font-semibold text-slate-800 dark:text-slate-200">Device: {safeDisplay(deviceDriftData.device_name || facts?.device)}</div>
+                            <div className="text-slate-600 dark:text-slate-400">
+                              Compare: {safeDisplay(deviceDriftData.from_filename)} → {safeDisplay(deviceDriftData.to_filename)}
+                            </div>
+                            <ul className="list-none space-y-1">
+                              {(deviceDriftData.changes || []).map((c, i) => (
+                                <li key={i} className="flex items-start gap-2">
+                                  {c.type === "add" && <span className="text-emerald-400 font-bold flex-shrink-0">+</span>}
+                                  {c.type === "remove" && <span className="text-rose-400 font-bold flex-shrink-0">−</span>}
+                                  {c.type === "modify" && <span className="text-amber-400 font-bold flex-shrink-0">~</span>}
+                                  <span>{safeDisplay(c.description)}</span>
+                                </li>
+                              ))}
+                            </ul>
+                          </div>
+                        ) : (
+                            <div className="grid gap-2">
+                            <div className="text-xs text-slate-700 dark:text-slate-300">
+                              <b>Device:</b> {safeDisplay(facts?.device)} <br />
+                              <b>Version history:</b> {deviceConfigVersions.versions?.length ?? 0} version(s) (raw config) <br />
+                              <b>Compare:</b>{" "}
+                              <span className="text-slate-600 dark:text-slate-400 font-medium">{safeDisplay(driftSummary?.from)}</span>
+                              <span className="mx-1">→</span>
+                              <span className="text-slate-600 dark:text-slate-400 font-medium">{safeDisplay(driftSummary?.to)}</span>
+                            </div>
+                            <div className="text-xs text-slate-500 dark:text-slate-400">
+                              Click the AI button above to compare configuration (running-config / current-configuration style) between the 2 latest versions.
+                            </div>
+                            <Button variant="secondary" onClick={() => setCompareOpen(true)} className="text-xs py-1.5 px-2">Compare Backups</Button>
+                          </div>
+                        )}
+                      </>
                     )}
                   </div>
                 )}
@@ -4266,7 +4879,7 @@ const DeviceDetailsView = ({ project, deviceId, goBack, uploadHistory, authedUse
           </div>
 
           {/* Bottom: Device Facts full width */}
-          <div className="flex-shrink-0 rounded-xl border border-slate-800 bg-slate-900/50 overflow-hidden">
+          <div className="flex-shrink-0 rounded-xl border border-slate-300 dark:border-slate-800 bg-white dark:bg-slate-900/50 overflow-hidden shadow-sm dark:shadow-none">
             <Card title="Device Facts">
               <div className="grid gap-3 grid-cols-4 md:grid-cols-6 text-xs max-h-[220px] overflow-auto">
                 <Metric k="Model" v={facts.model || "—"} />
@@ -4346,7 +4959,7 @@ const DeviceDetailsView = ({ project, deviceId, goBack, uploadHistory, authedUse
               <Button variant="secondary" onClick={()=>{setQMode("all");setQState("all");setQVlan("");setQSpeed("all");}}>Clear Filters</Button>
             </div>
           </div>
-          <div className="h-[70vh] overflow-auto rounded-2xl border border-gray-200 dark:border-[#1F2937]">
+          <div className="h-[70vh] overflow-auto rounded-2xl border border-slate-300 dark:border-[#1F2937]">
             <Table columns={ifaceColumns} data={filteredIfaces} empty="No interfaces" minWidthClass="min-w-[1400px]" />
           </div>
         </Card>
@@ -4356,7 +4969,7 @@ const DeviceDetailsView = ({ project, deviceId, goBack, uploadHistory, authedUse
       {/* VLANS */}
       {!loading && !error && tab === "vlans" && (
         <Card title={`VLANs (${vlans.length}) — All VLANs from config`} actions={<Button variant="secondary" onClick={exportVlans}>Export CSV</Button>}>
-          <div className="h-[70vh] overflow-auto rounded-2xl border border-gray-200 dark:border-[#1F2937]">
+          <div className="h-[70vh] overflow-auto rounded-2xl border border-slate-300 dark:border-[#1F2937]">
             <Table columns={vlanColumns} data={vlans} empty="No VLANs parsed" minWidthClass="min-w-[900px]" />
           </div>
         </Card>
@@ -4380,7 +4993,7 @@ const DeviceDetailsView = ({ project, deviceId, goBack, uploadHistory, authedUse
             {stpData.interfaces && Array.isArray(stpData.interfaces) && stpData.interfaces.length > 0 && (
               <div className="mt-4">
                 <h3 className="text-sm font-semibold mb-3">STP Port Roles & States (from parser)</h3>
-                <div className="h-[60vh] overflow-auto rounded-2xl border border-gray-200 dark:border-[#1F2937]">
+                <div className="h-[60vh] overflow-auto rounded-2xl border border-slate-300 dark:border-[#1F2937]">
                   <Table
                     columns={[
                       { header: "Port", key: "port" },
@@ -4399,7 +5012,7 @@ const DeviceDetailsView = ({ project, deviceId, goBack, uploadHistory, authedUse
             {(!stpData.interfaces || !Array.isArray(stpData.interfaces) || stpData.interfaces.length === 0) && stpData.port_roles && Object.keys(stpData.port_roles).length > 0 && (
               <div className="mt-4">
                 <h3 className="text-sm font-semibold mb-3">Port Roles & States (legacy format)</h3>
-                <div className="h-[60vh] overflow-auto rounded-2xl border border-gray-200 dark:border-[#1F2937]">
+                <div className="h-[60vh] overflow-auto rounded-2xl border border-slate-300 dark:border-[#1F2937]">
                   <Table
                     columns={[
                       { header: "Port", key: "port" },
@@ -4433,7 +5046,7 @@ const DeviceDetailsView = ({ project, deviceId, goBack, uploadHistory, authedUse
           {/* Static Routes */}
           {routingData.static && ((Array.isArray(routingData.static) && routingData.static.length > 0) || (routingData.static.routes && routingData.static.routes.length > 0)) && (
             <Card title="Static Routes">
-              <div className="h-[50vh] overflow-auto rounded-2xl border border-gray-200 dark:border-[#1F2937]">
+              <div className="h-[50vh] overflow-auto rounded-2xl border border-slate-300 dark:border-[#1F2937]">
                 <Table
                   columns={[
                     { header: "Network", key: "network" },
@@ -4461,7 +5074,7 @@ const DeviceDetailsView = ({ project, deviceId, goBack, uploadHistory, authedUse
               {routingData.ospf.interfaces && routingData.ospf.interfaces.length > 0 && (
                 <div className="mb-4">
                   <h3 className="text-sm font-semibold mb-2">OSPF Interfaces</h3>
-                  <div className="h-[30vh] overflow-auto rounded-xl border border-gray-200 dark:border-[#1F2937]">
+                  <div className="h-[30vh] overflow-auto rounded-xl border border-slate-300 dark:border-[#1F2937]">
                     <Table
                       columns={[
                         { header: "Interface", key: "interface" },
@@ -4478,7 +5091,7 @@ const DeviceDetailsView = ({ project, deviceId, goBack, uploadHistory, authedUse
               {routingData.ospf.neighbors && routingData.ospf.neighbors.length > 0 && (
                 <div className="mb-4">
                   <h3 className="text-sm font-semibold mb-2">OSPF Neighbors</h3>
-                  <div className="h-[30vh] overflow-auto rounded-xl border border-gray-200 dark:border-[#1F2937]">
+                  <div className="h-[30vh] overflow-auto rounded-xl border border-slate-300 dark:border-[#1F2937]">
                     <Table
                       columns={[
                         { header: "Neighbor ID", key: "neighbor_id" },
@@ -4508,7 +5121,7 @@ const DeviceDetailsView = ({ project, deviceId, goBack, uploadHistory, authedUse
               {routingData.eigrp.neighbors && routingData.eigrp.neighbors.length > 0 && (
                 <div className="mb-4">
                   <h3 className="text-sm font-semibold mb-2">EIGRP Neighbors</h3>
-                  <div className="h-[30vh] overflow-auto rounded-xl border border-gray-200 dark:border-[#1F2937]">
+                  <div className="h-[30vh] overflow-auto rounded-xl border border-slate-300 dark:border-[#1F2937]">
                     <Table
                       columns={[
                         { header: "Neighbor", key: "neighbor" },
@@ -4538,7 +5151,7 @@ const DeviceDetailsView = ({ project, deviceId, goBack, uploadHistory, authedUse
               {routingData.bgp.peers && routingData.bgp.peers.length > 0 && (
                 <div>
                   <h3 className="text-sm font-semibold mb-2">BGP Peers</h3>
-                  <div className="h-[40vh] overflow-auto rounded-xl border border-gray-200 dark:border-[#1F2937]">
+                  <div className="h-[40vh] overflow-auto rounded-xl border border-slate-300 dark:border-[#1F2937]">
                     <Table
                       columns={[
                         { header: "Peer IP", key: "peer", cell: (r) => r.peer || r.peer_ip || "—" },
@@ -4581,7 +5194,7 @@ const DeviceDetailsView = ({ project, deviceId, goBack, uploadHistory, authedUse
         <div className="grid gap-6">
           <Card title={`Neighbors (${neighborsData.length})`}>
             {neighborsData.length > 0 ? (
-              <div className="h-[70vh] overflow-auto rounded-2xl border border-gray-200 dark:border-[#1F2937]">
+              <div className="h-[70vh] overflow-auto rounded-2xl border border-slate-300 dark:border-[#1F2937]">
                 <Table
                   columns={[
                     { header: "Device Name", key: "device_name" },
@@ -4629,7 +5242,7 @@ const DeviceDetailsView = ({ project, deviceId, goBack, uploadHistory, authedUse
           {/* MAC Address Table */}
           <Card title="MAC Address Table">
             {macArpData.mac_table && macArpData.mac_table.length > 0 ? (
-              <div className="h-[50vh] overflow-auto rounded-2xl border border-gray-200 dark:border-[#1F2937]">
+              <div className="h-[50vh] overflow-auto rounded-2xl border border-slate-300 dark:border-[#1F2937]">
                 <Table
                   columns={[
                     { header: "MAC Address", key: "mac_address" },
@@ -4650,7 +5263,7 @@ const DeviceDetailsView = ({ project, deviceId, goBack, uploadHistory, authedUse
           {/* ARP Table */}
           <Card title="ARP Table">
             {macArpData.arp_table && macArpData.arp_table.length > 0 ? (
-              <div className="h-[50vh] overflow-auto rounded-2xl border border-gray-200 dark:border-[#1F2937]">
+              <div className="h-[50vh] overflow-auto rounded-2xl border border-slate-300 dark:border-[#1F2937]">
                 <Table
                   columns={[
                     { header: "IP Address", key: "ip_address" },
@@ -4676,7 +5289,7 @@ const DeviceDetailsView = ({ project, deviceId, goBack, uploadHistory, authedUse
           {/* User Accounts */}
           {(securityData.user_accounts && securityData.user_accounts.length > 0) || (securityData.users && securityData.users.length > 0) && (
             <Card title="User Accounts & Privilege Levels">
-              <div className="h-[40vh] overflow-auto rounded-xl border border-gray-200 dark:border-[#1F2937]">
+              <div className="h-[40vh] overflow-auto rounded-xl border border-slate-300 dark:border-[#1F2937]">
                 <Table
                   columns={[
                     { header: "Username", key: "username" },
@@ -4726,7 +5339,7 @@ const DeviceDetailsView = ({ project, deviceId, goBack, uploadHistory, authedUse
                 {securityData.snmp.communities && securityData.snmp.communities.length > 0 && (
                   <div className="col-span-2">
                     <h4 className="text-sm font-semibold mb-2">Communities</h4>
-                    <div className="h-[20vh] overflow-auto rounded-xl border border-gray-200 dark:border-[#1F2937]">
+                    <div className="h-[20vh] overflow-auto rounded-xl border border-slate-300 dark:border-[#1F2937]">
                       <Table
                         columns={[
                           { header: "Name", key: "name" },
@@ -4785,9 +5398,9 @@ const DeviceDetailsView = ({ project, deviceId, goBack, uploadHistory, authedUse
             <Card title="Access Control Lists (ACLs)">
               <div className="grid gap-4">
                 {securityData.acls.map((acl, idx) => (
-                  <Card key={idx} title={`ACL ${acl.acl_number || acl.name || `#${idx + 1}`}`} className="border border-gray-200 dark:border-gray-700">
+                  <Card key={idx} title={`ACL ${acl.acl_number || acl.name || `#${idx + 1}`}`} className="border border-slate-300 dark:border-gray-700">
                     {acl.rules && Array.isArray(acl.rules) && acl.rules.length > 0 ? (
-                      <div className="h-[40vh] overflow-auto rounded-xl border border-gray-200 dark:border-[#1F2937]">
+                      <div className="h-[40vh] overflow-auto rounded-xl border border-slate-300 dark:border-[#1F2937]">
                         <Table
                           columns={[
                             { header: "Rule ID", key: "id" },
@@ -4826,7 +5439,7 @@ const DeviceDetailsView = ({ project, deviceId, goBack, uploadHistory, authedUse
           {/* EtherChannel / Port-Channel */}
           {haData.etherchannel && haData.etherchannel.length > 0 && (
             <Card title="EtherChannel / Port-Channel">
-              <div className="h-[50vh] overflow-auto rounded-2xl border border-gray-200 dark:border-[#1F2937]">
+              <div className="h-[50vh] overflow-auto rounded-2xl border border-slate-300 dark:border-[#1F2937]">
                 <Table
                   columns={[
                     { header: "Port-Channel", key: "name" },
@@ -4845,7 +5458,7 @@ const DeviceDetailsView = ({ project, deviceId, goBack, uploadHistory, authedUse
           {/* HSRP */}
           {haData.hsrp && haData.hsrp.groups && haData.hsrp.groups.length > 0 && (
             <Card title="HSRP (Hot Standby Router Protocol)">
-              <div className="h-[50vh] overflow-auto rounded-2xl border border-gray-200 dark:border-[#1F2937]">
+              <div className="h-[50vh] overflow-auto rounded-2xl border border-slate-300 dark:border-[#1F2937]">
                 <Table
                   columns={[
                     { header: "Group", key: "group_id" },
@@ -4866,7 +5479,7 @@ const DeviceDetailsView = ({ project, deviceId, goBack, uploadHistory, authedUse
           {/* VRRP */}
           {haData.vrrp && ((Array.isArray(haData.vrrp) && haData.vrrp.length > 0) || (haData.vrrp.groups && haData.vrrp.groups.length > 0)) && (
             <Card title="VRRP (Virtual Router Redundancy Protocol)">
-              <div className="h-[50vh] overflow-auto rounded-2xl border border-gray-200 dark:border-[#1F2937]">
+              <div className="h-[50vh] overflow-auto rounded-2xl border border-slate-300 dark:border-[#1F2937]">
                 <Table
                   columns={[
                     { header: "VRID", key: "vrid" },
@@ -4905,10 +5518,10 @@ const DeviceDetailsView = ({ project, deviceId, goBack, uploadHistory, authedUse
               <button
                 key={t.id}
                 onClick={() => setRawSubTab(t.id)}
-                className={`px-4 py-2 rounded-xl text-sm font-semibold ${
+                className={`px-4 py-2 rounded-xl text-sm font-semibold border transition-all ${
                   rawSubTab === t.id
-                    ? "bg-blue-600 text-white"
-                    : "bg-gray-100 dark:bg-gray-800 hover:bg-gray-200 dark:hover:bg-gray-700"
+                    ? "bg-white/90 dark:bg-white/10 backdrop-blur-sm border-slate-300/80 dark:border-slate-600/80 text-slate-800 dark:text-slate-100 shadow-sm"
+                    : "bg-slate-100/80 dark:bg-slate-800/50 border-slate-300 dark:border-slate-700/60 text-slate-600 dark:text-slate-400 hover:bg-slate-200/80 dark:hover:bg-slate-700/50"
                 }`}
               >
                 {t.label}
@@ -4941,7 +5554,7 @@ const DeviceDetailsView = ({ project, deviceId, goBack, uploadHistory, authedUse
                     URL.revokeObjectURL(url);
                   }}
                   disabled={!deviceData}
-                  className="inline-flex items-center gap-2 px-3 py-1.5 text-xs font-semibold rounded-xl bg-blue-600 text-white hover:bg-blue-700 transition focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:opacity-50 disabled:cursor-not-allowed"
+                  className="inline-flex items-center gap-2 px-3 py-1.5 text-xs font-semibold rounded-xl bg-white/90 dark:bg-white/10 backdrop-blur-sm border border-slate-300/80 dark:border-slate-600/80 text-slate-800 dark:text-slate-100 shadow-sm hover:bg-white dark:hover:bg-white/15 transition focus:outline-none focus:ring-2 focus:ring-slate-400 dark:focus:ring-slate-500 disabled:opacity-50 disabled:cursor-not-allowed"
                   title="Download as JSON file"
                 >
                   <span>⬇</span>
@@ -4949,7 +5562,7 @@ const DeviceDetailsView = ({ project, deviceId, goBack, uploadHistory, authedUse
                 </button>
               }
             >
-              <div className="rounded-xl border border-gray-200 dark:border-[#1F2937] p-3 bg-gray-50 dark:bg-[#0F172A] text-sm overflow-auto max-h-[70vh]">
+              <div className="rounded-xl border border-slate-300 dark:border-[#1F2937] p-3 bg-gray-50 dark:bg-[#0F172A] text-sm overflow-auto max-h-[70vh]">
                 {deviceData ? (
                   <pre className="whitespace-pre-wrap">{JSON.stringify(deviceData, null, 2)}</pre>
                 ) : (
@@ -4984,7 +5597,7 @@ const DeviceDetailsView = ({ project, deviceId, goBack, uploadHistory, authedUse
                     URL.revokeObjectURL(url);
                   }}
                   disabled={!deviceData?.original_content}
-                  className="inline-flex items-center gap-2 px-3 py-1.5 text-xs font-semibold rounded-xl bg-blue-600 text-white hover:bg-blue-700 transition focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:opacity-50 disabled:cursor-not-allowed"
+                  className="inline-flex items-center gap-2 px-3 py-1.5 text-xs font-semibold rounded-xl bg-white/90 dark:bg-white/10 backdrop-blur-sm border border-slate-300/80 dark:border-slate-600/80 text-slate-800 dark:text-slate-100 shadow-sm hover:bg-white dark:hover:bg-white/15 transition focus:outline-none focus:ring-2 focus:ring-slate-400 dark:focus:ring-slate-500 disabled:opacity-50 disabled:cursor-not-allowed"
                   title="Download as TXT file"
                 >
                   <span>⬇</span>
@@ -4992,7 +5605,7 @@ const DeviceDetailsView = ({ project, deviceId, goBack, uploadHistory, authedUse
                 </button>
               }
             >
-              <div className="rounded-xl border border-gray-200 dark:border-[#1F2937] p-3 bg-gray-50 dark:bg-[#0F172A] text-sm overflow-auto max-h-[70vh]">
+              <div className="rounded-xl border border-slate-300 dark:border-[#1F2937] p-3 bg-gray-50 dark:bg-[#0F172A] text-sm overflow-auto max-h-[70vh]">
                 {deviceData?.original_content ? (
                   <pre className="whitespace-pre-wrap">{deviceData.original_content}</pre>
                 ) : (
@@ -5038,7 +5651,7 @@ const DeviceDetailsView = ({ project, deviceId, goBack, uploadHistory, authedUse
                   </Field>
                 </div>
 
-                <div className="rounded-xl border border-gray-200 dark:border-[#1F2937] overflow-hidden">
+                <div className="rounded-xl border border-slate-300 dark:border-[#1F2937] overflow-hidden">
                   <div className="grid grid-cols-1 md:grid-cols-2">
                     <div className="border-b md:border-b-0 md:border-r border-[#1F2937] p-3">
                       <div className="text-xs text-gray-400 mb-2 truncate">{leftFile?.name || "—"}</div>
@@ -5086,9 +5699,9 @@ const DeviceDetailsView = ({ project, deviceId, goBack, uploadHistory, authedUse
 
 
 const Metric = ({ k, v }) => (
-  <div className="rounded-xl border border-gray-200 dark:border-[#1F2937] bg-white dark:bg-[#0F172A] p-3">
-    <div className="text-xs text-gray-500 dark:text-gray-400">{safeDisplay(k)}</div>
-    <div className="mt-1 font-semibold">{safeDisplay(v)}</div>
+  <div className="rounded-xl border border-slate-300 dark:border-slate-700/80 bg-white dark:bg-slate-800/50 p-3">
+    <div className="text-xs text-slate-500 dark:text-slate-400">{safeDisplay(k)}</div>
+    <div className="mt-1 font-semibold text-slate-800 dark:text-slate-100">{safeDisplay(v)}</div>
   </div>
 );
 
@@ -5326,7 +5939,7 @@ const UploadConfigForm = ({ project, authedUser, onClose, onUpload }) => {
                 onDrop={handleDrop}
                 className={`border-2 border-dashed rounded-xl p-6 text-center transition-colors ${
                   dragActive
-                    ? 'border-blue-500 bg-blue-50 dark:bg-blue-900/20'
+                    ? 'border-slate-400/80 dark:border-slate-500/80 bg-slate-100/80 dark:bg-white/10'
                     : 'border-gray-300 dark:border-gray-700 hover:border-gray-400 dark:hover:border-gray-600'
                 }`}
               >
@@ -5357,10 +5970,10 @@ const UploadConfigForm = ({ project, authedUser, onClose, onUpload }) => {
                   <div className="text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
                     Selected {files.length} file(s):
                   </div>
-                  <div className="border border-gray-200 dark:border-gray-700 rounded-lg p-2 max-h-48 overflow-y-auto">
+                  <div className="border border-slate-300 dark:border-gray-700 rounded-lg p-2 max-h-48 overflow-y-auto">
                     <div className="space-y-2">
                       {files.map((file, idx) => (
-                        <div key={idx} className="flex items-center justify-between rounded-lg border border-gray-200 dark:border-gray-700 p-2 text-sm bg-gray-50 dark:bg-gray-800/50">
+                        <div key={idx} className="flex items-center justify-between rounded-lg border border-slate-300 dark:border-gray-700 p-2 text-sm bg-gray-50 dark:bg-gray-800/50">
                           <div className="flex-1 min-w-0">
                             <div className="font-medium truncate">{file.name}</div>
                             <div className="text-xs text-gray-500">{(file.size / 1024).toFixed(1)} KB</div>
@@ -5380,7 +5993,7 @@ const UploadConfigForm = ({ project, authedUser, onClose, onUpload }) => {
               )}
             </Field>
 
-            <div className="flex gap-2 justify-end sticky bottom-0 bg-white dark:bg-gray-900 pt-3 pb-1 border-t border-gray-200 dark:border-gray-700 mt-2">
+            <div className="flex gap-2 justify-end sticky bottom-0 bg-white dark:bg-gray-900 pt-3 pb-1 border-t border-slate-300 dark:border-gray-700 mt-2">
               <Button variant="secondary" onClick={onClose}>Cancel</Button>
               <Button type="submit" disabled={files.length === 0 || isUploading}>
                 {isUploading ? 'Uploading...' : 'Upload Files'}
@@ -5686,7 +6299,7 @@ const UploadDocumentForm = ({ project, authedUser, onClose, onUpload, folderStru
                 onDrop={handleDrop}
                 className={`border-2 border-dashed rounded-xl p-6 text-center transition-colors ${
                   dragActive
-                    ? 'border-blue-500 bg-blue-50 dark:bg-blue-900/20'
+                    ? 'border-slate-400/80 dark:border-slate-500/80 bg-slate-100/80 dark:bg-white/10'
                     : 'border-gray-300 dark:border-gray-700 hover:border-gray-400 dark:hover:border-gray-600'
                 }`}
               >
@@ -5717,10 +6330,10 @@ const UploadDocumentForm = ({ project, authedUser, onClose, onUpload, folderStru
                   <div className="text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
                     Selected {files.length} file(s):
                   </div>
-                  <div className="border border-gray-200 dark:border-gray-700 rounded-lg p-2 max-h-48 overflow-y-auto">
+                  <div className="border border-slate-300 dark:border-gray-700 rounded-lg p-2 max-h-48 overflow-y-auto">
                     <div className="space-y-2">
                       {files.map((file, idx) => (
-                        <div key={idx} className="flex items-center justify-between rounded-lg border border-gray-200 dark:border-gray-700 p-2 text-sm bg-gray-50 dark:bg-gray-800/50">
+                        <div key={idx} className="flex items-center justify-between rounded-lg border border-slate-300 dark:border-gray-700 p-2 text-sm bg-gray-50 dark:bg-gray-800/50">
                           <div className="flex-1 min-w-0">
                             <div className="font-medium truncate">{file.name}</div>
                             <div className="text-xs text-gray-500">{(file.size / 1024).toFixed(1)} KB</div>
@@ -5740,7 +6353,7 @@ const UploadDocumentForm = ({ project, authedUser, onClose, onUpload, folderStru
               )}
             </Field>
 
-            <div className="flex gap-2 justify-end sticky bottom-0 bg-white dark:bg-gray-900 pt-3 pb-1 border-t border-gray-200 dark:border-gray-700 mt-2">
+            <div className="flex gap-2 justify-end sticky bottom-0 bg-white dark:bg-gray-900 pt-3 pb-1 border-t border-slate-300 dark:border-gray-700 mt-2">
               <Button variant="secondary" onClick={onClose}>Cancel</Button>
               <Button type="submit" disabled={files.length === 0 || isUploading}>
                 {isUploading ? 'Uploading...' : 'Upload Files'}
@@ -6208,7 +6821,7 @@ const AnalysisDetailModal = ({ analysis, authedUser, onVerify, onClose, loading 
                 {JSON.stringify(currentContent, null, 2)}
               </pre>
               {analysis.ai_draft_text && viewMode === "draft" && (
-                <div className="mt-4 p-4 bg-blue-50 dark:bg-blue-900/20 rounded-lg">
+                <div className="mt-4 p-4 bg-slate-100/90 dark:bg-white/5 rounded-xl border border-slate-300 dark:border-slate-700/80">
                   <h4 className="font-semibold mb-2">Full AI Response:</h4>
                   <p className="whitespace-pre-wrap text-sm">{safeDisplay(analysis?.ai_draft_text)}</p>
                 </div>
@@ -6369,7 +6982,7 @@ const PerformanceMetricsView = ({ metrics }) => {
           </thead>
           <tbody>
             {metrics.map((m) => (
-              <tr key={m.log_id} className="border-b border-gray-200 dark:border-gray-700">
+              <tr key={m.log_id} className="border-b border-slate-300 dark:border-gray-700">
                 <td className="px-4 py-2">{m.device_name}</td>
                 <td className="px-4 py-2">{m.inference_time_ms?.toFixed(0)}</td>
                 <td className="px-4 py-2">{m.token_usage?.total_tokens || 0}</td>
@@ -6523,7 +7136,7 @@ const HistoryPage = ({ project, can, authedUser }) => {
               />
             </div>
             <div className="flex-1 min-h-0 overflow-y-auto overflow-x-auto">
-              <div className="rounded-lg border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-900/50">
+              <div className="rounded-lg border border-slate-300 dark:border-gray-700 bg-white dark:bg-gray-900/50">
                 <Table
                   columns={[
                     { header: "Time", key: "created_at", cell: (r) => <span className="text-xs">{formatDateTime(r.created_at)}</span> },
@@ -7524,7 +8137,7 @@ const DocumentsPage = ({ project, can, authedUser, uploadHistory, setUploadHisto
                 </div>
               </div>
             ) : previewContent.preview_type === "text" ? (
-              <div className="flex-1 min-h-0 overflow-y-auto overflow-x-auto rounded-lg border border-gray-200 dark:border-gray-700 p-4 bg-gray-50 dark:bg-[#0F172A]">
+              <div className="flex-1 min-h-0 overflow-y-auto overflow-x-auto rounded-lg border border-slate-300 dark:border-gray-700 p-4 bg-gray-50 dark:bg-[#0F172A]">
                 <pre className="whitespace-pre-wrap text-sm leading-relaxed text-gray-800 dark:text-gray-200 font-mono">
                   {previewContent.preview_data || "(empty file)"}
                 </pre>
@@ -7545,7 +8158,7 @@ const DocumentsPage = ({ project, can, authedUser, uploadHistory, setUploadHisto
               </div>
             ) : previewContent.preview_type === "pdf" || previewContent.blob_url ? (
               previewContent.blob_url ? (
-                <div className="flex-1 min-h-0 overflow-hidden rounded-lg border border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-900">
+                <div className="flex-1 min-h-0 overflow-hidden rounded-lg border border-slate-300 dark:border-gray-700 bg-gray-50 dark:bg-gray-900">
                   <iframe
                     src={`${previewContent.blob_url}#toolbar=1&navpanes=1&scrollbar=1`}
                     className="w-full h-full"
@@ -7554,7 +8167,7 @@ const DocumentsPage = ({ project, can, authedUser, uploadHistory, setUploadHisto
                   />
                 </div>
               ) : (
-                <div className="flex-1 flex items-center justify-center text-gray-500 dark:text-gray-300 border border-gray-200 dark:border-gray-700 rounded-lg">
+                <div className="flex-1 flex items-center justify-center text-gray-500 dark:text-gray-300 border border-slate-300 dark:border-gray-700 rounded-lg">
                   <div className="text-center">
                     <div className="text-4xl mb-2">📄</div>
                     <div>{previewContent.preview_data || "PDF Preview"}</div>
@@ -7868,7 +8481,7 @@ const DocumentsPage = ({ project, can, authedUser, uploadHistory, setUploadHisto
                   </div>
                 )}
                 {moveFolderTarget?.folder_id === "Other" && (
-                  <div className="text-sm text-blue-500 dark:text-blue-400">
+                  <div className="text-sm text-slate-600 dark:text-slate-300">
                     ℹ️ This file is in the Other folder (virtual). You can move it to another folder or Root.
                   </div>
                 )}
@@ -8061,7 +8674,7 @@ const FileTree2 = ({
     return (
       <div
         className={`flex items-center gap-2 py-1.5 cursor-pointer hover:bg-gray-100 dark:hover:bg-[#1A2231] ${
-          isSelected ? "bg-blue-50 dark:bg-blue-900/20" : ""
+          isSelected ? "bg-slate-100/90 dark:bg-white/10 border-slate-300/80 dark:border-slate-600/80" : ""
         }`}
         style={{ paddingLeft: `${paddingLeft}px` }}
         onClick={(e) => {
@@ -8084,7 +8697,7 @@ const FileTree2 = ({
           </span>
         </div>
         <span className="text-sm flex-shrink-0">{open ? "📂" : "📁"}</span>
-        <span className={`text-sm flex-1 min-w-0 truncate ${isSelected ? 'font-semibold text-blue-600 dark:text-blue-400' : 'font-medium'}`}>
+        <span className={`text-sm flex-1 min-w-0 truncate ${isSelected ? 'font-semibold text-slate-800 dark:text-slate-100' : 'font-medium'}`}>
           {folder.name}
         </span>
       </div>
@@ -8108,7 +8721,7 @@ const FileTree2 = ({
     return (
       <div
         className={`flex items-center py-1.5 cursor-pointer hover:bg-gray-100 dark:hover:bg-[#1A2231] relative group ${
-          selected ? "bg-blue-50 dark:bg-blue-900/20" : ""
+          selected ? "bg-slate-100/90 dark:bg-white/10" : ""
         }`}
         style={{ paddingLeft: `${paddingLeft}px` }}
         onClick={() => {
@@ -8128,7 +8741,7 @@ const FileTree2 = ({
         </div>
         <div className="flex items-center gap-2 min-w-0 flex-1">
           <span className="text-sm flex-shrink-0">📄</span>
-          <span className={`text-sm truncate ${selected ? 'font-semibold text-blue-600 dark:text-blue-400' : ''}`}>
+          <span className={`text-sm truncate ${selected ? 'font-semibold text-slate-800 dark:text-slate-100' : ''}`}>
             {f.name}
           </span>
         </div>
@@ -8438,10 +9051,10 @@ const SettingPage = ({ project, setProjects, authedUser, goIndex }) => {
                       file:mr-4 file:py-2 file:px-4
                       file:rounded-lg file:border-0
                       file:text-sm file:font-semibold
-                      file:bg-blue-600 file:text-white
-                      hover:file:bg-blue-700
-                      dark:file:bg-blue-500 dark:file:text-white
-                      dark:hover:file:bg-blue-600
+                      file:bg-slate-100 file:text-slate-800 file:border file:border-slate-300 file:rounded-lg file:px-3 file:py-1.5
+                      hover:file:bg-slate-200
+                      dark:file:bg-slate-700 dark:file:text-slate-100 dark:file:border-slate-600
+                      dark:hover:file:bg-slate-600
                       cursor-pointer transition-colors"
                   />
                   {error && (
@@ -8452,7 +9065,7 @@ const SettingPage = ({ project, setProjects, authedUser, goIndex }) => {
                   {topoUrl && (
                     <div className="mt-3">
                       <p className="text-xs text-gray-500 dark:text-gray-400 mb-2">Preview:</p>
-                      <div className="relative rounded-lg border border-gray-200 dark:border-gray-700 overflow-hidden bg-gray-50 dark:bg-gray-900/50">
+                      <div className="relative rounded-lg border border-slate-300 dark:border-gray-700 overflow-hidden bg-gray-50 dark:bg-gray-900/50">
                         <img
                           src={topoUrl}
                           alt="Topology preview"
@@ -8470,7 +9083,7 @@ const SettingPage = ({ project, setProjects, authedUser, goIndex }) => {
 
         <Card title="Team Members" className="flex-shrink-0">
           <div className="space-y-4">
-            <div className="p-4 bg-gray-50 dark:bg-gray-800/50 rounded-lg border border-gray-200 dark:border-gray-700">
+            <div className="p-4 bg-gray-50 dark:bg-gray-800/50 rounded-lg border border-slate-300 dark:border-gray-700">
               <h3 className="text-sm font-semibold text-gray-700 dark:text-gray-300 mb-3">Add New Member</h3>
               <AddMemberInline
                 members={members}
@@ -8562,7 +9175,7 @@ const SettingPage = ({ project, setProjects, authedUser, goIndex }) => {
         </Card>
       </div>
 
-      <div className="flex-shrink-0 flex items-center justify-between pt-4 border-t border-gray-200 dark:border-gray-700 mt-6">
+      <div className="flex-shrink-0 flex items-center justify-between pt-4 border-t border-slate-300 dark:border-gray-700 mt-6">
         <div className="flex gap-3">
           <Button onClick={save} variant="primary">Save Changes</Button>
         </div>
@@ -8982,7 +9595,7 @@ const CommandTemplatesPage = () => {
       <Card title={currentTemplates.name}>
         <div className="grid gap-6">
           {currentTemplates.commands.map((category, idx) => (
-            <div key={idx} className="border-b border-gray-200 dark:border-[#1F2937] pb-4 last:border-0">
+            <div key={idx} className="border-b border-slate-300 dark:border-[#1F2937] pb-4 last:border-0">
               <h3 className="text-sm font-semibold text-gray-700 dark:text-gray-300 mb-3">
                 {category.category}
               </h3>
@@ -8990,7 +9603,7 @@ const CommandTemplatesPage = () => {
                 {category.commands.map((cmd, cmdIdx) => (
                   <div
                     key={cmdIdx}
-                    className="flex items-center justify-between p-3 bg-gray-50 dark:bg-[#0F172A] rounded-lg border border-gray-200 dark:border-[#1F2937] hover:bg-gray-100 dark:hover:bg-[#1A2231] transition"
+                    className="flex items-center justify-between p-3 bg-gray-50 dark:bg-[#0F172A] rounded-lg border border-slate-300 dark:border-[#1F2937] hover:bg-gray-100 dark:hover:bg-[#1A2231] transition"
                   >
                     <code className="text-sm text-gray-800 dark:text-gray-200 font-mono">
                       {cmd}
@@ -9418,33 +10031,41 @@ const DeviceImageUpload = ({ project, deviceName, authedUser, setProjects }) => 
   
   return (
     <div className="flex flex-col h-full min-h-0">
-      {/* Header: Upload / Change / Delete on top (like image 3) */}
+      {/* Single header: "Device Image" (left) + Upload/Delete (right) */}
       {canEdit && (
-        <div className="flex-shrink-0 flex items-center justify-end gap-2 pb-2 border-b border-slate-700/80">
-          <Button
-            variant="secondary"
-            size="sm"
-            className="text-xs"
-            onClick={() => fileInputRef.current?.click()}
-            disabled={uploading}
-          >
-            {uploading ? "Uploading..." : imageUrl ? "Change Image" : "Upload Image"}
-          </Button>
-          {imageUrl && (
+        <div className="flex-shrink-0 flex items-center justify-between gap-2 pb-2 border-b border-slate-300 dark:border-slate-700/80 px-1">
+          <span className="text-sm font-semibold text-slate-800 dark:text-slate-200">Device Image</span>
+          <div className="flex gap-2">
             <Button
               variant="secondary"
               size="sm"
               className="text-xs"
-              onClick={handleDelete}
+              onClick={() => fileInputRef.current?.click()}
               disabled={uploading}
             >
-              Delete Image
+              {uploading ? "Uploading..." : imageUrl ? "Change Image" : "Upload Image"}
             </Button>
-          )}
+            {imageUrl && (
+              <Button
+                variant="secondary"
+                size="sm"
+                className="text-xs"
+                onClick={handleDelete}
+                disabled={uploading}
+              >
+                Delete Image
+              </Button>
+            )}
+          </div>
+        </div>
+      )}
+      {!canEdit && (
+        <div className="flex-shrink-0 flex items-center justify-between gap-2 pb-2 border-b border-slate-300 dark:border-slate-700/80 px-1">
+          <span className="text-sm font-semibold text-slate-800 dark:text-slate-200">Device Image</span>
         </div>
       )}
       {/* Full area for device image display */}
-      <div className="flex-1 min-h-[160px] flex items-center justify-center rounded-lg border border-slate-700/60 bg-slate-800/40 mt-2 overflow-hidden">
+      <div className="flex-1 min-h-[160px] flex items-center justify-center rounded-xl border border-slate-300 dark:border-slate-700/60 bg-slate-100 dark:bg-slate-800/40 mt-2 overflow-hidden">
         {imageUrl ? (
           <img
             src={imageUrl}
@@ -9452,9 +10073,9 @@ const DeviceImageUpload = ({ project, deviceName, authedUser, setProjects }) => 
             className="max-w-full max-h-full w-full h-full object-contain"
           />
         ) : (
-          <div className="flex flex-col items-center justify-center gap-2 text-slate-500">
-            <span className="text-sm">No image</span>
-            <span className="text-[10px] max-w-[200px] text-center">
+          <div className="flex flex-col items-center justify-center gap-2 text-slate-700 dark:text-slate-500">
+            <span className="text-sm font-semibold">No image</span>
+            <span className="text-xs max-w-[200px] text-center font-medium">
               Upload 600×600px PNG for topology icon
             </span>
           </div>
@@ -9565,7 +10186,7 @@ function classifyRoleByName(name = "") {
 }
 
 /* ===== TopologyGraph (SVG) ===== */
-const TopologyGraph = ({ project, onOpenDevice, can, authedUser, setProjects, setTopologyLLMMetrics, topologyLLMMetrics, llmBusy, requestRun, onComplete, setLlmNotification }) => {
+const TopologyGraph = ({ project, onOpenDevice, can, authedUser, setProjects, setTopologyLLMMetrics, topologyLLMMetrics, llmBusy, llmBusyMessage, requestRun, onComplete, setLlmNotification }) => {
   // Helper function for default positioning - defined first to avoid hoisting issues
   const getDefaultPos = (nodeId, role, index = 0, totalByRole = {}) => {
     const centerX = 50;
@@ -10880,7 +11501,7 @@ const TopologyGraph = ({ project, onOpenDevice, can, authedUser, setProjects, se
     <Card 
       title={
         <div className="flex items-center justify-between w-full py-1 gap-2">
-          <span className="text-xs font-medium text-slate-300 flex-shrink-0">Topology</span>
+          <span className="text-xs font-semibold text-slate-800 dark:text-slate-400 flex-shrink-0">Topology</span>
           <div className="flex items-center gap-2 flex-1 justify-end min-w-0">
             {/* Topology completion popup - always in DOM so it shows when LLM finishes (even if user was on another tab and came back) */}
             <NotificationModal
@@ -10899,12 +11520,12 @@ const TopologyGraph = ({ project, onOpenDevice, can, authedUser, setProjects, se
             />
             {/* LLM info and last modified - larger format */}
             {topologyLLMMetrics && (
-              <span className="text-[10px] text-slate-400 whitespace-nowrap">
+              <span className="text-[10px] text-slate-700 dark:text-slate-400 whitespace-nowrap">
                 {topologyLLMMetrics.model_name?.split(':')[0] || '—'} | {topologyLLMMetrics.inference_time_ms ? `${(topologyLLMMetrics.inference_time_ms / 1000).toFixed(1)}s` : '—'}
               </span>
             )}
             {lastModified && (
-              <span className="text-[10px] text-slate-400 whitespace-nowrap">
+              <span className="text-[10px] text-slate-700 dark:text-slate-400 whitespace-nowrap">
                 {formatShortDate(lastModified)}
               </span>
             )}
@@ -10916,8 +11537,8 @@ const TopologyGraph = ({ project, onOpenDevice, can, authedUser, setProjects, se
                     type="button"
                     onClick={handleGenerateTopology}
                     disabled={generatingTopology || llmBusy}
-                    className="w-8 h-8 flex items-center justify-center rounded-md bg-emerald-600 hover:bg-emerald-700 text-white transition-colors disabled:opacity-50 disabled:cursor-not-allowed text-base"
-                    title={generatingTopology ? "Analyzing topology... Please wait." : llmBusy ? "Another LLM task is running (queued). You can switch to Documents/History tab." : "Generate topology with AI"}
+                    className="w-8 h-8 flex items-center justify-center rounded-xl bg-white/90 dark:bg-white/10 backdrop-blur-sm border border-slate-300/80 dark:border-slate-600/80 text-slate-700 dark:text-slate-200 shadow-sm hover:bg-white dark:hover:bg-white/15 transition-colors disabled:opacity-50 disabled:cursor-not-allowed text-base"
+                    title={generatingTopology ? "Analyzing topology... Please wait." : llmBusy ? (llmBusyMessage || "Another LLM task is running. You can switch to Documents/History tab.") : "Generate topology with AI"}
                     aria-label={generatingTopology ? "Generating topology..." : "AI Topology"}
                   >
                     {generatingTopology || llmBusy ? "⏳" : "✨"}
@@ -10928,8 +11549,8 @@ const TopologyGraph = ({ project, onOpenDevice, can, authedUser, setProjects, se
                 <>
                   {!editMode ? (
                     <button
-                      className="w-6 h-6 flex items-center justify-center rounded border border-slate-600 hover:bg-slate-700 text-slate-300 text-xs transition-colors"
-                      onClick={() => setEditMode(true)}
+                    className="w-6 h-6 flex items-center justify-center rounded-lg border border-slate-300 dark:border-slate-600 bg-slate-100/80 dark:bg-slate-800/50 hover:bg-slate-200 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-300 text-xs transition-colors"
+                    onClick={() => setEditMode(true)}
                       title="Edit Graph"
                     >
                       ✏️
@@ -10937,14 +11558,14 @@ const TopologyGraph = ({ project, onOpenDevice, can, authedUser, setProjects, se
                   ) : (
                     <>
                       <button
-                        className="w-6 h-6 flex items-center justify-center rounded border border-slate-600 hover:bg-slate-700 text-slate-300 text-xs transition-colors"
-                        onClick={handleCancel}
+                      className="w-6 h-6 flex items-center justify-center rounded-lg border border-slate-300 dark:border-slate-600 bg-slate-100/80 dark:bg-slate-800/50 hover:bg-slate-200 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-300 text-xs transition-colors"
+                      onClick={handleCancel}
                         title="Cancel"
                       >
                         ✕
                       </button>
                       <button
-                        className="w-6 h-6 flex items-center justify-center rounded bg-blue-600 hover:bg-blue-700 text-white text-xs transition-colors"
+                        className="w-6 h-6 flex items-center justify-center rounded-lg bg-white/90 dark:bg-white/10 backdrop-blur-sm border border-slate-300/80 dark:border-slate-600/80 text-slate-700 dark:text-slate-200 shadow-sm hover:bg-white dark:hover:bg-white/15 text-xs transition-colors"
                         onClick={handleSave}
                         title="Save Layout"
                       >
@@ -10955,23 +11576,23 @@ const TopologyGraph = ({ project, onOpenDevice, can, authedUser, setProjects, se
                 </>
               )}
               {/* Zoom controls - larger and clearer */}
-              <div className="flex gap-1 ml-1 border-l border-slate-700 pl-1">
+              <div className="flex gap-1 ml-1 border-l border-slate-300 dark:border-slate-700 pl-1">
                 <button
-                  className="w-6 h-6 flex items-center justify-center rounded border border-slate-600 hover:bg-slate-700 text-slate-300 text-xs transition-colors"
+                  className="w-6 h-6 flex items-center justify-center rounded-lg border border-slate-300 dark:border-slate-600 bg-slate-100/80 dark:bg-slate-800/50 hover:bg-slate-200 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-300 text-xs transition-colors"
                   onClick={handleZoomIn}
                   title="Zoom In"
                 >
                   +
                 </button>
                 <button
-                  className="w-6 h-6 flex items-center justify-center rounded border border-slate-600 hover:bg-slate-700 text-slate-300 text-xs transition-colors"
+                  className="w-6 h-6 flex items-center justify-center rounded-lg border border-slate-300 dark:border-slate-600 bg-slate-100/80 dark:bg-slate-800/50 hover:bg-slate-200 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-300 text-xs transition-colors"
                   onClick={handleZoomOut}
                   title="Zoom Out"
                 >
                   −
                 </button>
                 <button
-                  className="w-6 h-6 flex items-center justify-center rounded border border-slate-600 hover:bg-slate-700 text-slate-300 text-xs transition-colors"
+                  className="w-6 h-6 flex items-center justify-center rounded-lg border border-slate-300 dark:border-slate-600 bg-slate-100/80 dark:bg-slate-800/50 hover:bg-slate-200 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-300 text-xs transition-colors"
                   onClick={handleZoomReset}
                   title="Reset View"
                 >
@@ -10995,12 +11616,12 @@ const TopologyGraph = ({ project, onOpenDevice, can, authedUser, setProjects, se
         return (
           <>
             {isActuallyGenerating && (
-              <div className="mb-3 p-2 rounded bg-slate-700/50 border border-slate-600 text-slate-300 text-xs">
+              <div className="mb-3 p-2 rounded-lg bg-slate-200/90 dark:bg-slate-700/50 border border-slate-300 dark:border-slate-600 text-slate-700 dark:text-slate-300 text-xs">
                 ⏳ Analyzing with LLM... This may take 1–2 minutes. You can switch to Documents or other tabs meanwhile.
               </div>
             )}
             {topologyError && (
-              <div className="mb-2 p-2 rounded bg-rose-900/20 border border-rose-700 text-rose-400 text-xs break-words">
+              <div className="mb-2 p-2 rounded-lg bg-rose-50 dark:bg-rose-900/20 border border-rose-300 dark:border-rose-700 text-rose-700 dark:text-rose-400 text-xs break-words">
                 Error: {topologyError}
               </div>
             )}
@@ -11045,9 +11666,9 @@ const TopologyGraph = ({ project, onOpenDevice, can, authedUser, setProjects, se
           </div>
         </div>
       )}
-      <div className="relative h-[calc(100vh-380px)] min-h-[450px] rounded-xl bg-[#0B1220] overflow-hidden">
+      <div className="relative h-[calc(100vh-380px)] min-h-[450px] rounded-xl bg-slate-100 dark:bg-[#0B1220] overflow-hidden">
         {isGraphLoading ? (
-          <div className="absolute inset-0 flex items-center justify-center text-slate-400 text-sm">
+          <div className="absolute inset-0 flex items-center justify-center text-slate-500 dark:text-slate-400 text-sm">
             Loading topology graph...
           </div>
         ) : null}
@@ -11139,6 +11760,8 @@ const TopologyGraph = ({ project, onOpenDevice, can, authedUser, setProjects, se
               const imageFormat = deviceImageBase64.startsWith('iVBOR') ? 'png' : 'jpeg';
               deviceImageUrl = `data:image/${imageFormat};base64,${deviceImageBase64}`;
             }
+            // Label always below icon: image height is size*8 (centered), so bottom at +size*4; SVG icon bottom ~+size*0.6
+            const labelY = deviceImageUrl ? (deviceSize * 4 + 3.2) : (deviceSize + 3);
             
             return (
               <g 
@@ -11158,12 +11781,13 @@ const TopologyGraph = ({ project, onOpenDevice, can, authedUser, setProjects, se
                 />
                 <text 
                   x={0} 
-                  y={deviceSize + 3} 
+                  y={labelY} 
                   fontSize="2.4" 
-                  fill="#C7D2FE"
+                  fontWeight="600"
+                  fill="var(--topo-label-fill, #1e293b)"
                   textAnchor="middle"
                   pointerEvents="none"
-                  className="select-none"
+                  className="select-none topology-node-label"
                 >
                   {getNodeName(n.id)}
                 </text>
@@ -11177,7 +11801,7 @@ const TopologyGraph = ({ project, onOpenDevice, can, authedUser, setProjects, se
         {/* Link tooltip */}
         {linkTooltip && (
           <div
-            className="absolute z-10 text-xs bg-[#0F172A] text-gray-100 border border-[#1F2937] rounded-lg p-2 whitespace-pre"
+            className="absolute z-10 text-xs bg-white dark:bg-[#0F172A] text-slate-800 dark:text-gray-100 border border-slate-300 dark:border-[#1F2937] rounded-lg p-2 whitespace-pre shadow-md"
             style={{ 
               left: linkTooltip.x + 8, 
               top: linkTooltip.y + 8, 
@@ -11188,7 +11812,7 @@ const TopologyGraph = ({ project, onOpenDevice, can, authedUser, setProjects, se
             {linkTooltip.text}
           </div>
         )}
-        <div className="absolute top-2 right-2 text-[10px] text-gray-500 dark:text-gray-400 bg-black/30 px-2 py-1 rounded">
+        <div className="absolute top-2 right-2 text-[10px] font-medium text-slate-800 dark:text-slate-400 bg-white/95 dark:bg-black/30 border border-slate-300 dark:border-transparent px-2 py-1 rounded-lg shadow-sm">
           Zoom: {(zoom * 100).toFixed(0)}%
         </div>
       </div>
@@ -11355,17 +11979,17 @@ function buildDeviceNarrative(project, row) {
   const role = classifyRoleByName(row.device);
 
   const parts = [];
-  parts.push(`สรุปอัตโนมัติของอุปกรณ์: ${row.device}`);
+  parts.push(`Device summary: ${row.device}`);
   parts.push([
-    `• รุ่น/แพลตฟอร์ม: ${row.model || "—"} • OS/Version: ${row.osVersion || "—"}`,
+    `• Model/Platform: ${row.model || "—"} • OS/Version: ${row.osVersion || "—"}`,
     `• Serial: ${row.serial || "—"} • Mgmt IP: ${row.mgmtIp || "—"}`
   ].join("  |  "));
   if (row.ifaces) {
-    parts.push(`• พอร์ตทั้งหมด ${row.ifaces.total} (Up ${row.ifaces.up}, Down ${row.ifaces.down}, AdminDown ${row.ifaces.adminDown})`);
+    parts.push(`• Ports total ${row.ifaces.total} (Up ${row.ifaces.up}, Down ${row.ifaces.down}, AdminDown ${row.ifaces.adminDown})`);
     parts.push(`• Access ≈ ${row.accessCount ?? "—"}  |  Trunk ≈ ${row.trunkCount ?? "—"}`);
     if (row.allowedVlansShort) parts.push(`• Allowed VLANs (short): ${row.allowedVlansShort}`);
   }
-  parts.push(`• VLAN ทั้งหมด: ${row.vlanCount ?? "—"}  |  STP: ${row.stpMode || "—"}${row.stpRoot ? ` (Root: ${row.stpRoot})` : ""}`);
+  parts.push(`• VLANs: ${row.vlanCount ?? "—"}  |  STP: ${row.stpMode || "—"}${row.stpRoot ? ` (Root: ${row.stpRoot})` : ""}`);
 
   // L3
   const l3 = [];

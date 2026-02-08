@@ -37,6 +37,21 @@ SYSTEM_PROMPT_PROJECT_OVERVIEW = """You are a Network Solution Architect. Review
 
 **CRITICAL:** Output ONLY JSON, no markdown, no code blocks. Parseable directly as JSON object."""
 
+# Per-Device Overview (More Detail page - Device Summary tab)
+SYSTEM_PROMPT_DEVICE_OVERVIEW = """You are a Network Solution Architect. Analyze this single device's configuration and provide a concise summary.
+
+**Task: Per-Device Summary**
+- Summarize the device's role, key configuration (interfaces, VLANs, routing, STP, etc.), and status.
+- Use clear bullet points or short paragraphs. Output in English.
+- **Constraint:** Keep it concise (about 5–10 lines). Professional and descriptive.
+
+**Output Format:** Return ONLY valid JSON:
+{
+  "overview_text": "string (concise summary of this device in English)"
+}
+
+**CRITICAL:** Output ONLY JSON, no markdown, no code blocks. Parseable directly as JSON object."""
+
 # Project-Level Analysis System Prompt - Full Project Analysis (Scope 2.3.5.1 & 2.3.5.2)
 SYSTEM_PROMPT_FULL_PROJECT_ANALYSIS = """You are a Network Solution Architect. Analyze these network devices as a whole system.
 
@@ -97,6 +112,55 @@ SYSTEM_PROMPT_PROJECT_RECOMMENDATIONS = """You are a Network Solution Architect.
 
 **CRITICAL:**
 - You MUST fill both "issue" and "recommendation" for every item. Never leave them empty.
+- Output ONLY JSON, no markdown, no code blocks. Parseable directly as JSON object."""
+
+# Per-Device Recommendations (More Detail page - AI Recommendations tab)
+SYSTEM_PROMPT_DEVICE_RECOMMENDATIONS = """You are a Network Solution Architect. Analyze this single device's configuration.
+
+**Task: Per-Device flaw and improvement analysis**
+- Find flaws, missing configurations, security issues, and best-practice gaps for THIS device only.
+- Recommend what to add or change so the device works as it should (e.g. enable NTP, harden security, fix VLAN/STP/routing).
+- For each item give: (1) clear issue description, (2) concrete recommendation (what to add or change). Be concise but actionable.
+
+**Output Format:** Return ONLY valid JSON:
+{
+  "recommendations": [
+    {
+      "severity": "high|medium|low",
+      "issue": "Short description of the problem or gap for this device.",
+      "recommendation": "What to add or do (specific, actionable)."
+    }
+  ]
+}
+
+**CRITICAL:**
+- You MUST fill both "issue" and "recommendation" for every item.
+- Output ONLY JSON, no markdown, no code blocks. Parseable directly as JSON object."""
+
+# Config Drift summary (More Detail page - Config Drift tab)
+SYSTEM_PROMPT_CONFIG_DRIFT = """You are a Network Engineer. You compare two device output files and summarize only CONFIGURATION changes.
+
+**Scope: Configuration only**
+- Analyze ONLY the configuration section of each file. This is the part that corresponds to commands such as: show running-config, display current-configuration, show startup-config, display saved-configuration (and equivalent vendor commands).
+- IGNORE and do NOT report: show version output, interface status (e.g. "current state UP/DOWN"), display device, display cpu-usage, or any other non-configuration output. Report only changes to actual configuration lines (e.g. interface settings, VLANs, ACLs, NTP, SNMP, routing config).
+
+**Task: Config drift summary**
+- Output a short list of changes: additions, removals, and modifications to the configuration only.
+- For additions: what config was added (e.g. "Enabled port-security on Gi1/0/5").
+- For removals: what config was removed (e.g. "Removed VLAN 40").
+- For modifications: describe the config change with old → new (e.g. "NTP server 10.10.1.10 → 10.10.1.11").
+
+**Output Format:** Return ONLY valid JSON:
+{
+  "changes": [
+    { "type": "add", "description": "Short description of what was added" },
+    { "type": "remove", "description": "Short description of what was removed" },
+    { "type": "modify", "description": "What changed, use 'old_value → new_value' format" }
+  ]
+}
+
+**CRITICAL:**
+- "type" must be exactly "add", "remove", or "modify".
 - Output ONLY JSON, no markdown, no code blocks. Parseable directly as JSON object."""
 
 
@@ -487,6 +551,107 @@ Return ONLY valid JSON with 'overview_text' key as specified in system prompt.""
                 details=str(e),
             )
 
+    async def analyze_device_overview(
+        self,
+        devices_data: List[Dict[str, Any]],
+        project_id: str,
+        device_name: str,
+    ) -> Dict[str, Any]:
+        """
+        Analyze a single device - overview/summary only (for More Detail page).
+        Returns overview_text for that device.
+        """
+        start_time = time.perf_counter()
+        if not devices_data or not device_name:
+            return self._error_result(
+                "[ERROR] No device data or device_name provided.",
+                "invalid_input",
+                0,
+            )
+        try:
+            aggregated_data = self._prepare_aggregated_data(devices_data, project_id)
+        except Exception as e:
+            logger.exception("Error preparing device data for device_overview: %s", e)
+            return self._error_result(
+                f"[ERROR] Failed to prepare device data: {str(e)}",
+                "data_preparation_failed",
+                0,
+                details=str(e),
+            )
+        try:
+            aggregated_json = json.dumps(aggregated_data, separators=(",", ":"), ensure_ascii=False, indent=2, default=str)
+            if len(aggregated_json) > self.MAX_AGGREGATED_JSON_CHARS:
+                aggregated_json = aggregated_json[: self.MAX_AGGREGATED_JSON_CHARS] + "\n\n[Truncated.]"
+        except (TypeError, ValueError) as e:
+            logger.exception("Error serializing device data to JSON: %s", e)
+            return self._error_result(
+                f"[ERROR] Failed to serialize device data: {str(e)}",
+                "json_serialization_failed",
+                0,
+                details=str(e),
+            )
+        user_prompt = f"""Analyze this single device: {device_name}.
+
+=== DEVICE CONFIGURATION ===
+{aggregated_json}
+
+=== REQUEST ===
+Provide a concise summary of this device: its role, key configuration, and status. Return ONLY valid JSON with 'overview_text' key."""
+
+        url = f"{self.base_url}/api/chat"
+        payload = {
+            "model": self.model_name,
+            "messages": [
+                {"role": "system", "content": SYSTEM_PROMPT_DEVICE_OVERVIEW},
+                {"role": "user", "content": user_prompt},
+            ],
+            "stream": False,
+            "options": {"temperature": 0.3, "top_p": 0.85, "num_predict": 1024},
+        }
+        try:
+            async with httpx.AsyncClient(timeout=float(self.timeout_seconds)) as client:
+                response = await client.post(url, json=payload)
+                response.raise_for_status()
+                data = response.json()
+            inference_time_sec = time.perf_counter() - start_time
+            inference_time_ms = inference_time_sec * 1000
+            token_usage = {
+                "prompt_tokens": data.get("prompt_eval_count", 0),
+                "completion_tokens": data.get("eval_count", 0),
+                "total_tokens": data.get("prompt_eval_count", 0) + data.get("eval_count", 0),
+            }
+            ai_response = data.get("message", {}).get("content", "")
+            parsed_response = self._parse_json_response(ai_response)
+            if isinstance(parsed_response, dict) and parsed_response.get("format") == "text":
+                parsed_response = {}
+            if not isinstance(parsed_response, dict):
+                parsed_response = {}
+            if "overview_text" not in parsed_response:
+                parsed_response["overview_text"] = "Analysis completed. Overview not provided."
+            logger.info(
+                "device_overview_analysis model_used=%s inference_time_ms=%.0f project_id=%s device_name=%s",
+                self.model_name, inference_time_ms, project_id, device_name,
+            )
+            return {
+                "content": ai_response,
+                "parsed_response": parsed_response,
+                "metrics": {
+                    "inference_time_ms": inference_time_ms,
+                    "token_usage": token_usage,
+                    "model_name": self.model_name,
+                    "timestamp": datetime.utcnow(),
+                },
+            }
+        except Exception as e:
+            inference_time_ms = (time.perf_counter() - start_time) * 1000
+            logger.exception("device_overview_analysis error project_id=%s device_name=%s", project_id, device_name)
+            return self._error_result(
+                f"[ERROR] Device analysis failed: {str(e)}",
+                "analysis_failed",
+                inference_time_ms,
+                details=str(e),
+            )
+
     async def analyze_project_recommendations(
         self,
         devices_data: List[Dict[str, Any]],
@@ -654,6 +819,210 @@ Give a NETWORK-WIDE gap and improvement list: what is missing or should be added
                 inference_time_ms,
                 details=str(e),
             )
+
+    async def analyze_device_recommendations(
+        self,
+        devices_data: List[Dict[str, Any]],
+        project_id: str,
+        device_name: str,
+    ) -> Dict[str, Any]:
+        """
+        Analyze a single device for flaws and recommendations (More Detail - AI Recommendations tab).
+        Returns recommendations list for this device only.
+        """
+        start_time = time.perf_counter()
+        if not devices_data or not device_name:
+            return self._error_result(
+                "[ERROR] No device data or device_name provided.",
+                "invalid_input",
+                0,
+            )
+        try:
+            aggregated_data = self._prepare_aggregated_data(devices_data, project_id)
+        except Exception as e:
+            logger.exception("Error preparing device data for device_recommendations: %s", e)
+            return self._error_result(
+                f"[ERROR] Failed to prepare device data: {str(e)}",
+                "data_preparation_failed",
+                0,
+                details=str(e),
+            )
+        try:
+            aggregated_json = json.dumps(aggregated_data, separators=(",", ":"), ensure_ascii=False, indent=2, default=str)
+            if len(aggregated_json) > self.MAX_AGGREGATED_JSON_CHARS:
+                aggregated_json = aggregated_json[: self.MAX_AGGREGATED_JSON_CHARS] + "\n\n[Truncated.]"
+        except (TypeError, ValueError) as e:
+            logger.exception("Error serializing device data to JSON: %s", e)
+            return self._error_result(
+                f"[ERROR] Failed to serialize device data to JSON: {str(e)}",
+                "json_serialization_failed",
+                0,
+                details=str(e),
+            )
+        user_prompt = f"""Analyze this single device: {device_name}. Find flaws and recommend improvements so the config works as it should.
+
+=== DEVICE CONFIGURATION ===
+{aggregated_json}
+
+=== REQUEST ===
+List issues and actionable recommendations for this device only. Return ONLY valid JSON with "recommendations" array; each item must have "severity", "issue", and "recommendation"."""
+
+        url = f"{self.base_url}/api/chat"
+        payload = {
+            "model": self.model_name,
+            "messages": [
+                {"role": "system", "content": SYSTEM_PROMPT_DEVICE_RECOMMENDATIONS},
+                {"role": "user", "content": user_prompt},
+            ],
+            "stream": False,
+            "options": {"temperature": 0.3, "top_p": 0.85, "num_predict": 1024},
+        }
+        try:
+            async with httpx.AsyncClient(timeout=float(self.timeout_seconds)) as client:
+                response = await client.post(url, json=payload)
+                response.raise_for_status()
+                data = response.json()
+            inference_time_ms = (time.perf_counter() - start_time) * 1000
+            ai_response = data.get("message", {}).get("content", "")
+            token_usage = {
+                "prompt_tokens": data.get("prompt_eval_count", 0),
+                "completion_tokens": data.get("eval_count", 0),
+                "total_tokens": data.get("prompt_eval_count", 0) + data.get("eval_count", 0),
+            }
+            parsed_response = self._parse_json_response(ai_response)
+            if isinstance(parsed_response, dict) and parsed_response.get("format") == "text":
+                logger.warning("Failed to parse JSON for device recommendations. Raw: %s", ai_response[:500])
+                return self._error_result(
+                    "[ERROR] LLM returned non-JSON. Expected JSON with 'recommendations' key.",
+                    "json_parse_failed",
+                    inference_time_ms,
+                    details=ai_response[:500],
+                )
+            if not isinstance(parsed_response, dict):
+                parsed_response = {}
+            if "recommendations" not in parsed_response:
+                parsed_response["recommendations"] = []
+            return {
+                "content": ai_response,
+                "parsed_response": parsed_response,
+                "metrics": {
+                    "inference_time_ms": inference_time_ms,
+                    "token_usage": token_usage,
+                    "model_name": self.model_name,
+                    "timestamp": datetime.utcnow(),
+                },
+            }
+        except httpx.ReadTimeout:
+            inference_time_ms = (time.perf_counter() - start_time) * 1000
+            return self._error_result("[ERROR] Ollama read timeout.", "timeout", inference_time_ms)
+        except httpx.ConnectError as e:
+            inference_time_ms = (time.perf_counter() - start_time) * 1000
+            return self._error_result(f"[ERROR] Cannot connect to Ollama: {e!s}", "connection_failed", inference_time_ms)
+        except Exception as e:
+            inference_time_ms = (time.perf_counter() - start_time) * 1000
+            logger.exception("device_recommendations_analysis error project_id=%s device_name=%s", project_id, device_name)
+            return self._error_result(f"[ERROR] Analysis failed: {str(e)}", "analysis_failed", inference_time_ms, details=str(e))
+
+    async def analyze_config_drift(
+        self,
+        old_content: str,
+        new_content: str,
+        device_name: str,
+        from_filename: Optional[str] = None,
+        to_filename: Optional[str] = None,
+    ) -> Dict[str, Any]:
+        """
+        Summarize configuration drift between two configs (More Detail - Config Drift tab).
+        Returns changes list: [{ type: "add"|"remove"|"modify", description: "..." }].
+        """
+        start_time = time.perf_counter()
+        if not old_content or not new_content:
+            return self._error_result(
+                "[ERROR] Both old and new config content required.",
+                "invalid_input",
+                0,
+            )
+        # Truncate to avoid token overflow (e.g. 20k chars each)
+        max_chars = 18000
+        old_content = (old_content or "")[:max_chars]
+        new_content = (new_content or "")[:max_chars]
+        from_label = from_filename or "old"
+        to_label = to_filename or "new"
+        user_prompt = f"""Device: {device_name}. Compare: {from_label} → {to_label}.
+
+Consider ONLY the configuration section in each file (e.g. output of show running-config / display current-configuration / show startup-config / display saved-configuration). Ignore version output, interface status lines, and other non-configuration output. Report only changes to actual configuration.
+
+=== OLD FILE (previous) ===
+{old_content}
+
+=== NEW FILE (latest) ===
+{new_content}
+
+=== REQUEST ===
+Summarize configuration changes only: additions, removals, modifications. For modifications use "old_value → new_value". Return ONLY valid JSON with "changes" array; each item must have "type" ("add"|"remove"|"modify") and "description"."""
+
+        url = f"{self.base_url}/api/chat"
+        payload = {
+            "model": self.model_name,
+            "messages": [
+                {"role": "system", "content": SYSTEM_PROMPT_CONFIG_DRIFT},
+                {"role": "user", "content": user_prompt},
+            ],
+            "stream": False,
+            "options": {"temperature": 0.2, "top_p": 0.85, "num_predict": 1024},
+        }
+        try:
+            async with httpx.AsyncClient(timeout=float(self.timeout_seconds)) as client:
+                response = await client.post(url, json=payload)
+                response.raise_for_status()
+                data = response.json()
+            inference_time_ms = (time.perf_counter() - start_time) * 1000
+            ai_response = data.get("message", {}).get("content", "")
+            token_usage = {
+                "prompt_tokens": data.get("prompt_eval_count", 0),
+                "completion_tokens": data.get("eval_count", 0),
+                "total_tokens": data.get("prompt_eval_count", 0) + data.get("eval_count", 0),
+            }
+            parsed_response = self._parse_json_response(ai_response)
+            if isinstance(parsed_response, dict) and parsed_response.get("format") == "text":
+                logger.warning("Failed to parse JSON for config drift. Raw: %s", ai_response[:500])
+                return self._error_result(
+                    "[ERROR] LLM returned non-JSON. Expected JSON with 'changes' key.",
+                    "json_parse_failed",
+                    inference_time_ms,
+                    details=ai_response[:500],
+                )
+            if not isinstance(parsed_response, dict):
+                parsed_response = {}
+            changes = parsed_response.get("changes") or []
+            if not isinstance(changes, list):
+                changes = []
+            validated = []
+            for c in changes:
+                if isinstance(c, dict) and c.get("type") and c.get("description"):
+                    t = str(c.get("type", "")).lower()
+                    if t in ("add", "remove", "modify"):
+                        validated.append({"type": t, "description": str(c.get("description", ""))})
+            return {
+                "content": ai_response,
+                "parsed_response": {"changes": validated},
+                "metrics": {
+                    "inference_time_ms": inference_time_ms,
+                    "token_usage": token_usage,
+                    "model_name": self.model_name,
+                    "timestamp": datetime.utcnow(),
+                },
+            }
+        except httpx.ReadTimeout:
+            inference_time_ms = (time.perf_counter() - start_time) * 1000
+            return self._error_result("[ERROR] Ollama read timeout.", "timeout", inference_time_ms)
+        except httpx.ConnectError as e:
+            inference_time_ms = (time.perf_counter() - start_time) * 1000
+            return self._error_result(f"[ERROR] Cannot connect to Ollama: {e!s}", "connection_failed", inference_time_ms)
+        except Exception as e:
+            inference_time_ms = (time.perf_counter() - start_time) * 1000
+            logger.exception("config_drift_analysis error device_name=%s", device_name)
+            return self._error_result(f"[ERROR] Analysis failed: {str(e)}", "analysis_failed", inference_time_ms, details=str(e))
 
     async def analyze_full_project(
         self,

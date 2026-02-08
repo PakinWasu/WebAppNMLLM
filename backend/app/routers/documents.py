@@ -1,5 +1,5 @@
 from fastapi import APIRouter, Depends, HTTPException, UploadFile, File, Form, Query, Body
-from fastapi.responses import FileResponse, StreamingResponse
+from fastapi.responses import FileResponse, StreamingResponse, PlainTextResponse
 from datetime import datetime, timezone
 from typing import List, Optional
 from pathlib import Path
@@ -570,6 +570,25 @@ async def get_document_preview(
     preview = await generate_preview(file_path, doc.get("content_type", "application/octet-stream"))
     
     return preview
+
+
+@router.get("/{document_id}/content")
+async def get_document_content(
+    project_id: str,
+    document_id: str,
+    version: Optional[int] = Query(None, description="Specific version, or latest if not provided"),
+    user=Depends(get_current_user)
+):
+    """Get raw text content of a document (for config compare / diff). Returns plain text."""
+    await check_project_access(project_id, user)
+    content_bytes = await read_document_file(project_id, document_id, version)
+    if not content_bytes:
+        raise HTTPException(status_code=404, detail="Document file not found")
+    try:
+        text = content_bytes.decode("utf-8", errors="replace")
+    except Exception:
+        text = content_bytes.decode("latin-1", errors="replace")
+    return PlainTextResponse(content=text, media_type="text/plain; charset=utf-8")
 
 
 @router.get("/{document_id}/versions")

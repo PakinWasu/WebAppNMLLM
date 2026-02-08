@@ -115,6 +115,13 @@ async def create_indexes():
             print(f"⚠️ Info: Could not setup parsed_configs collection at startup: {e}")
             print("Collection and indexes will be created on first write")
         
+        # LLM job lock: one lock per project (global across users/devices)
+        try:
+            await _db["llm_job_locks"].create_index("project_id", unique=True)
+            print("✅ llm_job_locks index created")
+        except Exception as e:
+            print(f"⚠️ llm_job_locks index: {e}")
+
         print("MongoDB indexes created")
     except Exception as e:
         print(f"Warning: Could not create indexes: {e}")

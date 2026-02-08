@@ -266,6 +266,28 @@ export async function getDocumentVersions(projectId, documentId) {
  return api(`/projects/${projectId}/documents/${documentId}/versions`);
 }
 
+/** List config versions for a device (for Compare Config modal). Returns { configs: [{ id, document_id, version, filename, created_at }] }. */
+export async function getDeviceConfigs(projectId, deviceId) {
+ const res = await api(`/projects/${projectId}/devices/${encodeURIComponent(deviceId)}/configs`);
+ return res.configs || [];
+}
+
+/** Get raw text content of a document (for config diff). Returns string. */
+export async function getDocumentContentText(projectId, documentId, version = null) {
+ const token = getToken();
+ const url = version != null
+  ? `${API_BASE || ''}/projects/${projectId}/documents/${documentId}/content?version=${version}`
+  : `${API_BASE || ''}/projects/${projectId}/documents/${documentId}/content`;
+ const response = await fetch(url, {
+  headers: { Authorization: token ? `Bearer ${token}` : '' },
+ });
+ if (!response.ok) {
+  const err = await response.json().catch(() => ({ detail: 'Failed to load content' }));
+  throw new Error(err.detail || `Failed with status ${response.status}`);
+ }
+ return response.text();
+}
+
 export async function moveDocumentFolder(projectId, documentId, folderId) {
  const token = getToken();
  const response = await fetch(`${API_BASE}/projects/${projectId}/documents/${documentId}/folder`, {
@@ -406,7 +428,79 @@ export async function getProjectRecommendations(projectId) {
   });
 }
 
-// Full Project Analysis API removed - use analyzeProjectOverview and analyzeProjectRecommendations separately
+/** Server-side LLM busy status for this project (any user/device). Poll to sync UI across clients. */
+export async function getProjectLlmStatus(projectId) {
+  return api(`/projects/${projectId}/analyze/llm-status`, { method: 'GET', timeout: 10000 });
+}
+
+/** Combined overview + recommendations for Summary/Device detail (gap_analysis from recommendations). */
+export async function getFullProjectAnalysis(projectId) {
+  const [overviewRes, recRes] = await Promise.all([
+    api(`/projects/${projectId}/analyze/overview`, { method: 'GET' }).catch(() => ({ overview_text: null, metrics: null })),
+    api(`/projects/${projectId}/analyze/recommendations`, { method: 'GET' }).catch(() => ({ recommendations: [], metrics: null })),
+  ]);
+  const recommendations = recRes.recommendations || [];
+  const gap_analysis = recommendations.map((r) => ({
+    severity: r.severity || 'Medium',
+    device: r.device || 'all',
+    issue: r.issue ?? r.message ?? '',
+    recommendation: r.recommendation ?? r.message ?? '',
+  }));
+  return {
+    network_overview: overviewRes.overview_text ?? null,
+    gap_analysis,
+    metrics: overviewRes.metrics || recRes.metrics || null,
+  };
+}
+
+// Per-device analysis (More Detail page) — LLM can take 1–5 min, use long timeout
+const DEVICE_LLM_TIMEOUT_MS = 330000; // 5.5 min to match backend OLLAMA_TIMEOUT
+
+export async function getDeviceOverview(projectId, deviceName) {
+  return api(`/projects/${projectId}/analyze/device-overview?device_name=${encodeURIComponent(deviceName)}`);
+}
+
+export async function analyzeDeviceOverview(projectId, deviceName) {
+  return api(`/projects/${projectId}/analyze/device-overview`, {
+    method: 'POST',
+    body: JSON.stringify({ device_name: deviceName }),
+    timeout: DEVICE_LLM_TIMEOUT_MS,
+  });
+}
+
+export async function getDeviceRecommendations(projectId, deviceName) {
+  return api(`/projects/${projectId}/analyze/device-recommendations?device_name=${encodeURIComponent(deviceName)}`);
+}
+
+export async function analyzeDeviceRecommendations(projectId, deviceName) {
+  return api(`/projects/${projectId}/analyze/device-recommendations`, {
+    method: 'POST',
+    body: JSON.stringify({ device_name: deviceName }),
+    timeout: DEVICE_LLM_TIMEOUT_MS,
+  });
+}
+
+export async function getDeviceConfigDrift(projectId, deviceName) {
+  return api(`/projects/${projectId}/analyze/device-config-drift?device_name=${encodeURIComponent(deviceName)}`);
+}
+
+/** Compare two versions of same document (version history) — raw config files. */
+export async function analyzeDeviceConfigDrift(projectId, deviceName, options = {}) {
+  const body = { device_name: deviceName };
+  if (options.documentId != null && options.fromVersion != null && options.toVersion != null) {
+    body.document_id = options.documentId;
+    body.from_version = options.fromVersion;
+    body.to_version = options.toVersion;
+  } else if (options.fromDocumentId && options.toDocumentId) {
+    body.from_document_id = options.fromDocumentId;
+    body.to_document_id = options.toDocumentId;
+  }
+  return api(`/projects/${projectId}/analyze/device-config-drift`, {
+    method: 'POST',
+    body: JSON.stringify(body),
+    timeout: DEVICE_LLM_TIMEOUT_MS,
+  });
+}
 
 // Folders API
 export async function getFolders(projectId, options = {}) {
