@@ -15,6 +15,15 @@ logger = logging.getLogger(__name__)
 MAX_DEVICES_FOR_LLM = 20
 
 
+def _iso_generated_at(dt) -> Optional[str]:
+    """Serialize generated_at to ISO string so frontend polling can compare reliably."""
+    if dt is None:
+        return None
+    if isinstance(dt, datetime):
+        return dt.isoformat()
+    return str(dt)
+
+
 async def _get_latest_configs_per_device(project_id: str):
     """
     Fetch latest parsed config per device in one aggregation (no N+1).
@@ -130,7 +139,7 @@ async def get_project_recommendations(
             "metrics": saved_result.get("metrics", {}),
             "devices_analyzed": saved_result.get("result_data", {}).get("devices_analyzed", 0),
             "project_id": project_id,
-            "generated_at": saved_result.get("generated_at")
+            "generated_at": _iso_generated_at(saved_result.get("generated_at"))
         }
     
     except HTTPException:

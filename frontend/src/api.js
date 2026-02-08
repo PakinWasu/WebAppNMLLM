@@ -482,12 +482,20 @@ export async function getPerformanceMetrics(projectId, deviceName = null, limit 
 }
 
 // Topology API
+
+/** Fast: fetch nodes/links from DB only (no LLM). Use for instant graph display. */
+export async function getNetworkTopology(projectId) {
+  return api(`/projects/${projectId}/network-topology`, { timeout: 15000 });
+}
+
+/** Slow: triggers LLM analysis. Call only when user requests AI generation. */
 export async function generateTopology(projectId) {
   return api(`/projects/${projectId}/topology/generate`, {
     method: 'POST',
   });
 }
 
+/** Get saved topology (from LLM result or project). Use for polling after generate. */
 export async function getTopology(projectId) {
   return api(`/projects/${projectId}/topology`);
 }

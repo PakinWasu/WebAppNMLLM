@@ -131,6 +131,24 @@
 
 ---
 
+## Topology (decoupled: data vs LLM)
+
+### GET `/projects/{project_id}/network-topology` (fast)
+- **Description**: Fetch nodes/links from DB only (rule-based, no LLM). Use for instant graph display.
+- **Response**: `{ "topology": { "nodes": [...], "edges": [...] }, "layout": { "positions": {}, "links": [], "node_labels": {}, "node_roles": {} }, "generated_at": null, "llm_used": false }`
+- **Auth**: Required (must be member or admin)
+
+### POST `/projects/{project_id}/topology/generate` (slow)
+- **Description**: Run LLM analysis to generate/refresh topology. Long-running (2–5 min). Call only when user requests AI generation.
+- **Response**: `{ "topology": { "nodes": [...], "edges": [...] }, "analysis_summary": "string", "metrics": {...} }`
+- **Auth**: Required (must be member or admin)
+
+### GET `/projects/{project_id}/topology`
+- **Description**: Get saved topology (from last LLM result or project metadata). Use for polling after POST generate.
+- **Auth**: Required (must be member or admin)
+
+---
+
 ## AI Test (`/ai/test`)
 
 ### GET `/ai/test`

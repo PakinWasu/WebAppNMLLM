@@ -1,15 +1,43 @@
 """Topology API endpoints for auto-generating network topology using LLM"""
 
 from fastapi import APIRouter, Depends, HTTPException
-from typing import Dict, Any
+from typing import Dict, Any, Optional
 from datetime import datetime, timezone
 
 from ..db.mongo import db
+
+
+def _iso_generated_at(dt) -> Optional[str]:
+    """Serialize generated_at to ISO string so frontend polling can compare reliably."""
+    if dt is None:
+        return None
+    if isinstance(dt, datetime):
+        return dt.isoformat()
+    return str(dt)
 from ..dependencies.auth import get_current_user, check_project_access, check_project_manager_or_admin
 from ..services.topology_service import topology_service
 from ..models.topology import TopologyLayoutUpdate
 
 router = APIRouter(prefix="/projects/{project_id}/topology", tags=["topology"])
+
+# Fast topology (DB + rule-based only, no LLM) - for instant graph display
+network_topology_router = APIRouter(prefix="/projects/{project_id}", tags=["topology"])
+
+
+@network_topology_router.get("/network-topology")
+async def get_network_topology(
+    project_id: str,
+    user=Depends(get_current_user)
+) -> Dict[str, Any]:
+    """
+    Get network topology from database only (rule-based, no LLM).
+    Returns immediately. Use for instant graph render.
+    For AI analysis, call POST /topology/generate separately.
+    """
+    await check_project_access(project_id, user)
+    result = await topology_service.get_network_topology_fast(project_id)
+    return result
+
 
 # Test router (no project_id required)
 test_router = APIRouter(prefix="/topology", tags=["topology"])
@@ -99,11 +127,9 @@ async def get_topology(
                 "node_roles": project.get("topoNodeRoles", {})
             },
             "llm_metrics": llm_result.get("metrics"),
-            "generated_at": llm_result.get("generated_at"),
-            "llm_metrics": llm_result.get("metrics"),
             "llm_summary": llm_result.get("analysis_summary"),
             "llm_used": llm_result.get("llm_used", False),
-            "generated_at": llm_result.get("generated_at"),
+            "generated_at": _iso_generated_at(llm_result.get("generated_at")),
             "saved": True
         }
     

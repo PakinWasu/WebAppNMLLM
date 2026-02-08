@@ -575,6 +575,63 @@ Project: {project_id} ({device_count} devices)"""
         
         return validated_edges
     
+    async def get_network_topology_fast(self, project_id: str) -> Dict[str, Any]:
+        """
+        Fetch network topology from DB only (rule-based, no LLM).
+        Returns immediately with nodes/edges from parsed_configs.
+        Use this for instant graph display; call generate_topology (LLM) separately for AI analysis.
+        """
+        project = await db()["projects"].find_one({"project_id": project_id})
+        if not project:
+            return {
+                "topology": {"nodes": [], "edges": []},
+                "layout": {"positions": {}, "links": [], "node_labels": {}, "node_roles": {}},
+                "generated_at": None,
+                "llm_used": False,
+            }
+        devices_cursor = db()["parsed_configs"].find(
+            {"project_id": project_id},
+            sort=[("device_name", 1)]
+        )
+        devices_data = []
+        device_names = set()
+        async for device_doc in devices_cursor:
+            device_doc.pop("_id", None)
+            device_data = {
+                "device_name": device_doc.get("device_name"),
+                "device_overview": device_doc.get("device_overview", {}),
+                "interfaces": device_doc.get("interfaces", []),
+                "neighbors": device_doc.get("neighbors", []),
+                "routing": device_doc.get("routing", {}),
+            }
+            if device_data["device_name"] and device_data["device_name"] not in device_names:
+                devices_data.append(device_data)
+                device_names.add(device_data["device_name"])
+        if not devices_data:
+            return {
+                "topology": {"nodes": [], "edges": []},
+                "layout": {
+                    "positions": project.get("topoPositions", {}),
+                    "links": project.get("topoLinks", []),
+                    "node_labels": project.get("topoNodeLabels", {}),
+                    "node_roles": project.get("topoNodeRoles", {}),
+                },
+                "generated_at": None,
+                "llm_used": False,
+            }
+        topology_data = self._generate_rule_based_topology(devices_data)
+        return {
+            "topology": topology_data,
+            "layout": {
+                "positions": project.get("topoPositions", {}),
+                "links": project.get("topoLinks", []),
+                "node_labels": project.get("topoNodeLabels", {}),
+                "node_roles": project.get("topoNodeRoles", {}),
+            },
+            "generated_at": None,
+            "llm_used": False,
+        }
+    
     async def _save_llm_result(
         self,
         project_id: str,

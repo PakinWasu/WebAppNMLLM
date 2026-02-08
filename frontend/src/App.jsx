@@ -1,5 +1,6 @@
 // src/App.jsx
 import React, { useMemo, useState, useEffect, useRef } from "react";
+import { flushSync } from "react-dom";
 import * as api from "./api";
 import MainLayout from "./components/layout/MainLayout";
 
@@ -29,45 +30,38 @@ if (!window.llmPollingService) {
         
         try {
           const result = await endpoint(projectId);
-          const currentGeneratedAt = result.generated_at;
+          // Normalize to string so comparison works (backend may return ISO string or date-like)
+          const currentGeneratedAt = result.generated_at != null ? String(result.generated_at) : null;
+          const lastStr = lastGeneratedAt != null ? String(lastGeneratedAt) : null;
+          const isNewResult = currentGeneratedAt && (lastStr === null || currentGeneratedAt !== lastStr);
           
-          // Check if we got a new result (compare generated_at)
-          if (currentGeneratedAt && (!lastGeneratedAt || currentGeneratedAt !== lastGeneratedAt)) {
+          // Overview: has overview_text and new generated_at => done
+          if (result.overview_text && isNewResult) {
             this.stopPolling(key);
             if (onUpdate) onUpdate(result);
             return;
           }
-          
-          // For recommendations, check if recommendations array exists
-          if (result.recommendations && Array.isArray(result.recommendations)) {
-            // If we have recommendations and generated_at, it's a new result
-            if (currentGeneratedAt && (!lastGeneratedAt || currentGeneratedAt !== lastGeneratedAt)) {
-              this.stopPolling(key);
-              if (onUpdate) onUpdate(result);
-              return;
-            }
-            // If we have recommendations (even empty array) and generated_at exists, it's complete
-            if (currentGeneratedAt && !lastGeneratedAt) {
-              this.stopPolling(key);
-              if (onUpdate) onUpdate(result);
-              return;
-            }
-          }
-          
-          // For topology, check if topology data exists
-          if (result.topology && (result.topology.nodes?.length > 0 || result.topology.edges?.length > 0)) {
-            if (currentGeneratedAt && (!lastGeneratedAt || currentGeneratedAt !== lastGeneratedAt)) {
-              this.stopPolling(key);
-              if (onUpdate) onUpdate(result);
-              return;
-            }
-          }
-          
-          // For overview, check if overview_text exists
-          if (result.overview_text && currentGeneratedAt && (!lastGeneratedAt || currentGeneratedAt !== lastGeneratedAt)) {
+          // Recommendations: has recommendations array and new generated_at => done
+          if (result.recommendations && Array.isArray(result.recommendations) && isNewResult) {
             this.stopPolling(key);
             if (onUpdate) onUpdate(result);
             return;
+          }
+          // Topology: has topology (nodes or edges) and new generated_at => done
+          const hasTopology = result.topology && (result.topology.nodes?.length > 0 || result.topology.edges?.length > 0);
+          if (hasTopology && isNewResult) {
+            this.stopPolling(key);
+            if (onUpdate) onUpdate(result);
+            return;
+          }
+          // Fallback: any content + generated_at we haven't seen => done (robust detection)
+          if (currentGeneratedAt && (lastStr === null || currentGeneratedAt !== lastStr)) {
+            const hasContent = result.overview_text || (result.recommendations && result.recommendations.length >= 0) || hasTopology;
+            if (hasContent) {
+              this.stopPolling(key);
+              if (onUpdate) onUpdate(result);
+              return;
+            }
           }
           
           if (currentGeneratedAt) {
@@ -82,14 +76,25 @@ if (!window.llmPollingService) {
         }
       };
       
-      // Start polling immediately, then every 5 seconds
-      checkForUpdates();
-      const interval = setInterval(checkForUpdates, 5000);
+      const runPoll = () => { checkForUpdates(); };
+      runPoll();
+      const interval = setInterval(runPoll, 4000);
+      const onVisible = () => {
+        if (document.visibilityState === "visible") runPoll();
+      };
+      document.addEventListener("visibilitychange", onVisible);
+      if (!this._visibilityCleanup) this._visibilityCleanup = new Map();
+      this._visibilityCleanup.set(key, () => document.removeEventListener("visibilitychange", onVisible));
       this.intervals.set(key, interval);
       this.callbacks.set(key, { onUpdate, onError, projectId, endpoint });
     },
     
     stopPolling(key) {
+      const cleanup = this._visibilityCleanup && this._visibilityCleanup.get(key);
+      if (cleanup) {
+        cleanup();
+        this._visibilityCleanup.delete(key);
+      }
       const interval = this.intervals.get(key);
       if (interval) {
         clearInterval(interval);
@@ -2389,8 +2394,18 @@ const ProjectAnalysisPanel = ({ project, summaryRows, coreCount, distCount, acce
   const [recGenerating, setRecGenerating] = React.useState(false);
   const overviewGenerateRef = React.useRef(null);
   const recGenerateRef = React.useRef(null);
+  const overviewGetActionRef = React.useRef(null);
+  const recGetActionRef = React.useRef(null);
 
   const handleAiClick = () => {
+    const getAction = activeTab === "overview" ? overviewGetActionRef.current : recGetActionRef.current;
+    if (typeof getAction === "function") {
+      const result = getAction();
+      if (result?.action === "show" && result.data) {
+        setLlmNotification(result.data);
+        return;
+      }
+    }
     const fn = activeTab === "overview" ? overviewGenerateRef.current : recGenerateRef.current;
     if (typeof fn !== "function") return;
     requestRun(fn);
@@ -2450,6 +2465,7 @@ const ProjectAnalysisPanel = ({ project, summaryRows, coreCount, distCount, acce
             summaryRows={summaryRows}
             fullHeight
             onRegisterGenerate={(fn) => { overviewGenerateRef.current = fn; }}
+            onRegisterGetAction={(getter) => { overviewGetActionRef.current = getter; }}
             onGeneratingChange={setOverviewGenerating}
             onComplete={onComplete}
             requestRun={requestRun}
@@ -2462,6 +2478,7 @@ const ProjectAnalysisPanel = ({ project, summaryRows, coreCount, distCount, acce
             summaryRows={summaryRows}
             fullHeight
             onRegisterGenerate={(fn) => { recGenerateRef.current = fn; }}
+            onRegisterGetAction={(getter) => { recGetActionRef.current = getter; }}
             onGeneratingChange={setRecGenerating}
             onComplete={onComplete}
             requestRun={requestRun}
@@ -2474,7 +2491,7 @@ const ProjectAnalysisPanel = ({ project, summaryRows, coreCount, distCount, acce
 };
 
 /* ========= Network Overview Card Component ========= */
-const NetworkOverviewCard = ({ project, summaryRows, fullHeight, onRegisterGenerate, onGeneratingChange, onComplete, requestRun, setLlmNotification }) => {
+const NetworkOverviewCard = ({ project, summaryRows, fullHeight, onRegisterGenerate, onRegisterGetAction, onGeneratingChange, onComplete, requestRun, setLlmNotification }) => {
   const [overviewText, setOverviewText] = React.useState(null);
   const [llmMetrics, setLlmMetrics] = React.useState(null);
   const [generating, setGenerating] = React.useState(false);
@@ -2698,17 +2715,16 @@ const NetworkOverviewCard = ({ project, summaryRows, fullHeight, onRegisterGener
   };
   
   const doGenerate = async () => {
-    if (!projectId || generating) return;
-    
-    setShowNotification(false);
-    setGenerating(true);
-    setError(null);
-    
-    // Store generating state in localStorage (persists across navigation)
-    const storageKey = `llm_generating_overview_${projectId}`;
-    localStorage.setItem(storageKey, "true");
-    
-    // Start analysis (don't wait for response - polling will pick it up)
+    if (!projectId) return;
+    const storageKeyOverview = `llm_generating_overview_${projectId}`;
+    if (localStorage.getItem(storageKeyOverview) === "true") return;
+    // Update UI immediately so "Analyzing with LLM..." shows on first click (and on regenerate)
+    flushSync(() => {
+      setShowNotification(false);
+      setGenerating(true);
+      setError(null);
+    });
+    localStorage.setItem(storageKeyOverview, "true");
     api.analyzeProjectOverview(projectId)
       .catch((err) => {
         console.error("Project overview analysis request failed:", err);
@@ -2717,7 +2733,7 @@ const NetworkOverviewCard = ({ project, summaryRows, fullHeight, onRegisterGener
         if (err.message && !err.message.includes("timeout")) {
           setError(err.message || err.detail || "Failed to start analysis. Check backend/LLM server.");
           setGenerating(false);
-          localStorage.removeItem(storageKey);
+          localStorage.removeItem(storageKeyOverview);
           onComplete?.();
         }
       });
@@ -2730,6 +2746,15 @@ const NetworkOverviewCard = ({ project, summaryRows, fullHeight, onRegisterGener
     onRegisterGenerate?.(() => generateRef.current?.());
     return () => onRegisterGenerate?.(null);
   }, [onRegisterGenerate]);
+
+  React.useEffect(() => {
+    onRegisterGetAction?.(() => (
+      overviewText != null
+        ? { action: "show", data: { show: true, type: "success", title: "Network Overview Generated", message: "LLM analysis completed successfully.", metrics: llmMetrics, onRegenerate: () => requestRun?.(generateRef.current) } }
+        : { action: "generate" }
+    ));
+    return () => onRegisterGetAction?.(null);
+  }, [overviewText, llmMetrics, onRegisterGetAction, requestRun]);
   
   return (
     <>
@@ -2797,7 +2822,7 @@ function recommendationsToGapAnalysis(recommendations) {
 }
 
 /* ========= Recommendations Card Component ========= */
-const RecommendationsCard = ({ project, summaryRows, fullHeight, onRegisterGenerate, onGeneratingChange, onComplete, requestRun, setLlmNotification }) => {
+const RecommendationsCard = ({ project, summaryRows, fullHeight, onRegisterGenerate, onRegisterGetAction, onGeneratingChange, onComplete, requestRun, setLlmNotification }) => {
   const [gapAnalysis, setGapAnalysis] = React.useState([]);
   const [llmMetrics, setLlmMetrics] = React.useState(null);
   const [generatingRecOnly, setGeneratingRecOnly] = React.useState(false);
@@ -3033,21 +3058,14 @@ const RecommendationsCard = ({ project, summaryRows, fullHeight, onRegisterGener
   
   const doGenerateRecommendations = async () => {
     if (!projectId) return;
-    
-    const storageKey = `llm_generating_rec_${projectId}`;
-    const isAlreadyGenerating = generatingRecOnly || localStorage.getItem(storageKey) === "true";
-    if (isAlreadyGenerating) {
-      return;
-    }
-    
-    setShowNotification(false);
-    setGeneratingRecOnly(true);
-    setError(null);
-    
-    // Store generating state in localStorage (persists across navigation)
-    localStorage.setItem(storageKey, "true");
-    
-    // Start analysis (don't wait for response - polling will pick it up)
+    const storageKeyRec = `llm_generating_rec_${projectId}`;
+    if (localStorage.getItem(storageKeyRec) === "true") return;
+    flushSync(() => {
+      setShowNotification(false);
+      setGeneratingRecOnly(true);
+      setError(null);
+    });
+    localStorage.setItem(storageKeyRec, "true");
     api.analyzeProjectRecommendations(projectId)
       .then(() => {
         // Request sent successfully - polling will handle the result
@@ -3059,7 +3077,7 @@ const RecommendationsCard = ({ project, summaryRows, fullHeight, onRegisterGener
         if (err.message && !err.message.includes("timeout") && !err.message.includes("ECONNRESET")) {
           setError(err.message || err.detail || "Failed to start analysis. Check backend/LLM server.");
           setGeneratingRecOnly(false);
-          localStorage.removeItem(storageKey);
+          localStorage.removeItem(storageKeyRec);
           onComplete?.();
         } else {
           // Timeout or connection reset is expected - polling will handle it
@@ -3075,6 +3093,16 @@ const RecommendationsCard = ({ project, summaryRows, fullHeight, onRegisterGener
     onRegisterGenerate?.(() => generateRef.current?.());
     return () => onRegisterGenerate?.(null);
   }, [onRegisterGenerate]);
+
+  React.useEffect(() => {
+    const hasResult = Array.isArray(gapAnalysis) && gapAnalysis.length > 0;
+    onRegisterGetAction?.(() => (
+      hasResult
+        ? { action: "show", data: { show: true, type: "success", title: "Recommendations Generated", message: `LLM analysis completed. Found ${gapAnalysis.length} recommendations.`, metrics: llmMetrics, onRegenerate: () => requestRun?.(generateRef.current) } }
+        : { action: "generate" }
+    ));
+    return () => onRegisterGetAction?.(null);
+  }, [gapAnalysis, llmMetrics, onRegisterGetAction, requestRun]);
   
   return (
     <>
@@ -3185,17 +3213,19 @@ function useLLMQueue(projectId) {
     if (typeof runFn !== "function") return;
     if (!busyRef.current) {
       busyRef.current = true;
-      setLlmBusy(true);
+      flushSync(() => setLlmBusy(true));
       runFn();
     } else {
       queueRef.current.push(runFn);
+      // Show busy immediately so Regenerate / second click is not ignored visually
+      flushSync(() => setLlmBusy(true));
     }
   }, []);
 
   const onComplete = React.useCallback(() => {
     if (queueRef.current.length > 0) {
       const next = queueRef.current.shift();
-      setLlmBusy(true);
+      flushSync(() => setLlmBusy(true));
       next();
     } else {
       busyRef.current = false;
@@ -9636,6 +9666,10 @@ const TopologyGraph = ({ project, onOpenDevice, can, authedUser, setProjects, se
   const [topologyError, setTopologyError] = React.useState(null);
   const [showTopologyNotification, setShowTopologyNotification] = React.useState(false);
   const [topologyNotificationData, setTopologyNotificationData] = React.useState(null);
+  /** True while fetching graph data (fast endpoint). Graph shows loading. */
+  const [isGraphLoading, setIsGraphLoading] = React.useState(true);
+  /** True while LLM is analyzing (slow). Graph stays interactive; only AI panel shows loading. */
+  const isAiLoading = generatingTopology;
   
   const rows = project.summaryRows || [];
   // Base nodes from project summary rows - compute first
@@ -9855,7 +9889,7 @@ const TopologyGraph = ({ project, onOpenDevice, can, authedUser, setProjects, se
               type: "success"
             });
             setShowTopologyNotification(true);
-            setLlmNotification?.({ show: true, type: "success", title: "Topology Generated", message: `LLM topology generation completed. Found ${aiNodes.length} nodes and ${aiEdges.length} links.`, metrics: topologyData.llm_metrics, onRegenerate: () => requestRun?.(doGenerateTopology) });
+            setLlmNotification?.({ show: true, type: "success", title: "Topology Generated", message: "LLM analysis completed successfully.", metrics: topologyData.llm_metrics, onRegenerate: () => requestRun?.(doGenerateTopologyRef.current) });
           },
           (errorMsg) => {
             setGeneratingTopology(false);
@@ -9968,7 +10002,7 @@ const TopologyGraph = ({ project, onOpenDevice, can, authedUser, setProjects, se
               type: "success"
             });
             setShowTopologyNotification(true);
-            setLlmNotification?.({ show: true, type: "success", title: "Topology Generated", message: `LLM topology generation completed. Found ${aiNodes.length} nodes and ${aiEdges.length} links.`, metrics: topologyData.llm_metrics, onRegenerate: () => requestRun?.(doGenerateTopology) });
+            setLlmNotification?.({ show: true, type: "success", title: "Topology Generated", message: "LLM analysis completed successfully.", metrics: topologyData.llm_metrics, onRegenerate: () => requestRun?.(doGenerateTopologyRef.current) });
           },
           (errorMsg) => {
             setGeneratingTopology(false);
@@ -10006,9 +10040,15 @@ const TopologyGraph = ({ project, onOpenDevice, can, authedUser, setProjects, se
             setNodeRoles(topologyData.layout.node_roles);
           }
         }
-        // Load LLM metrics from database if available
+        // Load LLM metrics from database if available (so "has result" is true after refresh/tab switch; button shows popup instead of sending to LLM)
         if (topologyData.llm_metrics) {
           setTopologyLLMMetrics(topologyData.llm_metrics);
+          setTopologyNotificationData({
+            title: "Topology Generated",
+            message: "LLM analysis completed successfully.",
+            metrics: topologyData.llm_metrics,
+            type: "success"
+          });
         }
         // Store last modified date if available
         if (topologyData.updated_at || topologyData.last_modified) {
@@ -10152,7 +10192,7 @@ const TopologyGraph = ({ project, onOpenDevice, can, authedUser, setProjects, se
             type: "success"
           });
           setShowTopologyNotification(true);
-          setLlmNotification?.({ show: true, type: "success", title: "Topology Generated", message: `LLM topology generation completed. Found ${aiNodes.length} nodes and ${aiEdges.length} links.`, metrics: topologyData.llm_metrics, onRegenerate: () => requestRun?.(doGenerateTopology) });
+          setLlmNotification?.({ show: true, type: "success", title: "Topology Generated", message: "LLM analysis completed successfully.", metrics: topologyData.llm_metrics, onRegenerate: () => requestRun?.(doGenerateTopologyRef.current) });
         },
         (errorMsg) => {
           setGeneratingTopology(false);
@@ -10266,12 +10306,12 @@ const TopologyGraph = ({ project, onOpenDevice, can, authedUser, setProjects, se
         
         setTopologyNotificationData({
           title: "Topology Generated",
-          message: `LLM topology generation completed. Found ${aiNodes.length} nodes and ${convertedEdges.length} links.`,
+          message: "LLM analysis completed successfully.",
           metrics: topologyData.llm_metrics,
           type: "success"
         });
         setShowTopologyNotification(true);
-        setLlmNotification?.({ show: true, type: "success", title: "Topology Generated", message: `LLM topology generation completed. Found ${aiNodes.length} nodes and ${convertedEdges.length} links.`, metrics: topologyData.llm_metrics, onRegenerate: () => requestRun?.(doGenerateTopology) });
+        setLlmNotification?.({ show: true, type: "success", title: "Topology Generated", message: "LLM analysis completed successfully.", metrics: topologyData.llm_metrics, onRegenerate: () => requestRun?.(doGenerateTopologyRef.current) });
       },
         (errorMsg) => {
           setGeneratingTopology(false);
@@ -10288,17 +10328,33 @@ const TopologyGraph = ({ project, onOpenDevice, can, authedUser, setProjects, se
     };
   }, [project.project_id || project.id, generatingTopology]);
   
-  // Generate topology using AI (runs via LLM queue when not busy)
+  const doGenerateTopologyRef = React.useRef(null);
+
   const handleGenerateTopology = () => {
     const projectId = project.project_id || project.id;
     if (!projectId) {
       setTopologyError("Project ID not found");
       return;
     }
+    // If we already have a result (from this session or loaded from API), show popup only; do not send to LLM until user clicks Regenerate
+    const hasResult = topologyNotificationData || topologyLLMMetrics;
+    if (hasResult && !generatingTopology && !llmBusy) {
+      const data = topologyNotificationData || { title: "Topology Generated", message: "LLM analysis completed successfully.", metrics: topologyLLMMetrics, type: "success" };
+      setShowTopologyNotification(true);
+      setLlmNotification?.({ show: true, type: "success", title: data.title || "Topology Generated", message: data.message || "LLM analysis completed successfully.", metrics: data.metrics, onRegenerate: () => requestRun?.(doGenerateTopologyRef.current) });
+      return;
+    }
+    // Show "Analyzing..." immediately on first click (fixes regenerate not updating UI)
+    flushSync(() => {
+      setShowTopologyNotification(false);
+      setGeneratingTopology(true);
+      setTopologyError(null);
+    });
+    const fn = doGenerateTopologyRef.current || doGenerateTopology;
     if (typeof requestRun === "function") {
-      requestRun(doGenerateTopology);
+      requestRun(fn);
     } else {
-      doGenerateTopology();
+      fn();
     }
   };
 
@@ -10308,21 +10364,15 @@ const TopologyGraph = ({ project, onOpenDevice, can, authedUser, setProjects, se
       setTopologyError("Project ID not found");
       return;
     }
-    
-    const storageKey = `llm_generating_topology_${projectId}`;
-    const isAlreadyGenerating = generatingTopology || localStorage.getItem(storageKey) === "true";
-    if (isAlreadyGenerating) {
-      return;
-    }
-    
-    setShowTopologyNotification(false);
-    setGeneratingTopology(true);
-    setTopologyError(null);
-    
-    // Store generating state in localStorage (persists across navigation)
-    localStorage.setItem(storageKey, "true");
-    
-    // Start analysis (don't wait for response - polling will pick it up)
+    const storageKeyTopo = `llm_generating_topology_${projectId}`;
+    if (localStorage.getItem(storageKeyTopo) === "true") return;
+    // UI already updated by handleGenerateTopology when from button; ensure state when from modal Regenerate
+    flushSync(() => {
+      setShowTopologyNotification(false);
+      setGeneratingTopology(true);
+      setTopologyError(null);
+    });
+    localStorage.setItem(storageKeyTopo, "true");
     api.generateTopology(projectId)
       .then(() => {
         // Request sent successfully - polling will handle the result
@@ -10334,7 +10384,7 @@ const TopologyGraph = ({ project, onOpenDevice, can, authedUser, setProjects, se
         if (err.message && !err.message.includes("timeout") && !err.message.includes("ECONNRESET") && !err.message.includes("socket hang up")) {
           setTopologyError(err.message || err.detail || "Failed to start topology generation. Check backend/LLM server.");
           setGeneratingTopology(false);
-          localStorage.removeItem(storageKey);
+          localStorage.removeItem(storageKeyTopo);
           onComplete?.();
         } else {
           // Timeout or connection reset is expected for long-running LLM - polling will handle it
@@ -10343,6 +10393,7 @@ const TopologyGraph = ({ project, onOpenDevice, can, authedUser, setProjects, se
       });
     // Note: We don't set generatingTopology=false here - polling will handle it when result is ready
   };
+  doGenerateTopologyRef.current = doGenerateTopology;
 
   const [dragging, setDragging] = useState(null);
   const [selectedNode, setSelectedNode] = useState(null);
@@ -10377,7 +10428,75 @@ const TopologyGraph = ({ project, onOpenDevice, can, authedUser, setProjects, se
   const [linkMode, setLinkMode] = useState("none"); // "none", "add", "edit"
   const [reroutingLink, setReroutingLink] = useState(null); // For re-routing link connectors
   
-  // Load topology layout from backend on mount
+  // Step 1: Fetch fast topology (DB only, no LLM) on mount so graph shows immediately
+  React.useEffect(() => {
+    const projectId = project.project_id || project.id;
+    if (!projectId) {
+      setIsGraphLoading(false);
+      return;
+    }
+    let cancelled = false;
+    (async () => {
+      try {
+        const data = await api.getNetworkTopology(projectId);
+        if (cancelled) return;
+        const topo = data.topology || {};
+        const apiNodes = topo.nodes || [];
+        const apiEdges = topo.edges || [];
+        if (apiNodes.length > 0 || apiEdges.length > 0) {
+          const roleCounts = {};
+          const roleIndices = {};
+          apiNodes.forEach(n => {
+            const role = (n.type || "access").toLowerCase();
+            roleCounts[role] = (roleCounts[role] || 0) + 1;
+          });
+          const newNodes = apiNodes.map((n, idx) => {
+            const role = (n.type || "access").toLowerCase();
+            roleIndices[role] = roleIndices[role] ?? 0;
+            return {
+              id: n.id,
+              label: n.label || n.id,
+              role,
+              type: n.type || "Switch",
+              model: n.model,
+              mgmtIp: n.ip || n.management_ip,
+            };
+          });
+          const newLinks = apiEdges.map(e => ({
+            a: e.from,
+            b: e.to,
+            label: e.label || "",
+            evidence: e.evidence || "",
+            type: "trunk",
+          }));
+          setTopologyNodes(newNodes);
+          setLinks(newLinks);
+          const layout = data.layout || {};
+          if (layout.positions && Object.keys(layout.positions).length > 0) {
+            setPositions(layout.positions);
+          } else {
+            const pos = {};
+            const posRoleIndices = {};
+            newNodes.forEach(n => {
+              const role = (n.role || "access").toLowerCase();
+              posRoleIndices[role] = posRoleIndices[role] ?? 0;
+              pos[n.id] = getDefaultPos(n.id, role, posRoleIndices[role], roleCounts);
+              posRoleIndices[role]++;
+            });
+            setPositions(nudgePositionsNoOverlap(pos, newNodes.map(n => n.id)));
+          }
+          if (layout.node_labels) setNodeLabels(layout.node_labels);
+          if (layout.node_roles) setNodeRoles(layout.node_roles);
+        }
+      } catch (err) {
+        if (!cancelled) console.warn("Fast topology load failed, using fallback:", err);
+      } finally {
+        if (!cancelled) setIsGraphLoading(false);
+      }
+    })();
+    return () => { cancelled = true; };
+  }, [project.project_id || project.id]);
+  
   // Handle zoom
   const handleZoomIn = () => {
     setZoom(prev => Math.min(prev + 0.2, 3.0));
@@ -10773,8 +10892,9 @@ const TopologyGraph = ({ project, onOpenDevice, can, authedUser, setProjects, se
               type={topologyNotificationData?.type || "success"}
               onRegenerate={() => {
                 setShowTopologyNotification(false);
-                if (typeof requestRun === "function") requestRun(doGenerateTopology);
-                else doGenerateTopology();
+                const fn = doGenerateTopologyRef.current || doGenerateTopology;
+                if (typeof requestRun === "function") requestRun(fn);
+                else fn();
               }}
             />
             {/* LLM info and last modified - larger format */}
@@ -10926,6 +11046,11 @@ const TopologyGraph = ({ project, onOpenDevice, can, authedUser, setProjects, se
         </div>
       )}
       <div className="relative h-[calc(100vh-380px)] min-h-[450px] rounded-xl bg-[#0B1220] overflow-hidden">
+        {isGraphLoading ? (
+          <div className="absolute inset-0 flex items-center justify-center text-slate-400 text-sm">
+            Loading topology graph...
+          </div>
+        ) : null}
         <svg 
           viewBox="0 0 100 100" 
           className="w-full h-full"
@@ -10934,8 +11059,10 @@ const TopologyGraph = ({ project, onOpenDevice, can, authedUser, setProjects, se
           onMouseLeave={handleMouseUp}
           onMouseDown={handlePanStart}
           onWheel={handleWheel}
+          aria-hidden={isGraphLoading}
           style={{
-            cursor: isPanning ? 'grabbing' : (!dragging ? 'grab' : 'default')
+            cursor: isPanning ? 'grabbing' : (!dragging ? 'grab' : 'default'),
+            visibility: isGraphLoading ? 'hidden' : 'visible',
           }}
         >
           <g transform={`translate(${pan.x}, ${pan.y}) scale(${zoom})`}>
