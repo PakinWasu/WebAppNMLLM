@@ -15,6 +15,8 @@ export function clearToken() {
  localStorage.removeItem('token');
 }
 
+const DEFAULT_TIMEOUT_MS = 60000; // 60s so slow LLM backend doesn't hang the app forever
+
 export async function api(endpoint, options = {}) {
  const token = getToken();
  const headers = {
@@ -26,11 +28,17 @@ export async function api(endpoint, options = {}) {
   headers['Authorization'] = `Bearer ${token}`;
  }
 
+ const timeoutMs = options.timeout ?? DEFAULT_TIMEOUT_MS;
+ const controller = new AbortController();
+ const timeoutId = setTimeout(() => controller.abort(), timeoutMs);
+
  try {
   const response = await fetch(`${API_BASE}${endpoint}`, {
    ...options,
    headers,
+   signal: controller.signal,
   });
+  clearTimeout(timeoutId);
 
   if (!response.ok) {
    const error = await response.json().catch(() => ({ detail: 'Request failed' }));
@@ -39,7 +47,10 @@ export async function api(endpoint, options = {}) {
 
   return response.json();
  } catch (error) {
-  // Network error or other fetch errors
+  clearTimeout(timeoutId);
+  if (error.name === 'AbortError') {
+   throw new Error('Request timeout. Server or Ollama may be busy. Try again or restart Ollama.');
+  }
   if (error instanceof TypeError && error.message.includes('fetch')) {
    throw new Error('Cannot connect to server. Please check your connection.');
   }
@@ -206,13 +217,13 @@ export async function uploadDocuments(projectId, files, metadata, folderId) {
  return response.json();
 }
 
-export async function getDocuments(projectId, filters = {}) {
+export async function getDocuments(projectId, filters = {}, options = {}) {
  const params = new URLSearchParams();
  if (filters.folder_id) params.append('folder_id', filters.folder_id);
  if (filters.uploader) params.append('uploader', filters.uploader);
  if (filters.search) params.append('search', filters.search);
- 
- const response = await api(`/projects/${projectId}/documents?${params}`);
+ const timeout = options.timeout ?? 30000;
+ const response = await api(`/projects/${projectId}/documents?${params}`, { timeout });
  // API returns {documents: [...], count: ...}, extract documents array
  return response.documents || response || [];
 }
@@ -398,8 +409,9 @@ export async function getProjectRecommendations(projectId) {
 // Full Project Analysis API removed - use analyzeProjectOverview and analyzeProjectRecommendations separately
 
 // Folders API
-export async function getFolders(projectId) {
-  const response = await api(`/projects/${projectId}/folders`);
+export async function getFolders(projectId, options = {}) {
+  const timeout = options.timeout ?? 30000;
+  const response = await api(`/projects/${projectId}/folders`, { timeout });
   return response.folders || [];
 }
 

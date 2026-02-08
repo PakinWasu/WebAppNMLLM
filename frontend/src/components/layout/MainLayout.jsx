@@ -14,7 +14,7 @@ export default function MainLayout({ topBar, leftSidebar, children, mainClassNam
     <div className="h-screen flex flex-col overflow-hidden bg-slate-950 text-slate-200">
       {/* Top bar */}
       {topBar && (
-        <header className="flex-shrink-0 h-12 border-b border-slate-800 bg-slate-900/80">
+        <header className="flex-shrink-0 h-12 border-b border-slate-800 bg-slate-900/80 relative z-20" style={{ pointerEvents: 'auto' }}>
           {topBar}
         </header>
       )}

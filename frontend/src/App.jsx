@@ -114,6 +114,34 @@ if (!window.llmPollingService) {
 
 const globalPollingService = window.llmPollingService;
 
+// Notify user when LLM result is ready (browser notification + document.title) so they know without refreshing
+function notifyLLMResultReady(title, body) {
+  const fullTitle = title || "LLM Analysis Complete";
+  const fullBody = body || "Result is ready. Switch to Summary to view.";
+  try {
+    if (typeof Notification !== "undefined") {
+      if (Notification.permission === "granted") {
+        const n = new Notification(fullTitle, { body: fullBody });
+        n.onclick = () => { window.focus(); n.close(); };
+      } else if (Notification.permission === "default") {
+        Notification.requestPermission().then((p) => {
+          if (p === "granted") {
+            const n = new Notification(fullTitle, { body: fullBody });
+            n.onclick = () => { window.focus(); n.close(); };
+          }
+        });
+      }
+    }
+  } catch (e) {
+    console.warn("Browser notification failed:", e);
+  }
+  const baseTitle = document.title.replace(/^\[.*?\]\s*/, "");
+  document.title = `[Done] ${fullTitle} – ${baseTitle}`;
+  setTimeout(() => {
+    document.title = document.title.replace(/^\[Done\]\s.*?\s–\s/, "") || baseTitle;
+  }, 8000);
+}
+
 // Utility function to format date/time in local timezone (English)
 const formatDateTime = (dateString) => {
   if (!dateString) return "—";
@@ -211,11 +239,11 @@ const NotificationModal = ({ show, onClose, title, message, metrics, type = "suc
   };
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
-      <div className="absolute inset-0 bg-black/50" onClick={onClose} />
-      <div className="relative bg-white dark:bg-gray-800 rounded-xl shadow-xl max-w-md w-full p-6 border border-gray-200 dark:border-gray-700">
+    <div className="fixed inset-0 z-[100] flex items-center justify-center p-4" role="dialog" aria-modal="true" aria-labelledby="notification-modal-title">
+      <div className="absolute inset-0 bg-black/50" onClick={onClose} aria-hidden="true" />
+      <div className="relative z-10 bg-white dark:bg-gray-800 rounded-xl shadow-xl max-w-md w-full p-6 border border-gray-200 dark:border-gray-700">
         <div className="flex items-start justify-between mb-4">
-          <h3 className={`text-lg font-semibold ${
+          <h3 id="notification-modal-title" className={`text-lg font-semibold ${
             type === "success" ? "text-green-600 dark:text-green-400" :
             type === "error" ? "text-red-600 dark:text-red-400" :
             "text-blue-600 dark:text-blue-400"
@@ -223,8 +251,10 @@ const NotificationModal = ({ show, onClose, title, message, metrics, type = "suc
             {title}
           </h3>
           <button
+            type="button"
             onClick={onClose}
             className="text-gray-400 hover:text-gray-600 dark:hover:text-gray-300"
+            aria-label="Close"
           >
             <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
@@ -1016,16 +1046,18 @@ export default function App() {
                         <span className="text-sm font-medium text-slate-300 truncate">{safeDisplay(project?.name)}</span>
                         {/* Tabs integrated in header */}
                         {projectTabs.length > 0 && (
-                          <nav className="flex items-center gap-1 ml-4">
+                          <nav className="flex items-center gap-1 ml-4" aria-label="Project tabs (always clickable)">
                             {projectTabs.map((t) => (
                               <button
                                 key={t.id}
+                                type="button"
                                 onClick={() => setRoute({ ...route, tab: t.id })}
                                 className={`flex items-center gap-2 px-3 py-1.5 text-xs font-medium transition rounded-lg whitespace-nowrap ${
                                   (route.tab || "setting") === t.id
                                     ? "bg-blue-600 text-white"
                                     : "hover:bg-slate-700 hover:text-blue-400 text-slate-400"
                                 }`}
+                                title={`Go to ${t.label}`}
                               >
                                 <span>{safeDisplay(t.icon)}</span>
                                 <span>{safeDisplay(t.label)}</span>
@@ -2071,6 +2103,10 @@ const ProjectView = ({
 }) => {
   if (!project)
     return <div className="text-sm text-rose-400">Project not found</div>;
+
+  const projectId = project?.project_id || project?.id;
+  const { llmBusy, requestRun, onComplete } = useLLMQueue(projectId);
+  const [llmNotification, setLlmNotification] = React.useState(null);
   
   // Show tabs based on permissions
   const tabs = [];
@@ -2085,6 +2121,18 @@ const ProjectView = ({
 
   return (
     <div className="h-full flex flex-col min-h-0">
+      {/* Global LLM completion popup — shows even when user is on Documents/History so they see result without switching back */}
+      {llmNotification?.show && (
+        <NotificationModal
+          show={true}
+          onClose={() => setLlmNotification((n) => n ? { ...n, show: false } : null)}
+          title={llmNotification.title || "LLM Complete"}
+          message={llmNotification.message || ""}
+          metrics={llmNotification.metrics}
+          type={llmNotification.type || "success"}
+          onRegenerate={llmNotification.onRegenerate}
+        />
+      )}
       {/* Main content - full width (header is now in MainLayout topBar) */}
       <main className="flex-1 min-h-0 overflow-hidden flex flex-col gap-3 px-4 py-3">
         {tab === "setting" && can("project-setting", project) && (
@@ -2103,6 +2151,10 @@ const ProjectView = ({
               authedUser={authedUser}
               setProjects={setProjects}
               openDevice={openDevice}
+              llmBusy={llmBusy}
+              requestRun={requestRun}
+              onComplete={onComplete}
+              setLlmNotification={setLlmNotification}
             />
           </div>
         )}
@@ -2263,19 +2315,19 @@ const OverviewPage = ({ project, uploadHistory }) => {
     <Card title="Activity Log (Recent)">
       <div className="mb-4 grid grid-cols-1 md:grid-cols-3 gap-2">
         <Input 
-          placeholder="ค้นหา (ชื่อไฟล์, ผู้ใช้, คำอธิบาย...)" 
+          placeholder="Search (filename, user, description...)" 
           value={searchActivity} 
           onChange={(e) => setSearchActivity(e.target.value)} 
         />
         <Select 
           value={filterActivityWho} 
           onChange={setFilterActivityWho} 
-                  options={[{value: "all", label: "ทั้งหมด (Responsible User)"}, ...uniqueActivityWhos.map(w => ({value: w, label: w}))]} 
+                  options={[{value: "all", label: "All (Responsible User)"}, ...uniqueActivityWhos.map(w => ({value: w, label: w}))]} 
                 />
                 <Select 
                   value={filterActivityWhat} 
                   onChange={setFilterActivityWhat} 
-                  options={[{value: "all", label: "ทั้งหมด (Activity Type)"}, ...uniqueActivityWhats.map(w => ({value: w, label: w}))]}
+                  options={[{value: "all", label: "All (Activity Type)"}, ...uniqueActivityWhats.map(w => ({value: w, label: w}))]}
         />
       </div>
       <Table
@@ -2331,41 +2383,90 @@ const OverviewPage = ({ project, uploadHistory }) => {
 /* ========= Topology helpers (role + links) ========= */
 
 /* ========= Project Analysis Panel Component (tabbed) ========= */
-const ProjectAnalysisPanel = ({ project, summaryRows, coreCount, distCount, accessCount }) => {
+const ProjectAnalysisPanel = ({ project, summaryRows, coreCount, distCount, accessCount, llmBusy, requestRun, onComplete, setLlmNotification }) => {
   const [activeTab, setActiveTab] = React.useState("overview");
+  const [overviewGenerating, setOverviewGenerating] = React.useState(false);
+  const [recGenerating, setRecGenerating] = React.useState(false);
+  const overviewGenerateRef = React.useRef(null);
+  const recGenerateRef = React.useRef(null);
+
+  const handleAiClick = () => {
+    const fn = activeTab === "overview" ? overviewGenerateRef.current : recGenerateRef.current;
+    if (typeof fn !== "function") return;
+    requestRun(fn);
+  };
+
+  const tabGenerating = activeTab === "overview" ? overviewGenerating : recGenerating;
+  const buttonDisabled = summaryRows.length === 0 || llmBusy || tabGenerating;
+  const title = summaryRows.length === 0
+    ? "Upload configs first"
+    : llmBusy
+      ? (tabGenerating ? "Analysis in progress. Please wait..." : "Another task is running. Please wait...")
+      : "Generate with AI (for current tab)";
+
   return (
     <div className="col-span-6 min-h-0 flex flex-col w-full">
-      {/* File-like tabs */}
-      <div className="flex flex-shrink-0 border-b border-slate-700 bg-slate-900/40">
+      {/* Tabs + AI button on top (no duplicate header below) */}
+      <div className="flex flex-shrink-0 flex items-center justify-between border-b border-slate-700 bg-slate-900/40">
+        <div className="flex">
+          <button
+            type="button"
+            onClick={() => setActiveTab("overview")}
+            className={`px-4 py-2.5 text-sm font-medium border-b-2 transition-colors ${
+              activeTab === "overview"
+                ? "border-emerald-500 text-slate-100 bg-slate-800/50"
+                : "border-transparent text-slate-400 hover:text-slate-300 hover:bg-slate-800/30"
+            }`}
+          >
+            Network Overview
+          </button>
+          <button
+            type="button"
+            onClick={() => setActiveTab("recommendations")}
+            className={`px-4 py-2.5 text-sm font-medium border-b-2 transition-colors ${
+              activeTab === "recommendations"
+                ? "border-emerald-500 text-slate-100 bg-slate-800/50"
+                : "border-transparent text-slate-400 hover:text-slate-300 hover:bg-slate-800/30"
+            }`}
+          >
+            Recommendations
+          </button>
+        </div>
         <button
           type="button"
-          onClick={() => setActiveTab("overview")}
-          className={`px-4 py-2.5 text-sm font-medium border-b-2 transition-colors ${
-            activeTab === "overview"
-              ? "border-emerald-500 text-slate-100 bg-slate-800/50"
-              : "border-transparent text-slate-400 hover:text-slate-300 hover:bg-slate-800/30"
-          }`}
+          onClick={handleAiClick}
+          disabled={buttonDisabled}
+          className="w-8 h-8 flex items-center justify-center rounded-md bg-blue-600 hover:bg-blue-700 text-white transition-colors disabled:opacity-50 disabled:cursor-not-allowed mr-2 text-base flex-shrink-0"
+          title={title}
+          aria-label="AI Analysis"
         >
-          Network Overview
-        </button>
-        <button
-          type="button"
-          onClick={() => setActiveTab("recommendations")}
-          className={`px-4 py-2.5 text-sm font-medium border-b-2 transition-colors ${
-            activeTab === "recommendations"
-              ? "border-emerald-500 text-slate-100 bg-slate-800/50"
-              : "border-transparent text-slate-400 hover:text-slate-300 hover:bg-slate-800/30"
-          }`}
-        >
-          Recommendations
+          {llmBusy ? "⏳" : "✨"}
         </button>
       </div>
       <div className="flex-1 min-h-0 flex flex-col overflow-hidden">
         {activeTab === "overview" && (
-          <NetworkOverviewCard project={project} summaryRows={summaryRows} fullHeight />
+          <NetworkOverviewCard
+            project={project}
+            summaryRows={summaryRows}
+            fullHeight
+            onRegisterGenerate={(fn) => { overviewGenerateRef.current = fn; }}
+            onGeneratingChange={setOverviewGenerating}
+            onComplete={onComplete}
+            requestRun={requestRun}
+            setLlmNotification={setLlmNotification}
+          />
         )}
         {activeTab === "recommendations" && (
-          <RecommendationsCard project={project} summaryRows={summaryRows} fullHeight />
+          <RecommendationsCard
+            project={project}
+            summaryRows={summaryRows}
+            fullHeight
+            onRegisterGenerate={(fn) => { recGenerateRef.current = fn; }}
+            onGeneratingChange={setRecGenerating}
+            onComplete={onComplete}
+            requestRun={requestRun}
+            setLlmNotification={setLlmNotification}
+          />
         )}
       </div>
     </div>
@@ -2373,7 +2474,7 @@ const ProjectAnalysisPanel = ({ project, summaryRows, coreCount, distCount, acce
 };
 
 /* ========= Network Overview Card Component ========= */
-const NetworkOverviewCard = ({ project, summaryRows, fullHeight }) => {
+const NetworkOverviewCard = ({ project, summaryRows, fullHeight, onRegisterGenerate, onGeneratingChange, onComplete, requestRun, setLlmNotification }) => {
   const [overviewText, setOverviewText] = React.useState(null);
   const [llmMetrics, setLlmMetrics] = React.useState(null);
   const [generating, setGenerating] = React.useState(false);
@@ -2383,6 +2484,10 @@ const NetworkOverviewCard = ({ project, summaryRows, fullHeight }) => {
   const [notificationData, setNotificationData] = React.useState(null);
 
   const projectId = project?.project_id || project?.id;
+
+  React.useEffect(() => {
+    onGeneratingChange?.(generating);
+  }, [generating, onGeneratingChange]);
 
   // Load generating state from localStorage on mount and start polling if needed
   React.useEffect(() => {
@@ -2400,10 +2505,12 @@ const NetworkOverviewCard = ({ project, summaryRows, fullHeight }) => {
           projectId,
           api.getProjectOverview,
           (result) => {
+            notifyLLMResultReady("Network Overview", "LLM analysis completed. Open Summary to view.");
             setOverviewText(result.overview_text || null);
             setLlmMetrics(result.metrics || null);
             setGenerating(false);
             localStorage.removeItem(storageKey);
+            onComplete?.();
             setNotificationData({
               title: "Network Overview Generated",
               message: "LLM analysis completed successfully.",
@@ -2411,11 +2518,13 @@ const NetworkOverviewCard = ({ project, summaryRows, fullHeight }) => {
               type: "success"
             });
             setShowNotification(true);
+            setLlmNotification?.({ show: true, type: "success", title: "Network Overview Generated", message: "LLM analysis completed successfully.", metrics: result.metrics, onRegenerate: () => requestRun?.(doGenerate) });
           },
           (errorMsg) => {
             setGenerating(false);
             setError(errorMsg);
             localStorage.removeItem(storageKey);
+            onComplete?.();
           }
         );
       } else {
@@ -2423,10 +2532,12 @@ const NetworkOverviewCard = ({ project, summaryRows, fullHeight }) => {
         globalPollingService.resumePolling(
           pollingKey,
           (result) => {
+            notifyLLMResultReady("Network Overview", "LLM analysis completed. Open Summary to view.");
             setOverviewText(result.overview_text || null);
             setLlmMetrics(result.metrics || null);
             setGenerating(false);
             localStorage.removeItem(storageKey);
+            onComplete?.();
             setNotificationData({
               title: "Network Overview Generated",
               message: "LLM analysis completed successfully.",
@@ -2434,11 +2545,13 @@ const NetworkOverviewCard = ({ project, summaryRows, fullHeight }) => {
               type: "success"
             });
             setShowNotification(true);
+            setLlmNotification?.({ show: true, type: "success", title: "Network Overview Generated", message: "LLM analysis completed successfully.", metrics: result.metrics, onRegenerate: () => requestRun?.(doGenerate) });
           },
           (errorMsg) => {
             setGenerating(false);
             setError(errorMsg);
             localStorage.removeItem(storageKey);
+            onComplete?.();
           }
         );
       }
@@ -2446,6 +2559,7 @@ const NetworkOverviewCard = ({ project, summaryRows, fullHeight }) => {
   }, [projectId]);
   
   // Load saved full project analysis on mount (use network_overview from full analysis)
+  // Timeout so we never block forever if API hangs
   React.useEffect(() => {
     if (!projectId) {
       setLoading(false);
@@ -2453,35 +2567,43 @@ const NetworkOverviewCard = ({ project, summaryRows, fullHeight }) => {
     }
     
     let isMounted = true;
+    const LOAD_TIMEOUT_MS = 12000;
     
     const loadSavedAnalysis = async () => {
+      const timeoutPromise = new Promise((_, reject) => {
+        setTimeout(() => reject(new Error("Load timeout")), LOAD_TIMEOUT_MS);
+      });
       try {
-        // Try to load from full project analysis first
-        const fullResult = await api.getFullProjectAnalysis(projectId);
+        const fullResult = await Promise.race([
+          api.getFullProjectAnalysis(projectId),
+          timeoutPromise
+        ]);
         if (isMounted) {
           setOverviewText(fullResult.network_overview || null);
           setLlmMetrics(fullResult.metrics || null);
-          setLoading(false);
           return;
         }
       } catch (err) {
-        // Fallback to old overview endpoint if full analysis not available
-        try {
-          const result = await api.getProjectOverview(projectId);
-          if (isMounted) {
-            setOverviewText(result.overview_text || null);
-            setLlmMetrics(result.metrics || null);
-            setLoading(false);
-          }
-        } catch (err2) {
-          // Ignore 404 - no saved overview yet
-          if (err2.message && !err2.message.includes("404")) {
-            console.warn("Failed to load saved overview:", err2);
-          }
-          if (isMounted) {
-            setLoading(false);
+        if (err?.message === "Load timeout") {
+          if (isMounted) console.warn("Overview load timed out, showing empty state");
+        } else {
+          try {
+            const result = await Promise.race([
+              api.getProjectOverview(projectId),
+              timeoutPromise
+            ]);
+            if (isMounted) {
+              setOverviewText(result.overview_text || null);
+              setLlmMetrics(result.metrics || null);
+            }
+          } catch (err2) {
+            if (err2?.message !== "Load timeout" && err2?.message && !err2.message.includes("404")) {
+              console.warn("Failed to load saved overview:", err2);
+            }
           }
         }
+      } finally {
+        if (isMounted) setLoading(false);
       }
     };
     
@@ -2512,10 +2634,12 @@ const NetworkOverviewCard = ({ project, summaryRows, fullHeight }) => {
       globalPollingService.resumePolling(
         pollingKey,
         (result) => {
+          notifyLLMResultReady("Network Overview", "LLM analysis completed. Open Summary to view.");
           setOverviewText(result.overview_text || null);
           setLlmMetrics(result.metrics || null);
           setGenerating(false);
           localStorage.removeItem(storageKey);
+          onComplete?.();
           setNotificationData({
             title: "Network Overview Generated",
             message: "LLM analysis completed successfully.",
@@ -2523,11 +2647,13 @@ const NetworkOverviewCard = ({ project, summaryRows, fullHeight }) => {
             type: "success"
           });
           setShowNotification(true);
+          setLlmNotification?.({ show: true, type: "success", title: "Network Overview Generated", message: "LLM analysis completed successfully.", metrics: result.metrics, onRegenerate: () => requestRun?.(doGenerate) });
         },
         (errorMsg) => {
           setGenerating(false);
           setError(errorMsg);
           localStorage.removeItem(storageKey);
+          onComplete?.();
         }
       );
     } else {
@@ -2536,10 +2662,12 @@ const NetworkOverviewCard = ({ project, summaryRows, fullHeight }) => {
         projectId,
         api.getProjectOverview,
         (result) => {
+          notifyLLMResultReady("Network Overview", "LLM analysis completed. Open Summary to view.");
           setOverviewText(result.overview_text || null);
           setLlmMetrics(result.metrics || null);
           setGenerating(false);
           localStorage.removeItem(storageKey);
+          onComplete?.();
           setNotificationData({
             title: "Network Overview Generated",
             message: "LLM analysis completed successfully.",
@@ -2547,11 +2675,13 @@ const NetworkOverviewCard = ({ project, summaryRows, fullHeight }) => {
             type: "success"
           });
           setShowNotification(true);
+          setLlmNotification?.({ show: true, type: "success", title: "Network Overview Generated", message: "LLM analysis completed successfully.", metrics: result.metrics, onRegenerate: () => requestRun?.(doGenerate) });
         },
         (errorMsg) => {
           setGenerating(false);
           setError(errorMsg);
           localStorage.removeItem(storageKey);
+          onComplete?.();
         }
       );
     }
@@ -2570,6 +2700,7 @@ const NetworkOverviewCard = ({ project, summaryRows, fullHeight }) => {
   const doGenerate = async () => {
     if (!projectId || generating) return;
     
+    setShowNotification(false);
     setGenerating(true);
     setError(null);
     
@@ -2587,10 +2718,18 @@ const NetworkOverviewCard = ({ project, summaryRows, fullHeight }) => {
           setError(err.message || err.detail || "Failed to start analysis. Check backend/LLM server.");
           setGenerating(false);
           localStorage.removeItem(storageKey);
+          onComplete?.();
         }
       });
     // Note: We don't set generating=false here - polling will handle it
   };
+  
+  const generateRef = React.useRef(doGenerate);
+  generateRef.current = doGenerate;
+  React.useEffect(() => {
+    onRegisterGenerate?.(() => generateRef.current?.());
+    return () => onRegisterGenerate?.(null);
+  }, [onRegisterGenerate]);
   
   return (
     <>
@@ -2603,34 +2742,24 @@ const NetworkOverviewCard = ({ project, summaryRows, fullHeight }) => {
         type={notificationData?.type || "success"}
         onRegenerate={() => {
           setShowNotification(false);
-          doGenerate();
+          if (typeof requestRun === "function") requestRun(doGenerate);
+          else doGenerate();
         }}
       />
 
       <div className={`flex-1 min-h-0 flex flex-col rounded-b-xl border border-slate-800 border-t-0 bg-slate-900/50 overflow-hidden w-full ${fullHeight ? "min-h-0" : ""}`}>
-        <div className="flex-shrink-0 flex items-center justify-between px-3 py-2 border-b border-slate-700">
-          <div className="font-semibold text-slate-300 text-sm">Network Overview</div>
-          <button
-            onClick={handleGenerate}
-            disabled={generating || summaryRows.length === 0}
-            className="px-3 py-1.5 text-sm font-medium rounded-md bg-blue-600 hover:bg-blue-700 text-white transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
-            title={generating ? "Analysis in progress. Please wait..." : "Generate network overview with LLM"}
-          >
-            {generating ? "⏳ Generating..." : "LLM Analysis"}
-          </button>
-        </div>
         <div
           className="flex-1 min-h-0 overflow-y-auto overflow-x-hidden p-4 text-slate-400"
           style={fullHeight ? {} : { maxHeight: "calc(50vh - 100px)" }}
         >
           <div className={fullHeight ? "text-base" : "text-sm"}>
-            {loading ? (
+            {loading && !generating ? (
               <div className="text-slate-500 italic">Loading...</div>
             ) : (
               <>
                 {generating && (
                   <div className="p-2 rounded bg-slate-700/50 border border-slate-600 text-slate-300 text-sm mb-2">
-                    Analyzing with LLM... This may take 1–2 minutes (depending on number of devices).
+                    Analyzing with LLM... This may take 1–2 minutes (depending on number of devices). You can switch to Documents or other tabs meanwhile.
                   </div>
                 )}
                 {error && (
@@ -2644,7 +2773,7 @@ const NetworkOverviewCard = ({ project, summaryRows, fullHeight }) => {
                   </div>
                 ) : (
                   <div className="text-slate-500 italic">
-                    Click &quot;LLM Analysis&quot; to generate network overview.
+                    Click the AI button above to generate network overview.
                   </div>
                 )}
               </>
@@ -2668,7 +2797,7 @@ function recommendationsToGapAnalysis(recommendations) {
 }
 
 /* ========= Recommendations Card Component ========= */
-const RecommendationsCard = ({ project, summaryRows, fullHeight }) => {
+const RecommendationsCard = ({ project, summaryRows, fullHeight, onRegisterGenerate, onGeneratingChange, onComplete, requestRun, setLlmNotification }) => {
   const [gapAnalysis, setGapAnalysis] = React.useState([]);
   const [llmMetrics, setLlmMetrics] = React.useState(null);
   const [generatingRecOnly, setGeneratingRecOnly] = React.useState(false);
@@ -2678,6 +2807,10 @@ const RecommendationsCard = ({ project, summaryRows, fullHeight }) => {
   const [notificationData, setNotificationData] = React.useState(null);
 
   const projectId = project?.project_id || project?.id;
+
+  React.useEffect(() => {
+    onGeneratingChange?.(generatingRecOnly);
+  }, [generatingRecOnly, onGeneratingChange]);
 
   // Load generating state from localStorage on mount and start polling if needed
   React.useEffect(() => {
@@ -2698,11 +2831,13 @@ const RecommendationsCard = ({ project, summaryRows, fullHeight }) => {
           projectId,
           api.getProjectRecommendations,
           (result) => {
+            notifyLLMResultReady("Recommendations", "LLM analysis completed. Open Summary to view.");
             const recs = result.recommendations || [];
             setGapAnalysis(recommendationsToGapAnalysis(recs));
             setLlmMetrics(result.metrics || null);
             setGeneratingRecOnly(false);
             localStorage.removeItem(storageKeyRec);
+            onComplete?.();
             setNotificationData({
               title: "Recommendations Generated",
               message: `LLM analysis completed. Found ${recs.length} recommendations.`,
@@ -2710,11 +2845,13 @@ const RecommendationsCard = ({ project, summaryRows, fullHeight }) => {
               type: "success"
             });
             setShowNotification(true);
+            setLlmNotification?.({ show: true, type: "success", title: "Recommendations Generated", message: `LLM analysis completed. Found ${recs.length} recommendations.`, metrics: result.metrics, onRegenerate: () => requestRun?.(doGenerateRecommendations) });
           },
           (errorMsg) => {
             setGeneratingRecOnly(false);
             setError(errorMsg);
             localStorage.removeItem(storageKeyRec);
+            onComplete?.();
           }
         );
       } else {
@@ -2722,11 +2859,13 @@ const RecommendationsCard = ({ project, summaryRows, fullHeight }) => {
         globalPollingService.resumePolling(
           pollingKey,
           (result) => {
+            notifyLLMResultReady("Recommendations", "LLM analysis completed. Open Summary to view.");
             const recs = result.recommendations || [];
             setGapAnalysis(recommendationsToGapAnalysis(recs));
             setLlmMetrics(result.metrics || null);
             setGeneratingRecOnly(false);
             localStorage.removeItem(storageKeyRec);
+            onComplete?.();
             setNotificationData({
               title: "Recommendations Generated",
               message: `LLM analysis completed. Found ${recs.length} recommendations.`,
@@ -2734,11 +2873,13 @@ const RecommendationsCard = ({ project, summaryRows, fullHeight }) => {
               type: "success"
             });
             setShowNotification(true);
+            setLlmNotification?.({ show: true, type: "success", title: "Recommendations Generated", message: `LLM analysis completed. Found ${recs.length} recommendations.`, metrics: result.metrics, onRegenerate: () => requestRun?.(doGenerateRecommendations) });
           },
           (errorMsg) => {
             setGeneratingRecOnly(false);
             setError(errorMsg);
             localStorage.removeItem(storageKeyRec);
+            onComplete?.();
           }
         );
       }
@@ -2748,7 +2889,7 @@ const RecommendationsCard = ({ project, summaryRows, fullHeight }) => {
     }
   }, [projectId]);
   
-  // Load saved analysis on mount: recommendations-only
+  // Load saved analysis on mount: recommendations-only (timeout so we never block forever)
   React.useEffect(() => {
     if (!projectId) {
       setLoading(false);
@@ -2756,34 +2897,40 @@ const RecommendationsCard = ({ project, summaryRows, fullHeight }) => {
     }
     
     let isMounted = true;
+    const LOAD_TIMEOUT_MS = 12000;
     
     const loadSavedAnalysis = async () => {
+      const timeoutPromise = new Promise((_, reject) => {
+        setTimeout(() => reject(new Error("Load timeout")), LOAD_TIMEOUT_MS);
+      });
       try {
-        const recResult = await api.getProjectRecommendations(projectId);
+        const recResult = await Promise.race([
+          api.getProjectRecommendations(projectId),
+          timeoutPromise
+        ]);
         const recs = recResult?.recommendations || [];
         if (isMounted) {
           if (recs.length > 0) {
             setGapAnalysis(recommendationsToGapAnalysis(recs));
             setLlmMetrics(recResult.metrics || null);
           }
-          // If we have generated_at, it means analysis is complete (even if no recommendations)
           if (recResult.generated_at) {
-            // Clear any stale generating state
             const storageKeyRec = `llm_generating_rec_${projectId}`;
             const pollingKey = `recommendations_${projectId}`;
             localStorage.removeItem(storageKeyRec);
             setGeneratingRecOnly(false);
-            // Stop polling if it's running
             globalPollingService.stopPolling(pollingKey);
           }
         }
       } catch (err) {
-        // 404 is expected if no analysis yet - don't log as error
-        if (err.message && !err.message.includes("404")) {
+        if (err?.message === "Load timeout") {
+          if (isMounted) console.warn("Recommendations load timed out, showing empty state");
+        } else if (err?.message && !err.message.includes("404")) {
           console.warn("Failed to load saved recommendations:", err);
         }
+      } finally {
+        if (isMounted) setLoading(false);
       }
-      if (isMounted) setLoading(false);
     };
     
     loadSavedAnalysis();
@@ -2813,23 +2960,27 @@ const RecommendationsCard = ({ project, summaryRows, fullHeight }) => {
       globalPollingService.resumePolling(
         pollingKey,
         (result) => {
+          notifyLLMResultReady("Recommendations", "LLM analysis completed. Open Summary to view.");
           const recs = result.recommendations || [];
           setGapAnalysis(recommendationsToGapAnalysis(recs));
           setLlmMetrics(result.metrics || null);
           setGeneratingRecOnly(false);
           localStorage.removeItem(storageKeyRec);
+          onComplete?.();
           setNotificationData({
             title: "Recommendations Generated",
             message: `LLM analysis completed. Found ${recs.length} recommendations.`,
             metrics: result.metrics,
             type: "success"
           });
-          setShowNotification(true);
+                    setShowNotification(true);
+          setLlmNotification?.({ show: true, type: "success", title: "Recommendations Generated", message: `LLM analysis completed. Found ${recs.length} recommendations.`, metrics: result.metrics, onRegenerate: () => requestRun?.(doGenerateRecommendations) });
         },
         (errorMsg) => {
           setGeneratingRecOnly(false);
           setError(errorMsg);
           localStorage.removeItem(storageKeyRec);
+          onComplete?.();
         }
       );
     } else {
@@ -2838,11 +2989,13 @@ const RecommendationsCard = ({ project, summaryRows, fullHeight }) => {
         projectId,
         api.getProjectRecommendations,
         (result) => {
+          notifyLLMResultReady("Recommendations", "LLM analysis completed. Open Summary to view.");
           const recs = result.recommendations || [];
           setGapAnalysis(recommendationsToGapAnalysis(recs));
           setLlmMetrics(result.metrics || null);
           setGeneratingRecOnly(false);
           localStorage.removeItem(storageKeyRec);
+          onComplete?.();
           setNotificationData({
             title: "Recommendations Generated",
             message: `LLM analysis completed. Found ${recs.length} recommendations.`,
@@ -2850,11 +3003,13 @@ const RecommendationsCard = ({ project, summaryRows, fullHeight }) => {
             type: "success"
           });
           setShowNotification(true);
+          setLlmNotification?.({ show: true, type: "success", title: "Recommendations Generated", message: `LLM analysis completed. Found ${recs.length} recommendations.`, metrics: result.metrics, onRegenerate: () => requestRun?.(doGenerateRecommendations) });
         },
         (errorMsg) => {
           setGeneratingRecOnly(false);
           setError(errorMsg);
           localStorage.removeItem(storageKeyRec);
+          onComplete?.();
         }
       );
     }
@@ -2885,6 +3040,7 @@ const RecommendationsCard = ({ project, summaryRows, fullHeight }) => {
       return;
     }
     
+    setShowNotification(false);
     setGeneratingRecOnly(true);
     setError(null);
     
@@ -2904,6 +3060,7 @@ const RecommendationsCard = ({ project, summaryRows, fullHeight }) => {
           setError(err.message || err.detail || "Failed to start analysis. Check backend/LLM server.");
           setGeneratingRecOnly(false);
           localStorage.removeItem(storageKey);
+          onComplete?.();
         } else {
           // Timeout or connection reset is expected - polling will handle it
           console.log("Request timeout/reset (expected) - polling will continue");
@@ -2911,6 +3068,13 @@ const RecommendationsCard = ({ project, summaryRows, fullHeight }) => {
       });
     // Note: We don't set generatingRecOnly=false here - polling will handle it when result is ready
   };
+  
+  const generateRef = React.useRef(doGenerateRecommendations);
+  generateRef.current = doGenerateRecommendations;
+  React.useEffect(() => {
+    onRegisterGenerate?.(() => generateRef.current?.());
+    return () => onRegisterGenerate?.(null);
+  }, [onRegisterGenerate]);
   
   return (
     <>
@@ -2923,24 +3087,12 @@ const RecommendationsCard = ({ project, summaryRows, fullHeight }) => {
         type={notificationData?.type || "success"}
         onRegenerate={() => {
           setShowNotification(false);
-          doGenerateRecommendations();
+          if (typeof requestRun === "function") requestRun(doGenerateRecommendations);
+          else doGenerateRecommendations();
         }}
       />
 
       <div className={`flex-1 min-h-0 flex flex-col rounded-b-xl border border-slate-800 border-t-0 bg-slate-900/50 overflow-hidden w-full ${fullHeight ? "min-h-0" : ""}`}>
-        <div className="flex-shrink-0 flex items-center justify-between gap-2 px-3 py-2 border-b border-slate-700 flex-wrap">
-          <div className="font-semibold text-slate-300 text-sm">Recommendations</div>
-          <div className="flex items-center gap-1.5">
-            <button
-              onClick={handleGenerateRecommendationsOnly}
-              disabled={generatingRecOnly || summaryRows.length === 0}
-              className="px-3 py-1.5 text-sm font-medium rounded-md bg-emerald-600 hover:bg-emerald-700 text-white transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
-              title={generatingRecOnly ? "Analysis in progress. Please wait..." : "Use LLM for recommendations"}
-            >
-              {generatingRecOnly ? "⏳ Generating..." : "LLM Analysis"}
-            </button>
-          </div>
-        </div>
         <div
           className="flex-1 min-h-0 overflow-y-auto overflow-x-hidden p-4 text-slate-400"
           style={fullHeight ? {} : { maxHeight: "calc(50vh - 100px)" }}
@@ -2957,7 +3109,7 @@ const RecommendationsCard = ({ project, summaryRows, fullHeight }) => {
               <div className={textSize}>
                 {isActuallyGenerating && (
                   <div className="p-2 rounded bg-slate-700/50 border border-slate-600 text-slate-300 text-sm mb-2">
-                    ⏳ Analyzing with LLM... This may take 1–2 minutes (depending on number of devices). You can navigate away and return later.
+                    ⏳ Analyzing with LLM... This may take 1–2 minutes. You can switch to Documents or other tabs meanwhile.
                   </div>
                 )}
                 {error && (
@@ -2999,7 +3151,7 @@ const RecommendationsCard = ({ project, summaryRows, fullHeight }) => {
                   </div>
                 ) : !isActuallyGenerating ? (
                   <div className="text-slate-500 italic">
-                    Click &quot;LLM Analysis&quot; to analyze with LLM.
+                    Click the AI button above to generate recommendations.
                   </div>
                 ) : null}
               </div>
@@ -3011,34 +3163,89 @@ const RecommendationsCard = ({ project, summaryRows, fullHeight }) => {
   );
 };
 
+/* ========= LLM queue: one job at a time, run next when current completes ========= */
+/* Sync with localStorage: after refresh, if any LLM job was "generating", treat as busy until that job completes (polling will call onComplete). */
+function isAnyLLMGenerating(projectId) {
+  if (!projectId) return false;
+  return (
+    localStorage.getItem(`llm_generating_overview_${projectId}`) === "true" ||
+    localStorage.getItem(`llm_generating_rec_${projectId}`) === "true" ||
+    localStorage.getItem(`llm_generating_topology_${projectId}`) === "true"
+  );
+}
+
+function useLLMQueue(projectId) {
+  const initialBusy = isAnyLLMGenerating(projectId);
+  const [llmBusy, setLlmBusy] = useState(initialBusy);
+  const busyRef = React.useRef(initialBusy);
+  const queueRef = React.useRef([]);
+  busyRef.current = initialBusy;
+
+  const requestRun = React.useCallback((runFn) => {
+    if (typeof runFn !== "function") return;
+    if (!busyRef.current) {
+      busyRef.current = true;
+      setLlmBusy(true);
+      runFn();
+    } else {
+      queueRef.current.push(runFn);
+    }
+  }, []);
+
+  const onComplete = React.useCallback(() => {
+    if (queueRef.current.length > 0) {
+      const next = queueRef.current.shift();
+      setLlmBusy(true);
+      next();
+    } else {
+      busyRef.current = false;
+      setLlmBusy(false);
+    }
+  }, []);
+
+  return { llmBusy, requestRun, onComplete };
+}
+
 /* ========= SUMMARY (network-focused) + CSV ========= */
-const SummaryPage = ({ project, can, authedUser, setProjects, openDevice }) => {
+const SummaryPage = ({ project, can, authedUser, setProjects, openDevice, llmBusy, requestRun, onComplete, setLlmNotification }) => {
+  const projectId = project?.project_id || project?.id;
   // LLM metrics state for topology generation (shared with TopologyGraph)
   const [topologyLLMMetrics, setTopologyLLMMetrics] = React.useState(null);
   const [q, setQ] = useState("");
   const [showUploadConfig, setShowUploadConfig] = useState(false);
-  const [summaryRows, setSummaryRows] = useState([]);
+  // Use cached project.summaryRows when returning to page so we never show "no data" while refetching
+  const [summaryRows, setSummaryRows] = useState(() => project?.summaryRows ?? []);
   const [dashboardMetrics, setDashboardMetrics] = useState(null);
-  const [loading, setLoading] = useState(true);
+  const [loading, setLoading] = useState(() => !(project?.summaryRows?.length));
   const [error, setError] = useState(null);
   const [folderStructure, setFolderStructure] = useState(null);
   // Removed: searchConfig, filterConfigWho, filterConfigWhat, configUploadHistory (History table removed)
 
+  // Sync from project when project reference changes (e.g. after navigation)
+  useEffect(() => {
+    if (project?.summaryRows?.length && summaryRows.length === 0) {
+      setSummaryRows(project.summaryRows);
+      setLoading(false);
+    }
+  }, [project?.summaryRows, project?.project_id]);
+
   // Load summary + dashboard metrics from API (NOC backend)
   useEffect(() => {
+    let cancelled = false;
     const loadSummary = async () => {
       const projectId = project?.project_id || project?.id;
       if (!projectId) {
-        setLoading(false);
+        if (!cancelled) setLoading(false);
         return;
       }
-      setLoading(true);
-      setError(null);
+      if (!cancelled) setLoading(true);
+      if (!cancelled) setError(null);
       try {
         const [summary, metrics] = await Promise.all([
           api.getConfigSummary(projectId),
           api.getSummaryMetrics(projectId).catch(() => null),
         ]);
+        if (cancelled) return;
         setSummaryRows(summary.summaryRows || []);
         setDashboardMetrics(metrics || null);
 
@@ -3057,15 +3264,17 @@ const SummaryPage = ({ project, can, authedUser, setProjects, openDevice }) => {
           return updated;
         });
       } catch (err) {
+        if (cancelled) return;
         console.error('Failed to load config summary:', err);
         setError(err.message || 'Failed to load summary data');
-        setSummaryRows([]);
+        setSummaryRows(prev => prev.length ? prev : []);
         setDashboardMetrics(null);
       } finally {
-        setLoading(false);
+        if (!cancelled) setLoading(false);
       }
     };
     loadSummary();
+    return () => { cancelled = true; };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [project?.project_id || project?.id]);
 
@@ -3240,8 +3449,9 @@ const SummaryPage = ({ project, can, authedUser, setProjects, openDevice }) => {
   const accessCount = dashboardMetrics?.access ?? summaryRows.filter((r) => /access/i.test(r.device || "")).length;
 
   // ====== UI: Single-pane, above-the-fold (1920x1080) ======
+  // No overlay when LLM is running - all controls (Search, CSV, Upload, tabs in header) stay usable
   return (
-    <div className="h-full flex flex-col gap-0 overflow-hidden min-h-0">
+    <div className="h-full flex flex-col gap-0 overflow-hidden min-h-0" style={{ pointerEvents: 'auto' }}>
       {/* Content section header - integrated design */}
       <div className="flex-shrink-0 flex items-center justify-between gap-2 py-0.5 px-2">
         <h2 className="text-xs font-semibold text-slate-300 flex items-center gap-1.5">
@@ -3288,10 +3498,16 @@ const SummaryPage = ({ project, can, authedUser, setProjects, openDevice }) => {
         />
       )}
 
+      {/* When LLM is running, tabs (Summary/Documents/History) in the header stay clickable — no overlay */}
+      {llmBusy && (
+        <div className="flex-shrink-0 px-2 py-0.5 text-[10px] text-slate-500 bg-slate-800/30 rounded">
+          Waiting for LLM — You can click Summary / Documents / History tabs above to switch pages.
+        </div>
+      )}
       {/* Topology (2/3) + Project Analysis (1/3) */}
       <div className="flex-shrink-0 grid grid-cols-12 gap-3" style={{ height: '60%' }}>
         <div className="col-span-6 min-h-0 overflow-hidden rounded-xl border border-slate-800 bg-slate-900/50">
-          <TopologyGraph project={project} onOpenDevice={(id)=>openDevice(id)} can={can} authedUser={authedUser} setProjects={setProjects} setTopologyLLMMetrics={setTopologyLLMMetrics} topologyLLMMetrics={topologyLLMMetrics} />
+          <TopologyGraph project={project} onOpenDevice={(id)=>openDevice(id)} can={can} authedUser={authedUser} setProjects={setProjects} setTopologyLLMMetrics={setTopologyLLMMetrics} topologyLLMMetrics={topologyLLMMetrics} llmBusy={llmBusy} requestRun={requestRun} onComplete={onComplete} setLlmNotification={setLlmNotification} />
         </div>
         <ProjectAnalysisPanel 
           project={project}
@@ -3299,6 +3515,10 @@ const SummaryPage = ({ project, can, authedUser, setProjects, openDevice }) => {
           coreCount={coreCount}
           distCount={distCount}
           accessCount={accessCount}
+          llmBusy={llmBusy}
+          requestRun={requestRun}
+          onComplete={onComplete}
+          setLlmNotification={setLlmNotification}
         />
       </div>
 
@@ -3431,7 +3651,7 @@ const DeviceDetailsView = ({ project, deviceId, goBack, uploadHistory, authedUse
     fetchDeviceDetails();
   }, [project?.project_id || project?.id, deviceId]);
 
-  // เลือก row ของอุปกรณ์นี้จาก summaryRows (ข้อมูลจริงจาก API)
+  // Pick device row from summaryRows (real data from API)
   const row =
     project?.summaryRows?.find((r) => r.device === deviceId) ||
     project?.summaryRows?.[0] ||
@@ -3809,6 +4029,7 @@ const DeviceDetailsView = ({ project, deviceId, goBack, uploadHistory, authedUse
   // Tabs
   const [tab, setTab] = React.useState("overview"); // overview | interfaces | vlans | stp | routing | neighbors | macarp | security | ha | raw
   const [rawSubTab, setRawSubTab] = React.useState("parsed"); // parsed | original
+  const [llmPanelTab, setLlmPanelTab] = React.useState("summary"); // summary | recommendations | drift — folder-like selection for LLM section
 
   // คำนวณ drift summary จาก 2 ไฟล์ล่าสุดถ้ามี (ใช้ข้อมูลจาก API)
   const lastTwo = deviceBackups.slice(0, 2);
@@ -3827,18 +4048,20 @@ const DeviceDetailsView = ({ project, deviceId, goBack, uploadHistory, authedUse
 
   return (
     <div className="h-full flex flex-col gap-0 overflow-hidden min-h-0">
-      {/* Header + Tabs: single row, compact */}
-      <div className="flex-shrink-0 flex items-center justify-between gap-2 py-0.5 px-2 flex-wrap">
-        <div className="flex items-center gap-2 flex-wrap min-w-0">
-          <h2 className="text-xs font-semibold text-slate-300 flex items-center gap-1.5 whitespace-nowrap">
-            <span className="w-0.5 h-3 bg-blue-500/70 rounded-full"></span>
+      {/* Header: title larger, tabs and back button */}
+      <div className="flex-shrink-0 flex items-center justify-between gap-4 py-3 px-3 flex-wrap border-b border-slate-700/80">
+        <div className="flex flex-col gap-0.5 min-w-0">
+          <h2 className="text-lg font-semibold text-slate-200 flex items-center gap-2">
+            <span className="w-1 h-4 bg-blue-500/70 rounded-full flex-shrink-0"></span>
             More Details — {facts.device}
           </h2>
-          <span className="text-[10px] text-slate-500 dark:text-slate-400 whitespace-nowrap">
+          <span className="text-sm text-slate-500 dark:text-slate-400">
             From config/show parsing • Mgmt IP: {facts.mgmtIp || "—"}
           </span>
-          {!loading && !error && (
-            <div className="flex gap-1 flex-wrap">
+        </div>
+        {!loading && !error && (
+          <div className="flex gap-2 flex-wrap items-center">
+            <div className="flex gap-1.5 flex-wrap">
               {[
                 { id: "overview", label: "Overview" },
                 { id: "interfaces", label: "Interfaces" },
@@ -3854,7 +4077,7 @@ const DeviceDetailsView = ({ project, deviceId, goBack, uploadHistory, authedUse
                 <button
                   key={t.id}
                   onClick={() => setTab(t.id)}
-                  className={`px-2 py-1 rounded-md text-[10px] font-medium ${
+                  className={`px-3 py-1.5 rounded-lg text-xs font-medium transition-colors ${
                     tab === t.id
                       ? "bg-blue-600 text-white"
                       : "bg-slate-800 border border-slate-700 text-slate-400 hover:bg-slate-700 hover:text-slate-300"
@@ -3864,9 +4087,9 @@ const DeviceDetailsView = ({ project, deviceId, goBack, uploadHistory, authedUse
                 </button>
               ))}
             </div>
-          )}
-        </div>
-        <Button variant="secondary" onClick={goBack} className="text-[10px] py-1 px-2 h-6 flex-shrink-0">← Back to Summary</Button>
+            <Button variant="secondary" onClick={goBack} className="text-xs py-1.5 px-3 h-8 flex-shrink-0">← Back to Summary</Button>
+          </div>
+        )}
       </div>
 
       {loading && (
@@ -3881,144 +4104,184 @@ const DeviceDetailsView = ({ project, deviceId, goBack, uploadHistory, authedUse
         </div>
       )}
 
-      {/* OVERVIEW */}
+      {/* OVERVIEW: Top = Device Image | LLM side by side; Bottom = Device Facts */}
       {!loading && !error && tab === "overview" && (
-        <div className="flex-1 min-h-0 grid grid-cols-12 gap-3 overflow-hidden">
-          {/* Left: Topo zone — Device Image (like Summary topology area) */}
-          <div className="col-span-6 min-h-0 overflow-hidden rounded-xl border border-slate-800 bg-slate-900/50 flex flex-col">
-            <Card title="Device Image" className="flex-1 min-h-0 flex flex-col overflow-hidden">
-              <div className="flex-1 min-h-0 overflow-auto">
-                <DeviceImageUpload 
-                  project={project}
-                  deviceName={deviceId}
-                  authedUser={authedUser}
-                  setProjects={setProjects}
-                />
+        <div className="flex-1 min-h-0 flex flex-col gap-3 overflow-hidden p-2">
+          {/* Top row: Device Image (left) + LLM section (right) */}
+          <div className="grid grid-cols-12 gap-3 min-h-0 flex-1" style={{ minHeight: "280px" }}>
+            <div className="col-span-5 min-h-0 overflow-hidden rounded-xl border border-slate-800 bg-slate-900/50 flex flex-col">
+              <Card title="Device Image" className="flex-1 min-h-0 flex flex-col overflow-hidden">
+                <div className="flex-1 min-h-0 overflow-auto">
+                  <DeviceImageUpload 
+                    project={project}
+                    deviceName={deviceId}
+                    authedUser={authedUser}
+                    setProjects={setProjects}
+                  />
+                </div>
+              </Card>
+            </div>
+            {/* LLM panel: folder-like tabs (like image 2) + content */}
+            <div className="col-span-7 min-h-0 flex flex-col rounded-xl border border-slate-800 bg-slate-900/50 overflow-hidden">
+              <div className="flex-shrink-0 flex border-b border-slate-700 bg-slate-900/80">
+                <button
+                  type="button"
+                  onClick={() => setLlmPanelTab("summary")}
+                  className={`px-4 py-2.5 text-sm font-medium border-b-2 transition-colors ${
+                    llmPanelTab === "summary"
+                      ? "border-emerald-500 text-slate-100 bg-slate-800/50"
+                      : "border-transparent text-slate-400 hover:text-slate-300 hover:bg-slate-800/30"
+                  }`}
+                >
+                  Device Summary (LLM)
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setLlmPanelTab("recommendations")}
+                  className={`px-4 py-2.5 text-sm font-medium border-b-2 transition-colors ${
+                    llmPanelTab === "recommendations"
+                      ? "border-emerald-500 text-slate-100 bg-slate-800/50"
+                      : "border-transparent text-slate-400 hover:text-slate-300 hover:bg-slate-800/30"
+                  }`}
+                >
+                  AI Recommendations
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setLlmPanelTab("drift")}
+                  className={`px-4 py-2.5 text-sm font-medium border-b-2 transition-colors ${
+                    llmPanelTab === "drift"
+                      ? "border-emerald-500 text-slate-100 bg-slate-800/50"
+                      : "border-transparent text-slate-400 hover:text-slate-300 hover:bg-slate-800/30"
+                  }`}
+                >
+                  Config Drift (30d)
+                </button>
               </div>
-            </Card>
+              <div className="flex-1 min-h-0 overflow-y-auto p-3">
+                {llmPanelTab === "summary" && (
+                  <div className="rounded-lg border border-slate-700 p-3 bg-slate-800/50">
+                    <div className="text-[10px] text-slate-500 uppercase tracking-wide mb-2">Per-device summary for LLM</div>
+                    <pre className="whitespace-pre-wrap text-xs leading-relaxed text-slate-300">{safeDisplay(deviceNarrative)}</pre>
+                  </div>
+                )}
+                {llmPanelTab === "recommendations" && (
+                  <div>
+                    <div className="text-[10px] text-slate-500 uppercase tracking-wide mb-2">AI-generated recommendations for this device</div>
+                    {projectAnalysisLoading ? (
+                      <div className="text-xs text-slate-500">Loading AI analysis...</div>
+                    ) : deviceRecs.length ? (
+                      <div className="space-y-2">
+                        {projectGapAnalysis.map((item, idx) => (
+                          <div key={idx} className="p-2 rounded border text-xs break-words" style={{
+                            borderColor: item.severity === "High" ? "#ef4444" : item.severity === "Medium" ? "#eab308" : "#64748b",
+                            backgroundColor: item.severity === "High" ? "rgba(239, 68, 68, 0.1)" : item.severity === "Medium" ? "rgba(234, 179, 8, 0.1)" : "rgba(100, 116, 139, 0.1)"
+                          }}>
+                            <div className="flex items-start gap-2 mb-1">
+                              <span className={`text-[10px] font-semibold px-1.5 py-0.5 rounded ${
+                                item.severity === "High" ? "bg-rose-500 text-white" : 
+                                item.severity === "Medium" ? "bg-yellow-500 text-white" : 
+                                "bg-slate-500 text-white"
+                              }`}>
+                                {item.severity?.toUpperCase() || "MEDIUM"}
+                              </span>
+                            </div>
+                            {item.issue && (
+                              <div className="text-[10px] text-slate-300 mb-1">
+                                <span className="font-semibold">Issue:</span> {item.issue}
+                              </div>
+                            )}
+                            {item.recommendation && (
+                              <div className="text-[10px] text-slate-200">
+                                <span className="font-semibold">Recommendation:</span> {item.recommendation}
+                              </div>
+                            )}
+                          </div>
+                        ))}
+                      </div>
+                    ) : (
+                      <div className="text-xs text-slate-500">
+                        No AI recommendations yet. Run project analysis from the Summary page to generate.
+                      </div>
+                    )}
+                  </div>
+                )}
+                {llmPanelTab === "drift" && (
+                  <div>
+                    <div className="text-[10px] text-slate-500 uppercase tracking-wide mb-2">Configuration drift vs. previous backups</div>
+                    {loadingBackups ? (
+                      <div className="text-xs text-slate-400">Loading backup history...</div>
+                    ) : deviceBackups.length < 2 ? (
+                      <div className="text-xs text-slate-400">Upload at least 2 config files for this device to compare.</div>
+                    ) : (
+                      <div className="grid gap-2">
+                        <div className="text-xs">
+                          <b>Device:</b> {safeDisplay(facts?.device)} <br />
+                          <b>Available backups:</b> {deviceBackups.length} file(s) <br />
+                          <b>Latest files:</b>{" "}
+                          <span className="text-blue-300">{safeDisplay(driftSummary?.from)}</span>{" "}
+                          <span className="mx-1">→</span>
+                          <span className="text-blue-300">{safeDisplay(driftSummary?.to)}</span>
+                        </div>
+                        <div className="text-xs text-slate-400">
+                          Use &quot;Compare Backups&quot; for detailed diff or download files to compare locally.
+                        </div>
+                        <Button variant="secondary" onClick={() => setCompareOpen(true)} className="text-xs py-1.5 px-2">Compare Backups</Button>
+                      </div>
+                    )}
+                  </div>
+                )}
+              </div>
+            </div>
           </div>
 
-          {/* Right: Device Facts (summary table zone) + LLM section */}
-          <div className="col-span-6 min-h-0 flex flex-col gap-3 overflow-hidden">
-            {/* Device Facts — summary table zone */}
-            <div className="flex-shrink-0 rounded-xl border border-slate-800 bg-slate-900/50 overflow-hidden">
-              <Card title="Device Facts">
-                <div className="grid gap-2 grid-cols-3 text-[10px] max-h-[200px] overflow-auto">
-                  <Metric k="Model" v={facts.model || "—"} />
-                  <Metric k="OS / Version" v={facts.osVersion || "—"} />
-                  <Metric k="Serial" v={facts.serial || "—"} />
-                  <Metric k="Mgmt IP" v={facts.mgmtIp || "—"} />
-                  <Metric k="Role" v={facts.role || "—"} />
-                  <Metric k="Uptime" v={facts.uptime || "—"} />
-                  <Metric k="VLAN Count" v={facts.vlanCount ?? "—"} />
-                  <Metric k="Allowed VLANs (short)" v={facts.allowedVlansShort || "—"} />
-                  <Metric k="STP Mode" v={facts.stpMode || "—"} />
-                  <Metric k="STP Root" v={facts.stpRoot || "—"} />
-                  <Metric k="SVIs" v={facts.sviCount ?? "—"} />
-                  <Metric k="HSRP Groups" v={facts.hsrpGroups ?? "—"} />
-                  <Metric k="Routing" v={facts.routing || "—"} />
-                  <Metric k="OSPF Neighbors" v={facts.ospfNeighbors ?? "—"} />
-                  <Metric k="BGP ASN" v={facts.bgpAsn ?? "—"} />
-                  <Metric k="BGP Neighbors" v={facts.bgpNeighbors ?? "—"} />
-                  <Metric k="CDP / LLDP" v={`${facts.cdpNeighbors ?? "—"} / ${facts.lldpNeighbors ?? "—"}`} />
-                  <Metric k="NTP" v={facts.ntpStatus || "—"} />
-                  <Metric k="SNMP" v={facts.snmp || "—"} />
-                  <Metric k="Syslog" v={facts.syslog || "—"} />
-                  <Metric k="CPU %" v={facts.cpu != null && facts.cpu !== "—" ? `${facts.cpu}%` : "—"} />
-                  <Metric k="Memory %" v={facts.mem != null && facts.mem !== "—" ? `${facts.mem}%` : "—"} />
-                  <Metric k="Hostname" v={overview.hostname || "—"} />
-                  <Metric k="Management IP" v={overview.management_ip || overview.mgmt_ip || "—"} />
-                  {overview.device_status && Object.keys(overview.device_status).length > 0 && (
-                    <>
-                      <Metric k="Device Slot" v={overview.device_status.slot || "—"} />
-                      <Metric k="Device Type" v={overview.device_status.type || "—"} />
-                      <Metric k="Device Status" v={overview.device_status.status || "—"} />
-                      <Metric k="Device Role" v={overview.device_status.role || "—"} />
-                    </>
-                  )}
-                  <Metric
-                    k="Ifaces (T/U/D/A)"
-                    v={
-                      facts.ifaces
-                        ? `${facts.ifaces.total} / ${facts.ifaces.up} / ${facts.ifaces.down} / ${facts.ifaces.adminDown}`
-                        : "—"
-                    }
-                  />
-                  <Metric k="Ports (Access/Trunk)" v={`${facts.accessCount ?? "—"}/${facts.trunkCount ?? "—"}`} />
-                </div>
-              </Card>
-            </div>
-
-            {/* LLM section: AI Summary, Recommendations, Drift (stacked) */}
-            <div className="flex-1 min-h-0 overflow-y-auto flex flex-col gap-3 rounded-xl border border-slate-800 bg-slate-900/50 p-2">
-              <Card title="AI Summary (per-device)">
-                <div className="rounded-lg border border-slate-700 p-3 bg-slate-800/50">
-                  <pre className="whitespace-pre-wrap text-[11px] leading-relaxed text-slate-300">{safeDisplay(deviceNarrative)}</pre>
-                </div>
-              </Card>
-              <Card title="Recommendations (AI-Generated)">
-                {projectAnalysisLoading ? (
-                  <div className="text-xs text-slate-500">Loading AI analysis...</div>
-                ) : deviceRecs.length ? (
-                  <div className="space-y-2">
-                    {projectGapAnalysis.map((item, idx) => (
-                      <div key={idx} className="p-2 rounded border text-xs break-words" style={{
-                        borderColor: item.severity === "High" ? "#ef4444" : item.severity === "Medium" ? "#eab308" : "#64748b",
-                        backgroundColor: item.severity === "High" ? "rgba(239, 68, 68, 0.1)" : item.severity === "Medium" ? "rgba(234, 179, 8, 0.1)" : "rgba(100, 116, 139, 0.1)"
-                      }}>
-                        <div className="flex items-start gap-2 mb-1">
-                          <span className={`text-[10px] font-semibold px-1.5 py-0.5 rounded ${
-                            item.severity === "High" ? "bg-rose-500 text-white" : 
-                            item.severity === "Medium" ? "bg-yellow-500 text-white" : 
-                            "bg-slate-500 text-white"
-                          }`}>
-                            {item.severity?.toUpperCase() || "MEDIUM"}
-                          </span>
-                        </div>
-                        {item.issue && (
-                          <div className="text-[10px] text-slate-300 mb-1">
-                            <span className="font-semibold">Issue:</span> {item.issue}
-                          </div>
-                        )}
-                        {item.recommendation && (
-                          <div className="text-[10px] text-slate-200">
-                            <span className="font-semibold">Recommendation:</span> {item.recommendation}
-                          </div>
-                        )}
-                      </div>
-                    ))}
-                  </div>
-                ) : (
-                  <div className="text-xs text-slate-500">
-                    No AI-generated recommendations available. Generate project analysis from the Summary page.
-                  </div>
+          {/* Bottom: Device Facts full width */}
+          <div className="flex-shrink-0 rounded-xl border border-slate-800 bg-slate-900/50 overflow-hidden">
+            <Card title="Device Facts">
+              <div className="grid gap-3 grid-cols-4 md:grid-cols-6 text-xs max-h-[220px] overflow-auto">
+                <Metric k="Model" v={facts.model || "—"} />
+                <Metric k="OS / Version" v={facts.osVersion || "—"} />
+                <Metric k="Serial" v={facts.serial || "—"} />
+                <Metric k="Mgmt IP" v={facts.mgmtIp || "—"} />
+                <Metric k="Role" v={facts.role || "—"} />
+                <Metric k="Uptime" v={facts.uptime || "—"} />
+                <Metric k="VLAN Count" v={facts.vlanCount ?? "—"} />
+                <Metric k="Allowed VLANs (short)" v={facts.allowedVlansShort || "—"} />
+                <Metric k="STP Mode" v={facts.stpMode || "—"} />
+                <Metric k="STP Root" v={facts.stpRoot || "—"} />
+                <Metric k="SVIs" v={facts.sviCount ?? "—"} />
+                <Metric k="HSRP Groups" v={facts.hsrpGroups ?? "—"} />
+                <Metric k="Routing" v={facts.routing || "—"} />
+                <Metric k="OSPF Neighbors" v={facts.ospfNeighbors ?? "—"} />
+                <Metric k="BGP ASN" v={facts.bgpAsn ?? "—"} />
+                <Metric k="BGP Neighbors" v={facts.bgpNeighbors ?? "—"} />
+                <Metric k="CDP / LLDP" v={`${facts.cdpNeighbors ?? "—"} / ${facts.lldpNeighbors ?? "—"}`} />
+                <Metric k="NTP" v={facts.ntpStatus || "—"} />
+                <Metric k="SNMP" v={facts.snmp || "—"} />
+                <Metric k="Syslog" v={facts.syslog || "—"} />
+                <Metric k="CPU %" v={facts.cpu != null && facts.cpu !== "—" ? `${facts.cpu}%` : "—"} />
+                <Metric k="Memory %" v={facts.mem != null && facts.mem !== "—" ? `${facts.mem}%` : "—"} />
+                <Metric k="Hostname" v={overview.hostname || "—"} />
+                <Metric k="Management IP" v={overview.management_ip || overview.mgmt_ip || "—"} />
+                {overview.device_status && Object.keys(overview.device_status).length > 0 && (
+                  <>
+                    <Metric k="Device Slot" v={overview.device_status.slot || "—"} />
+                    <Metric k="Device Type" v={overview.device_status.type || "—"} />
+                    <Metric k="Device Status" v={overview.device_status.status || "—"} />
+                    <Metric k="Device Role" v={overview.device_status.role || "—"} />
+                  </>
                 )}
-              </Card>
-              <Card title="Drift & Changes (30 days)">
-                {loadingBackups ? (
-                  <div className="text-xs text-slate-400">Loading backup history...</div>
-                ) : deviceBackups.length < 2 ? (
-                  <div className="text-xs text-slate-400">Not enough backups to compare. Upload at least 2 config files for this device.</div>
-                ) : (
-                  <div className="grid gap-2">
-                    <div className="text-xs">
-                      <b>Device:</b> {safeDisplay(facts?.device)} <br />
-                      <b>Available backups:</b> {deviceBackups.length} file(s) <br />
-                      <b>Latest files:</b>{" "}
-                      <span className="text-blue-300">{safeDisplay(driftSummary?.from)}</span>{" "}
-                      <span className="mx-1">→</span>
-                      <span className="text-blue-300">{safeDisplay(driftSummary?.to)}</span>
-                    </div>
-                    <div className="text-xs text-slate-400">
-                      To view detailed diff, use the &quot;Compare Backups&quot; button below or download files to compare locally.
-                    </div>
-                    <div>
-                      <Button variant="secondary" onClick={() => setCompareOpen(true)} className="text-[10px] py-1 px-2">Compare Backups</Button>
-                    </div>
-                  </div>
-                )}
-              </Card>
-            </div>
+                <Metric
+                  k="Ifaces (T/U/D/A)"
+                  v={
+                    facts.ifaces
+                      ? `${facts.ifaces.total} / ${facts.ifaces.up} / ${facts.ifaces.down} / ${facts.ifaces.adminDown}`
+                      : "—"
+                  }
+                />
+                <Metric k="Ports (Access/Trunk)" v={`${facts.accessCount ?? "—"}/${facts.trunkCount ?? "—"}`} />
+              </div>
+            </Card>
           </div>
         </div>
       )}
@@ -6213,7 +6476,7 @@ const HistoryPage = ({ project, can, authedUser }) => {
           <div className="flex-1 min-h-0 flex flex-col overflow-hidden gap-4">
             <div className="grid grid-cols-1 md:grid-cols-3 gap-3 flex-shrink-0">
               <Input 
-                placeholder="ค้นหา (ชื่อไฟล์, ผู้ใช้, คำอธิบาย...)" 
+                placeholder="Search (filename, user, description...)" 
                 value={searchDoc} 
                 onChange={(e) => setSearchDoc(e.target.value)}
                 className="w-full"
@@ -6221,12 +6484,12 @@ const HistoryPage = ({ project, can, authedUser }) => {
               <Select 
                 value={filterWho} 
                 onChange={setFilterWho} 
-                options={[{value: "all", label: "ทั้งหมด (Responsible User)"}, ...uniqueWhos.map(w => ({value: w, label: w}))]} 
+                options={[{value: "all", label: "All (Responsible User)"}, ...uniqueWhos.map(w => ({value: w, label: w}))]} 
               />
               <Select 
                 value={filterWhat} 
                 onChange={setFilterWhat} 
-                options={[{value: "all", label: "ทั้งหมด (Activity Type)"}, ...uniqueWhats.map(w => ({value: w, label: w}))]} 
+                options={[{value: "all", label: "All (Activity Type)"}, ...uniqueWhats.map(w => ({value: w, label: w}))]} 
               />
             </div>
             <div className="flex-1 min-h-0 overflow-y-auto overflow-x-auto">
@@ -6924,7 +7187,7 @@ const DocumentsPage = ({ project, can, authedUser, uploadHistory, setUploadHisto
   const handleEditFolder = (folderId) => {
     // Only prevent editing Config folder
     if (folderId === "Config") {
-      alert("ไม่สามารถแก้ไขโฟลเดอร์ Config ได้");
+      alert("Cannot edit the Config folder.");
       return;
     }
     const found = findFolder(tree, folderId);
@@ -6935,19 +7198,19 @@ const DocumentsPage = ({ project, can, authedUser, uploadHistory, setUploadHisto
       setFolderParent(found.parent ? found.parent.id : null);
       setShowFolderDialog(true);
     } else {
-      alert("ไม่พบโฟลเดอร์");
+      alert("Folder not found.");
     }
   };
 
   const handleDeleteFolder = async (folderId) => {
     // Only prevent deleting Config folder and Other folder
     if (folderId === "Config" || folderId === "Other") {
-      alert("ไม่สามารถลบโฟลเดอร์นี้ได้");
+      alert("Cannot delete this folder.");
       return;
     }
     const found = findFolder(tree, folderId);
     if (found) {
-      if (confirm(`ต้องการลบโฟลเดอร์ "${found.node.name}" และไฟล์ทั้งหมดภายในหรือไม่?`)) {
+      if (confirm(`Delete folder "${found.node.name}" and all files inside?`)) {
         try {
           const projectId = project.project_id || project.id;
           await api.deleteFolder(projectId, folderId);
@@ -6960,10 +7223,10 @@ const DocumentsPage = ({ project, can, authedUser, uploadHistory, setUploadHisto
             deleted: f.deleted || false
           }));
           setCustomFolders(transformedFolders);
-          alert("ลบโฟลเดอร์สำเร็จ");
+          alert("Folder deleted successfully.");
         } catch (error) {
           console.error('Failed to delete folder:', error);
-          alert(`ลบโฟลเดอร์ไม่สำเร็จ: ${error.message || error}`);
+          alert(`Failed to delete folder: ${error.message || error}`);
         }
       }
     }
@@ -6971,14 +7234,14 @@ const DocumentsPage = ({ project, can, authedUser, uploadHistory, setUploadHisto
 
   const handleSaveFolder = async () => {
     if (!folderName.trim()) {
-      alert("กรุณากรอกชื่อโฟลเดอร์");
+      alert("Please enter a folder name.");
       return;
     }
 
     // Prevent editing Config folder and Other folder
     if (folderAction === "edit" && selectedFolder) {
       if (selectedFolder === "Config" || selectedFolder === "Other") {
-        alert("ไม่สามารถแก้ไขโฟลเดอร์นี้ได้");
+        alert("Cannot edit this folder.");
         return;
       }
     }
@@ -6989,15 +7252,15 @@ const DocumentsPage = ({ project, can, authedUser, uploadHistory, setUploadHisto
       if (folderAction === "add") {
         // Prevent adding to Config folder
         if (folderParent === "Config" || folderParent === "Other") {
-          alert("ไม่สามารถสร้างโฟลเดอร์ในโฟลเดอร์นี้ได้");
+          alert("Cannot create a folder inside this folder.");
           return;
         }
         
         await api.createFolder(projectId, folderName.trim(), folderParent || null);
-        alert("สร้างโฟลเดอร์สำเร็จ");
+        alert("Folder created successfully.");
       } else if (folderAction === "edit" && selectedFolder) {
         await api.updateFolder(projectId, selectedFolder, folderName.trim(), folderParent || null);
-        alert("แก้ไขโฟลเดอร์สำเร็จ");
+        alert("Folder updated successfully.");
       }
       
       // Reload folders from API
@@ -7015,7 +7278,7 @@ const DocumentsPage = ({ project, can, authedUser, uploadHistory, setUploadHisto
       setSelectedFolder(null);
     } catch (error) {
       console.error('Failed to save folder:', error);
-      alert(`ไม่สำเร็จ: ${error.message || error}`);
+      alert(`Failed: ${error.message || error}`);
     }
   };
 
@@ -7561,22 +7824,22 @@ const DocumentsPage = ({ project, can, authedUser, uploadHistory, setUploadHisto
                 </Field>
                 {moveFolderTarget?.folder_id === "Config" && (
                   <div className="text-sm text-red-500 dark:text-red-400">
-                    ⚠️ ไม่สามารถย้ายไฟล์ออกจากโฟลเดอร์ Config ได้
+                    ⚠️ Cannot move files out of the Config folder.
                   </div>
                 )}
                 {moveFolderId === "Config" && (
                   <div className="text-sm text-red-500 dark:text-red-400">
-                    ⚠️ ไม่สามารถย้ายไฟล์เข้าโฟลเดอร์ Config ได้ กรุณาใช้ Upload Config แทน
+                    ⚠️ Cannot move files into the Config folder. Please use Upload Config instead.
                   </div>
                 )}
                 {moveFolderId === "Other" && (
                   <div className="text-sm text-red-500 dark:text-red-400">
-                    ⚠️ ไม่สามารถย้ายไฟล์เข้าโฟลเดอร์ Other ได้ โฟลเดอร์ Other เป็นโฟลเดอร์เสมือนสำหรับไฟล์ที่มี folder_id ไม่ถูกต้อง
+                    ⚠️ Cannot move files into the Other folder. Other is a virtual folder for files with invalid folder_id.
                   </div>
                 )}
                 {moveFolderTarget?.folder_id === "Other" && (
                   <div className="text-sm text-blue-500 dark:text-blue-400">
-                    ℹ️ ไฟล์นี้อยู่ในโฟลเดอร์ Other (โฟลเดอร์เสมือน) คุณสามารถย้ายไปโฟลเดอร์อื่นหรือ Root ได้
+                    ℹ️ This file is in the Other folder (virtual). You can move it to another folder or Root.
                   </div>
                 )}
                 <div className="flex gap-2 justify-end">
@@ -7591,16 +7854,16 @@ const DocumentsPage = ({ project, can, authedUser, uploadHistory, setUploadHisto
                       try {
                         // Prevent moving to/from Config folder
                         if (moveFolderTarget?.folder_id === "Config") {
-                          alert('ไม่สามารถย้ายไฟล์ออกจากโฟลเดอร์ Config ได้');
+                          alert('Cannot move files out of the Config folder.');
                           return;
                         }
                         if (moveFolderId === "Config") {
-                          alert('ไม่สามารถย้ายไฟล์เข้าโฟลเดอร์ Config ได้ กรุณาใช้ Upload Config แทน');
+                          alert('Cannot move files into the Config folder. Please use Upload Config instead.');
                           return;
                         }
                         // Prevent moving to Other folder (it's a virtual folder)
                         if (moveFolderId === "Other") {
-                          alert('ไม่สามารถย้ายไฟล์เข้าโฟลเดอร์ Other ได้ โฟลเดอร์ Other เป็นโฟลเดอร์เสมือนสำหรับไฟล์ที่มี folder_id ไม่ถูกต้อง');
+                          alert('Cannot move files into the Other folder. Other is a virtual folder for files with invalid folder_id.');
                           return;
                         }
                         
@@ -7667,16 +7930,16 @@ const DocumentsPage = ({ project, can, authedUser, uploadHistory, setUploadHisto
         <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
           <div className="bg-white dark:bg-gray-800 rounded-xl p-6 max-w-md w-full mx-4 shadow-xl">
             <h3 className="text-lg font-semibold mb-4 text-gray-900 dark:text-gray-100">
-              {folderAction === "add" ? "สร้างโฟลเดอร์ใหม่" : "แก้ไขชื่อโฟลเดอร์"}
+              {folderAction === "add" ? "Create new folder" : "Rename folder"}
             </h3>
             <div className="space-y-4">
               {folderAction === "add" && (
-                <Field label="โฟลเดอร์แม่ (ไม่บังคับ)">
+                <Field label="Parent folder (optional)">
                   <Select
                     value={folderParent || ""}
                     onChange={(value) => setFolderParent(value || null)}
                     options={[
-                      { value: "", label: "Root (ระดับบนสุด)" },
+                      { value: "", label: "Root (top level)" },
                       ...getAllFolders(tree).map(f => ({
                         value: f.id,
                         label: f.path.join(" / ")
@@ -7685,11 +7948,11 @@ const DocumentsPage = ({ project, can, authedUser, uploadHistory, setUploadHisto
                   />
                 </Field>
               )}
-              <Field label="ชื่อโฟลเดอร์">
+              <Field label="Folder name">
                 <Input
                   value={folderName}
                   onChange={(e) => setFolderName(e.target.value)}
-                  placeholder="กรอกชื่อโฟลเดอร์"
+                  placeholder="Enter folder name"
                   autoFocus
                 />
               </Field>
@@ -8790,19 +9053,19 @@ const LogsPage = ({ project, uploadHistory }) => {
     </div>
     <div className="grid grid-cols-1 md:grid-cols-3 gap-2">
       <Input 
-        placeholder="ค้นหา (ชื่อไฟล์, ผู้ใช้, คำอธิบาย...)" 
+        placeholder="Search (filename, user, description...)" 
         value={searchLog} 
         onChange={(e) => setSearchLog(e.target.value)} 
       />
       <Select 
         value={filterLogWho} 
         onChange={setFilterLogWho} 
-        options={[{value: "all", label: "ทั้งหมด (Responsible User)"}, ...uniqueLogWhos.map(w => ({value: w, label: w}))]} 
+        options={[{value: "all", label: "All (Responsible User)"}, ...uniqueLogWhos.map(w => ({value: w, label: w}))]} 
       />
       <Select 
         value={filterLogWhat} 
         onChange={setFilterLogWhat} 
-        options={[{value: "all", label: "ทั้งหมด (Activity Type)"}, ...uniqueLogWhats.map(w => ({value: w, label: w}))]} 
+        options={[{value: "all", label: "All (Activity Type)"}, ...uniqueLogWhats.map(w => ({value: w, label: w}))]} 
       />
     </div>
     <Table
@@ -9124,53 +9387,51 @@ const DeviceImageUpload = ({ project, deviceName, authedUser, setProjects }) => 
   };
   
   return (
-    <div className="space-y-3">
-      {imageUrl ? (
-        <div className="flex items-start gap-4">
-          <img 
-            src={imageUrl} 
-            alt={`${deviceName} device`}
-            className="w-32 h-32 object-contain border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-800"
-          />
-          {canEdit && (
-            <div className="flex flex-col gap-2">
-              <Button
-                variant="secondary"
-                size="sm"
-                onClick={() => fileInputRef.current?.click()}
-                disabled={uploading}
-              >
-                {uploading ? "Uploading..." : "Change Image"}
-              </Button>
-              <Button
-                variant="secondary"
-                size="sm"
-                onClick={handleDelete}
-                disabled={uploading}
-              >
-                Delete Image
-              </Button>
-            </div>
-          )}
-        </div>
-      ) : (
-        <div className="flex items-center gap-4">
-          <div className="w-32 h-32 border-2 border-dashed border-gray-300 dark:border-gray-600 rounded-lg flex items-center justify-center bg-gray-50 dark:bg-gray-800">
-            <span className="text-sm text-gray-500 dark:text-gray-400">No image</span>
-          </div>
-          {canEdit && (
+    <div className="flex flex-col h-full min-h-0">
+      {/* Header: Upload / Change / Delete on top (like image 3) */}
+      {canEdit && (
+        <div className="flex-shrink-0 flex items-center justify-end gap-2 pb-2 border-b border-slate-700/80">
+          <Button
+            variant="secondary"
+            size="sm"
+            className="text-xs"
+            onClick={() => fileInputRef.current?.click()}
+            disabled={uploading}
+          >
+            {uploading ? "Uploading..." : imageUrl ? "Change Image" : "Upload Image"}
+          </Button>
+          {imageUrl && (
             <Button
               variant="secondary"
-              onClick={() => fileInputRef.current?.click()}
+              size="sm"
+              className="text-xs"
+              onClick={handleDelete}
               disabled={uploading}
             >
-              {uploading ? "Uploading..." : "Upload Image"}
+              Delete Image
             </Button>
           )}
         </div>
       )}
+      {/* Full area for device image display */}
+      <div className="flex-1 min-h-[160px] flex items-center justify-center rounded-lg border border-slate-700/60 bg-slate-800/40 mt-2 overflow-hidden">
+        {imageUrl ? (
+          <img
+            src={imageUrl}
+            alt={`${deviceName} device`}
+            className="max-w-full max-h-full w-full h-full object-contain"
+          />
+        ) : (
+          <div className="flex flex-col items-center justify-center gap-2 text-slate-500">
+            <span className="text-sm">No image</span>
+            <span className="text-[10px] max-w-[200px] text-center">
+              Upload 600×600px PNG for topology icon
+            </span>
+          </div>
+        )}
+      </div>
       {error && (
-        <div className="text-sm text-rose-600 dark:text-rose-400">{safeDisplay(error)}</div>
+        <div className="flex-shrink-0 text-xs text-rose-400 mt-2">{safeDisplay(error)}</div>
       )}
       <input
         ref={fileInputRef}
@@ -9179,11 +9440,6 @@ const DeviceImageUpload = ({ project, deviceName, authedUser, setProjects }) => 
         onChange={handleFileSelect}
         className="hidden"
       />
-      {canEdit && (
-        <div className="text-xs text-gray-500 dark:text-gray-400">
-          Upload an image to replace the default device icon in topology view. Max size: 600x600px (auto-resized). PNG format recommended for transparent backgrounds.
-        </div>
-      )}
     </div>
   );
 };
@@ -9279,7 +9535,7 @@ function classifyRoleByName(name = "") {
 }
 
 /* ===== TopologyGraph (SVG) ===== */
-const TopologyGraph = ({ project, onOpenDevice, can, authedUser, setProjects, setTopologyLLMMetrics, topologyLLMMetrics }) => {
+const TopologyGraph = ({ project, onOpenDevice, can, authedUser, setProjects, setTopologyLLMMetrics, topologyLLMMetrics, llmBusy, requestRun, onComplete, setLlmNotification }) => {
   // Helper function for default positioning - defined first to avoid hoisting issues
   const getDefaultPos = (nodeId, role, index = 0, totalByRole = {}) => {
     const centerX = 50;
@@ -9348,6 +9604,32 @@ const TopologyGraph = ({ project, onOpenDevice, can, authedUser, setProjects, se
         return { x: 20 + (col * defaultSpacing), y: 20 + (row * defaultSpacing) };
       }
     }
+  };
+
+  // Nudge positions so nodes do not overlap; user can rearrange later
+  const nudgePositionsNoOverlap = (positions, nodeIds, minDist = 14) => {
+    const pos = { ...positions };
+    const ids = nodeIds || Object.keys(pos);
+    for (let iter = 0; iter < 8; iter++) {
+      let moved = false;
+      for (let i = 0; i < ids.length; i++) {
+        for (let j = i + 1; j < ids.length; j++) {
+          const a = pos[ids[i]], b = pos[ids[j]];
+          if (!a || !b) continue;
+          const dx = b.x - a.x, dy = b.y - a.y;
+          const dist = Math.hypot(dx, dy);
+          if (dist < minDist && dist > 0.01) {
+            const push = (minDist - dist) / 2;
+            const nx = (dx / dist) * push, ny = (dy / dist) * push;
+            pos[ids[i]] = { x: a.x - nx, y: a.y - ny };
+            pos[ids[j]] = { x: b.x + nx, y: b.y + ny };
+            moved = true;
+          }
+        }
+      }
+      if (!moved) break;
+    }
+    return pos;
   };
 
   const [generatingTopology, setGeneratingTopology] = React.useState(false);
@@ -9467,6 +9749,7 @@ const TopologyGraph = ({ project, onOpenDevice, can, authedUser, setProjects, se
           projectId,
           api.getTopology,
           (topologyData) => {
+            notifyLLMResultReady("Topology", "LLM topology completed. Open Summary to view.");
             // Process topology result
             const aiNodes = topologyData.topology?.nodes || [];
             const aiEdges = topologyData.topology?.edges || [];
@@ -9527,11 +9810,13 @@ const TopologyGraph = ({ project, onOpenDevice, can, authedUser, setProjects, se
                   roleIndices[role]++;
                 }
               });
+              const nodeIds = updatedNodes.map(n => n.id);
+              const nudgedPositions = nudgePositionsNoOverlap(updatedPositions, nodeIds);
               
               // Update states
               setTopologyNodes(updatedNodes);
               setLinks(convertedEdges);
-              setPositions(updatedPositions);
+              setPositions(nudgedPositions);
               
               // Update project state
               setProjects(prev => prev.map(p => {
@@ -9540,7 +9825,7 @@ const TopologyGraph = ({ project, onOpenDevice, can, authedUser, setProjects, se
                     ...p,
                     topoLinks: convertedEdges,
                     topoNodes: aiNodes,
-                    topoPositions: updatedPositions
+                    topoPositions: nudgedPositions
                   };
                 }
                 return p;
@@ -9550,12 +9835,19 @@ const TopologyGraph = ({ project, onOpenDevice, can, authedUser, setProjects, se
               if (topologyData.llm_metrics) {
                 setTopologyLLMMetrics(topologyData.llm_metrics);
               }
+              // Auto-save layout so nodes don't overlap; user can rearrange later
+              const labels = Object.fromEntries(updatedNodes.map(n => [n.id, n.label || n.id]));
+              const roles = Object.fromEntries(updatedNodes.map(n => [n.id, n.role || "access"]));
+              api.saveTopologyLayout(projectId, nudgedPositions, convertedEdges, labels, roles).then(() => {
+                setProjects(prev => prev.map(p => (p.project_id || p.id) === projectId ? { ...p, topoPositions: nudgedPositions, topoLinks: convertedEdges, topoNodeLabels: labels, topoNodeRoles: roles, topoUpdatedAt: new Date().toISOString() } : p));
+              }).catch(err => console.warn("Failed to auto-save topology layout:", err));
             }
             
             setGeneratingTopology(false);
             localStorage.removeItem(storageKey);
+            onComplete?.();
             
-            // Show notification
+            // Show notification popup (same as Recommendations); global popup so it shows even on Documents/History tab
             setTopologyNotificationData({
               title: "Topology Generated",
               message: `LLM topology generation completed. Found ${aiNodes.length} nodes and ${aiEdges.length} links.`,
@@ -9563,11 +9855,13 @@ const TopologyGraph = ({ project, onOpenDevice, can, authedUser, setProjects, se
               type: "success"
             });
             setShowTopologyNotification(true);
+            setLlmNotification?.({ show: true, type: "success", title: "Topology Generated", message: `LLM topology generation completed. Found ${aiNodes.length} nodes and ${aiEdges.length} links.`, metrics: topologyData.llm_metrics, onRegenerate: () => requestRun?.(doGenerateTopology) });
           },
           (errorMsg) => {
             setGeneratingTopology(false);
             setTopologyError(errorMsg);
             localStorage.removeItem(storageKey);
+            onComplete?.();
           }
         );
       } else {
@@ -9575,6 +9869,7 @@ const TopologyGraph = ({ project, onOpenDevice, can, authedUser, setProjects, se
         globalPollingService.resumePolling(
           pollingKey,
           (topologyData) => {
+            notifyLLMResultReady("Topology", "LLM topology completed. Open Summary to view.");
             // Process topology result (same as above)
             const aiNodes = topologyData.topology?.nodes || [];
             const aiEdges = topologyData.topology?.edges || [];
@@ -9633,10 +9928,12 @@ const TopologyGraph = ({ project, onOpenDevice, can, authedUser, setProjects, se
                   roleIndices[role]++;
                 }
               });
+              const nodeIds = updatedNodes.map(n => n.id);
+              const nudgedPositions = nudgePositionsNoOverlap(updatedPositions, nodeIds);
               
               setTopologyNodes(updatedNodes);
               setLinks(convertedEdges);
-              setPositions(updatedPositions);
+              setPositions(nudgedPositions);
               
               setProjects(prev => prev.map(p => {
                 if ((p.project_id || p.id) === projectId) {
@@ -9644,7 +9941,7 @@ const TopologyGraph = ({ project, onOpenDevice, can, authedUser, setProjects, se
                     ...p,
                     topoLinks: convertedEdges,
                     topoNodes: aiNodes,
-                    topoPositions: updatedPositions
+                    topoPositions: nudgedPositions
                   };
                 }
                 return p;
@@ -9653,10 +9950,16 @@ const TopologyGraph = ({ project, onOpenDevice, can, authedUser, setProjects, se
               if (topologyData.llm_metrics) {
                 setTopologyLLMMetrics(topologyData.llm_metrics);
               }
+              const labels = Object.fromEntries(updatedNodes.map(n => [n.id, n.label || n.id]));
+              const roles = Object.fromEntries(updatedNodes.map(n => [n.id, n.role || "access"]));
+              api.saveTopologyLayout(projectId, nudgedPositions, convertedEdges, labels, roles).then(() => {
+                setProjects(prev => prev.map(p => (p.project_id || p.id) === projectId ? { ...p, topoPositions: nudgedPositions, topoLinks: convertedEdges, topoNodeLabels: labels, topoNodeRoles: roles, topoUpdatedAt: new Date().toISOString() } : p));
+              }).catch(err => console.warn("Failed to auto-save topology layout:", err));
             }
             
             setGeneratingTopology(false);
             localStorage.removeItem(storageKey);
+            onComplete?.();
             
             setTopologyNotificationData({
               title: "Topology Generated",
@@ -9665,11 +9968,13 @@ const TopologyGraph = ({ project, onOpenDevice, can, authedUser, setProjects, se
               type: "success"
             });
             setShowTopologyNotification(true);
+            setLlmNotification?.({ show: true, type: "success", title: "Topology Generated", message: `LLM topology generation completed. Found ${aiNodes.length} nodes and ${aiEdges.length} links.`, metrics: topologyData.llm_metrics, onRegenerate: () => requestRun?.(doGenerateTopology) });
           },
           (errorMsg) => {
             setGeneratingTopology(false);
             setTopologyError(errorMsg);
             localStorage.removeItem(storageKey);
+            onComplete?.();
           }
         );
       }
@@ -9804,11 +10109,13 @@ const TopologyGraph = ({ project, onOpenDevice, can, authedUser, setProjects, se
                 roleIndices[role]++;
               }
             });
+            const nodeIds = updatedNodes.map(n => n.id);
+            const nudgedPositions = nudgePositionsNoOverlap(updatedPositions, nodeIds);
             
             // Update states
             setTopologyNodes(updatedNodes);
             setLinks(convertedEdges);
-            setPositions(updatedPositions);
+            setPositions(nudgedPositions);
             
             // Update project state
             setProjects(prev => prev.map(p => {
@@ -9817,7 +10124,7 @@ const TopologyGraph = ({ project, onOpenDevice, can, authedUser, setProjects, se
                   ...p,
                   topoLinks: convertedEdges,
                   topoNodes: aiNodes,
-                  topoPositions: updatedPositions
+                  topoPositions: nudgedPositions
                 };
               }
               return p;
@@ -9827,12 +10134,17 @@ const TopologyGraph = ({ project, onOpenDevice, can, authedUser, setProjects, se
             if (topologyData.llm_metrics) {
               setTopologyLLMMetrics(topologyData.llm_metrics);
             }
+            const labels = Object.fromEntries(updatedNodes.map(n => [n.id, n.label || n.id]));
+            const roles = Object.fromEntries(updatedNodes.map(n => [n.id, n.role || "access"]));
+            api.saveTopologyLayout(projectId, nudgedPositions, convertedEdges, labels, roles).then(() => {
+              setProjects(prev => prev.map(p => (p.project_id || p.id) === projectId ? { ...p, topoPositions: nudgedPositions, topoLinks: convertedEdges, topoNodeLabels: labels, topoNodeRoles: roles, topoUpdatedAt: new Date().toISOString() } : p));
+            }).catch(err => console.warn("Failed to auto-save topology layout:", err));
           }
           
           setGeneratingTopology(false);
           localStorage.removeItem(storageKey);
+          onComplete?.();
           
-          // Show notification
           setTopologyNotificationData({
             title: "Topology Generated",
             message: `LLM topology generation completed. Found ${aiNodes.length} nodes and ${aiEdges.length} links.`,
@@ -9840,11 +10152,13 @@ const TopologyGraph = ({ project, onOpenDevice, can, authedUser, setProjects, se
             type: "success"
           });
           setShowTopologyNotification(true);
+          setLlmNotification?.({ show: true, type: "success", title: "Topology Generated", message: `LLM topology generation completed. Found ${aiNodes.length} nodes and ${aiEdges.length} links.`, metrics: topologyData.llm_metrics, onRegenerate: () => requestRun?.(doGenerateTopology) });
         },
         (errorMsg) => {
           setGeneratingTopology(false);
           setTopologyError(errorMsg);
           localStorage.removeItem(storageKey);
+          onComplete?.();
         }
       );
     } else {
@@ -9853,6 +10167,7 @@ const TopologyGraph = ({ project, onOpenDevice, can, authedUser, setProjects, se
         projectId,
         api.getTopology,
         (topologyData) => {
+        notifyLLMResultReady("Topology", "LLM topology completed. Open Summary to view.");
         // Process topology result
         const aiNodes = topologyData.topology?.nodes || [];
         const aiEdges = topologyData.topology?.edges || [];
@@ -9913,11 +10228,13 @@ const TopologyGraph = ({ project, onOpenDevice, can, authedUser, setProjects, se
               roleIndices[role]++;
             }
           });
+          const nodeIds = updatedNodes.map(n => n.id);
+          const nudgedPositions = nudgePositionsNoOverlap(updatedPositions, nodeIds);
           
           // Update states
           setTopologyNodes(updatedNodes);
           setLinks(convertedEdges);
-          setPositions(updatedPositions);
+          setPositions(nudgedPositions);
           
           // Update project state
           setProjects(prev => prev.map(p => {
@@ -9926,7 +10243,7 @@ const TopologyGraph = ({ project, onOpenDevice, can, authedUser, setProjects, se
                 ...p,
                 topoLinks: convertedEdges,
                 topoNodes: aiNodes,
-                topoPositions: updatedPositions
+                topoPositions: nudgedPositions
               };
             }
             return p;
@@ -9936,12 +10253,17 @@ const TopologyGraph = ({ project, onOpenDevice, can, authedUser, setProjects, se
           if (topologyData.llm_metrics) {
             setTopologyLLMMetrics(topologyData.llm_metrics);
           }
+          const labels = Object.fromEntries(updatedNodes.map(n => [n.id, n.label || n.id]));
+          const roles = Object.fromEntries(updatedNodes.map(n => [n.id, n.role || "access"]));
+          api.saveTopologyLayout(projectId, nudgedPositions, convertedEdges, labels, roles).then(() => {
+            setProjects(prev => prev.map(p => (p.project_id || p.id) === projectId ? { ...p, topoPositions: nudgedPositions, topoLinks: convertedEdges, topoNodeLabels: labels, topoNodeRoles: roles, topoUpdatedAt: new Date().toISOString() } : p));
+          }).catch(err => console.warn("Failed to auto-save topology layout:", err));
         }
         
         setGeneratingTopology(false);
         localStorage.removeItem(storageKey);
+        onComplete?.();
         
-        // Show notification
         setTopologyNotificationData({
           title: "Topology Generated",
           message: `LLM topology generation completed. Found ${aiNodes.length} nodes and ${convertedEdges.length} links.`,
@@ -9949,11 +10271,13 @@ const TopologyGraph = ({ project, onOpenDevice, can, authedUser, setProjects, se
           type: "success"
         });
         setShowTopologyNotification(true);
+        setLlmNotification?.({ show: true, type: "success", title: "Topology Generated", message: `LLM topology generation completed. Found ${aiNodes.length} nodes and ${convertedEdges.length} links.`, metrics: topologyData.llm_metrics, onRegenerate: () => requestRun?.(doGenerateTopology) });
       },
         (errorMsg) => {
           setGeneratingTopology(false);
           setTopologyError(errorMsg);
           localStorage.removeItem(storageKey);
+          onComplete?.();
         }
       );
     }
@@ -9964,23 +10288,18 @@ const TopologyGraph = ({ project, onOpenDevice, can, authedUser, setProjects, se
     };
   }, [project.project_id || project.id, generatingTopology]);
   
-  // Generate topology using AI
-  const handleGenerateTopology = async () => {
+  // Generate topology using AI (runs via LLM queue when not busy)
+  const handleGenerateTopology = () => {
     const projectId = project.project_id || project.id;
     if (!projectId) {
       setTopologyError("Project ID not found");
       return;
     }
-    
-    // Check if already generating (from state or localStorage) - prevent duplicate requests
-    const storageKey = `llm_generating_topology_${projectId}`;
-    const isAlreadyGenerating = generatingTopology || localStorage.getItem(storageKey) === "true";
-    if (isAlreadyGenerating) {
-      console.log("Topology generation already in progress, skipping duplicate request");
-      return; // Prevent double-click and duplicate requests
+    if (typeof requestRun === "function") {
+      requestRun(doGenerateTopology);
+    } else {
+      doGenerateTopology();
     }
-    
-    await doGenerateTopology();
   };
 
   const doGenerateTopology = async () => {
@@ -9996,6 +10315,7 @@ const TopologyGraph = ({ project, onOpenDevice, can, authedUser, setProjects, se
       return;
     }
     
+    setShowTopologyNotification(false);
     setGeneratingTopology(true);
     setTopologyError(null);
     
@@ -10015,6 +10335,7 @@ const TopologyGraph = ({ project, onOpenDevice, can, authedUser, setProjects, se
           setTopologyError(err.message || err.detail || "Failed to start topology generation. Check backend/LLM server.");
           setGeneratingTopology(false);
           localStorage.removeItem(storageKey);
+          onComplete?.();
         } else {
           // Timeout or connection reset is expected for long-running LLM - polling will handle it
           console.log("Request timeout/reset (expected for LLM) - polling will continue");
@@ -10351,10 +10672,10 @@ const TopologyGraph = ({ project, onOpenDevice, can, authedUser, setProjects, se
       setLinkMode("none");
       setSelectedLink(null);
       
-      alert("✅ บันทึกตำแหน่ง topology สำเร็จ");
+      alert("Topology layout saved successfully.");
     } catch (error) {
       console.error("Failed to save topology layout:", error);
-      alert(`❌ ไม่สามารถบันทึกได้: ${error.message}`);
+      alert(`Failed to save: ${error.message}`);
     }
   };
 
@@ -10442,6 +10763,20 @@ const TopologyGraph = ({ project, onOpenDevice, can, authedUser, setProjects, se
         <div className="flex items-center justify-between w-full py-1 gap-2">
           <span className="text-xs font-medium text-slate-300 flex-shrink-0">Topology</span>
           <div className="flex items-center gap-2 flex-1 justify-end min-w-0">
+            {/* Topology completion popup - always in DOM so it shows when LLM finishes (even if user was on another tab and came back) */}
+            <NotificationModal
+              show={showTopologyNotification}
+              onClose={() => setShowTopologyNotification(false)}
+              title={topologyNotificationData?.title || "Topology Generated"}
+              message={topologyNotificationData?.message || "LLM topology generation completed."}
+              metrics={topologyNotificationData?.metrics}
+              type={topologyNotificationData?.type || "success"}
+              onRegenerate={() => {
+                setShowTopologyNotification(false);
+                if (typeof requestRun === "function") requestRun(doGenerateTopology);
+                else doGenerateTopology();
+              }}
+            />
             {/* LLM info and last modified - larger format */}
             {topologyLLMMetrics && (
               <span className="text-[10px] text-slate-400 whitespace-nowrap">
@@ -10457,25 +10792,15 @@ const TopologyGraph = ({ project, onOpenDevice, can, authedUser, setProjects, se
             <div className="flex gap-1 items-center flex-shrink-0">
               {!editMode && (
                 <>
-                  <NotificationModal
-                    show={showTopologyNotification}
-                    onClose={() => setShowTopologyNotification(false)}
-                    title={topologyNotificationData?.title || "Topology Generated"}
-                    message={topologyNotificationData?.message || "LLM topology generation completed."}
-                    metrics={topologyNotificationData?.metrics}
-                    type={topologyNotificationData?.type || "success"}
-                    onRegenerate={() => {
-                      setShowTopologyNotification(false);
-                      doGenerateTopology();
-                    }}
-                  />
                   <button
+                    type="button"
                     onClick={handleGenerateTopology}
-                    disabled={generatingTopology}
-                    className="px-2 py-1 text-[10px] font-medium rounded-md bg-emerald-600 hover:bg-emerald-700 text-white transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
-                    title={generatingTopology ? "Analysis in progress. Please wait..." : "Use LLM for topology"}
+                    disabled={generatingTopology || llmBusy}
+                    className="w-8 h-8 flex items-center justify-center rounded-md bg-emerald-600 hover:bg-emerald-700 text-white transition-colors disabled:opacity-50 disabled:cursor-not-allowed text-base"
+                    title={generatingTopology ? "Analyzing topology... Please wait." : llmBusy ? "Another LLM task is running (queued). You can switch to Documents/History tab." : "Generate topology with AI"}
+                    aria-label={generatingTopology ? "Generating topology..." : "AI Topology"}
                   >
-                    {generatingTopology ? "⏳ Generating..." : "LLM Analysis"}
+                    {generatingTopology || llmBusy ? "⏳" : "✨"}
                   </button>
                 </>
               )}
@@ -10551,7 +10876,7 @@ const TopologyGraph = ({ project, onOpenDevice, can, authedUser, setProjects, se
           <>
             {isActuallyGenerating && (
               <div className="mb-3 p-2 rounded bg-slate-700/50 border border-slate-600 text-slate-300 text-xs">
-                ⏳ Analyzing with LLM... This may take 1–2 minutes (depending on number of devices). You can navigate away and return later.
+                ⏳ Analyzing with LLM... This may take 1–2 minutes. You can switch to Documents or other tabs meanwhile.
               </div>
             )}
             {topologyError && (
@@ -10746,11 +11071,11 @@ const TopologyGraph = ({ project, onOpenDevice, can, authedUser, setProjects, se
         <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
           <div className="bg-white dark:bg-gray-800 rounded-xl p-6 max-w-md w-full mx-4 shadow-xl">
             <h3 className="text-lg font-semibold mb-4 text-gray-900 dark:text-gray-100">
-              แก้ไขลิงก์
+              Edit link
             </h3>
             <div className="space-y-4">
               <div>
-                <span className="text-sm text-gray-600 dark:text-gray-400">จาก:</span>
+                <span className="text-sm text-gray-600 dark:text-gray-400">From:</span>
                 <span className="ml-2 font-medium text-gray-900 dark:text-gray-100">
                   {getNodeName(links[selectedLink].a)}
                 </span>
@@ -10761,7 +11086,7 @@ const TopologyGraph = ({ project, onOpenDevice, can, authedUser, setProjects, se
                   {getNodeName(links[selectedLink].b)}
                 </span>
               </div>
-              <Field label="ประเภทลิงก์">
+              <Field label="Link type">
                 <Select
                   value={links[selectedLink].type || "trunk"}
                   onChange={(value) => {
@@ -10776,7 +11101,7 @@ const TopologyGraph = ({ project, onOpenDevice, can, authedUser, setProjects, se
                   ]}
                 />
               </Field>
-              <Field label="ป้ายกำกับ (ไม่บังคับ)">
+              <Field label="Label (optional)">
                 <Input
                   value={links[selectedLink].label || ""}
                   onChange={(e) => {
@@ -10784,7 +11109,7 @@ const TopologyGraph = ({ project, onOpenDevice, can, authedUser, setProjects, se
                       i === selectedLink ? { ...l, label: e.target.value } : l
                     ));
                   }}
-                  placeholder="เช่น GigabitEthernet0/1"
+                  placeholder="e.g. GigabitEthernet0/1"
                 />
               </Field>
             </div>
@@ -10793,13 +11118,13 @@ const TopologyGraph = ({ project, onOpenDevice, can, authedUser, setProjects, se
                 setShowLinkDialog(false);
                 setSelectedLink(null);
               }}>
-                ปิด
+                Close
               </Button>
               <Button variant="primary" onClick={() => {
                 setShowLinkDialog(false);
                 setSelectedLink(null);
               }}>
-                ตกลง
+                OK
               </Button>
             </div>
           </div>
@@ -10811,19 +11136,19 @@ const TopologyGraph = ({ project, onOpenDevice, can, authedUser, setProjects, se
         <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
           <div className="bg-white dark:bg-gray-800 rounded-xl p-6 max-w-md w-full mx-4 shadow-xl">
             <h3 className="text-lg font-semibold mb-4 text-gray-900 dark:text-gray-100">
-              แก้ไขโหนด
+              Edit node
             </h3>
             <div className="space-y-4">
-              <Field label="ชื่อโหนด">
+              <Field label="Node name">
                 <Input
                   value={nodeLabels[editingNode] || ""}
                   onChange={(e) => {
                     setNodeLabels(prev => ({ ...prev, [editingNode]: e.target.value }));
                   }}
-                  placeholder="ชื่ออุปกรณ์"
+                  placeholder="Device name"
                 />
               </Field>
-              <Field label="บทบาท">
+              <Field label="Role">
                 <Select
                   value={nodeRoles[editingNode] || "access"}
                   onChange={(value) => {
@@ -10842,10 +11167,10 @@ const TopologyGraph = ({ project, onOpenDevice, can, authedUser, setProjects, se
                 setShowNodeDialog(false);
                 setEditingNode(null);
               }}>
-                ปิด
+                Close
               </Button>
               <Button variant="primary" onClick={handleSaveNode}>
-                บันทึก
+                Save
               </Button>
             </div>
           </div>
@@ -10855,7 +11180,7 @@ const TopologyGraph = ({ project, onOpenDevice, can, authedUser, setProjects, se
   );
 };
 
-/* ===== Topology helpers (fallback ถ้าไม่มี deriveLinksFromProject เดิม) ===== */
+/* ===== Topology helpers (fallback when deriveLinksFromProject not available) ===== */
 function deriveLinksFromProject(project) {
   // ถ้าคุณมีฟังก์ชันนี้อยู่แล้ว ให้ใช้ของเดิมได้เลย
   // ตรงนี้คือ fallback: เดาว่า core เชื่อม distribution และ access
@@ -10932,29 +11257,29 @@ function buildDeviceNarrative(project, row) {
     parts.push(`• ความสัมพันธ์ในระบบ: (ยังไม่พบจากกราฟ — แนะนำอัปโหลด show cdp/lldp neighbors)`);
   }
 
-  // ภาพรวม STP ทั้งระบบ + บทบาทของตัวนี้
+  // STP overview and this device's role
   if (Object.keys(stp.modeByDev).length) {
     const rootTxt = stp.rootCandidates.length
       ? `Root Bridge: ${stp.rootCandidates.join(", ")}`
-      : "Root Bridge: (ยังไม่ระบุ — ไม่มีอุปกรณ์รายงานเป็น Root)";
-    parts.push(`• ภาพรวม STP ทั่วระบบ: โหมดของแต่ละอุปกรณ์อาจเป็น ${[...new Set(Object.values(stp.modeByDev))].join(", ")} | ${rootTxt}`);
+      : "Root Bridge: (not identified — no device reporting as Root)";
+    parts.push(`• STP overview: per-device mode may be ${[...new Set(Object.values(stp.modeByDev))].join(", ")} | ${rootTxt}`);
     if (row.stpRoot && /yes|root/i.test(row.stpRoot)) {
-      parts.push(`• บทบาท STP ของอุปกรณ์นี้: Root Bridge`);
+      parts.push(`• This device STP role: Root Bridge`);
     } else if (role === "distribution" || role === "access") {
-      parts.push(`• บทบาท STP ของอุปกรณ์นี้: Non-root (คาดว่าเชื่อม uplink ไปยัง ${uniqNeigh[0] ?? "core"}; พอร์ต access ควรอยู่สถานะ PortFast)`);
+      parts.push(`• This device STP role: Non-root (likely uplink to ${uniqNeigh[0] ?? "core"}; access ports should be PortFast)`);
     }
   }
 
-  // HSRP/VRRP จาก VLAN details (ถ้ามี)
+  // HSRP/VRRP from VLAN details (if any)
   const hsrpHints = [];
   const vds = project.vlanDetails?.[row.device] || [];
   vds.forEach(v => { if (v.hsrpVip) hsrpHints.push(`VLAN${v.vlanId}→${v.hsrpVip}`); });
-  if (hsrpHints.length) parts.push(`• HSRP/VRRP ที่เกี่ยวข้อง: ${hsrpHints.join(", ")}`);
+  if (hsrpHints.length) parts.push(`• HSRP/VRRP: ${hsrpHints.join(", ")}`);
 
-  // บทบาทภาพรวม
-  if (role === "core") parts.push("• บทบาทเชิงโครงข่าย: Core — จุดรวมการเชื่อมต่อ uplink/downlink และเส้นทางหลัก");
-  else if (role === "distribution") parts.push("• บทบาทเชิงโครงข่าย: Distribution — รวมสายจาก Access ขึ้นสู่ Core");
-  else if (role === "access") parts.push("• บทบาทเชิงโครงข่าย: Access — ให้บริการปลายทางผู้ใช้/อุปกรณ์");
+  // Network role summary
+  if (role === "core") parts.push("• Network role: Core — aggregation of uplink/downlink and main paths");
+  else if (role === "distribution") parts.push("• Network role: Distribution — aggregates Access links to Core");
+  else if (role === "access") parts.push("• Network role: Access — serves end users/devices");
 
   return parts.join("\n");
 }
