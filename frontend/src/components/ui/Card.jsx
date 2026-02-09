@@ -1,20 +1,56 @@
 import React from "react";
+import { safeDisplay, safeChild } from "../../utils/format";
 
-/**
- * Card with optional title and actions. Light/dark, rounded, subtle shadow.
- */
-export default function Card({ title, actions, children, className = "" }) {
+export default function Card({
+  title,
+  actions,
+  children,
+  className = "",
+  compact = false,
+  compactHeader = false,
+}) {
+  const isFlexCard =
+    className.includes("flex flex-col") || className.includes("flex-1");
+  const isFullScreen =
+    className.includes("overflow-hidden") && isFlexCard;
+  const headerCompact = compact || compactHeader;
   return (
     <div
-      className={`rounded-xl border border-slate-300 dark:border-slate-700/80 bg-white/95 dark:bg-slate-900/95 backdrop-blur-sm shadow-card dark:shadow-card-dark ${className}`}
+      className={`rounded-2xl border border-slate-300 dark:border-[#1F2937] bg-white dark:bg-[#111827] shadow-sm ${className}`}
     >
       {(title || actions) && (
-        <div className="flex items-center justify-between border-b border-slate-300 dark:border-slate-800 px-4 py-3">
-          <h3 className="text-card-title font-semibold text-slate-800 dark:text-slate-200">{title}</h3>
-          <div className="flex gap-2">{actions}</div>
+        <div
+          className={`flex items-center justify-between border-b border-gray-100 dark:border-[#1F2937] flex-shrink-0 ${
+            headerCompact ? "px-3 py-2" : compact ? "px-2 py-1" : "px-5 py-3"
+          }`}
+        >
+          <h3
+            className={`${
+              compact ? "text-[10px]" : compactHeader ? "text-xs" : "text-sm"
+            } font-semibold text-gray-700 dark:text-gray-200`}
+          >
+            {safeDisplay(title)}
+          </h3>
+          <div className={`flex gap-2 ${compactHeader ? "gap-1.5" : ""}`}>
+            {safeChild(actions)}
+          </div>
         </div>
       )}
-      <div className="p-4">{children}</div>
+      <div
+        className={
+          isFlexCard
+            ? isFullScreen
+              ? "flex-1 min-h-0 flex flex-col overflow-hidden"
+              : compact
+                ? "p-1 flex-1 min-h-0 flex flex-col overflow-hidden"
+                : "p-5 flex-1 min-h-0 flex flex-col overflow-hidden"
+            : compact
+              ? "p-1"
+              : "p-5"
+        }
+      >
+        {safeChild(children)}
+      </div>
     </div>
   );
 }
