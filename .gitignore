@@ -3,77 +3,54 @@ node_modules/
 __pycache__/
 *.pyc
 *.pyo
-*.pyd
 .Python
 env/
 venv/
-ENV/
-.pytest_cache/
+.venv/
 
-# Database
-mongo-data/
-mongo-backup/
-*.db
-*.sqlite
-
-# Storage
-storage/
-backups/
-*.log
-*.log.*
-
-# Environment variables
+# Secrets (must not be in repo)
 .env
 .env.local
 .env.*.local
 backend/.env
 frontend/.env
 
-# IDE
-.vscode/
-.idea/
-*.swp
-*.swo
-*~
-.cursor/
-
-# OS
-.DS_Store
-Thumbs.db
-desktop.ini
+# Runtime data
+mongo-data/
+mongo-backup/
+storage/
+backups/
+*.log
+*.log.*
+*.db
+*.sqlite
+test_config/
 
 # Build outputs
 dist/
 build/
-*.egg-info/
 frontend/dist/
-backend/dist/
+*.egg-info/
 
-# Docker
-.dockerignore
+# Local overrides
 docker-compose.override.yml
 
-# Test files
-display-all/
-test_config/
-*.test.js
-*.test.ts
-*.test.jsx
-*.test.tsx
+# OS
+.DS_Store
+Thumbs.db
 
-# Temporary files
-*.tmp
-*.temp
-*.bak
-*.backup
-*.old
-nginx.conf.backup
+# IDE / editor
+.idea/
+.vscode/
+.cursor/
+*.swp
+*.swo
+*~
 
-# Coverage reports
-coverage/
-.nyc_output/
-
-# Local development
-.local/
-local/
-
+# scripts/ – ไฟล์ที่สร้างจากสคริปต์ (ไม่เอาเข้า repo)
+scripts/*.log
+scripts/output/
+scripts/*.tmp
+scripts/*.temp
+scripts/.env
+scripts/*.bak

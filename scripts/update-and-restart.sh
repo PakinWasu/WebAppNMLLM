@@ -1,11 +1,12 @@
 #!/bin/bash
 # อัปเดตแล้ว restart Docker เสมอ (รวมถึงเมื่อแก้ LLM / .env / โค้ด backend)
-# ใช้: ./update-and-restart.sh
-# หรือ pull จาก git ก่อนแล้วค่อย restart: ./update-and-restart.sh --pull
+# ใช้: ./scripts/update-and-restart.sh
+# หรือ pull จาก git ก่อนแล้วค่อย restart: ./scripts/update-and-restart.sh --pull
 
 set -e
 SCRIPT_DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" && pwd )"
-cd "$SCRIPT_DIR"
+REPO_ROOT="$( cd "$SCRIPT_DIR/.." && pwd )"
+cd "$REPO_ROOT"
 
 COMPOSE_FILE="docker-compose.prod.yml"
 PULL=false
