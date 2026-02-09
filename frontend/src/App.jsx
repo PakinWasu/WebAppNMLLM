@@ -4709,7 +4709,7 @@ const DeviceDetailsView = ({ project, deviceId, goBack, can: canProp, loadProjec
             <Button variant="secondary" onClick={goBack} className="text-xs py-1.5 px-3 h-8 flex-shrink-0">← Back to Summary</Button>
             {canDeleteDevice && (
               <Button variant="danger" onClick={() => { setShowDeleteDeviceModal(true); setDeleteConfirmText(""); }} className="text-xs py-1.5 px-3 h-8 flex-shrink-0">
-                ลบอุปกรณ์
+                Delete Device
               </Button>
             )}
           </div>
@@ -4721,12 +4721,12 @@ const DeviceDetailsView = ({ project, deviceId, goBack, can: canProp, loadProjec
         <div className="fixed inset-0 z-[100] flex items-center justify-center p-4" role="dialog" aria-modal="true">
           <div className="absolute inset-0 bg-black/50" onClick={() => !deleteDeviceLoading && setShowDeleteDeviceModal(false)} />
           <div className="relative z-10 w-full max-w-md rounded-xl border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-900 shadow-xl p-5">
-            <h3 className="text-lg font-semibold text-slate-800 dark:text-slate-200 mb-2">ยืนยันการลบอุปกรณ์</h3>
+            <h3 className="text-lg font-semibold text-slate-800 dark:text-slate-200 mb-2">Confirm Device Deletion</h3>
             <p className="text-sm text-slate-600 dark:text-slate-400 mb-3">
-              การลบจะทำให้ข้อมูล config ทุกเวอร์ชัน รูปอุปกรณ์ และผลวิเคราะห์ของอุปกรณ์ <strong>{safeDisplay(deviceId)}</strong> หายทั้งหมด และจะลบออกจาก topology ด้วย
+              Deleting will remove all config versions, device image, and analysis results for device <strong>{safeDisplay(deviceId)}</strong> and remove it from topology.
             </p>
             <p className="text-sm text-slate-600 dark:text-slate-400 mb-2">
-              พิมพ์ชื่ออุปกรณ์ด้านล่างเพื่อยืนยัน:
+              Type the device name below to confirm:
             </p>
             <input
               type="text"
@@ -4739,7 +4739,7 @@ const DeviceDetailsView = ({ project, deviceId, goBack, can: canProp, loadProjec
             />
             <div className="flex gap-2 justify-end">
               <Button variant="secondary" onClick={() => !deleteDeviceLoading && setShowDeleteDeviceModal(false)} disabled={deleteDeviceLoading}>
-                ยกเลิก
+                Cancel
               </Button>
               <Button
                 variant="danger"
@@ -4754,14 +4754,14 @@ const DeviceDetailsView = ({ project, deviceId, goBack, can: canProp, loadProjec
                     if (loadProjects) await loadProjects();
                     if (goBack) goBack();
                   } catch (e) {
-                    alert("ลบอุปกรณ์ไม่สำเร็จ: " + (e.message || e));
+                    alert("Failed to delete device: " + (e.message || e));
                   } finally {
                     setDeleteDeviceLoading(false);
                   }
                 }}
                 disabled={deleteConfirmText !== deviceId || deleteDeviceLoading}
               >
-                {deleteDeviceLoading ? "กำลังลบ…" : "ลบอุปกรณ์"}
+                {deleteDeviceLoading ? "Deleting..." : "Delete Device"}
               </Button>
             </div>
           </div>
