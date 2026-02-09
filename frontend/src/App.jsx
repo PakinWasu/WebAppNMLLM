@@ -3,6 +3,8 @@ import React, { useMemo, useState, useEffect, useRef } from "react";
 import { flushSync } from "react-dom";
 import * as api from "./api";
 import MainLayout from "./components/layout/MainLayout";
+import { parseHash } from "./utils/routing";
+import { useHashRoute } from "./hooks/useHashRoute";
 
 // Global polling service for LLM results (works across page navigation)
 // Store in window object to persist across component unmounts
@@ -363,19 +365,20 @@ const ConfirmationModal = ({ show, onClose, onConfirm, title, message }) => {
   );
 };
 
-const Card = ({ title, actions, children, className = "", compact = false }) => {
+const Card = ({ title, actions, children, className = "", compact = false, compactHeader = false }) => {
   const isFlexCard = className.includes('flex flex-col') || className.includes('flex-1');
   const isFullScreen = className.includes('overflow-hidden') && isFlexCard;
+  const headerCompact = compact || compactHeader;
   return (
     <div
       className={`rounded-2xl border border-slate-300 dark:border-[#1F2937] bg-white dark:bg-[#111827] shadow-sm ${className}`}
     >
       {(title || actions) && (
-        <div className={`flex items-center justify-between border-b border-gray-100 dark:border-[#1F2937] flex-shrink-0 ${compact ? 'px-2 py-1' : 'px-5 py-3'}`}>
-          <h3 className={`${compact ? 'text-[10px]' : 'text-sm'} font-semibold text-gray-700 dark:text-gray-200`}>
+        <div className={`flex items-center justify-between border-b border-gray-100 dark:border-[#1F2937] flex-shrink-0 ${headerCompact ? 'px-3 py-2' : (compact ? 'px-2 py-1' : 'px-5 py-3')}`}>
+          <h3 className={`${compact ? 'text-[10px]' : (compactHeader ? 'text-xs' : 'text-sm')} font-semibold text-gray-700 dark:text-gray-200`}>
             {safeDisplay(title)}
           </h3>
-          <div className="flex gap-2">{safeChild(actions)}</div>
+          <div className={`flex gap-2 ${compactHeader ? 'gap-1.5' : ''}`}>{safeChild(actions)}</div>
         </div>
       )}
       <div className={isFlexCard ? (isFullScreen ? "flex-1 min-h-0 flex flex-col overflow-hidden" : (compact ? "p-1 flex-1 min-h-0 flex flex-col overflow-hidden" : "p-5 flex-1 min-h-0 flex flex-col overflow-hidden")) : (compact ? "p-1" : "p-5")}>{safeChild(children)}</div>
@@ -848,7 +851,7 @@ export default function App() {
   const [users, setUsers] = useState([]);
   const [projects, setProjects] = useState([]);
   const [authedUser, setAuthedUser] = useState(null); // {username, role}
-  const [route, setRoute] = useState({ name: "login" });
+  const { route, setRoute, routeToHash, handleNavClick } = useHashRoute(api.getToken, authedUser);
   const [uploadHistory, setUploadHistory] = useState([]);
   const [loading, setLoading] = useState(false);
 
@@ -868,13 +871,14 @@ export default function App() {
     localStorage.setItem("darkMode", dark.toString());
   }, [dark]);
 
-  // Load user info on mount if token exists
+  // Load user info on mount if token exists; then apply hash route so refresh keeps position
   useEffect(() => {
     const loadUser = async () => {
       try {
         const user = await api.getMe();
         setAuthedUser({ username: user.username, role: user.role || "admin" });
-        setRoute({ name: "index" });
+        const fromHash = parseHash(window.location.hash);
+        setRoute(fromHash.name ? fromHash : { name: "index" });
         await loadProjects();
         if (user.role === "admin") {
           await loadUsers();
@@ -983,7 +987,8 @@ export default function App() {
       await api.login(username, password);
       const user = await api.getMe();
       setAuthedUser({ username: user.username, role: user.role || "admin" });
-      setRoute({ name: "index" });
+      const fromHash = parseHash(window.location.hash);
+      setRoute(fromHash.name ? fromHash : { name: "index" });
       await loadProjects();
       if (user.role === "admin") {
         await loadUsers();
@@ -1021,6 +1026,9 @@ export default function App() {
         projectTabs.push({ id: "documents", label: "Documents", icon: "📄" });
         projectTabs.push({ id: "history", label: "History", icon: "📜" });
       }
+      if (can("upload-config", project)) {
+        projectTabs.push({ id: "script-generator", label: "Command Template", icon: "⚡" });
+      }
     }
     
     return (
@@ -1029,13 +1037,14 @@ export default function App() {
           <div className="h-full flex items-center justify-between gap-2 px-3 sm:px-4 border-b border-slate-300 dark:border-slate-800">
             {/* Left: Logo + Platform Name + Breadcrumb */}
             <div className="flex items-center gap-2 sm:gap-4 flex-1 min-w-0">
-              <button
-                onClick={() => setRoute({ name: "index" })}
+              <a
+                href="#/"
+                onClick={(e) => handleNavClick(e, () => setRoute({ name: "index" }))}
                 className="flex items-center gap-2 sm:gap-3 hover:opacity-85 transition-opacity cursor-pointer flex-shrink-0"
               >
                 <div className="h-7 w-7 rounded-xl bg-white/90 dark:bg-white/10 backdrop-blur-sm border border-slate-300/80 dark:border-slate-600/80 flex-shrink-0 shadow-sm" />
                 <span className="text-xs sm:text-sm font-semibold text-slate-800 dark:text-slate-200 whitespace-nowrap truncate">Network Project Platform</span>
-              </button>
+              </a>
               {/* Breadcrumb and Tabs (show when in project or device) */}
               {project && (
                 <>
@@ -1043,12 +1052,13 @@ export default function App() {
                   <div className="flex items-center gap-2 sm:gap-4 flex-1 min-w-0">
                     {route.name === "device" ? (
                       <>
-                        <button
-                          onClick={() => setRoute({ name: "project", projectId: route.projectId, tab: "summary" })}
+                        <a
+                          href={`#/project/${encodeURIComponent(route.projectId)}/tab/summary`}
+                          onClick={(e) => handleNavClick(e, () => setRoute({ name: "project", projectId: route.projectId, tab: "summary" }))}
                           className="text-xs sm:text-sm font-medium text-slate-600 dark:text-slate-300 hover:text-slate-900 dark:hover:text-slate-100 truncate"
                         >
                           {safeDisplay(project?.name)}
-                        </button>
+                        </a>
                         <span className="text-slate-400 dark:text-slate-500 flex-shrink-0">/</span>
                         <span className="text-xs sm:text-sm font-medium text-slate-700 dark:text-slate-300 truncate">{safeDisplay(route?.device)}</span>
                       </>
@@ -1058,10 +1068,10 @@ export default function App() {
                         {projectTabs.length > 0 && (
                           <nav className="flex items-center gap-1 ml-2 sm:ml-4 flex-wrap" aria-label="Project tabs">
                             {projectTabs.map((t) => (
-                              <button
+                              <a
                                 key={t.id}
-                                type="button"
-                                onClick={() => setRoute({ ...route, tab: t.id })}
+                                href={`#/project/${encodeURIComponent(route.projectId)}/tab/${encodeURIComponent(t.id)}`}
+                                onClick={(e) => handleNavClick(e, () => setRoute({ ...route, tab: t.id }))}
                                 className={`flex items-center gap-1.5 px-2.5 py-1.5 text-xs font-medium transition rounded-xl whitespace-nowrap border ${
                                   (route.tab || "setting") === t.id
                                     ? "bg-white/90 dark:bg-white/10 backdrop-blur-sm border-slate-300/80 dark:border-slate-600/80 text-slate-800 dark:text-slate-100 shadow-sm"
@@ -1071,7 +1081,7 @@ export default function App() {
                               >
                                 <span>{safeDisplay(t.icon)}</span>
                                 <span className="hidden xs:inline">{safeDisplay(t.label)}</span>
-                              </button>
+                              </a>
                             ))}
                           </nav>
                         )}
@@ -1087,9 +1097,13 @@ export default function App() {
                 {dark ? "🌙" : "☀️"}
               </Button>
               <span className="text-xs text-slate-500 dark:text-slate-400 hidden sm:inline truncate max-w-[100px]">{safeDisplay(authedUser?.username)}</span>
-              <Button variant="secondary" className="text-xs py-1.5 px-3" onClick={handleLogout}>
+              <a
+                href="#/login"
+                onClick={(e) => handleNavClick(e, handleLogout)}
+                className="inline-flex items-center justify-center rounded-lg px-3 py-1.5 text-xs font-medium shadow-sm transition focus:outline-none focus:ring-2 focus:ring-offset-2 bg-white text-gray-900 ring-1 ring-gray-300 hover:bg-gray-50 focus:ring-blue-500 dark:bg-gray-800 dark:text-gray-100 dark:ring-gray-600 dark:hover:bg-gray-700"
+              >
                 Sign out
-              </Button>
+              </a>
             </div>
           </div>
         }
@@ -1100,10 +1114,8 @@ export default function App() {
             authedUser={authedUser}
             can={can}
             projects={projects}
-            openProject={(p) => setRoute({ name: "project", projectId: p.project_id || p.id, tab: "setting" })}
-            newProject={() => setRoute({ name: "newProject" })}
-            openUserAdmin={() => setRoute({ name: "userAdmin" })}
-            openChangePassword={() => setRoute({ name: "changePassword", username: authedUser.username, fromIndex: true })}
+            setRoute={setRoute}
+            routeToHash={routeToHash}
             isMember={isMember}
           />
         )}
@@ -1123,6 +1135,7 @@ export default function App() {
             llmBusyMessage={llmBusyMessage}
             requestRun={requestRun}
             onComplete={onComplete}
+            routeToHash={routeToHash}
           />
         )}
         {route.name === "project" && !project && (
@@ -1134,6 +1147,8 @@ export default function App() {
             deviceId={route.device}
             goBack={() => setRoute({ name: "project", projectId: route.projectId, tab: "summary" })}
             goIndex={() => setRoute({ name: "index" })}
+            goBackHref={routeToHash({ name: "project", projectId: route.projectId, tab: "summary" })}
+            goIndexHref="#/"
             can={can}
             loadProjects={loadProjects}
             uploadHistory={uploadHistory}
@@ -1161,11 +1176,12 @@ export default function App() {
           setRoute={setRoute}
           can={can}
           onLogout={handleLogout}
+          routeToHash={routeToHash}
         />
       </div>
       <div className="mx-auto max-w-[1440px] px-4 py-4 sm:px-6 sm:py-6">
           <div className="mt-4 sm:mt-6">
-            {route.name === "login" && (
+            {(!authedUser && route.name !== "changePassword") && (
               <Login
                 onLogin={handleLogin}
                 goChange={(username) =>
@@ -1198,12 +1214,8 @@ export default function App() {
                 authedUser={authedUser}
                 can={can}
                 projects={projects}
-                openProject={(p) =>
-                  setRoute({ name: "project", projectId: p.project_id || p.id, tab: "setting" })
-                }
-                newProject={() => setRoute({ name: "newProject" })}
-                openUserAdmin={() => setRoute({ name: "userAdmin" })}
-                openChangePassword={() => setRoute({ name: "changePassword", username: authedUser.username, fromIndex: true })}
+                setRoute={setRoute}
+                routeToHash={routeToHash}
                 isMember={isMember}
               />
             )}
@@ -1211,6 +1223,7 @@ export default function App() {
               route.name === "newProject" &&
               can("create-project") && (
                 <NewProjectPage
+                  indexHref="#/"
                   onCancel={() => setRoute({ name: "index" })}
                   onCreate={async (proj) => {
                     await loadProjects();
@@ -1222,6 +1235,7 @@ export default function App() {
               route.name === "userAdmin" &&
               can("user-management") && (
                 <UserAdminPage
+                  indexHref="#/"
                   users={users}
                   setUsers={setUsers}
                   onClose={async () => {
@@ -1248,6 +1262,7 @@ export default function App() {
                 llmBusyMessage={llmBusyMessage}
                 requestRun={requestRun}
                 onComplete={onComplete}
+                routeToHash={routeToHash}
               />
             )}
             {authedUser && route.name === "device" && (
@@ -1256,6 +1271,8 @@ export default function App() {
                 deviceId={route.device}
                 goBack={() => setRoute({ name: "project", projectId: route.projectId, tab: "summary" })}
                 goIndex={() => setRoute({ name: "index" })}
+                goBackHref={routeToHash({ name: "project", projectId: route.projectId, tab: "summary" })}
+                goIndexHref="#/"
                 can={can}
                 loadProjects={loadProjects}
                 uploadHistory={uploadHistory}
@@ -1274,21 +1291,20 @@ export default function App() {
 }
 
 /* ========= HEADER ========= */
-const Header = ({ dark, setDark, authedUser, setRoute, can, onLogout }) => (
+const Header = ({ dark, setDark, authedUser, setRoute, can, onLogout, routeToHash }) => (
   <div className="flex items-center justify-between gap-4 w-full flex-wrap sm:flex-nowrap">
-    <button
-      onClick={() => {
-        if (authedUser) {
-          setRoute({ name: "index" });
-        } else {
-          setRoute({ name: "login" });
-        }
+    <a
+      href={routeToHash ? routeToHash(authedUser ? { name: "index" } : { name: "login" }) : "#/"}
+      onClick={(e) => {
+        e.preventDefault();
+        if (authedUser) setRoute({ name: "index" });
+        else setRoute({ name: "login" });
       }}
       className="flex items-center gap-3 hover:opacity-85 transition-opacity cursor-pointer min-w-0"
     >
       <div className="h-8 w-8 sm:h-9 sm:w-9 rounded-xl bg-white/90 dark:bg-white/10 backdrop-blur-sm border border-slate-300/80 dark:border-slate-600/80 flex-shrink-0 shadow-sm" />
       <span className="text-base sm:text-lg font-semibold text-slate-800 dark:text-slate-100 truncate">Network Project Platform</span>
-    </button>
+    </a>
     <div className="flex items-center gap-2 flex-shrink-0">
       <Button variant="ghost" onClick={() => setDark(!dark)} className="text-slate-600 dark:text-slate-400" title={dark ? "Switch to light mode" : "Switch to dark mode"}>
         {dark ? "🌙 Dark" : "☀️ Light"}
@@ -1296,14 +1312,22 @@ const Header = ({ dark, setDark, authedUser, setRoute, can, onLogout }) => (
       {authedUser ? (
         <>
           <span className="text-sm text-slate-600 dark:text-slate-400 hidden xs:inline">{safeDisplay(authedUser?.username)}</span>
-          <Button variant="secondary" onClick={onLogout}>
+          <a
+            href={routeToHash ? routeToHash({ name: "login" }) : "#/login"}
+            onClick={(e) => handleNavClick(e, onLogout)}
+            className="inline-flex items-center justify-center rounded-lg px-3 py-1.5 text-xs font-medium shadow-sm transition focus:outline-none focus:ring-2 focus:ring-offset-2 disabled:opacity-50 disabled:cursor-not-allowed whitespace-nowrap bg-white text-gray-900 ring-1 ring-gray-300 hover:bg-gray-50 focus:ring-blue-500 dark:bg-gray-800 dark:text-gray-100 dark:ring-gray-600 dark:hover:bg-gray-700"
+          >
             Sign out
-          </Button>
+          </a>
         </>
       ) : (
-        <Button variant="secondary" onClick={() => setRoute({ name: "login" })}>
+        <a
+          href={routeToHash ? routeToHash({ name: "login" }) : "#/login"}
+          onClick={(e) => handleNavClick(e, () => setRoute({ name: "login" }))}
+          className="inline-flex items-center justify-center rounded-lg px-3 py-1.5 text-xs font-medium shadow-sm transition focus:outline-none focus:ring-2 focus:ring-offset-2 bg-transparent text-gray-700 hover:bg-gray-100 focus:ring-blue-500 dark:text-gray-200 dark:hover:bg-gray-800"
+        >
           Sign in
-        </Button>
+        </a>
       )}
     </div>
   </div>
@@ -1505,10 +1529,8 @@ const ProjectIndex = ({
   authedUser,
   can,
   projects,
-  openProject,
-  newProject,
-  openUserAdmin,
-  openChangePassword,
+  setRoute,
+  routeToHash,
   isMember,
 }) => {
   const [q, setQ] = useState("");
@@ -1519,6 +1541,10 @@ const ProjectIndex = ({
     );
     return mine.filter((p) => p.name.toLowerCase().includes(q.toLowerCase()));
   }, [projects, authedUser, q, can, isMember]);
+  const linkProps = (targetRoute) => ({
+    href: routeToHash ? routeToHash(targetRoute) : "#/",
+    onClick: (e) => handleNavClick(e, () => setRoute(targetRoute)),
+  });
   return (
     <div className="grid gap-6">
       <div className="flex items-center justify-between">
@@ -1530,16 +1556,18 @@ const ProjectIndex = ({
             onChange={(e) => setQ(e.target.value)}
           />
           {can("create-project") && (
-            <Button onClick={newProject}>New Project</Button>
+            <a {...linkProps({ name: "newProject" })} className="inline-flex items-center justify-center rounded-lg px-3 py-1.5 text-xs font-medium shadow-sm transition focus:outline-none focus:ring-2 focus:ring-offset-2 bg-white/90 dark:bg-white/10 backdrop-blur-sm border border-slate-300/80 dark:border-slate-600/80 text-slate-800 dark:text-slate-100 hover:bg-white dark:hover:bg-white/15 focus:ring-slate-400 dark:focus:ring-slate-500">
+              New Project
+            </a>
           )}
           {can("user-management") && (
-            <Button variant="secondary" onClick={openUserAdmin}>
+            <a {...linkProps({ name: "userAdmin" })} className="inline-flex items-center justify-center rounded-lg px-3 py-1.5 text-xs font-medium shadow-sm transition focus:outline-none focus:ring-2 focus:ring-offset-2 bg-white text-gray-900 ring-1 ring-gray-300 hover:bg-gray-50 focus:ring-blue-500 dark:bg-gray-800 dark:text-gray-100 dark:ring-gray-600 dark:hover:bg-gray-700">
               User Admin
-            </Button>
+            </a>
           )}
-          <Button variant="ghost" onClick={openChangePassword}>
+          <a {...linkProps({ name: "changePassword", username: authedUser?.username, fromIndex: true })} className="inline-flex items-center justify-center rounded-lg px-3 py-1.5 text-xs font-medium transition focus:outline-none focus:ring-2 focus:ring-offset-2 bg-transparent text-gray-700 hover:bg-gray-100 focus:ring-blue-500 dark:text-gray-200 dark:hover:bg-gray-800">
             Change Password
-          </Button>
+          </a>
         </div>
       </div>
       <div className="grid grid-cols-1 gap-4 md:grid-cols-2 lg:grid-cols-3">
@@ -1604,18 +1632,16 @@ const ProjectIndex = ({
                 </span>
               </div>
               <div className="pt-2">
-                <Button 
-                  onClick={() => {
-                    if (p.project_id || p.id) {
-                      openProject(p);
-                    } else {
-                      console.error("Project missing project_id:", p);
-                    }
-                  }}
-                  className="w-full"
+                <a
+                  href={p.project_id || p.id ? (routeToHash ? routeToHash({ name: "project", projectId: p.project_id || p.id, tab: "setting" }) : "#/") : "#/"}
+                  onClick={(e) => handleNavClick(e, () => {
+                    if (p.project_id || p.id) setRoute({ name: "project", projectId: p.project_id || p.id, tab: "setting" });
+                    else console.error("Project missing project_id:", p);
+                  })}
+                  className="inline-flex items-center justify-center w-full rounded-lg px-3 py-1.5 text-xs font-medium shadow-sm transition focus:outline-none focus:ring-2 focus:ring-offset-2 bg-white/90 dark:bg-white/10 backdrop-blur-sm border border-slate-300/80 dark:border-slate-600/80 text-slate-800 dark:text-slate-100 hover:bg-white dark:hover:bg-white/15 focus:ring-slate-400 dark:focus:ring-slate-500"
                 >
                   Open Project
-                </Button>
+                </a>
               </div>
             </div>
           </Card>
@@ -1626,7 +1652,7 @@ const ProjectIndex = ({
 };
 
 /* ========= NEW PROJECT ========= */
-const NewProjectPage = ({ onCancel, onCreate }) => {
+const NewProjectPage = ({ indexHref = "#/", onCancel, onCreate }) => {
   const [name, setName] = useState("");
   const [desc, setDesc] = useState("");
   const [members, setMembers] = useState([]);
@@ -1805,9 +1831,13 @@ const NewProjectPage = ({ onCancel, onCreate }) => {
         <Button onClick={save} disabled={!name || loading}>
           {loading ? "Creating..." : "Create"}
         </Button>
-        <Button variant="secondary" onClick={onCancel} disabled={loading}>
-          Cancel
-        </Button>
+        <a
+                href={indexHref}
+                onClick={(e) => handleNavClick(e, () => { if (!loading) onCancel(); })}
+                className={`inline-flex items-center justify-center rounded-lg px-3 py-1.5 text-xs font-medium shadow-sm transition focus:outline-none focus:ring-2 focus:ring-offset-2 bg-white text-gray-900 ring-1 ring-gray-300 hover:bg-gray-50 focus:ring-blue-500 dark:bg-gray-800 dark:text-gray-100 dark:ring-gray-600 dark:hover:bg-gray-700 ${loading ? "opacity-50 pointer-events-none" : ""}`}
+              >
+                Cancel
+              </a>
       </div>
     </div>
   );
@@ -1928,7 +1958,7 @@ const DeleteUserButton = ({ username, onDelete }) => {
 };
 
 /* ========= USER ADMIN (admin only) ========= */
-const UserAdminPage = ({ users, setUsers, onClose }) => {
+const UserAdminPage = ({ indexHref = "#/", users, setUsers, onClose }) => {
   const [username, setUsername] = useState("");
   const [email, setEmail] = useState("");
   const [phoneNumber, setPhoneNumber] = useState("");
@@ -1979,9 +2009,13 @@ const UserAdminPage = ({ users, setUsers, onClose }) => {
     <div className="grid gap-6">
       <div className="flex items-center justify-between">
         <h2 className="text-xl font-semibold">User Administration</h2>
-        <Button variant="secondary" onClick={onClose}>
+        <a
+          href={indexHref}
+          onClick={(e) => handleNavClick(e, onClose)}
+          className="inline-flex items-center justify-center rounded-lg px-3 py-1.5 text-xs font-medium shadow-sm transition focus:outline-none focus:ring-2 focus:ring-offset-2 bg-white text-gray-900 ring-1 ring-gray-300 hover:bg-gray-50 focus:ring-blue-500 dark:bg-gray-800 dark:text-gray-100 dark:ring-gray-600 dark:hover:bg-gray-700"
+        >
           ← Back to Index
-        </Button>
+        </a>
       </div>
       <Card title="Create Account">
         <div className="grid gap-4">
@@ -2130,6 +2164,7 @@ const ProjectView = ({
   llmBusyMessage,
   requestRun,
   onComplete,
+  routeToHash,
 }) => {
   if (!project)
     return <div className="text-sm text-rose-400">Project not found</div>;
@@ -2146,6 +2181,9 @@ const ProjectView = ({
     tabs.push({ id: "summary", label: "Summary", icon: "📊" });
     tabs.push({ id: "documents", label: "Documents", icon: "📄" });
     tabs.push({ id: "history", label: "History", icon: "📜" });
+  }
+  if (can("upload-config", project)) {
+    tabs.push({ id: "script-generator", label: "Command Template", icon: "⚡" });
   }
 
   return (
@@ -2176,6 +2214,8 @@ const ProjectView = ({
           <div className="flex-1 min-h-0 overflow-hidden flex flex-col">
             <SummaryPage
               project={project}
+              projectId={projectId}
+              routeToHash={routeToHash}
               can={can}
               authedUser={authedUser}
               setProjects={setProjects}
@@ -2203,6 +2243,15 @@ const ProjectView = ({
         {tab === "history" && can("view-documents", project) && (
           <div className="flex-1 min-h-0 overflow-hidden flex flex-col">
             <HistoryPage
+              project={project}
+              can={can}
+              authedUser={authedUser}
+            />
+          </div>
+        )}
+        {tab === "script-generator" && can("upload-config", project) && (
+          <div className="flex-1 min-h-0 overflow-hidden flex flex-col">
+            <ScriptGeneratorPage
               project={project}
               can={can}
               authedUser={authedUser}
@@ -3513,8 +3562,9 @@ const CompareConfigModal = ({ project, deviceList = [], onClose }) => {
 };
 
 /* ========= SUMMARY (network-focused) + CSV ========= */
-const SummaryPage = ({ project, can, authedUser, setProjects, openDevice, llmBusy, llmBusyMessage, requestRun, onComplete, setLlmNotification }) => {
-  const projectId = project?.project_id || project?.id;
+const SummaryPage = ({ project, projectId: projectIdProp, routeToHash, can, authedUser, setProjects, openDevice, llmBusy, llmBusyMessage, requestRun, onComplete, setLlmNotification }) => {
+  const projectId = projectIdProp || project?.project_id || project?.id;
+  const deviceDetailHref = (deviceId) => routeToHash ? routeToHash({ name: "device", projectId, device: deviceId }) : "#/";
   // LLM metrics state for topology generation (shared with TopologyGraph)
   const [topologyLLMMetrics, setTopologyLLMMetrics] = React.useState(null);
   const [q, setQ] = useState("");
@@ -3646,11 +3696,7 @@ const SummaryPage = ({ project, can, authedUser, setProjects, openDevice, llmBus
     }, 2000); // Wait 2 seconds for parsing to complete
   };
 
-  const handleDeviceClick = (deviceName, e) => {
-    if (e) {
-      e.preventDefault();
-      e.stopPropagation();
-    }
+  const handleDeviceClick = (deviceName) => {
     if (!deviceName) {
       console.error('Device name is missing');
       return;
@@ -3703,13 +3749,14 @@ const SummaryPage = ({ project, can, authedUser, setProjects, openDevice, llmBus
         }
       }},
     { header: "MORE", key: "more", width: "40px", cell: (r) => (
-      <button
+      <a
+        href={deviceDetailHref(r.device)}
+        onClick={(e) => handleNavClick(e, () => handleDeviceClick(r.device))}
         className="w-6 h-6 flex items-center justify-center rounded-lg border border-slate-300 dark:border-slate-600 bg-slate-100/80 dark:bg-slate-800/50 hover:bg-slate-200 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-300 text-[10px] transition-colors mx-auto"
-        onClick={(e) => handleDeviceClick(r.device, e)}
-        title="Open Details"
+        title="Open Details (Ctrl+click for new tab)"
       >
         →
-      </button>
+      </a>
     )},
   ];
 
@@ -3821,7 +3868,7 @@ const SummaryPage = ({ project, can, authedUser, setProjects, openDevice, llmBus
       {/* Topology (2/3) + Project Analysis (1/3) */}
       <div className="flex-shrink-0 grid grid-cols-1 lg:grid-cols-12 gap-3" style={{ height: '60%', minHeight: '320px' }}>
         <div className="lg:col-span-6 min-h-0 overflow-hidden rounded-xl border border-slate-300 dark:border-slate-800 bg-white dark:bg-slate-900/50 shadow-sm dark:shadow-none">
-          <TopologyGraph project={project} onOpenDevice={(id)=>openDevice(id)} can={can} authedUser={authedUser} setProjects={setProjects} setTopologyLLMMetrics={setTopologyLLMMetrics} topologyLLMMetrics={topologyLLMMetrics} llmBusy={llmBusy} llmBusyMessage={llmBusyMessage} requestRun={requestRun} onComplete={onComplete} setLlmNotification={setLlmNotification} />
+          <TopologyGraph project={project} projectId={projectId} routeToHash={routeToHash} onOpenDevice={(id)=>openDevice(id)} can={can} authedUser={authedUser} setProjects={setProjects} setTopologyLLMMetrics={setTopologyLLMMetrics} topologyLLMMetrics={topologyLLMMetrics} llmBusy={llmBusy} llmBusyMessage={llmBusyMessage} requestRun={requestRun} onComplete={onComplete} setLlmNotification={setLlmNotification} />
         </div>
         <ProjectAnalysisPanel 
           project={project}
@@ -3894,7 +3941,7 @@ const SummaryPage = ({ project, can, authedUser, setProjects, openDevice, llmBus
 
 
 /* ========= DEVICE DETAILS PAGE (with header navigation) ========= */
-const DeviceDetailsPage = ({ project, deviceId, goBack, goIndex, can, loadProjects, uploadHistory, authedUser, setProjects, llmBusy, llmBusyMessage, requestRun, onComplete }) => {
+const DeviceDetailsPage = ({ project, deviceId, goBack, goIndex, goBackHref, goIndexHref, can, loadProjects, uploadHistory, authedUser, setProjects, llmBusy, llmBusyMessage, requestRun, onComplete }) => {
   if (!project) {
     return <div className="text-sm text-rose-400">Project not found</div>;
   }
@@ -3905,6 +3952,9 @@ const DeviceDetailsPage = ({ project, deviceId, goBack, goIndex, can, loadProjec
         project={project}
         deviceId={deviceId}
         goBack={goBack}
+        goBackHref={goBackHref}
+        goIndex={goIndex}
+        goIndexHref={goIndexHref}
         can={can}
         loadProjects={loadProjects}
         uploadHistory={uploadHistory}
@@ -3921,13 +3971,18 @@ const DeviceDetailsPage = ({ project, deviceId, goBack, goIndex, can, loadProjec
 
 /* ========= DEVICE DETAILS (Overview / Interfaces / VLANs / Raw) ========= */
 /* ========= DEVICE DETAILS (Overview / Interfaces / VLANs / Raw) ========= */
-const DeviceDetailsView = ({ project, deviceId, goBack, can: canProp, loadProjects, uploadHistory, authedUser, setProjects, llmBusy: globalLlmBusy, llmBusyMessage, requestRun, onComplete }) => {
+const DeviceDetailsView = ({ project, deviceId, goBack, goBackHref, goIndex, goIndexHref, can: canProp, loadProjects, uploadHistory, authedUser, setProjects, llmBusy: globalLlmBusy, llmBusyMessage, requestRun, onComplete }) => {
   console.log('[DeviceDetailsView] Rendering with props:', { project, deviceId, hasGoBack: !!goBack });
   const [showDeleteDeviceModal, setShowDeleteDeviceModal] = React.useState(false);
   const [deleteConfirmText, setDeleteConfirmText] = React.useState("");
   const [deleteDeviceLoading, setDeleteDeviceLoading] = React.useState(false);
   const can = typeof canProp === "function" ? canProp : () => false;
   const canDeleteDevice = can("upload-config", project);
+  const backLink = goBack && (goBackHref != null ? (
+    <a href={goBackHref} onClick={(e) => handleNavClick(e, goBack)} className="inline-flex items-center justify-center rounded-lg px-3 py-1.5 text-xs font-medium shadow-sm transition focus:outline-none focus:ring-2 focus:ring-offset-2 bg-white text-gray-900 ring-1 ring-gray-300 hover:bg-gray-50 focus:ring-blue-500 dark:bg-gray-800 dark:text-gray-100 dark:ring-gray-600 dark:hover:bg-gray-700">← Back to Summary</a>
+  ) : (
+    <Button variant="secondary" onClick={goBack}>← Back to Summary</Button>
+  ));
   
   // Early return if project or deviceId is missing
   if (!project) {
@@ -3935,7 +3990,7 @@ const DeviceDetailsView = ({ project, deviceId, goBack, can: canProp, loadProjec
     return (
       <div className="grid gap-4">
         <div className="text-sm text-rose-400">Project not found</div>
-        {goBack && <Button variant="secondary" onClick={goBack}>← Back to Summary</Button>}
+        {goBack && backLink}
       </div>
     );
   }
@@ -3945,7 +4000,7 @@ const DeviceDetailsView = ({ project, deviceId, goBack, can: canProp, loadProjec
     return (
       <div className="grid gap-4">
         <div className="text-sm text-rose-400">Device ID not provided</div>
-        {goBack && <Button variant="secondary" onClick={goBack}>← Back to Summary</Button>}
+        {goBack && backLink}
       </div>
     );
   }
@@ -4706,7 +4761,11 @@ const DeviceDetailsView = ({ project, deviceId, goBack, can: canProp, loadProjec
                 </button>
               ))}
             </div>
-            <Button variant="secondary" onClick={goBack} className="text-xs py-1.5 px-3 h-8 flex-shrink-0">← Back to Summary</Button>
+            {goBack && (goBackHref != null ? (
+              <a href={goBackHref} onClick={(e) => handleNavClick(e, goBack)} className="inline-flex items-center justify-center rounded-lg px-3 py-1.5 h-8 text-xs font-medium shadow-sm transition focus:outline-none focus:ring-2 focus:ring-offset-2 flex-shrink-0 bg-white text-gray-900 ring-1 ring-gray-300 hover:bg-gray-50 focus:ring-blue-500 dark:bg-gray-800 dark:text-gray-100 dark:ring-gray-600 dark:hover:bg-gray-700">← Back to Summary</a>
+            ) : (
+              <Button variant="secondary" onClick={goBack} className="text-xs py-1.5 px-3 h-8 flex-shrink-0">← Back to Summary</Button>
+            ))}
             {canDeleteDevice && (
               <Button variant="danger" onClick={() => { setShowDeleteDeviceModal(true); setDeleteConfirmText(""); }} className="text-xs py-1.5 px-3 h-8 flex-shrink-0">
                 Delete Device
@@ -7371,6 +7430,798 @@ const HistoryPage = ({ project, can, authedUser }) => {
                     data={versions}
                   />
                 )}
+              </div>
+            </Card>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+};
+
+/* ========= SCRIPT GENERATOR PAGE ========= */
+const ScriptGeneratorPage = ({ project, can, authedUser }) => {
+  const projectId = project?.project_id || project?.id;
+  const [deviceInventory, setDeviceInventory] = React.useState([]);
+  const [ciscoCommands, setCiscoCommands] = React.useState("");
+  const [huaweiCommands, setHuaweiCommands] = React.useState("");
+  const [activeVendorTab, setActiveVendorTab] = React.useState("cisco");
+  const [loading, setLoading] = React.useState(true);
+  const [saving, setSaving] = React.useState(false);
+  const [showDeviceModal, setShowDeviceModal] = React.useState(false);
+  const [editingDevice, setEditingDevice] = React.useState(null);
+  const [csvFileInput, setCsvFileInput] = React.useState(null);
+  const [error, setError] = React.useState("");
+  const [showCsvInfoModal, setShowCsvInfoModal] = React.useState(false);
+
+  // Device form state
+  const [deviceForm, setDeviceForm] = React.useState({
+    ip: "",
+    hostname: "",
+    username: "",
+    password: "",
+    secret: "",
+    port: 22,
+    device_type: "cisco_ios"
+  });
+
+  // Load settings on mount
+  React.useEffect(() => {
+    const loadSettings = async () => {
+      if (!projectId) return;
+      setLoading(true);
+      try {
+        const settings = await api.getScriptSettings(projectId);
+        setDeviceInventory(settings.device_inventory || []);
+        setCiscoCommands(settings.cisco_commands || "");
+        setHuaweiCommands(settings.huawei_commands || "");
+      } catch (err) {
+        console.error("Failed to load script settings:", err);
+        setError("Failed to load settings: " + (err.message || err));
+      } finally {
+        setLoading(false);
+      }
+    };
+    loadSettings();
+  }, [projectId]);
+
+  // Save settings (full: device inventory + commands)
+  const handleSave = async () => {
+    if (!projectId) return;
+    setSaving(true);
+    setError("");
+    try {
+      await api.saveScriptSettings(projectId, {
+        device_inventory: deviceInventory,
+        cisco_commands: ciscoCommands,
+        huawei_commands: huaweiCommands
+      });
+      alert("Settings saved successfully!");
+    } catch (err) {
+      console.error("Failed to save settings:", err);
+      setError("Failed to save settings: " + (err.message || err));
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  // Persist only device inventory (auto-save after add/edit/delete/import)
+  const persistDeviceInventory = async (inventory) => {
+    if (!projectId) return;
+    setSaving(true);
+    setError("");
+    try {
+      await api.saveScriptSettings(projectId, {
+        device_inventory: inventory,
+        cisco_commands: ciscoCommands,
+        huawei_commands: huaweiCommands
+      });
+    } catch (err) {
+      console.error("Failed to save device list:", err);
+      setError("Failed to save: " + (err.message || err));
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  // Device CRUD operations
+  const handleAddDevice = () => {
+    setDeviceForm({
+      ip: "",
+      hostname: "",
+      username: "",
+      password: "",
+      secret: "",
+      port: 22,
+      device_type: "cisco_ios"
+    });
+    setEditingDevice(null);
+    setShowDeviceModal(true);
+  };
+
+  const handleEditDevice = (device, index) => {
+    setDeviceForm({ ...device });
+    setEditingDevice(index);
+    setShowDeviceModal(true);
+  };
+
+  const handleDeleteDevice = (index) => {
+    if (confirm("Delete this device?")) {
+      const next = deviceInventory.filter((_, i) => i !== index);
+      setDeviceInventory(next);
+      persistDeviceInventory(next);
+    }
+  };
+
+  const handleSaveDevice = () => {
+    if (!deviceForm.ip || !deviceForm.username) {
+      alert("IP and Username are required");
+      return;
+    }
+    let next;
+    if (editingDevice !== null) {
+      next = [...deviceInventory];
+      next[editingDevice] = { ...deviceForm };
+    } else {
+      next = [...deviceInventory, { ...deviceForm }];
+    }
+    setDeviceInventory(next);
+    setShowDeviceModal(false);
+    setEditingDevice(null);
+    persistDeviceInventory(next);
+  };
+
+  // CSV operations: Export template that matches Import format exactly
+  const exportCsvTemplate = () => {
+    const header = "ip,hostname,username,password,secret,port,device_type";
+    const exampleCisco = "192.168.1.1,Core-SW,admin,password123,enable_secret,22,cisco_ios";
+    const exampleHuawei = "192.168.1.2,Dist-SW,admin,password456,,22,huawei_vrp";
+    const csv = [header, exampleCisco, exampleHuawei].join("\n");
+    const blob = new Blob(["\uFEFF" + csv], { type: "text/csv;charset=utf-8" });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = "device_inventory_template.csv";
+    a.click();
+    URL.revokeObjectURL(url);
+  };
+
+  const handleCsvImport = async (e) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    
+    const text = await file.text();
+    const rawLines = text.split(/\r?\n/).map(line => line.trim()).filter(line => line.length > 0);
+    // Skip comment lines (starting with #) and find header row
+    const lines = rawLines.filter(line => !line.startsWith("#"));
+    if (lines.length < 2) {
+      alert("CSV must have a header row and at least one data row. Use Export CSV Template for the correct format.");
+      return;
+    }
+
+    const headers = lines[0].split(",").map(h => h.trim().toLowerCase().replace(/^\s*#\s*/, ""));
+    const requiredHeaders = ["ip", "username"];
+    const missingHeaders = requiredHeaders.filter(h => !headers.includes(h));
+    if (missingHeaders.length > 0) {
+      alert(`CSV missing required columns: ${missingHeaders.join(", ")}. Expected: ip, hostname, username, password, secret, port, device_type`);
+      return;
+    }
+
+    const devices = [];
+    for (let i = 1; i < lines.length; i++) {
+      const values = lines[i].split(",").map(v => v.trim());
+      const device = {};
+      headers.forEach((header, idx) => {
+        device[header] = values[idx] || "";
+      });
+      if (device.ip && device.username) {
+        const dt = (device.device_type || "cisco_ios").toLowerCase();
+        devices.push({
+          ip: device.ip,
+          hostname: device.hostname || "",
+          username: device.username,
+          password: device.password || "",
+          secret: device.secret || "",
+          port: parseInt(device.port, 10) || 22,
+          device_type: dt === "huawei_vrp" ? "huawei_vrp" : "cisco_ios"
+        });
+      }
+    }
+
+    if (devices.length > 0) {
+      const next = [...deviceInventory, ...devices];
+      setDeviceInventory(next);
+      persistDeviceInventory(next);
+      alert(`Imported ${devices.length} device(s). Saved.`);
+    } else {
+      alert("No valid devices found in CSV. Each row needs at least ip and username.");
+    }
+    e.target.value = "";
+  };
+
+  // Script generation
+  const generateLinuxScript = () => {
+    const commands = activeVendorTab === "cisco" ? ciscoCommands : huaweiCommands;
+    const vendor = activeVendorTab === "cisco" ? "cisco_ios" : "huawei_vrp";
+    
+    const filteredDevices = deviceInventory.filter(d => d.device_type === vendor);
+    if (filteredDevices.length === 0) {
+      alert("No devices found for selected vendor type");
+      return;
+    }
+    
+    // Helper function to sanitize hostname for filename
+    const sanitizeFilename = (str) => {
+      return (str || "").replace(/[\/\\:*?"<>| ]/g, "_").replace(/_+/g, "_").replace(/^_|_$/g, "");
+    };
+    
+    let script = "#!/bin/bash\n\n";
+    script += "# Auto-generated backup script\n";
+    script += "# Generated: " + new Date().toISOString() + "\n\n";
+    script += "# Check if sshpass is installed\n";
+    script += "if ! command -v sshpass &> /dev/null; then\n";
+    script += "    echo \"Error: sshpass is not installed.\"\n";
+    script += "    echo \"Please install it using: sudo apt-get install sshpass (Debian/Ubuntu) or sudo yum install sshpass (RHEL/CentOS)\"\n";
+    script += "    exit 1\n";
+    script += "fi\n\n";
+    script += "OUTPUT_DIR=\"backups\"\n";
+    script += "mkdir -p \"$OUTPUT_DIR\"\n\n";
+    
+    // Build command list
+    const commandLines = commands.split("\n").map(c => c.trim()).filter(c => c && !c.startsWith("!"));
+    
+    filteredDevices.forEach(device => {
+      const hostname = device.hostname || device.ip;
+      const safeHostname = sanitizeFilename(hostname);
+      const ip = device.ip;
+      const username = device.username;
+      const password = device.password || "";
+      const secret = device.secret || "";
+      const port = device.port || 22;
+      
+      script += `# Backup device: ${hostname} (${ip})\n`;
+      script += `echo "Connecting to ${hostname} (${ip})..."\n`;
+      script += `OUTPUT_FILE="$OUTPUT_DIR/${safeHostname}_$(date +%Y%m%d_%H%M%S).txt"\n\n`;
+      
+      // Escape password for bash
+      const escapedPassword = password.replace(/\\/g, "\\\\").replace(/"/g, '\\"').replace(/\$/g, "\\$").replace(/`/g, "\\`");
+      const escapedSecret = secret.replace(/\\/g, "\\\\").replace(/"/g, '\\"').replace(/\$/g, "\\$").replace(/`/g, "\\`");
+      
+      if (secret) {
+        script += `sshpass -p "${escapedPassword}" ssh -o StrictHostKeyChecking=no -o ConnectTimeout=10 -p ${port} ${username}@${ip} <<'EOF' | tee "$OUTPUT_FILE"\n`;
+        script += "enable\n";
+        script += `${escapedSecret}\n`;
+        commandLines.forEach(cmd => {
+          script += `${cmd}\n`;
+        });
+        script += "exit\n";
+        script += "EOF\n";
+      } else {
+        script += `sshpass -p "${escapedPassword}" ssh -o StrictHostKeyChecking=no -o ConnectTimeout=10 -p ${port} ${username}@${ip} <<'EOF' | tee "$OUTPUT_FILE"\n`;
+        commandLines.forEach(cmd => {
+          script += `${cmd}\n`;
+        });
+        script += "exit\n";
+        script += "EOF\n";
+      }
+      script += `if [ $? -eq 0 ]; then\n`;
+      script += `    echo "Backup completed for ${hostname}"\n`;
+      script += `else\n`;
+      script += `    echo "Warning: Backup may have failed for ${hostname} (check output file)\"\n`;
+      script += `fi\n`;
+      script += `echo ""\n\n`;
+    });
+    
+    script += "echo \"All backups completed!\"\n";
+
+    downloadScript(script, "backup_script.sh");
+  };
+
+  const generatePythonScript = () => {
+    const commands = activeVendorTab === "cisco" ? ciscoCommands : huaweiCommands;
+    const vendor = activeVendorTab === "cisco" ? "cisco_ios" : "huawei_vrp";
+    
+    const filteredDevices = deviceInventory.filter(d => d.device_type === vendor);
+    
+    // Helper function to sanitize hostname for filename
+    const sanitizeFilename = (str) => {
+      return (str || "").replace(/[\/\\:*?"<>| ]/g, "_").replace(/_+/g, "_").replace(/^_|_$/g, "");
+    };
+    
+    // Helper function to escape strings for Python
+    const escapeStr = (s) => (s || "").replace(/\\/g, "\\\\").replace(/"/g, '\\"').replace(/\n/g, "\\n");
+    
+    let script = "#!/usr/bin/env python3\n";
+    script += "# -*- coding: utf-8 -*-\n";
+    script += "\"\"\"\n";
+    script += "Auto-generated backup script\n";
+    script += "Generated: " + new Date().toISOString() + "\n";
+    script += "\"\"\"\n\n";
+    script += "from netmiko import ConnectHandler\n";
+    script += "from datetime import datetime\n";
+    script += "import os\n";
+    script += "import re\n";
+    script += "# import logging\n";
+    script += "# logging.basicConfig(filename='netmiko_debug.log', level=logging.DEBUG)  # Uncomment for debugging\n\n";
+    script += "OUTPUT_DIR = \"backups\"\n";
+    script += "os.makedirs(OUTPUT_DIR, exist_ok=True)\n\n";
+    script += "def sanitize_filename(name):\n";
+    script += "    \"\"\"Remove invalid characters from filename\"\"\"\n";
+    script += "    return re.sub(r'[\\/\\\\:*?\"<>| ]', '_', name).replace('__', '_').strip('_')\n\n";
+    script += "DEVICE_INVENTORY = [\n";
+    filteredDevices.forEach(device => {
+      script += `    {\n`;
+      script += `        "device_type": "${device.device_type}",\n`;
+      script += `        "host": "${escapeStr(device.ip)}",\n`;
+      script += `        "username": "${escapeStr(device.username)}",\n`;
+      script += `        "password": "${escapeStr(device.password)}",\n`;
+      script += `        "secret": "${escapeStr(device.secret || "")}",\n`;
+      script += `        "port": ${device.port || 22},\n`;
+      script += `        "hostname": "${escapeStr(device.hostname || device.ip)}"\n`;
+      script += `    },\n`;
+    });
+    script += "]\n\n";
+    script += "COMMANDS = \"\"\"\n";
+    script += commands + "\n";
+    script += "\"\"\"\n\n";
+    script += "def backup_device(device_info):\n";
+    script += "    try:\n";
+    script += "        print(f\"Connecting to {device_info['hostname']} ({device_info['host']})...\")\n";
+    script += "        \n";
+    script += "        # Create connection handler with robust parameters\n";
+    script += "        connection_params = {\n";
+    script += "            'device_type': device_info['device_type'],\n";
+    script += "            'host': device_info['host'],\n";
+    script += "            'username': device_info['username'],\n";
+    script += "            'password': device_info['password'],\n";
+    script += "            'port': device_info['port'],\n";
+    script += "            'global_delay_factor': 2,  # Handle slow devices\n";
+    script += "            'look_for_keys': False,   # Ignore local SSH keys\n";
+    script += "            'allow_agent': False,     # Disable SSH agent\n";
+    script += "        }\n";
+    script += "        \n";
+    script += "        # Add secret if provided (can be empty string)\n";
+    script += "        if device_info.get('secret'):\n";
+    script += "            connection_params['secret'] = device_info['secret']\n";
+    script += "        \n";
+    script += "        with ConnectHandler(**connection_params) as conn:\n";
+    script += "            # Always attempt to enter Enable mode (Privilege 15)\n";
+    script += "            # Some devices use login password for enable, or don't require secret\n";
+    script += "            try:\n";
+    script += "                conn.enable()\n";
+    script += "            except Exception as e:\n";
+    script += "                # Device may already be in enable mode, or enable not required\n";
+    script += "                print(f\"Warning: Could not enter enable mode or already privileged. Continuing... ({e})\")\n";
+    script += "            \n";
+    script += "            # Execute commands (send each command separately)\n";
+    script += "            command_list = COMMANDS.strip().split('\\n')\n";
+    script += "            command_list = [c.strip() for c in command_list if c.strip() and not c.strip().startswith('!')]\n";
+    script += "            \n";
+    script += "            output_parts = []\n";
+    script += "            for cmd in command_list:\n";
+    script += "                try:\n";
+    script += "                    # Use increased timeout for commands like 'show run' that can be slow\n";
+    script += "                    result = conn.send_command(cmd, read_timeout=90)\n";
+    script += "                    output_parts.append(f\"=== {cmd} ===\\n{result}\\n\")\n";
+    script += "                except Exception as e:\n";
+    script += "                    output_parts.append(f\"=== {cmd} ===\\nError: {e}\\n\")\n";
+    script += "            \n";
+    script += "            output = '\\n'.join(output_parts)\n";
+    script += "            \n";
+    script += "            # Save output to file with sanitized filename\n";
+    script += "            timestamp = datetime.now().strftime('%Y%m%d_%H%M%S')\n";
+    script += "            safe_hostname = sanitize_filename(device_info['hostname'])\n";
+    script += "            filename = os.path.join(OUTPUT_DIR, f\"{safe_hostname}_{timestamp}.txt\")\n";
+    script += "            with open(filename, 'w', encoding='utf-8') as f:\n";
+    script += "                f.write(output)\n";
+    script += "            \n";
+    script += "            print(f\"Backup completed for {device_info['hostname']}: {filename}\")\n";
+    script += "            return True\n";
+    script += "    except Exception as e:\n";
+    script += "        print(f\"Error backing up {device_info['hostname']}: {e}\")\n";
+    script += "        return False\n\n";
+    script += "if __name__ == \"__main__\":\n";
+    script += "    print(\"Starting backup process...\")\n";
+    script += "    print(f\"Found {len(DEVICE_INVENTORY)} device(s)\")\n";
+    script += "    print(\"\")\n";
+    script += "    \n";
+    script += "    success_count = 0\n";
+    script += "    for device in DEVICE_INVENTORY:\n";
+    script += "        if backup_device(device):\n";
+    script += "            success_count += 1\n";
+    script += "        print(\"\")\n";
+    script += "    \n";
+    script += "    print(f\"Backup process completed. {success_count}/{len(DEVICE_INVENTORY)} device(s) backed up successfully.\")\n";
+
+    downloadScript(script, "backup_script.py");
+  };
+
+  const downloadScript = (content, filename) => {
+    const blob = new Blob([content], { type: "text/plain" });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = filename;
+    a.click();
+    URL.revokeObjectURL(url);
+  };
+
+  const maskPassword = (str) => {
+    if (!str) return "";
+    return "•".repeat(Math.min(str.length, 8));
+  };
+
+  if (loading) {
+    return (
+      <div className="flex items-center justify-center h-full">
+        <div className="text-gray-500 dark:text-gray-400">Loading script settings...</div>
+      </div>
+    );
+  }
+
+  return (
+    <div className="h-full flex flex-col overflow-hidden">
+      {error && (
+        <div className="flex-shrink-0 px-4 py-2 bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded-lg text-red-700 dark:text-red-400 text-sm">
+          {error}
+        </div>
+      )}
+
+      {/* Top 60%: Device Inventory */}
+      <div className="flex-[0.6] min-h-0 flex flex-col overflow-hidden flex-shrink-0">
+        <Card
+          compactHeader
+          title={
+            <span className="flex items-center gap-1.5 text-base font-semibold text-gray-700 dark:text-gray-200">
+              Device Inventory
+              <button
+                type="button"
+                onClick={() => setShowCsvInfoModal(true)}
+                className="inline-flex items-center justify-center w-4 h-4 rounded-full bg-slate-300 dark:bg-slate-500 text-slate-700 dark:text-slate-100 hover:bg-slate-400 dark:hover:bg-slate-400 text-[10px] font-semibold focus:outline-none focus:ring-2 focus:ring-blue-500 transition-colors"
+                title="CSV format and import instructions"
+                aria-label="Show CSV instructions"
+              >
+                i
+              </button>
+            </span>
+          }
+          actions={
+            <div className="flex items-center gap-1.5 flex-wrap">
+              <button
+                type="button"
+                onClick={exportCsvTemplate}
+                className="px-2 py-1 rounded-md text-xs font-medium border border-slate-400 dark:border-slate-500 bg-slate-100 dark:bg-slate-700 text-slate-800 dark:text-slate-200 hover:bg-slate-200 dark:hover:bg-slate-600 focus:outline-none focus:ring-2 focus:ring-blue-500 transition-colors"
+              >
+                Export CSV Template
+              </button>
+              <label className="inline-block">
+                <input
+                  type="file"
+                  accept=".csv"
+                  onChange={handleCsvImport}
+                  className="hidden"
+                  ref={el => setCsvFileInput(el)}
+                />
+                <span className="inline-flex items-center justify-center px-2 py-1 rounded-md text-xs font-medium bg-blue-600 hover:bg-blue-700 text-white focus:outline-none focus:ring-2 focus:ring-blue-400 dark:bg-blue-600 dark:hover:bg-blue-500 dark:text-white cursor-pointer">
+                  Import CSV
+                </span>
+              </label>
+              <button
+                type="button"
+                onClick={handleAddDevice}
+                className="px-2 py-1 rounded-md text-xs font-medium bg-emerald-600 hover:bg-emerald-700 text-white focus:outline-none focus:ring-2 focus:ring-emerald-400 dark:bg-emerald-600 dark:hover:bg-emerald-500 dark:text-white transition-colors"
+              >
+                + Add Device
+              </button>
+            </div>
+          }
+          className="h-full flex flex-col min-h-0 overflow-hidden"
+        >
+          <div className="flex-1 min-h-0 overflow-auto">
+            <table className="w-full border-collapse table-fixed">
+              <thead>
+                <tr className="bg-slate-100 dark:bg-slate-800 border-b border-slate-200 dark:border-slate-600">
+                  <th className="px-4 py-3 text-left text-sm font-semibold text-slate-700 dark:text-slate-200 w-24">Status</th>
+                  <th className="px-4 py-3 text-left text-sm font-semibold text-slate-700 dark:text-slate-200 w-[44%]">Hostname/IP</th>
+                  <th className="px-4 py-3 text-left text-sm font-semibold text-slate-700 dark:text-slate-200 w-32">Vendor</th>
+                  <th className="px-4 py-3 text-left text-sm font-semibold text-slate-700 dark:text-slate-200 w-[28%]">Auth</th>
+                  <th className="px-4 py-3 text-right text-sm font-semibold text-slate-700 dark:text-slate-200 w-20">Actions</th>
+                </tr>
+              </thead>
+              <tbody>
+                {deviceInventory.length === 0 ? (
+                  <tr>
+                    <td colSpan="5" className="px-5 py-10 text-center text-slate-600 dark:text-slate-300">
+                      No devices added yet. Click "+ Add Device" to get started.
+                    </td>
+                  </tr>
+                ) : (
+                  deviceInventory.map((device, index) => (
+                    <tr key={index} className="hover:bg-slate-50 dark:hover:bg-slate-800/60 border-b border-slate-200 dark:border-slate-700 transition-colors">
+                      <td className="px-4 py-3 align-middle">
+                        <span className="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-green-100 text-green-800 dark:bg-green-900/40 dark:text-green-200 border border-green-300 dark:border-green-700">
+                          Ready
+                        </span>
+                      </td>
+                      <td className="px-4 py-3 align-middle">
+                        <div className="font-medium text-slate-900 dark:text-slate-100 leading-tight truncate">{device.hostname || device.ip}</div>
+                        <div className="text-xs text-slate-600 dark:text-slate-400 mt-0.5 truncate">{device.ip}</div>
+                      </td>
+                      <td className="px-4 py-3 align-middle">
+                        <span className="text-sm font-medium text-slate-700 dark:text-slate-200">
+                          {device.device_type === "cisco_ios" ? "Cisco IOS" : "Huawei VRP"}
+                        </span>
+                      </td>
+                      <td className="px-4 py-3 align-middle">
+                        <div className="flex items-center gap-2 min-w-0">
+                          <span className="font-medium text-slate-700 dark:text-slate-200 truncate">{device.username}</span>
+                          <span className="text-slate-400 dark:text-slate-500 flex-shrink-0">/</span>
+                          <span className="font-mono text-slate-600 dark:text-slate-300 truncate">{maskPassword(device.password)}</span>
+                        </div>
+                      </td>
+                      <td className="px-4 py-3 align-middle">
+                        <div className="flex items-center justify-end gap-1.5">
+                          <button
+                            type="button"
+                            onClick={() => handleEditDevice(device, index)}
+                            className="p-1.5 rounded text-slate-600 dark:text-slate-300 hover:bg-slate-200 dark:hover:bg-slate-600 hover:text-slate-800 dark:hover:text-slate-100 transition-colors"
+                            title="Edit"
+                            aria-label="Edit device"
+                          >
+                            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
+                            </svg>
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => handleDeleteDevice(index)}
+                            className="p-1.5 rounded text-red-600 dark:text-red-400 hover:bg-red-100 dark:hover:bg-red-900/30 transition-colors"
+                            title="Delete"
+                            aria-label="Delete device"
+                          >
+                            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                            </svg>
+                          </button>
+                        </div>
+                      </td>
+                    </tr>
+                  ))
+                )}
+              </tbody>
+            </table>
+          </div>
+        </Card>
+      </div>
+
+      {/* Bottom 40%: Command Template + Export Script */}
+      <div className="flex-[0.4] min-h-0 grid grid-cols-3 gap-4 overflow-hidden pt-3">
+        {/* Section 2: Command Template (2/3 width) */}
+        <Card
+          compactHeader
+          className="col-span-2 flex flex-col min-h-0 overflow-hidden"
+          title="Command Template"
+          actions={
+            <>
+              <Select
+                value={activeVendorTab}
+                onChange={(val) => setActiveVendorTab(val)}
+                options={[
+                  { value: "cisco", label: "Cisco IOS" },
+                  { value: "huawei", label: "Huawei VRP" }
+                ]}
+                className="w-32 text-xs py-1"
+              />
+              <Button variant="primary" onClick={handleSave} disabled={saving} className="text-xs py-1 px-2">
+                {saving ? "Saving..." : "Save"}
+              </Button>
+            </>
+          }
+        >
+          <div className="flex-1 min-h-0 flex flex-col p-4 overflow-hidden">
+            <textarea
+              value={activeVendorTab === "cisco" ? ciscoCommands : huaweiCommands}
+              onChange={(e) => {
+                if (activeVendorTab === "cisco") {
+                  setCiscoCommands(e.target.value);
+                } else {
+                  setHuaweiCommands(e.target.value);
+                }
+              }}
+              className="flex-1 min-h-[200px] w-full bg-[#1e1e1e] text-[#d4d4d4] font-mono text-sm p-4 rounded-lg resize-none focus:outline-none focus:ring-2 focus:ring-blue-500 border border-gray-300 dark:border-gray-700 overflow-y-auto"
+              placeholder="Enter commands here..."
+            />
+          </div>
+        </Card>
+
+        {/* Section 3: Script Export (1/3 width) — compact, no scrollbar */}
+        <Card compactHeader className="col-span-1 flex flex-col min-h-0 overflow-hidden" title="Export Script">
+          <div className="flex-1 min-h-0 flex flex-col p-3 gap-3 overflow-hidden">
+            <div className="flex-shrink-0 bg-blue-50 dark:bg-slate-900/50 border border-blue-200 dark:border-slate-700 rounded-lg px-3 py-2 text-blue-800 dark:text-blue-200 text-sm">
+              <div className="font-medium text-xs">Device Count</div>
+              <div className="text-xl font-bold leading-tight">{deviceInventory.filter(d => d.device_type === (activeVendorTab === "cisco" ? "cisco_ios" : "huawei_vrp")).length}</div>
+              <div className="text-xs opacity-75">devices for {activeVendorTab === "cisco" ? "Cisco IOS" : "Huawei VRP"}</div>
+            </div>
+            <div className="flex-shrink-0 flex flex-col gap-2">
+              <button
+                type="button"
+                onClick={generateLinuxScript}
+                disabled={deviceInventory.filter(d => d.device_type === (activeVendorTab === "cisco" ? "cisco_ios" : "huawei_vrp")).length === 0}
+                className="w-full py-2 bg-orange-600 hover:bg-orange-700 disabled:opacity-50 disabled:cursor-not-allowed text-white rounded-lg flex items-center justify-center gap-2 text-sm font-semibold shadow-sm focus:outline-none focus:ring-2 focus:ring-orange-400"
+              >
+                🐧 Linux Script (.sh)
+              </button>
+              <button
+                type="button"
+                onClick={generatePythonScript}
+                disabled={deviceInventory.filter(d => d.device_type === (activeVendorTab === "cisco" ? "cisco_ios" : "huawei_vrp")).length === 0}
+                className="w-full py-2 bg-indigo-600 hover:bg-indigo-700 disabled:opacity-50 disabled:cursor-not-allowed text-white rounded-lg flex items-center justify-center gap-2 text-sm font-semibold shadow-sm focus:outline-none focus:ring-2 focus:ring-indigo-400"
+              >
+                🐍 Windows Script (.py)
+              </button>
+            </div>
+          </div>
+        </Card>
+      </div>
+
+      {/* Add/Edit Device Modal */}
+      {showDeviceModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+          <div className="absolute inset-0 bg-black/50" onClick={() => setShowDeviceModal(false)} />
+          <div className="relative z-10 w-full max-w-md">
+            <Card
+              title={editingDevice !== null ? "Edit Device" : "Add Device"}
+              actions={
+                <button
+                  type="button"
+                  onClick={() => setShowDeviceModal(false)}
+                  className="text-gray-400 hover:text-gray-600 dark:hover:text-gray-300 p-1 rounded transition-colors"
+                  aria-label="Close"
+                >
+                  <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                  </svg>
+                </button>
+              }
+            >
+              <div className="space-y-4">
+                <Field label="IP Address *">
+                  <Input
+                    type="text"
+                    value={deviceForm.ip}
+                    onChange={(e) => setDeviceForm({ ...deviceForm, ip: e.target.value })}
+                    placeholder="192.168.1.1"
+                  />
+                </Field>
+                <Field label="Hostname">
+                  <Input
+                    type="text"
+                    value={deviceForm.hostname}
+                    onChange={(e) => setDeviceForm({ ...deviceForm, hostname: e.target.value })}
+                    placeholder="Core-SW"
+                  />
+                </Field>
+                <Field label="Username *">
+                  <Input
+                    type="text"
+                    value={deviceForm.username}
+                    onChange={(e) => setDeviceForm({ ...deviceForm, username: e.target.value })}
+                    placeholder="admin"
+                  />
+                </Field>
+                <Field label="Password">
+                  <PasswordInput
+                    value={deviceForm.password}
+                    onChange={(e) => setDeviceForm({ ...deviceForm, password: e.target.value })}
+                    placeholder="password123"
+                  />
+                </Field>
+                <Field label="Secret (Enable)">
+                  <PasswordInput
+                    value={deviceForm.secret}
+                    onChange={(e) => setDeviceForm({ ...deviceForm, secret: e.target.value })}
+                    placeholder="Leave empty if same as password or not required"
+                  />
+                  <p className="mt-1 text-xs text-gray-500 dark:text-gray-400">
+                    Enable/privileged password (Cisco). Leave empty if same as password, not required, or for Huawei devices.
+                  </p>
+                </Field>
+                <div className="grid grid-cols-2 gap-4">
+                  <Field label="Port">
+                    <Input
+                      type="number"
+                      value={deviceForm.port}
+                      onChange={(e) => setDeviceForm({ ...deviceForm, port: parseInt(e.target.value) || 22 })}
+                      placeholder="22"
+                    />
+                  </Field>
+                  <Field label="Device Type">
+                    <Select
+                      value={deviceForm.device_type}
+                      onChange={(val) => setDeviceForm({ ...deviceForm, device_type: val })}
+                      options={[
+                        { value: "cisco_ios", label: "Cisco IOS" },
+                        { value: "huawei_vrp", label: "Huawei VRP" }
+                      ]}
+                    />
+                  </Field>
+                </div>
+              </div>
+              <div className="flex gap-2 justify-end mt-6 pt-4 border-t border-gray-100 dark:border-[#1F2937]">
+                <Button variant="secondary" onClick={() => setShowDeviceModal(false)}>
+                  Cancel
+                </Button>
+                <Button variant="primary" onClick={handleSaveDevice}>
+                  {editingDevice !== null ? "Update" : "Add"}
+                </Button>
+              </div>
+            </Card>
+          </div>
+        </div>
+      )}
+
+      {/* CSV format & import instructions modal */}
+      {showCsvInfoModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+          <div className="absolute inset-0 bg-black/50" onClick={() => setShowCsvInfoModal(false)} />
+          <div className="relative z-10 w-full max-w-lg max-h-[90vh] overflow-hidden">
+            <Card
+              title={
+                <span className="flex items-center gap-2">
+                  <span className="inline-flex items-center justify-center w-6 h-6 rounded-full bg-blue-100 dark:bg-blue-900/50 text-blue-600 dark:text-blue-300 text-xs font-medium">i</span>
+                  CSV Template & Import Guide
+                </span>
+              }
+              actions={
+                <button
+                  type="button"
+                  onClick={() => setShowCsvInfoModal(false)}
+                  className="text-gray-400 hover:text-gray-600 dark:hover:text-gray-300 p-1 rounded transition-colors"
+                  aria-label="Close"
+                >
+                  <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                  </svg>
+                </button>
+              }
+              className="flex flex-col max-h-[90vh]"
+            >
+              <div className="flex-1 overflow-y-auto space-y-4 text-sm text-gray-700 dark:text-gray-300">
+                <section>
+                  <h4 className="font-semibold text-gray-900 dark:text-gray-100 mb-2">How to use</h4>
+                  <ol className="list-decimal list-inside space-y-1.5 pl-1 text-gray-600 dark:text-gray-400">
+                    <li>Click <strong className="text-gray-900 dark:text-gray-100">Export CSV Template</strong> to download a template file.</li>
+                    <li>Open the file in Excel or a text editor and fill in your device data.</li>
+                    <li>Save the file as CSV (UTF-8).</li>
+                    <li>Click <strong className="text-gray-900 dark:text-gray-100">Import CSV</strong> and select your saved file.</li>
+                    <li>Click <strong className="text-gray-900 dark:text-gray-100">Save Settings</strong> (in Command Template section) to store the devices in this project.</li>
+                    <li>Use <strong className="text-gray-900 dark:text-gray-100">Linux Script (.sh)</strong> or <strong className="text-gray-900 dark:text-gray-100">Windows Script (.py)</strong> to generate backup scripts.</li>
+                  </ol>
+                </section>
+                <section>
+                  <h4 className="font-semibold text-gray-900 dark:text-gray-100 mb-2">CSV columns (in the exported template)</h4>
+                  <ul className="space-y-1.5 border border-gray-200 dark:border-[#1F2937] rounded-lg p-3 bg-gray-50 dark:bg-slate-900/50">
+                    <li><strong className="text-gray-900 dark:text-gray-100">ip</strong> (required) — Device IP address, e.g. 192.168.1.1</li>
+                    <li><strong className="text-gray-900 dark:text-gray-100">hostname</strong> (optional) — Display name, e.g. Core-SW. If empty, IP is used.</li>
+                    <li><strong className="text-gray-900 dark:text-gray-100">username</strong> (required) — SSH login username</li>
+                    <li><strong className="text-gray-900 dark:text-gray-100">password</strong> (optional) — SSH password. Leave empty if using key-based auth (script may need editing).</li>
+                    <li><strong className="text-gray-900 dark:text-gray-100">secret</strong> (optional) — Enable/privileged password (Cisco). Leave empty for Huawei or if not used.</li>
+                    <li><strong className="text-gray-900 dark:text-gray-100">port</strong> (optional) — SSH port; default 22 if empty.</li>
+                    <li><strong className="text-gray-900 dark:text-gray-100">device_type</strong> (optional) — Use <code className="px-1 py-0.5 bg-gray-200 dark:bg-slate-700 rounded text-xs font-mono">cisco_ios</code> or <code className="px-1 py-0.5 bg-gray-200 dark:bg-slate-700 rounded text-xs font-mono">huawei_vrp</code>. Default is cisco_ios.</li>
+                  </ul>
+                </section>
+                <section>
+                  <h4 className="font-semibold text-gray-900 dark:text-gray-100 mb-2">Import rules</h4>
+                  <div className="space-y-1 text-gray-600 dark:text-gray-400">
+                    <p>• Rows must have <strong className="text-gray-900 dark:text-gray-100">ip</strong> and <strong className="text-gray-900 dark:text-gray-100">username</strong> to be imported.</p>
+                    <p>• Imported devices are <strong className="text-gray-900 dark:text-gray-100">added</strong> to the current list (not replaced).</p>
+                    <p>• Lines starting with <strong className="text-gray-900 dark:text-gray-100">#</strong> are ignored (you can add comments in the file).</p>
+                    <p>• After importing, click <strong className="text-gray-900 dark:text-gray-100">Save Settings</strong> so devices are saved for script generation.</p>
+                  </div>
+                </section>
+              </div>
+              <div className="flex-shrink-0 pt-4 mt-4 border-t border-gray-100 dark:border-[#1F2937]">
+                <Button variant="primary" onClick={() => setShowCsvInfoModal(false)}>Close</Button>
               </div>
             </Card>
           </div>
@@ -10301,7 +11152,8 @@ function classifyRoleByName(name = "") {
 }
 
 /* ===== TopologyGraph (SVG) ===== */
-const TopologyGraph = ({ project, onOpenDevice, can, authedUser, setProjects, setTopologyLLMMetrics, topologyLLMMetrics, llmBusy, llmBusyMessage, requestRun, onComplete, setLlmNotification }) => {
+const TopologyGraph = ({ project, projectId, routeToHash, onOpenDevice, can, authedUser, setProjects, setTopologyLLMMetrics, topologyLLMMetrics, llmBusy, llmBusyMessage, requestRun, onComplete, setLlmNotification }) => {
+  const deviceDetailHref = (deviceId) => routeToHash ? routeToHash({ name: "device", projectId: projectId || project?.project_id || project?.id, device: deviceId }) : "#/";
   // Helper function for default positioning - defined first to avoid hoisting issues
   const getDefaultPos = (nodeId, role, index = 0, totalByRole = {}) => {
     const centerX = 50;
@@ -11293,12 +12145,7 @@ const TopologyGraph = ({ project, onOpenDevice, can, authedUser, setProjects, se
   
   // Handle node drag
   const handleMouseDown = (nodeId, e) => {
-    if (!editMode) {
-      if (!e.ctrlKey && !e.metaKey) {
-        onOpenDevice?.(nodeId);
-      }
-      return;
-    }
+    if (!editMode) return; // view mode: navigation is handled by the <a> wrapper (click); ctrl/cmd/middle-click opens in new tab
     
     // In edit mode: Check if panning with modifier keys
     if (editMode && (e.ctrlKey || e.metaKey || e.shiftKey)) {
@@ -11877,9 +12724,8 @@ const TopologyGraph = ({ project, onOpenDevice, can, authedUser, setProjects, se
             // Label always below icon: image height is size*8 (centered), so bottom at +size*4; SVG icon bottom ~+size*0.6
             const labelY = deviceImageUrl ? (deviceSize * 4 + 3.2) : (deviceSize + 3);
             
-            return (
+            const nodeContent = (
               <g 
-                key={n.id}
                 transform={`translate(${p.x}, ${p.y})`}
                 onMouseDown={(e) => handleMouseDown(n.id, e)}
                 onClick={(e) => handleNodeClick(n.id, e)}
@@ -11906,9 +12752,17 @@ const TopologyGraph = ({ project, onOpenDevice, can, authedUser, setProjects, se
                   {getNodeName(n.id)}
                 </text>
                 {/* hover tooltip */}
-                <title>{`Role: ${n.role || "-"} • Model: ${n.model || "-"} • Mgmt: ${n.mgmtIp || "-"} • Routing: ${n.routing || "-"} • STP: ${n.stpMode || "-"}`}</title>
+                <title>{`Role: ${n.role || "-"} • Model: ${n.model || "-"} • Mgmt: ${n.mgmtIp || "-"} • Routing: ${n.routing || "-"} • STP: ${n.stpMode || "-"} • Ctrl+click to open in new tab`}</title>
               </g>
             );
+            if (!editMode) {
+              return (
+                <a key={n.id} href={deviceDetailHref(n.id)} onClick={(e) => handleNavClick(e, () => onOpenDevice?.(n.id))} style={{ cursor: "pointer" }}>
+                  {nodeContent}
+                </a>
+              );
+            }
+            return React.cloneElement(nodeContent, { key: n.id });
           })}
           </g>
         </svg>

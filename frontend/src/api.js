@@ -614,3 +614,15 @@ export async function saveTopologyLayout(projectId, positions, links, nodeLabels
     }),
   });
 }
+
+// Script Generator API
+export async function getScriptSettings(projectId) {
+  return api(`/projects/${projectId}/script-settings`);
+}
+
+export async function saveScriptSettings(projectId, settings) {
+  return api(`/projects/${projectId}/script-settings`, {
+    method: 'POST',
+    body: JSON.stringify(settings),
+  });
+}

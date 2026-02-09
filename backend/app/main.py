@@ -8,7 +8,7 @@ from .core.settings import settings
 from .core.security import hash_password
 from .services.ai_engine import call_ollama_chat
 from .services.llm_service import llm_service
-from .routers import auth, users, projects, documents, project_options, summary, folders, analysis, topology
+from .routers import auth, users, projects, documents, project_options, summary, folders, analysis, topology, script_generator
 from .routers.summary import device_router
 from .routers.analysis import overview_router
 from .routers.topology import network_topology_router
@@ -77,6 +77,7 @@ app.include_router(users.router)
 app.include_router(projects.router)
 app.include_router(documents.router)
 app.include_router(project_options.router)
+app.include_router(script_generator.router)
 app.include_router(summary.router)
 app.include_router(device_router)
 app.include_router(folders.router)
