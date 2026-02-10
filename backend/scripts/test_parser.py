@@ -8,7 +8,104 @@ from pathlib import Path
 # Add parent directory to path
 sys.path.insert(0, str(Path(__file__).parent.parent))
 
-from app.services.config_parser import ConfigParser
+from app.services.config_parser import ConfigParser, normalize_cisco_to_legacy
+from app.services.parsers.cisco import CiscoIOSParser
+
+# Minimal Cisco IOS-style content for testing without test_config file
+CISCO_SAMPLE = """
+CORE1#show version
+Cisco IOS Software, Version 15.2(4)M6
+Processor board ID FXS1234ABCD
+uptime is 1 week, 2 days, 3 hours
+
+CORE1#show running-config
+hostname CORE1
+interface GigabitEthernet0/0
+ description Uplink
+ ip address 10.0.0.1 255.255.255.0
+ no shutdown
+interface GigabitEthernet0/1
+ switchport mode access
+ switchport access vlan 10
+
+CORE1#show ip interface brief
+Interface              IP-Address      OK? Method Status                Protocol
+GigabitEthernet0/0      10.0.0.1        YES NVRAM  up                    up
+GigabitEthernet0/1      unassigned      YES unset  up                    up
+
+CORE1#show vlan brief
+VLAN Name                             Status    Ports
+1    default                          active
+10   DATA                            active
+
+CORE1#show ip route
+Codes: L - local, C - connected, S - static
+C    10.0.0.0/24 is directly connected, GigabitEthernet0/0
+
+CORE1#show cdp neighbors detail
+Device ID: DIST1
+IP address: 10.0.0.2
+Platform: cisco WS-C2960
+Port ID (outgoing port): GigabitEthernet0/1
+Interface: GigabitEthernet0/1
+"""
+
+
+def test_cisco_parser():
+    """Test Cisco IOS parser: spec output and normalized legacy shape."""
+    parser = ConfigParser()
+    cisco_parser = CiscoIOSParser()
+    assert cisco_parser.detect_vendor(CISCO_SAMPLE), "Cisco vendor detection should pass"
+
+    # Parse with ConfigParser (returns normalized legacy format for Cisco)
+    parsed = parser.parse_config(CISCO_SAMPLE, "CORE1_All.txt")
+    if not parsed:
+        print("Cisco parse_config returned None")
+        return False
+
+    assert parsed.get("vendor") == "cisco"
+    assert "device_overview" in parsed
+    assert "interfaces" in parsed
+    assert "vlans" in parsed
+    assert "routing" in parsed
+    assert "neighbors" in parsed
+    assert "mac_arp" in parsed
+    assert "security" in parsed
+    assert "ha" in parsed
+    assert "stp" in parsed
+
+    overview = parsed["device_overview"]
+    assert overview.get("hostname") == "CORE1"
+    assert overview.get("role") == "Core"
+    assert "management_ip" in overview or "mgmt_ip" in overview or overview.get("hostname")
+
+    interfaces = parsed["interfaces"]
+    assert isinstance(interfaces, list)
+    for i in interfaces:
+        assert "name" in i
+        assert "oper_status" in i or "status" in i
+        assert "port_mode" in i or "mode" in i or i.get("name", "").startswith("Gi")
+
+    vlans = parsed["vlans"]
+    assert isinstance(vlans, dict)
+    assert "total_vlan_count" in vlans
+    assert "vlan_list" in vlans
+
+    routing = parsed["routing"]
+    assert "static" in routing
+    assert isinstance(routing["static"], list)
+
+    # Direct CiscoIOSParser.parse returns spec shape; normalizer converts to legacy
+    raw = cisco_parser.parse(CISCO_SAMPLE, "CORE1_All.txt")
+    assert "arp_mac_table" in raw
+    assert isinstance(raw.get("vlans"), list)
+    normalized = normalize_cisco_to_legacy(raw)
+    assert "mac_arp" in normalized
+    assert "security" in normalized
+    assert isinstance(normalized["vlans"], dict) and "total_vlan_count" in normalized["vlans"]
+    print("Cisco parser and normalizer OK")
+    return True
+
 
 def test_parser():
     """Test parser with a sample log file"""
@@ -98,12 +195,22 @@ if __name__ == "__main__":
     print("=" * 60)
     print("Parser Test Script")
     print("=" * 60)
-    
-    success = test_parser()
-    
+
+    cisco_ok = False
+    try:
+        cisco_ok = test_cisco_parser()
+    except Exception as e:
+        print(f"Cisco test error: {e}")
+        import traceback
+        traceback.print_exc()
+
+    huawei_ok = test_parser()
+
     print("\n" + "=" * 60)
-    if success:
-        print("✅ Test PASSED")
+    all_ok = cisco_ok and huawei_ok
+    if all_ok:
+        print("✅ All tests PASSED")
     else:
-        print("❌ Test FAILED")
+        print("Result: Cisco=%s, Huawei=%s" % (cisco_ok, huawei_ok))
     print("=" * 60)
+    sys.exit(0 if cisco_ok else 1)

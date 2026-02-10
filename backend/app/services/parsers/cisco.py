@@ -1,815 +1,562 @@
-"""Cisco IOS/IOS-XE/IOS-XR/NX-OS configuration parser"""
+"""Cisco IOS/IOS-XE configuration parser - spec 2.3.2.1 through 2.3.2.9"""
 
 import re
 from typing import Dict, List, Any, Optional
 from .base import BaseParser
 
 
-class CiscoParser(BaseParser):
-    """Parser for Cisco device configurations"""
-    
+def _get_section(content: str, command_pattern: str) -> Optional[str]:
+    """Extract command output from content: from command line until next prompt or next 'show'."""
+    pattern = re.compile(
+        command_pattern + r"\s*(.*?)(?=show\s+|\n\s*[\w-]+#|$)",
+        re.IGNORECASE | re.DOTALL,
+    )
+    m = pattern.search(content)
+    return m.group(1).strip() if m else None
+
+
+class CiscoIOSParser(BaseParser):
+    """
+    Parser for Cisco IOS device outputs (concatenated show commands).
+    Returns exact JSON spec: device_overview, interfaces, vlans (list), routing.routes,
+    arp_mac_table, neighbors, stp, security_mgmt, ha.
+    """
+
     def detect_vendor(self, content: str) -> bool:
-        """Detect if this is a Cisco configuration"""
-        cisco_indicators = [
-            r'hostname\s+\S+',
-            r'version\s+\d+',
-            r'!.*Cisco',
-            r'switchport\s+mode',
-            r'spanning-tree',
-            r'router\s+ospf',
-            r'router\s+bgp',
-            r'show\s+running-config',
-            r'interface\s+(GigabitEthernet|FastEthernet|Ethernet|TenGigabitEthernet)',
+        """Detect if this is a Cisco configuration or command output."""
+        indicators = [
+            r"hostname\s+\S+",
+            r"version\s+\d+",
+            r"!.*Cisco",
+            r"switchport\s+mode",
+            r"spanning-tree",
+            r"router\s+ospf",
+            r"router\s+bgp",
+            r"show\s+running-config",
+            r"show\s+version",
+            r"interface\s+(GigabitEthernet|FastEthernet|Ethernet|TenGigabitEthernet)",
+            r"Cisco\s+IOS\s+Software",
         ]
-        content_lower = content.lower()
-        matches = sum(1 for pattern in cisco_indicators if re.search(pattern, content, re.IGNORECASE))
-        return matches >= 2
-    
+        return sum(1 for p in indicators if re.search(p, content, re.IGNORECASE)) >= 2
+
     def parse(self, content: str, filename: str) -> Dict[str, Any]:
-        """Parse complete Cisco configuration"""
+        """Return exact spec structure (2.3.2.1-2.3.2.9)."""
         return {
             "device_overview": self.extract_device_overview(content),
             "interfaces": self.extract_interfaces(content),
-            "vlans": self.extract_vlans(content),
-            "stp": self.extract_stp(content),
+            "vlans": self.extract_vlans(content).get("vlan_list", []),
             "routing": self.extract_routing(content),
+            "arp_mac_table": self.extract_mac_arp(content),
             "neighbors": self.extract_neighbors(content),
-            "mac_arp": self.extract_mac_arp(content),
-            "security": self.extract_security(content),
+            "stp": self.extract_stp(content),
+            "security_mgmt": self.extract_security(content),
             "ha": self.extract_ha(content),
         }
-    
+
     def extract_device_overview(self, content: str) -> Dict[str, Any]:
-        """Extract device overview information"""
+        """2.3.2.1 - hostname, role, model, os_version, serial_number, management_ip, uptime, cpu_utilization, memory_utilization."""
         overview = {
             "hostname": None,
             "role": None,
             "model": None,
-            "platform": None,
             "os_version": None,
             "serial_number": None,
-            "mgmt_ip": None,
+            "management_ip": None,
             "uptime": None,
-            "cpu_util": None,
-            "mem_util": None,
+            "cpu_utilization": None,
+            "memory_utilization": None,
         }
-        
-        # Extract hostname
-        hostname_match = re.search(r'hostname\s+(\S+)', content, re.IGNORECASE)
+        # Hostname from config or prompt (.*)#
+        hostname_match = re.search(r"hostname\s+(\S+)", content, re.IGNORECASE)
         if hostname_match:
             overview["hostname"] = hostname_match.group(1)
-        
-        # Extract role from comments
-        role_match = re.search(r'!.*ROLE:\s*(\S+)', content, re.IGNORECASE)
-        if role_match:
-            overview["role"] = role_match.group(1)
-        
-        # If role not found in comments, try to infer from hostname/device name
-        if not overview.get("role"):
-            hostname = overview.get("hostname", "").lower()
-            if hostname:
-                if "core" in hostname:
-                    overview["role"] = "Core"
-                elif "dist" in hostname or "distribution" in hostname:
-                    overview["role"] = "Distribution"
-                elif "access" in hostname:
-                    overview["role"] = "Access"
-                elif "router" in hostname or "rt" in hostname:
-                    overview["role"] = "Router"
-                elif "switch" in hostname or "sw" in hostname:
-                    overview["role"] = "Switch"
-        
-        # Extract version
-        version_match = re.search(r'version\s+([\d.]+)', content, re.IGNORECASE)
-        if version_match:
-            overview["os_version"] = version_match.group(1)
-        
-        # Extract from show version output
-        show_version_match = re.search(r'show\s+version.*?(?=show|!|$)', content, re.IGNORECASE | re.DOTALL)
-        if show_version_match:
-            version_output = show_version_match.group(0)
-            
-            # Model/Platform
-            model_match = re.search(r'(?:Model|cisco)\s+(\S+)', version_output, re.IGNORECASE)
-            if model_match:
-                overview["model"] = model_match.group(1)
-            
-            # Serial number
-            serial_match = re.search(r'[Ss]erial\s+[Nn]umber[:\s]+(\S+)', version_output)
-            if serial_match:
-                overview["serial_number"] = serial_match.group(1)
-            
+        if not overview["hostname"]:
+            prompt_match = re.search(r"^(\S+)#", content, re.MULTILINE)
+            if prompt_match:
+                overview["hostname"] = prompt_match.group(1)
+        # Role: infer from hostname
+        if overview.get("hostname"):
+            h = overview["hostname"].lower()
+            if "core" in h:
+                overview["role"] = "Core"
+            elif "dist" in h or "distribution" in h:
+                overview["role"] = "Distribution"
+            elif "access" in h or "acc" in h:
+                overview["role"] = "Access"
+            else:
+                overview["role"] = "Switch"
+        # show version section
+        version_block = _get_section(content, r"show\s+version")
+        if version_block:
+            # Cisco IOS Software, Version ...
+            os_m = re.search(r"Cisco\s+IOS\s+Software.*?Version\s+([^\s,]+)", version_block, re.IGNORECASE)
+            if os_m:
+                overview["os_version"] = os_m.group(1).strip()
+            if not overview["os_version"]:
+                ver_m = re.search(r"version\s+([\d.]+)", content, re.IGNORECASE)
+                if ver_m:
+                    overview["os_version"] = ver_m.group(1)
+            # Model number / Processor board ID
+            model_m = re.search(r"(?:Model\s+[Nn]umber|Processor\s+board\s+ID)[:\s]+(\S+)", version_block, re.IGNORECASE)
+            if model_m:
+                overview["model"] = model_m.group(1)
+            if not overview["model"]:
+                model_m2 = re.search(r"(?:cisco|Model)\s+(\S+)", version_block, re.IGNORECASE)
+                if model_m2:
+                    overview["model"] = model_m2.group(1)
+            # Serial
+            serial_m = re.search(r"(?:Processor\s+board\s+ID|Serial\s+[Nn]umber)[:\s]+(\S+)", version_block, re.IGNORECASE)
+            if serial_m:
+                overview["serial_number"] = serial_m.group(1)
             # Uptime
-            uptime_match = re.search(r'uptime\s+is\s+(.+?)(?:\n|$)', version_output, re.IGNORECASE)
-            if uptime_match:
-                overview["uptime"] = uptime_match.group(1).strip()
-        
-        # Extract management IP (look for IP on management interface or loopback)
-        mgmt_ip_match = re.search(r'interface\s+(?:[Vv]lan|Loopback|Management)\s*\d+.*?ip\s+address\s+(\d+\.\d+\.\d+\.\d+)', content, re.IGNORECASE | re.DOTALL)
-        if mgmt_ip_match:
-            overview["mgmt_ip"] = mgmt_ip_match.group(1)
-        
-        # CPU and Memory from show processes or show memory
-        cpu_match = re.search(r'CPU\s+utilization.*?(\d+(?:\.\d+)?)\s*%', content, re.IGNORECASE)
-        if cpu_match:
-            try:
-                overview["cpu_util"] = float(cpu_match.group(1))
-            except:
-                pass
-        
-        mem_match = re.search(r'[Mm]emory\s+utilization.*?(\d+(?:\.\d+)?)\s*%', content, re.IGNORECASE)
-        if mem_match:
-            try:
-                overview["mem_util"] = float(mem_match.group(1))
-            except:
-                pass
-        
-        return overview
-    
-    def extract_interfaces(self, content: str) -> List[Dict[str, Any]]:
-        """Extract interface information"""
-        interface_dict = {}  # Use dict to merge config and show output, prevent duplicates
-        
-        # Parse interface blocks
-        interface_pattern = r'interface\s+(\S+)\s*\n(.*?)(?=\ninterface\s+|$)'
-        for match in re.finditer(interface_pattern, content, re.IGNORECASE | re.DOTALL):
-            iface_name = match.group(1)
-            iface_config = match.group(2)
-            
-            iface = {
-                "name": iface_name,
-                "type": self._get_interface_type(iface_name),
-                "admin_status": "up" if "shutdown" not in iface_config.lower() else "down",
-                "oper_status": "up",  # Default, will be updated from show output
-                "line_protocol": "up",
-                "description": None,
-                "ipv4_address": None,
-                "ipv6_address": None,
-                "mac_address": None,
-                "speed": None,
-                "duplex": None,
-                "mtu": None,
-                "port_mode": None,
-                "access_vlan": None,
-                "native_vlan": None,
-                "allowed_vlans": None,
-            }
-            
-            # Extract description
-            desc_match = re.search(r'description\s+(.+?)(?:\n|$)', iface_config, re.IGNORECASE)
-            if desc_match:
-                iface["description"] = desc_match.group(1).strip()
-            
-            # Extract IPv4 address
-            ip_match = re.search(r'ip\s+address\s+(\d+\.\d+\.\d+\.\d+)', iface_config, re.IGNORECASE)
-            if ip_match:
-                iface["ipv4_address"] = ip_match.group(1)
-            
-            # Extract IPv6 address
-            ipv6_match = re.search(r'ipv6\s+address\s+([\da-fA-F:]+/\d+)', iface_config, re.IGNORECASE)
-            if ipv6_match:
-                iface["ipv6_address"] = ipv6_match.group(1)
-            
-            # Extract port mode
-            if "switchport mode access" in iface_config.lower():
-                iface["port_mode"] = "access"
-                vlan_match = re.search(r'switchport\s+access\s+vlan\s+(\d+)', iface_config, re.IGNORECASE)
-                if vlan_match:
-                    iface["access_vlan"] = vlan_match.group(1)
-            elif "switchport mode trunk" in iface_config.lower():
-                iface["port_mode"] = "trunk"
-                native_match = re.search(r'switchport\s+trunk\s+native\s+vlan\s+(\d+)', iface_config, re.IGNORECASE)
-                if native_match:
-                    iface["native_vlan"] = native_match.group(1)
-                allowed_match = re.search(r'switchport\s+trunk\s+allowed\s+vlan\s+(.+)', iface_config, re.IGNORECASE)
-                if allowed_match:
-                    iface["allowed_vlans"] = allowed_match.group(1).strip()
-            elif "no switchport" in iface_config.lower() or iface["ipv4_address"]:
-                iface["port_mode"] = "routed"
-            
-            interface_dict[iface_name] = iface
-        
-        # Update from show ip interface brief
-        brief_match = re.search(r'show\s+ip\s+interface\s+brief.*?\n(.*?)(?=!|show|$)', content, re.IGNORECASE | re.DOTALL)
-        if brief_match:
-            brief_lines = brief_match.group(1).strip().split('\n')
-            for line in brief_lines[1:]:  # Skip header
-                parts = line.split()
-                if len(parts) >= 4:
-                    iface_name = parts[0]
-                    ip_addr = parts[1] if parts[1] != "unassigned" else None
-                    status = parts[3] if len(parts) > 3 else None
-                    protocol = parts[4] if len(parts) > 4 else None
-                    
-                    if iface_name not in interface_dict:
-                        interface_dict[iface_name] = {
-                            "name": iface_name,
-                            "type": self._get_interface_type(iface_name),
-                            "admin_status": "up",
-                            "oper_status": status.lower() if status else "up",
-                            "line_protocol": protocol.lower() if protocol else "up",
-                        }
-                    
-                    iface = interface_dict[iface_name]
-                    if ip_addr:
-                        iface["ipv4_address"] = ip_addr
-                    if status:
-                        iface["oper_status"] = status.lower()
-                    if protocol:
-                        iface["line_protocol"] = protocol.lower()
-        
-        # Parse show interface for speed, duplex, MTU, MAC
-        # Try multiple patterns for show interface
-        show_patterns = [
-            r'(\S+)\s+is\s+(?:up|down|administratively down).*?Hardware\s+is\s+(.+?)(?=\n\S+\s+is\s+(?:up|down)|!|show|$)',
-            r'interface\s+(\S+).*?Hardware\s+is\s+(.+?)(?=\ninterface\s+|!|show|$)',
-        ]
-        
-        for pattern in show_patterns:
-            for match in re.finditer(pattern, content, re.IGNORECASE | re.DOTALL):
-                iface_name = match.group(1)
-                iface_details = match.group(2) if len(match.groups()) > 1 else ""
-                
-                if iface_name not in interface_dict:
-                    interface_dict[iface_name] = {
-                        "name": iface_name,
-                        "type": self._get_interface_type(iface_name),
-                    }
-                
-                iface = interface_dict[iface_name]
-                
-                # Extract MAC address
-                mac_match = re.search(r'address\s+is\s+([\da-fA-F.]+)', iface_details, re.IGNORECASE)
-                if mac_match:
-                    iface["mac_address"] = mac_match.group(1)
-                
-                # Extract Speed
-                speed_match = re.search(r'BW\s+(\d+)\s*(?:Kbit|Mbit|Gbit)', iface_details, re.IGNORECASE)
-                if speed_match:
-                    speed_val = speed_match.group(1)
-                    speed_unit = speed_match.group(0).upper()
-                    if 'GBIT' in speed_unit:
-                        iface["speed"] = f"{speed_val}Gbps"
-                    elif 'MBIT' in speed_unit:
-                        iface["speed"] = f"{speed_val}Mbps"
-                    else:
-                        iface["speed"] = f"{speed_val}Kbps"
-                else:
-                    # Try alternative pattern
-                    speed_match = re.search(r'(\d+)\s*(?:Mbps|Gbps|Kbps)', iface_details, re.IGNORECASE)
-                    if speed_match:
-                        iface["speed"] = speed_match.group(0)
-                
-                # Extract Duplex
-                duplex_match = re.search(r'(?:full|half)[-\s]*duplex', iface_details, re.IGNORECASE)
-                if duplex_match:
-                    iface["duplex"] = duplex_match.group(0).split()[0].lower()
-                
-                # Extract MTU
-                mtu_match = re.search(r'MTU\s+(\d+)', iface_details, re.IGNORECASE)
-                if mtu_match:
-                    iface["mtu"] = int(mtu_match.group(1))
-        
-        # Convert dict to list
-        interfaces = list(interface_dict.values())
-        
-        return interfaces
-    
-    def _get_interface_type(self, iface_name: str) -> str:
-        """Determine interface type from name"""
-        if "GigabitEthernet" in iface_name or "Gi" in iface_name:
-            return "GigabitEthernet"
-        elif "FastEthernet" in iface_name or "Fa" in iface_name:
-            return "FastEthernet"
-        elif "TenGigabitEthernet" in iface_name or "Te" in iface_name:
-            return "TenGigabitEthernet"
-        elif "Ethernet" in iface_name or "Eth" in iface_name:
-            return "Ethernet"
-        elif "Vlan" in iface_name or "VLAN" in iface_name:
-            return "VLAN"
-        elif "Loopback" in iface_name:
-            return "Loopback"
-        else:
-            return "Unknown"
-    
-    def extract_vlans(self, content: str) -> Dict[str, Any]:
-        """Extract VLAN information"""
-        vlans = {
-            "vlan_list": [],
-            "vlan_names": {},
-            "vlan_status": {},
-            "access_ports": {},
-            "trunk_ports": {},
-            "native_vlan": None,
-            "total_vlan_count": 0,
-        }
-        
-        # Parse vlan blocks
-        vlan_pattern = r'vlan\s+(\d+)\s*\n(.*?)(?=\nvlan\s+|$)'
-        for match in re.finditer(vlan_pattern, content, re.IGNORECASE | re.DOTALL):
-            vlan_id = match.group(1)
-            vlan_config = match.group(2)
-            
-            if vlan_id not in vlans["vlan_list"]:
-                vlans["vlan_list"].append(vlan_id)
-            
-            # Extract VLAN name
-            name_match = re.search(r'name\s+(\S+)', vlan_config, re.IGNORECASE)
-            if name_match:
-                vlans["vlan_names"][vlan_id] = name_match.group(1)
-            
-            # Status (default active)
-            vlans["vlan_status"][vlan_id] = "active"
-        
-        # Parse from show vlan brief
-        vlan_brief_match = re.search(r'show\s+vlan\s+brief.*?\n(.*?)(?=!|show|$)', content, re.IGNORECASE | re.DOTALL)
-        if vlan_brief_match:
-            brief_lines = vlan_brief_match.group(1).strip().split('\n')
-            for line in brief_lines[1:]:  # Skip header
-                parts = line.split()
-                if len(parts) >= 2:
-                    vlan_id = parts[0]
-                    vlan_name = parts[1] if len(parts) > 1 else None
-                    status = parts[2] if len(parts) > 2 else "active"
-                    ports = parts[3:] if len(parts) > 3 else []
-                    
-                    if vlan_id not in vlans["vlan_list"]:
-                        vlans["vlan_list"].append(vlan_id)
-                    if vlan_name:
-                        vlans["vlan_names"][vlan_id] = vlan_name
-                    vlans["vlan_status"][vlan_id] = status.lower()
-                    
-                    # Track ports
-                    for port in ports:
-                        if port not in vlans["access_ports"]:
-                            vlans["access_ports"][port] = []
-                        if vlan_id not in vlans["access_ports"][port]:
-                            vlans["access_ports"][port].append(vlan_id)
-        
-        vlans["total_vlan_count"] = len(vlans["vlan_list"])
-        
-        return vlans
-    
-    def extract_stp(self, content: str) -> Dict[str, Any]:
-        """Extract Spanning Tree Protocol information"""
-        stp = {
-            "mode": None,
-            "root_bridge_id": None,
-            "root_priority": None,
-            "is_root_bridge": False,
-            "port_roles": {},
-            "port_states": {},
-            "port_costs": {},
-            "portfast_enabled": {},
-            "bpdu_guard_enabled": {},
-        }
-        
-        # Extract STP mode
-        mode_match = re.search(r'spanning-tree\s+mode\s+(\S+)', content, re.IGNORECASE)
-        if mode_match:
-            stp["mode"] = mode_match.group(1).upper()
-        
-        # Parse from show spanning-tree
-        stp_match = re.search(r'show\s+spanning-tree.*?\n(.*?)(?=!|show|$)', content, re.IGNORECASE | re.DOTALL)
-        if stp_match:
-            stp_output = stp_match.group(1)
-            
-            # Root bridge info
-            root_match = re.search(r'Root\s+ID\s+.*?(\d+\.\d+\.\d+\.\d+)', stp_output, re.IGNORECASE)
-            if root_match:
-                stp["root_bridge_id"] = root_match.group(1)
-            
-            # Port information
-            port_pattern = r'(\S+)\s+(\w+)\s+(\w+)\s+(\d+)\s+(\d+\.\d+)\s+(\w+)'
-            for match in re.finditer(port_pattern, stp_output):
-                iface = match.group(1)
-                role = match.group(2)
-                state = match.group(3)
-                cost = match.group(4)
-                
-                stp["port_roles"][iface] = role
-                stp["port_states"][iface] = state
-                stp["port_costs"][iface] = cost
-        
-        # Extract portfast and bpduguard from config
-        for iface_match in re.finditer(r'interface\s+(\S+)\s*\n(.*?)(?=\ninterface\s+|$)', content, re.IGNORECASE | re.DOTALL):
-            iface = iface_match.group(1)
-            iface_config = iface_match.group(2)
-            
-            if "spanning-tree portfast" in iface_config.lower():
-                stp["portfast_enabled"][iface] = True
-            if "spanning-tree bpduguard enable" in iface_config.lower():
-                stp["bpdu_guard_enabled"][iface] = True
-        
-        return stp
-    
-    def extract_routing(self, content: str) -> Dict[str, Any]:
-        """Extract routing protocol information"""
-        routing = {
-            "static": {
-                "routes": [],
-                "default_route": None,
-            },
-            "ospf": {
-                "router_id": None,
-                "process_id": None,
-                "areas": [],
-                "interfaces": [],
-                "neighbors": [],
-                "dr_bdr": {},
-            },
-            "eigrp": {
-                "as_number": None,
-                "router_id": None,
-                "neighbors": [],
-                "hold_time": None,
-                "learned_routes": [],
-            },
-            "bgp": {
-                "local_as": None,
-                "peers": [],
-            },
-            "rip": {
-                "version": None,
-                "networks": [],
-                "interfaces": [],
-                "hop_count": {},
-                "auto_summary": None,
-                "passive_interfaces": [],
-                "timers": {
-                    "update": None,
-                    "invalid": None,
-                    "holddown": None,
-                    "flush": None,
-                },
-                "admin_distance": None,
-            },
-        }
-        
-        # Static routes
-        static_pattern = r'ip\s+route\s+(\S+)\s+(\S+)(?:\s+(\S+))?'
-        for match in re.finditer(static_pattern, content, re.IGNORECASE):
-            network = match.group(1)
-            next_hop = match.group(2)
-            if network == "0.0.0.0" and next_hop:
-                routing["static"]["default_route"] = next_hop
-            routing["static"]["routes"].append({
-                "network": network,
-                "next_hop": next_hop,
-                "interface": match.group(3) if match.group(3) else None,
-            })
-        
-        # OSPF
-        ospf_match = re.search(r'router\s+ospf\s+(\d+)', content, re.IGNORECASE)
-        if ospf_match:
-            routing["ospf"]["process_id"] = ospf_match.group(1)
-            
-            router_id_match = re.search(r'router-id\s+(\d+\.\d+\.\d+\.\d+)', content, re.IGNORECASE)
-            if router_id_match:
-                routing["ospf"]["router_id"] = router_id_match.group(1)
-        
-        # BGP
-        bgp_match = re.search(r'router\s+bgp\s+(\d+)', content, re.IGNORECASE)
-        if bgp_match:
-            routing["bgp"]["local_as"] = bgp_match.group(1)
-        
-        # EIGRP
-        eigrp_match = re.search(r'router\s+eigrp\s+(\d+)', content, re.IGNORECASE)
-        if eigrp_match:
-            routing["eigrp"]["as_number"] = eigrp_match.group(1)
-            
-            # Parse router-id
-            router_id_match = re.search(r'eigrp\s+\d+.*?router-id\s+(\d+\.\d+\.\d+\.\d+)', content, re.IGNORECASE | re.DOTALL)
-            if router_id_match:
-                routing["eigrp"]["router_id"] = router_id_match.group(1)
-            
-            # Parse EIGRP neighbors from show commands
-            eigrp_neighbor_match = re.search(r'show\s+eigrp\s+neighbors.*?\n(.*?)(?=!|show|$)', content, re.IGNORECASE | re.DOTALL)
-            if eigrp_neighbor_match:
-                neighbor_lines = eigrp_neighbor_match.group(1).strip().split('\n')
-                for line in neighbor_lines[1:]:  # Skip header
+            uptime_m = re.search(r"uptime\s+is\s+(.+?)(?:\n|$)", version_block, re.IGNORECASE)
+            if uptime_m:
+                overview["uptime"] = uptime_m.group(1).strip()
+        # Management IP: Loopback0 or Vlan1
+        for pattern in [
+            r"interface\s+Loopback\s*0\s*\n.*?ip\s+address\s+(\d+\.\d+\.\d+\.\d+)",
+            r"interface\s+Vlan\s*1\s*\n.*?ip\s+address\s+(\d+\.\d+\.\d+\.\d+)",
+            r"interface\s+Loopback0\s*\n.*?ip\s+address\s+(\d+\.\d+\.\d+\.\d+)",
+            r"interface\s+Vlan1\s*\n.*?ip\s+address\s+(\d+\.\d+\.\d+\.\d+)",
+        ]:
+            m = re.search(pattern, content, re.IGNORECASE | re.DOTALL)
+            if m:
+                overview["management_ip"] = m.group(1)
+                break
+        if not overview["management_ip"]:
+            brief = _get_section(content, r"show\s+ip\s+interface\s+brief")
+            if brief:
+                for line in brief.split("\n")[1:]:
                     parts = line.split()
-                    if len(parts) >= 4:
-                        routing["eigrp"]["neighbors"].append({
-                            "neighbor": parts[0],
-                            "interface": parts[1],
-                            "hold_time": int(parts[2]) if parts[2].isdigit() else None,
-                            "uptime": parts[3] if len(parts) > 3 else None,
-                        })
-                        if parts[2].isdigit() and not routing["eigrp"]["hold_time"]:
-                            routing["eigrp"]["hold_time"] = int(parts[2])
-        
-        # RIP
-        rip_match = re.search(r'router\s+rip', content, re.IGNORECASE)
-        if rip_match:
-            # Parse version
-            version_match = re.search(r'version\s+(\d+)', content, re.IGNORECASE)
-            if version_match:
-                routing["rip"]["version"] = version_match.group(1)
-            
-            # Parse networks
-            network_pattern = r'network\s+(\S+)'
-            for match in re.finditer(network_pattern, content, re.IGNORECASE):
-                if match.group(1) not in routing["rip"]["networks"]:
-                    routing["rip"]["networks"].append(match.group(1))
-            
-            # Parse auto-summary
-            auto_summary_match = re.search(r'auto-summary', content, re.IGNORECASE)
-            if auto_summary_match:
-                routing["rip"]["auto_summary"] = True
-            
-            # Parse passive interfaces
-            passive_match = re.search(r'passive-interface\s+(\S+)', content, re.IGNORECASE)
-            if passive_match:
-                routing["rip"]["passive_interfaces"].append(passive_match.group(1))
-            
-            # Parse timers
-            timer_match = re.search(r'timers\s+basic\s+(\d+)\s+(\d+)\s+(\d+)\s+(\d+)', content, re.IGNORECASE)
-            if timer_match:
-                routing["rip"]["timers"]["update"] = int(timer_match.group(1))
-                routing["rip"]["timers"]["invalid"] = int(timer_match.group(2))
-                routing["rip"]["timers"]["holddown"] = int(timer_match.group(3))
-                routing["rip"]["timers"]["flush"] = int(timer_match.group(4))
-            
-            # Parse admin distance
-            admin_dist_match = re.search(r'distance\s+(\d+)', content, re.IGNORECASE)
-            if admin_dist_match:
-                routing["rip"]["admin_distance"] = int(admin_dist_match.group(1))
-        
-        # Parse RIP database for hop counts
-        rip_db_match = re.search(r'show\s+ip\s+rip\s+database.*?\n(.*?)(?=!|show|$)', content, re.IGNORECASE | re.DOTALL)
-        if rip_db_match:
-            db_lines = rip_db_match.group(1).strip().split('\n')
-            for line in db_lines:
-                line = line.strip()
-                if not line or '---' in line:
+                    if len(parts) >= 2 and parts[1] != "unassigned" and re.match(r"\d+\.\d+\.\d+\.\d+", parts[1]):
+                        overview["management_ip"] = parts[1].split("/")[0]
+                        break
+        # CPU: show processes cpu - five seconds: X%/Y%
+        cpu_block = _get_section(content, r"show\s+processes\s+cpu")
+        if cpu_block:
+            cpu_m = re.search(r"five\s+seconds[:\s]+(?:\d+%\s*/\s*)?(\d+(?:\.\d+)?)\s*%", cpu_block, re.IGNORECASE)
+            if cpu_m:
+                try:
+                    overview["cpu_utilization"] = float(cpu_m.group(1))
+                except ValueError:
+                    pass
+        if overview["cpu_utilization"] is None:
+            cpu_m = re.search(r"CPU\s+utilization.*?(\d+(?:\.\d+)?)\s*%", content, re.IGNORECASE)
+            if cpu_m:
+                try:
+                    overview["cpu_utilization"] = float(cpu_m.group(1))
+                except ValueError:
+                    pass
+        # Memory: show memory - used/total or percentage
+        mem_block = _get_section(content, r"show\s+memory")
+        if mem_block:
+            used_m = re.search(r"(?:Total\s+)?(?:used|Used)\s*[=:]\s*(\d+)", mem_block, re.IGNORECASE)
+            total_m = re.search(r"(?:Total\s+)?(?:free|Free)\s*[=:]\s*(\d+)|total\s*[=:]\s*(\d+)", mem_block, re.IGNORECASE)
+            if used_m and total_m:
+                try:
+                    used = int(used_m.group(1))
+                    total = int(total_m.group(1) or total_m.group(2) or 0)
+                    if total and total > 0:
+                        overview["memory_utilization"] = round(100.0 * used / (used + total), 2)
+                except (ValueError, TypeError):
+                    pass
+            if overview["memory_utilization"] is None:
+                pct_m = re.search(r"(\d+(?:\.\d+)?)\s*%", mem_block)
+                if pct_m:
+                    try:
+                        overview["memory_utilization"] = float(pct_m.group(1))
+                    except ValueError:
+                        pass
+        if overview["memory_utilization"] is None:
+            mem_m = re.search(r"[Mm]emory\s+utilization.*?(\d+(?:\.\d+)?)\s*%", content, re.IGNORECASE)
+            if mem_m:
+                try:
+                    overview["memory_utilization"] = float(mem_m.group(1))
+                except ValueError:
+                    pass
+        return overview
+
+    def extract_interfaces(self, content: str) -> List[Dict[str, Any]]:
+        """2.3.2.2 - name, description, ip_address, status, protocol, mac_address, speed, duplex, mode (access/trunk/routed)."""
+        iface_map: Dict[str, Dict[str, Any]] = {}
+        # From config: interface blocks
+        for m in re.finditer(r"interface\s+(\S+)\s*\n(.*?)(?=\ninterface\s+|$)", content, re.IGNORECASE | re.DOTALL):
+            name, block = m.group(1), m.group(2)
+            if name.startswith("Null") or "NULL" in name.upper():
+                continue
+            if name not in iface_map:
+                iface_map[name] = {
+                    "name": name,
+                    "description": None,
+                    "ip_address": None,
+                    "status": "up",
+                    "protocol": "up",
+                    "mac_address": None,
+                    "speed": None,
+                    "duplex": None,
+                    "mode": None,
+                }
+            iface = iface_map[name]
+            if "shutdown" in block.lower():
+                iface["status"] = "down"
+                iface["protocol"] = "down"
+            desc_m = re.search(r"description\s+(.+?)(?:\n|$)", block, re.IGNORECASE)
+            if desc_m:
+                iface["description"] = desc_m.group(1).strip()
+            ip_m = re.search(r"ip\s+address\s+(\d+\.\d+\.\d+\.\d+\s+\d+\.\d+\.\d+\.\d+|\d+\.\d+\.\d+\.\d+/\d+)", block, re.IGNORECASE)
+            if ip_m:
+                iface["ip_address"] = ip_m.group(1).strip()
+            if "switchport mode access" in block.lower():
+                iface["mode"] = "access"
+            elif "switchport mode trunk" in block.lower():
+                iface["mode"] = "trunk"
+            elif "no switchport" in block.lower() or iface.get("ip_address"):
+                iface["mode"] = "routed"
+        # show ip interface brief
+        brief = _get_section(content, r"show\s+ip\s+interface\s+brief")
+        if brief:
+            for line in brief.split("\n")[1:]:
+                parts = line.split()
+                if len(parts) < 4:
                     continue
-                # Look for route entries with hop count
-                hop_match = re.search(r'(\d+\.\d+\.\d+\.\d+/\d+).*?\[(\d+)\]', line, re.IGNORECASE)
-                if hop_match:
-                    network = hop_match.group(1)
-                    hop_count = int(hop_match.group(2))
-                    routing["rip"]["hop_count"][network] = hop_count
-        
-        return routing
-    
+                name, ip_val, status, protocol = parts[0], parts[1] if len(parts) > 1 else None, parts[3] if len(parts) > 3 else None, parts[4] if len(parts) > 4 else None
+                if name not in iface_map:
+                    iface_map[name] = {"name": name, "description": None, "ip_address": None, "status": "up", "protocol": "up", "mac_address": None, "speed": None, "duplex": None, "mode": None}
+                iface = iface_map[name]
+                if ip_val and ip_val != "unassigned":
+                    iface["ip_address"] = ip_val if "/" in ip_val or " " in ip_val else ip_val
+                if status:
+                    iface["status"] = status.lower()
+                if protocol:
+                    iface["protocol"] = protocol.lower()
+        # show interfaces: status, protocol, MAC, speed, duplex
+        show_int = _get_section(content, r"show\s+interfaces")
+        if show_int:
+            current_name = None
+            for line in show_int.split("\n"):
+                line_strip = line.strip()
+                if not line_strip:
+                    continue
+                if line_strip.startswith("Vlan") or line_strip.startswith("GigabitEthernet") or line_strip.startswith("FastEthernet") or line_strip.startswith("Ethernet") or line_strip.startswith("Loopback") or line_strip.startswith("Port-channel"):
+                    parts = line_strip.split()
+                    if parts and "is" in line_strip:
+                        name = parts[0]
+                        current_name = name
+                        if name not in iface_map:
+                            iface_map[name] = {"name": name, "description": None, "ip_address": None, "status": "up", "protocol": "up", "mac_address": None, "speed": None, "duplex": None, "mode": None}
+                        iface = iface_map[name]
+                        if "administratively down" in line_strip or "down" in line_strip:
+                            iface["status"] = "down"
+                    continue
+                if current_name and current_name in iface_map:
+                    iface = iface_map[current_name]
+                    if "line protocol is" in line_strip.lower():
+                        if "down" in line_strip.lower():
+                            iface["protocol"] = "down"
+                    if "address is" in line_strip.lower():
+                        mac_m = re.search(r"address\s+is\s+([\da-fA-F.]+)", line_strip, re.IGNORECASE)
+                        if mac_m:
+                            iface["mac_address"] = mac_m.group(1)
+                    if "BW " in line_strip or "Mbit" in line_strip or "Gbit" in line_strip:
+                        bw_m = re.search(r"BW\s+(\d+)\s*(Kbit|Mbit|Gbit)", line_strip, re.IGNORECASE)
+                        if bw_m:
+                            u = bw_m.group(2).upper()
+                            if "GBIT" in u:
+                                iface["speed"] = f"{bw_m.group(1)}Gbps"
+                            elif "MBIT" in u:
+                                iface["speed"] = f"{bw_m.group(1)}Mbps"
+                            else:
+                                iface["speed"] = f"{bw_m.group(1)}Kbps"
+                    if "duplex" in line_strip.lower():
+                        dup_m = re.search(r"(Full|Half)[-\s]*[Dd]uplex", line_strip)
+                        if dup_m:
+                            iface["duplex"] = dup_m.group(1).lower()
+        # show interfaces switchport for mode if not set
+        switchport = _get_section(content, r"show\s+interfaces\s+switchport")
+        if switchport:
+            for block in re.split(r"\n(?=\w)", switchport):
+                name_m = re.match(r"(\S+).*?Switchport\s+Mode[:\s]+(\w+)", block, re.IGNORECASE | re.DOTALL)
+                if name_m and name_m.group(1) in iface_map and iface_map[name_m.group(1)].get("mode") is None:
+                    mode_val = name_m.group(2).lower()
+                    if "access" in mode_val:
+                        iface_map[name_m.group(1)]["mode"] = "access"
+                    elif "trunk" in mode_val:
+                        iface_map[name_m.group(1)]["mode"] = "trunk"
+                    else:
+                        iface_map[name_m.group(1)]["mode"] = "routed"
+        return list(iface_map.values())
+
+    def extract_vlans(self, content: str) -> Dict[str, Any]:
+        """2.3.2.3 - return dict with vlan_list: [{id (int), name, status}]."""
+        vlan_list: List[Dict[str, Any]] = []
+        seen: set = set()
+        # vlan <id> name <name>
+        for m in re.finditer(r"vlan\s+(\d+)\s*\n(.*?)(?=\nvlan\s+|^end\s|$)", content, re.IGNORECASE | re.DOTALL):
+            vid = int(m.group(1))
+            if vid in seen:
+                continue
+            seen.add(vid)
+            block = m.group(2)
+            name_m = re.search(r"name\s+(\S+)", block, re.IGNORECASE)
+            vlan_list.append({"id": vid, "name": name_m.group(1) if name_m else str(vid), "status": "active"})
+        # show vlan brief
+        brief = _get_section(content, r"show\s+vlan\s+brief")
+        if brief:
+            for line in brief.split("\n")[1:]:
+                parts = line.split()
+                if len(parts) < 2:
+                    continue
+                try:
+                    vid = int(parts[0])
+                except ValueError:
+                    continue
+                if vid in seen:
+                    continue
+                seen.add(vid)
+                name = parts[1] if len(parts) > 1 else str(vid)
+                status = parts[2].lower() if len(parts) > 2 else "active"
+                vlan_list.append({"id": vid, "name": name, "status": status})
+        return {"vlan_list": vlan_list}
+
+    def extract_stp(self, content: str) -> Dict[str, Any]:
+        """2.3.2 - mode (PVST/MST), root_bridges (list of VLANs where this device is root)."""
+        stp: Dict[str, Any] = {"mode": None, "root_bridges": []}
+        mode_m = re.search(r"spanning-tree\s+mode\s+(\S+)", content, re.IGNORECASE)
+        if mode_m:
+            stp["mode"] = mode_m.group(1).upper()
+        show_stp = _get_section(content, r"show\s+spanning-tree")
+        if show_stp:
+            # "This bridge is the root" or "VLANxxxx ... This bridge is the root"
+            for m in re.finditer(r"(?:VLAN\s*)?(\d+).*?[Tt]his\s+bridge\s+is\s+the\s+root", show_stp, re.IGNORECASE | re.DOTALL):
+                try:
+                    v = int(m.group(1))
+                    if v not in stp["root_bridges"]:
+                        stp["root_bridges"].append(v)
+                except ValueError:
+                    pass
+            if "this bridge is the root" in show_stp.lower() and not stp["root_bridges"]:
+                stp["root_bridges"].append(1)
+        return stp
+
+    def extract_routing(self, content: str) -> Dict[str, Any]:
+        """2.3.2.4 - routes: [{protocol, network, next_hop, interface}] (protocol C, S, O, B, L)."""
+        routes: List[Dict[str, Any]] = []
+        route_block = _get_section(content, r"show\s+ip\s+route")
+        if route_block:
+            # Gateway of last resort ...
+            for line in route_block.split("\n"):
+                line = line.strip()
+                if not line or line.startswith("Codes:") or line.startswith("Gateway"):
+                    continue
+                # C 10.0.0.0/8 is directly connected, GigabitEthernet0/0
+                # S* 0.0.0.0/0 [1/0] via 192.168.1.1
+                # O 10.1.1.0/24 [110/2] via 10.0.0.2, 00:00:15, GigabitEthernet0/0
+                proto_m = re.match(r"^([LCOBDSR\*]+)\s+(\d+\.\d+\.\d+\.\d+(?:/\d+)?)", line)
+                if not proto_m:
+                    continue
+                protocol_code = proto_m.group(1).replace("*", "").strip()
+                if not protocol_code:
+                    continue
+                protocol = protocol_code[0]
+                network = proto_m.group(2)
+                next_hop = None
+                interface = None
+                if "directly connected" in line.lower():
+                    if_m = re.search(r"directly\s+connected,?\s*(\S+)", line, re.IGNORECASE)
+                    if if_m:
+                        interface = if_m.group(1)
+                else:
+                    via_m = re.search(r"via\s+(\d+\.\d+\.\d+\.\d+)", line)
+                    if via_m:
+                        next_hop = via_m.group(1)
+                    if_m = re.search(r",\s*(\S+)\s*$", line)
+                    if if_m:
+                        interface = if_m.group(1)
+                routes.append({"protocol": protocol, "network": network, "next_hop": next_hop or "", "interface": interface or ""})
+        # Static from config
+        for m in re.finditer(r"ip\s+route\s+(\S+)\s+(\S+)(?:\s+(\S+))?", content, re.IGNORECASE):
+            net, nh, iface = m.group(1), m.group(2), m.group(3) or ""
+            if next((r for r in routes if r["network"] == net and r.get("protocol") == "S"), None):
+                continue
+            routes.append({"protocol": "S", "network": net, "next_hop": nh, "interface": iface})
+        return {"routes": routes}
+
     def extract_neighbors(self, content: str) -> List[Dict[str, Any]]:
-        """Extract neighbor discovery information"""
-        neighbors = []
-        
-        # CDP neighbors
-        cdp_match = re.search(r'show\s+cdp\s+neighbors.*?\n(.*?)(?=!|show|$)', content, re.IGNORECASE | re.DOTALL)
-        if cdp_match:
-            cdp_lines = cdp_match.group(1).strip().split('\n')
-            # Skip header lines - look for common header patterns
-            header_keywords = ['device id', 'local intf', 'holdtme', 'capability', 'platform', 'port id', '---', 'device', 'router', 'switch', 'wlan', 'other']
-            for line in cdp_lines:
-                line = line.strip()
-                if not line:
+        """2.3.2.6 - local_interface, neighbor_id, platform, remote_interface, ip_address (CDP/LLDP detail)."""
+        neighbors: List[Dict[str, Any]] = []
+        # CDP neighbors detail
+        detail_block = _get_section(content, r"show\s+cdp\s+neighbors\s+detail")
+        if detail_block:
+            for section in re.split(r"(?=-------------------------|Device ID:)", detail_block):
+                if "Device ID:" not in section:
                     continue
-                # Skip header lines
-                if any(keyword in line.lower() for keyword in header_keywords):
-                    continue
-                # Skip separator lines
-                if line.startswith('---') or line.startswith('==='):
-                    continue
-                parts = line.split()
-                if len(parts) >= 4:
-                    device_name = parts[0]
-                    local_port = parts[1]
-                    # Validate that device_name and local_port look like real values
-                    # Device names shouldn't be single characters or common header words
-                    invalid_names = ['device', 'router', 'switch', 'wlan', 'other', 'id', 'port', 'local', 'remote', 'neighbor', 'intf', 'dev']
-                    if device_name.lower() in invalid_names or len(device_name) <= 1:
-                        continue
-                    # Local port should contain interface type (Gi, Fa, Eth, etc.)
-                    if not re.search(r'(Gi|Fa|Eth|Te|Se|Lo|Vl|Po|Tu)', local_port, re.IGNORECASE):
-                        continue
+                dev_m = re.search(r"Device\s+ID:\s*(\S+)", section, re.IGNORECASE)
+                ip_m = re.search(r"IP\s+address:\s*(\d+\.\d+\.\d+\.\d+)", section, re.IGNORECASE)
+                plat_m = re.search(r"Platform:\s*(\S+)", section, re.IGNORECASE)
+                port_m = re.search(r"Port\s+ID\s*\(outgoing\s+port\):\s*(\S+)", section, re.IGNORECASE)
+                intf_m = re.search(r"Interface:\s*(\S+)", section, re.IGNORECASE)
+                if dev_m and intf_m:
                     neighbors.append({
-                        "device_name": device_name,
-                        "local_port": local_port,
-                        "remote_port": parts[-1],
-                        "platform": parts[-2] if len(parts) > 4 else None,
-                        "ip_address": None,  # CDP may not have IP in brief output
-                        "protocol": "CDP",
+                        "local_interface": intf_m.group(1),
+                        "neighbor_id": dev_m.group(1),
+                        "platform": plat_m.group(1) if plat_m else None,
+                        "remote_interface": port_m.group(1) if port_m else None,
+                        "ip_address": ip_m.group(1) if ip_m else None,
                     })
-        
-        # Parse detailed CDP output for IP addresses
-        cdp_detail_match = re.search(r'show\s+cdp\s+neighbors\s+detail.*?(.*?)(?=!|show|$)', content, re.IGNORECASE | re.DOTALL)
-        if cdp_detail_match:
-            detail_output = cdp_detail_match.group(1)
-            # Look for IP addresses in CDP detail
-            device_sections = detail_output.split('Device ID:')
-            for section in device_sections[1:]:  # Skip first empty section
-                ip_match = re.search(r'IP\s+address:\s+(\d+\.\d+\.\d+\.\d+)', section, re.IGNORECASE)
-                device_match = re.search(r'Device\s+ID:\s+(\S+)', section, re.IGNORECASE)
-                interface_match = re.search(r'Interface:\s+(\S+)', section, re.IGNORECASE)
-                
-                if ip_match and device_match and interface_match:
-                    device_name = device_match.group(1)
-                    local_port = interface_match.group(1)
-                    ip_address = ip_match.group(1)
-                    
-                    # Update existing neighbor or create new
-                    existing = next((n for n in neighbors if n.get("device_name") == device_name and n.get("local_port") == local_port), None)
-                    if existing:
-                        existing["ip_address"] = ip_address
-                    else:
+        # CDP brief fallback
+        if not neighbors:
+            brief = _get_section(content, r"show\s+cdp\s+neighbors")
+            if brief:
+                for line in brief.split("\n"):
+                    if re.match(r"^(Device|Capability|-----)", line, re.IGNORECASE):
+                        continue
+                    parts = line.split()
+                    if len(parts) >= 4 and re.search(r"(Gi|Fa|Eth|Te|Se|Lo|Vl|Po)", parts[1], re.IGNORECASE):
                         neighbors.append({
-                            "device_name": device_name,
-                            "local_port": local_port,
-                            "remote_port": "N/A",
-                            "platform": None,
-                            "ip_address": ip_address,
-                            "protocol": "CDP",
+                            "local_interface": parts[1],
+                            "neighbor_id": parts[0],
+                            "platform": parts[-2] if len(parts) > 4 else None,
+                            "remote_interface": parts[-1] if len(parts) >= 4 else None,
+                            "ip_address": None,
                         })
-        
-        # LLDP neighbors
-        lldp_match = re.search(r'show\s+lldp\s+neighbors.*?\n(.*?)(?=!|show|$)', content, re.IGNORECASE | re.DOTALL)
-        if lldp_match:
-            lldp_lines = lldp_match.group(1).strip().split('\n')
-            for line in lldp_lines[1:]:  # Skip header
-                parts = line.split()
-                if len(parts) >= 4:
-                    neighbors.append({
-                        "device_name": parts[0],
-                        "local_port": parts[1],
-                        "remote_port": parts[-1],
-                        "platform": parts[-2] if len(parts) > 4 else None,
-                        "ip_address": None,  # LLDP may not have IP in brief output
-                        "protocol": "LLDP",
-                    })
-        
-        # Parse detailed LLDP output for IP addresses
-        lldp_detail_match = re.search(r'show\s+lldp\s+neighbors\s+detail.*?(.*?)(?=!|show|$)', content, re.IGNORECASE | re.DOTALL)
-        if lldp_detail_match:
-            detail_output = lldp_detail_match.group(1)
-            # Look for IP addresses in LLDP detail
-            device_sections = detail_output.split('Chassis id:')
-            for section in device_sections[1:]:  # Skip first empty section
-                ip_match = re.search(r'Management\s+address:\s+(\d+\.\d+\.\d+\.\d+)', section, re.IGNORECASE)
-                device_match = re.search(r'System\s+name:\s+(\S+)', section, re.IGNORECASE)
-                interface_match = re.search(r'Local\s+intf:\s+(\S+)', section, re.IGNORECASE)
-                
-                if ip_match and device_match and interface_match:
-                    device_name = device_match.group(1)
-                    local_port = interface_match.group(1)
-                    ip_address = ip_match.group(1)
-                    
-                    # Update existing neighbor or create new
-                    existing = next((n for n in neighbors if n.get("device_name") == device_name and n.get("local_port") == local_port), None)
-                    if existing:
-                        existing["ip_address"] = ip_address
-                    else:
-                        neighbors.append({
-                            "device_name": device_name,
-                            "local_port": local_port,
-                            "remote_port": "N/A",
-                            "platform": None,
-                            "ip_address": ip_address,
-                            "protocol": "LLDP",
-                        })
-        
+        # LLDP neighbors detail
+        lldp_block = _get_section(content, r"show\s+lldp\s+neighbors\s+detail")
+        if lldp_block:
+            for section in re.split(r"(?=-------------------------|Chassis id:)", lldp_block):
+                if "Chassis id:" not in section and "Local Intf:" not in section:
+                    continue
+                sys_m = re.search(r"System\s+name:\s*(\S+)", section, re.IGNORECASE)
+                ip_m = re.search(r"Management\s+address:\s*(\d+\.\d+\.\d+\.\d+)", section, re.IGNORECASE)
+                port_m = re.search(r"Port\s+id:\s*(\S+)", section, re.IGNORECASE)
+                local_m = re.search(r"Local\s+intf:\s*(\S+)", section, re.IGNORECASE)
+                if sys_m and local_m:
+                    n = {
+                        "local_interface": local_m.group(1),
+                        "neighbor_id": sys_m.group(1),
+                        "platform": None,
+                        "remote_interface": port_m.group(1) if port_m else None,
+                        "ip_address": ip_m.group(1) if ip_m else None,
+                    }
+                    if not any(n["local_interface"] == x["local_interface"] and n["neighbor_id"] == x["neighbor_id"] for x in neighbors):
+                        neighbors.append(n)
         return neighbors
-    
+
     def extract_mac_arp(self, content: str) -> Dict[str, Any]:
-        """Extract MAC address table and ARP table"""
-        mac_arp = {
-            "mac_table": [],
-            "arp_table": [],
-        }
-        
-        # MAC address table
-        mac_match = re.search(r'show\s+mac\s+address-table.*?\n(.*?)(?=!|show|$)', content, re.IGNORECASE | re.DOTALL)
-        if mac_match:
-            mac_lines = mac_match.group(1).strip().split('\n')
-            for line in mac_lines[1:]:  # Skip header
+        """2.3.2.5 - arp_mac_table: { arp_entries: [], mac_entries: [] }."""
+        arp_entries: List[Dict[str, Any]] = []
+        mac_entries: List[Dict[str, Any]] = []
+        # show arp
+        arp_block = _get_section(content, r"show\s+arp")
+        if arp_block:
+            for line in arp_block.split("\n")[1:]:
+                parts = line.split()
+                if len(parts) >= 4 and re.match(r"\d+\.\d+\.\d+\.\d+", parts[1]):
+                    arp_entries.append({
+                        "ip_address": parts[1],
+                        "mac_address": parts[3] if len(parts) > 3 else None,
+                        "interface": parts[-1] if len(parts) > 4 else None,
+                    })
+        # show mac address-table
+        mac_block = _get_section(content, r"show\s+mac(?:\s+address-table|address-table)")
+        if not mac_block:
+            mac_block = _get_section(content, r"show\s+mac\s+address-table")
+        if mac_block:
+            for line in mac_block.split("\n")[1:]:
                 parts = line.split()
                 if len(parts) >= 3:
-                    mac_arp["mac_table"].append({
+                    mac_entries.append({
                         "vlan": parts[0],
                         "mac_address": parts[1],
                         "type": parts[2] if len(parts) > 2 else "DYNAMIC",
                         "port": parts[3] if len(parts) > 3 else None,
                     })
-        
-        # ARP table
-        arp_match = re.search(r'show\s+arp.*?\n(.*?)(?=!|show|$)', content, re.IGNORECASE | re.DOTALL)
-        if arp_match:
-            arp_lines = arp_match.group(1).strip().split('\n')
-            for line in arp_lines[1:]:  # Skip header
-                parts = line.split()
-                if len(parts) >= 4:
-                    mac_arp["arp_table"].append({
-                        "ip_address": parts[1],
-                        "mac_address": parts[3],
-                        "interface": parts[-1],
-                        "age": parts[2] if len(parts) > 4 else None,
-                    })
-        
-        return mac_arp
-    
+        return {"arp_entries": arp_entries, "mac_entries": mac_entries}
+
     def extract_security(self, content: str) -> Dict[str, Any]:
-        """Extract security and management information"""
-        security = {
+        """2.3.2.8 - security_mgmt: ssh_enabled, ssh_version, users, ntp_servers, snmp_enabled, logging_host, acls."""
+        sec: Dict[str, Any] = {
+            "ssh_enabled": False,
+            "ssh_version": None,
             "users": [],
-            "aaa": {},
-            "ssh": {
-                "version": None,
-                "enabled": False,
-            },
-            "snmp": {
-                "enabled": False,
-                "communities": [],
-            },
-            "ntp": {
-                "enabled": False,
-                "servers": [],
-            },
-            "logging": {},
+            "ntp_servers": [],
+            "snmp_enabled": False,
+            "logging_host": None,
             "acls": [],
         }
-        
-        # Users
-        user_pattern = r'username\s+(\S+)\s+(?:privilege\s+(\d+))?\s*(?:secret|password)'
-        for match in re.finditer(user_pattern, content, re.IGNORECASE):
-            security["users"].append({
-                "username": match.group(1),
-                "privilege": int(match.group(2)) if match.group(2) else 1,
-            })
-        
-        # SSH
-        if "ip ssh version" in content.lower():
-            ssh_version_match = re.search(r'ip\s+ssh\s+version\s+(\d+)', content, re.IGNORECASE)
-            if ssh_version_match:
-                security["ssh"]["version"] = ssh_version_match.group(1)
-            security["ssh"]["enabled"] = True
-        
-        # SNMP
+        if "transport input ssh" in content.lower() or "transport input telnet ssh" in content.lower():
+            sec["ssh_enabled"] = True
+        ver_m = re.search(r"ip\s+ssh\s+version\s+(\d+)", content, re.IGNORECASE)
+        if ver_m:
+            sec["ssh_version"] = ver_m.group(1)
+            sec["ssh_enabled"] = True
+        for m in re.finditer(r"username\s+(\S+)\s+(?:privilege\s+(\d+))?\s*(?:secret|password)", content, re.IGNORECASE):
+            sec["users"].append({"username": m.group(1), "privilege": int(m.group(2)) if m.group(2) else 1})
+        for m in re.finditer(r"ntp\s+server\s+(\S+)", content, re.IGNORECASE):
+            sec["ntp_servers"].append(m.group(1))
         if "snmp-server" in content.lower():
-            security["snmp"]["enabled"] = True
-            community_pattern = r'snmp-server\s+community\s+(\S+)'
-            for match in re.finditer(community_pattern, content, re.IGNORECASE):
-                security["snmp"]["communities"].append(match.group(1))
-        
-        # NTP
-        if "ntp" in content.lower():
-            security["ntp"]["enabled"] = True
-            ntp_server_pattern = r'ntp\s+server\s+(\S+)'
-            for match in re.finditer(ntp_server_pattern, content, re.IGNORECASE):
-                security["ntp"]["servers"].append(match.group(1))
-        
-        return security
-    
+            sec["snmp_enabled"] = True
+        log_m = re.search(r"logging\s+host\s+(\d+\.\d+\.\d+\.\d+|\S+)", content, re.IGNORECASE)
+        if log_m:
+            sec["logging_host"] = log_m.group(1)
+        for m in re.finditer(r"ip\s+access-group\s+(\S+)\s+\w+", content, re.IGNORECASE):
+            acl = m.group(1)
+            if acl not in sec["acls"]:
+                sec["acls"].append(acl)
+        for m in re.finditer(r"access-list\s+(\d+)\s+\w+", content, re.IGNORECASE):
+            acl = m.group(1)
+            if acl not in sec["acls"]:
+                sec["acls"].append(acl)
+        return sec
+
     def extract_ha(self, content: str) -> Dict[str, Any]:
-        """Extract High Availability information"""
-        ha = {
-            "port_channels": [],
-            "hsrp": [],
-            "vrrp": [],
-        }
-        
-        # Port channels
-        portchan_pattern = r'interface\s+(Port-channel|port-channel)\s*(\d+)\s*\n(.*?)(?=\ninterface\s+|$)'
-        for match in re.finditer(portchan_pattern, content, re.IGNORECASE | re.DOTALL):
-            channel_id = match.group(2)
-            channel_config = match.group(3)
-            
+        """2.3.2.9 - etherchannels [{id, protocol, members}], hsrp_vrrp [{interface, group, virtual_ip, state}]."""
+        ha: Dict[str, Any] = {"etherchannels": [], "hsrp_vrrp": []}
+        # show etherchannel summary
+        ec_block = _get_section(content, r"show\s+etherchannel\s+summary")
+        if ec_block:
+            for line in ec_block.split("\n"):
+                if "Po" in line or "port-channel" in line.lower():
+                    # Group  Port-channel  Protocol  Ports
+                    grp_m = re.search(r"(\d+)\s+(Po\d+|\S+)\s+(\S+)\s+(.+)", line, re.IGNORECASE)
+                    if grp_m:
+                        grp_id = int(grp_m.group(1))
+                        proto = grp_m.group(3).upper()
+                        rest = grp_m.group(4)
+                        members = re.findall(r"(?:Gi|Fa|Te|Eth)\S*", rest, re.IGNORECASE)
+                        ha["etherchannels"].append({"id": grp_id, "protocol": proto, "members": members})
+        # From config: channel-group
+        for m in re.finditer(r"interface\s+(Port-channel|port-channel)\s*(\d+)\s*\n(.*?)(?=\ninterface\s+|$)", content, re.IGNORECASE | re.DOTALL):
+            grp_id = int(m.group(2))
+            if any(e.get("id") == grp_id for e in ha["etherchannels"]):
+                continue
             members = []
-            mode = None
-            
-            # Find member interfaces
-            for iface_match in re.finditer(r'interface\s+(\S+)\s*\n(.*?)(?=\ninterface\s+|$)', content, re.IGNORECASE | re.DOTALL):
-                iface_config = iface_match.group(2)
-                if f"channel-group {channel_id}" in iface_config.lower():
-                    members.append(iface_match.group(1))
-                    if "channel-group" in iface_config.lower():
-                        mode_match = re.search(r'channel-group\s+\d+\s+mode\s+(\S+)', iface_config, re.IGNORECASE)
-                        if mode_match:
-                            mode = mode_match.group(1).upper()
-            
-            ha["port_channels"].append({
-                "id": channel_id,
-                "mode": mode,
-                "members": members,
-                "status": "up" if members else "down",
-            })
-        
-        # HSRP
-        hsrp_pattern = r'standby\s+(\d+)\s+ip\s+(\d+\.\d+\.\d+\.\d+)'
-        for match in re.finditer(hsrp_pattern, content, re.IGNORECASE):
-            ha["hsrp"].append({
-                "group": match.group(1),
-                "virtual_ip": match.group(2),
-            })
-        
+            proto = "LACP"
+            for m2 in re.finditer(r"interface\s+(\S+)\s*\n(.*?)(?=\ninterface\s+|$)", content, re.IGNORECASE | re.DOTALL):
+                if f"channel-group {grp_id}" in m2.group(2).lower():
+                    members.append(m2.group(1))
+                    mode_m = re.search(r"channel-group\s+\d+\s+mode\s+(\S+)", m2.group(2), re.IGNORECASE)
+                    if mode_m:
+                        proto = mode_m.group(1).upper()
+            ha["etherchannels"].append({"id": grp_id, "protocol": proto, "members": members})
+        # HSRP / standby
+        for m in re.finditer(r"standby\s+(\d+)\s+ip\s+(\d+\.\d+\.\d+\.\d+)", content, re.IGNORECASE):
+            ha["hsrp_vrrp"].append({"interface": None, "group": int(m.group(1)), "virtual_ip": m.group(2), "state": None})
+        show_standby = _get_section(content, r"show\s+standby\s+brief")
+        if show_standby:
+            for line in show_standby.split("\n")[1:]:
+                parts = line.split()
+                if len(parts) >= 4:
+                    ha["hsrp_vrrp"].append({
+                        "interface": parts[0],
+                        "group": int(parts[1]) if parts[1].isdigit() else None,
+                        "virtual_ip": parts[2] if re.match(r"\d+\.\d+\.\d+\.\d+", parts[2]) else None,
+                        "state": parts[3] if len(parts) > 3 else None,
+                    })
         # VRRP
-        vrrp_pattern = r'vrrp\s+(\d+)\s+ip\s+(\d+\.\d+\.\d+\.\d+)'
-        for match in re.finditer(vrrp_pattern, content, re.IGNORECASE):
-            ha["vrrp"].append({
-                "group": match.group(1),
-                "virtual_ip": match.group(2),
-            })
-        
+        for m in re.finditer(r"vrrp\s+(\d+)\s+ip\s+(\d+\.\d+\.\d+\.\d+)", content, re.IGNORECASE):
+            ha["hsrp_vrrp"].append({"interface": None, "group": int(m.group(1)), "virtual_ip": m.group(2), "state": "Active"})
         return ha
 
+
+# Alias for backward compatibility; ConfigParser can use CiscoIOSParser.
+CiscoParser = CiscoIOSParser
