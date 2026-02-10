@@ -5905,7 +5905,8 @@ const ScriptGeneratorPage = ({ project, can, authedUser }) => {
     script += "    echo \"Please install it using: sudo apt-get install sshpass (Debian/Ubuntu) or sudo yum install sshpass (RHEL/CentOS)\"\n";
     script += "    exit 1\n";
     script += "fi\n\n";
-    script += "OUTPUT_DIR=\"backups\"\n";
+    script += "DATE_DIR=\"$(date +%Y-%m-%d)\"\n";
+    script += "OUTPUT_DIR=\"backups/$DATE_DIR\"\n";
     script += "mkdir -p \"$OUTPUT_DIR\"\n\n";
     
     // Build command list
@@ -5919,6 +5920,7 @@ const ScriptGeneratorPage = ({ project, can, authedUser }) => {
       const password = device.password || "";
       const secret = device.secret || "";
       const port = device.port || 22;
+      const isHuawei = device.device_type === "huawei_vrp";
       
       script += `# Backup device: ${hostname} (${ip})\n`;
       script += `echo "Connecting to ${hostname} (${ip})..."\n`;
@@ -5927,9 +5929,19 @@ const ScriptGeneratorPage = ({ project, can, authedUser }) => {
       // Escape password for bash
       const escapedPassword = password.replace(/\\/g, "\\\\").replace(/"/g, '\\"').replace(/\$/g, "\\$").replace(/`/g, "\\`");
       const escapedSecret = secret.replace(/\\/g, "\\\\").replace(/"/g, '\\"').replace(/\$/g, "\\$").replace(/`/g, "\\`");
+
+      // Global SSH options (all vendors)
+      let sshOptions = "-o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null -o ConnectTimeout=10";
+      // Huawei-specific legacy algorithms for older devices
+      if (isHuawei) {
+        sshOptions += " -o KexAlgorithms=+diffie-hellman-group1-sha1,diffie-hellman-group14-sha1";
+        sshOptions += " -o HostKeyAlgorithms=+ssh-rsa";
+        sshOptions += " -o Ciphers=+aes128-cbc,3des-cbc,aes128-ctr,aes256-ctr";
+        sshOptions += " -o MACs=+hmac-sha1,hmac-md5,hmac-sha1-96,hmac-md5-96";
+      }
       
       if (secret) {
-        script += `sshpass -p "${escapedPassword}" ssh -o StrictHostKeyChecking=no -o ConnectTimeout=10 -p ${port} ${username}@${ip} <<'EOF' | tee "$OUTPUT_FILE"\n`;
+        script += `sshpass -p "${escapedPassword}" ssh -v ${sshOptions} -p ${port} ${username}@${ip} <<'EOF' | tee "$OUTPUT_FILE"\n`;
         script += "enable\n";
         script += `${escapedSecret}\n`;
         commandLines.forEach(cmd => {
@@ -5938,7 +5950,7 @@ const ScriptGeneratorPage = ({ project, can, authedUser }) => {
         script += "exit\n";
         script += "EOF\n";
       } else {
-        script += `sshpass -p "${escapedPassword}" ssh -o StrictHostKeyChecking=no -o ConnectTimeout=10 -p ${port} ${username}@${ip} <<'EOF' | tee "$OUTPUT_FILE"\n`;
+        script += `sshpass -p "${escapedPassword}" ssh -v ${sshOptions} -p ${port} ${username}@${ip} <<'EOF' | tee "$OUTPUT_FILE"\n`;
         commandLines.forEach(cmd => {
           script += `${cmd}\n`;
         });
@@ -5954,8 +5966,28 @@ const ScriptGeneratorPage = ({ project, can, authedUser }) => {
     });
     
     script += "echo \"All backups completed!\"\n";
+    
+    // Determine vendor label for filename (Cisco / Huawei / Mixed_Network)
+    const deviceTypes = new Set(filteredDevices.map(d => d.device_type));
+    let vendorLabel;
+    if (deviceTypes.size > 1) {
+      vendorLabel = "Mixed_Network";
+    } else {
+      const onlyType = deviceTypes.values().next().value;
+      if (onlyType === "cisco_ios") {
+        vendorLabel = "Cisco";
+      } else if (onlyType === "huawei_vrp") {
+        vendorLabel = "Huawei";
+      } else {
+        vendorLabel = "Mixed_Network";
+      }
+    }
+    const osLabel = "Linux";
+    const ext = "sh";
+    const baseFilename = `${vendorLabel}_Backup_for_${osLabel}.${ext}`;
+    const safeFilename = sanitizeFilename(baseFilename);
 
-    downloadScript(script, "backup_script.sh");
+    downloadScript(script, safeFilename);
   };
 
   const generatePythonScript = () => {
@@ -5984,7 +6016,8 @@ const ScriptGeneratorPage = ({ project, can, authedUser }) => {
     script += "import re\n";
     script += "# import logging\n";
     script += "# logging.basicConfig(filename='netmiko_debug.log', level=logging.DEBUG)  # Uncomment for debugging\n\n";
-    script += "OUTPUT_DIR = \"backups\"\n";
+    script += "DATE_DIR = datetime.now().strftime('%Y-%m-%d')\n";
+    script += "OUTPUT_DIR = os.path.join('backups', DATE_DIR)\n";
     script += "os.makedirs(OUTPUT_DIR, exist_ok=True)\n\n";
     script += "def sanitize_filename(name):\n";
     script += "    \"\"\"Remove invalid characters from filename\"\"\"\n";
@@ -6016,23 +6049,23 @@ const ScriptGeneratorPage = ({ project, can, authedUser }) => {
     script += "            'username': device_info['username'],\n";
     script += "            'password': device_info['password'],\n";
     script += "            'port': device_info['port'],\n";
-    script += "            'global_delay_factor': 2,  # Handle slow devices\n";
-    script += "            'look_for_keys': False,   # Ignore local SSH keys\n";
-    script += "            'allow_agent': False,     # Disable SSH agent\n";
+    script += "            'global_delay_factor': 4,      # Handle very slow / legacy devices\n";
+    script += "            'auth_timeout': 60,\n";
+    script += "            'banner_timeout': 60,\n";
+    script += "            'look_for_keys': False,        # CRITICAL: Ignore local SSH keys (Windows-friendly)\n";
+    script += "            'allow_agent': False,          # CRITICAL: Disable SSH agent, force password auth\n";
+    script += "            'conn_timeout': 60,           # Extended timeout for initial connection\n";
     script += "        }\n";
     script += "        \n";
-    script += "        # Add secret if provided (can be empty string)\n";
-    script += "        if device_info.get('secret'):\n";
-    script += "            connection_params['secret'] = device_info['secret']\n";
+    script += "        # Add enable secret only if provided\n";
+    script += "        secret = device_info.get('secret')\n";
+    script += "        if secret:\n";
+    script += "            connection_params['secret'] = secret\n";
     script += "        \n";
     script += "        with ConnectHandler(**connection_params) as conn:\n";
-    script += "            # Always attempt to enter Enable mode (Privilege 15)\n";
-    script += "            # Some devices use login password for enable, or don't require secret\n";
-    script += "            try:\n";
+    script += "            # Enter enable mode only when a secret is configured\n";
+    script += "            if secret:\n";
     script += "                conn.enable()\n";
-    script += "            except Exception as e:\n";
-    script += "                # Device may already be in enable mode, or enable not required\n";
-    script += "                print(f\"Warning: Could not enter enable mode or already privileged. Continuing... ({e})\")\n";
     script += "            \n";
     script += "            # Execute commands (send each command separately)\n";
     script += "            command_list = COMMANDS.strip().split('\\n')\n";
@@ -6074,7 +6107,27 @@ const ScriptGeneratorPage = ({ project, can, authedUser }) => {
     script += "    \n";
     script += "    print(f\"Backup process completed. {success_count}/{len(DEVICE_INVENTORY)} device(s) backed up successfully.\")\n";
 
-    downloadScript(script, "backup_script.py");
+    // Determine vendor label for filename (Cisco / Huawei / Mixed_Network)
+    const deviceTypes = new Set(filteredDevices.map(d => d.device_type));
+    let vendorLabel;
+    if (deviceTypes.size > 1) {
+      vendorLabel = "Mixed_Network";
+    } else {
+      const onlyType = deviceTypes.values().next().value;
+      if (onlyType === "cisco_ios") {
+        vendorLabel = "Cisco";
+      } else if (onlyType === "huawei_vrp") {
+        vendorLabel = "Huawei";
+      } else {
+        vendorLabel = "Mixed_Network";
+      }
+    }
+    const osLabel = "Windows";
+    const ext = "py";
+    const baseFilename = `${vendorLabel}_Backup_for_${osLabel}.${ext}`;
+    const safeFilename = sanitizeFilename(baseFilename);
+
+    downloadScript(script, safeFilename);
   };
 
   const downloadScript = (content, filename) => {
