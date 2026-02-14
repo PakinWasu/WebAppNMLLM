@@ -2,11 +2,22 @@ from fastapi import APIRouter, Depends, HTTPException
 from datetime import datetime, timezone
 from pymongo.errors import DuplicateKeyError
 from ..db.mongo import db
-from ..dependencies.auth import require_admin
+from ..dependencies.auth import require_admin, get_current_user
 from ..core.security import hash_password, encrypt_temp_password, decrypt_temp_password
 from ..models.user import UserCreate, UserUpdate
 
 router = APIRouter(prefix="/users", tags=["users"])
+
+
+@router.get("/usernames")
+async def list_usernames(user=Depends(get_current_user)):
+    """List all usernames. Any authenticated user can call this (e.g. project managers need it to add members)."""
+    users = []
+    async for u in db()["users"].find({}, {"_id": 0, "username": 1}):
+        if u.get("username"):
+            users.append({"username": u["username"]})
+    return users
+
 
 @router.get("", dependencies=[Depends(require_admin)])
 async def list_users():

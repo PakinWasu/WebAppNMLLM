@@ -81,6 +81,25 @@ export async function changePassword(currentPassword, newPassword) {
  });
 }
 
+export async function verifyPassword(currentPassword) {
+ return api('/auth/verify-password', {
+  method: 'POST',
+  body: JSON.stringify({
+   current_password: currentPassword
+  }),
+ });
+}
+
+export async function updateMyProfile(email, phoneNumber) {
+ return api('/auth/me', {
+  method: 'PATCH',
+  body: JSON.stringify({
+   email: email || undefined,
+   phone_number: phoneNumber !== undefined && phoneNumber !== '' ? phoneNumber : null
+  }),
+ });
+}
+
 export async function testAI() {
  return api('/ai/test');
 }
@@ -130,7 +149,7 @@ export async function removeProjectMember(projectId, username) {
  });
 }
 
-export async function updateProject(projectId, name, description, topoUrl, visibility, backupInterval) {
+export async function updateProject(projectId, name, description, topoUrl, visibility, backupInterval, status) {
  return api(`/projects/${projectId}`, {
   method: 'PUT',
   body: JSON.stringify({ 
@@ -138,7 +157,8 @@ export async function updateProject(projectId, name, description, topoUrl, visib
     description,
     topo_url: topoUrl !== undefined ? topoUrl : null,
     visibility: visibility !== undefined ? visibility : null,
-    backup_interval: backupInterval !== undefined ? backupInterval : null
+    backup_interval: backupInterval !== undefined ? backupInterval : null,
+    status: status !== undefined ? status : null
   }),
  });
 }
@@ -151,6 +171,11 @@ export async function deleteProject(projectId) {
 
 export async function getUsers() {
  return api('/users');
+}
+
+/** List usernames only. Any authenticated user (e.g. manager) can call this for adding project members. */
+export async function getUsernames() {
+ return api('/users/usernames');
 }
 
 export async function createUser(username, email, phoneNumber, tempPassword) {

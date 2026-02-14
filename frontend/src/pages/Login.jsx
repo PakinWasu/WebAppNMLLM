@@ -3,7 +3,7 @@ import * as api from "../api";
 import { Card, Button, Field, Input, PasswordInput } from "../components/ui";
 import { safeDisplay } from "../utils/format";
 
-export default function Login({ onLogin, goChange }) {
+export default function Login({ onLogin }) {
   const [username, setUsername] = useState("");
   const [password, setPassword] = useState("");
   const [error, setError] = useState("");
@@ -12,7 +12,7 @@ export default function Login({ onLogin, goChange }) {
   const handleSubmit = async (e) => {
     e?.preventDefault();
     if (!username.trim() || !password.trim()) {
-      setError("Please enter username and password");
+      setError("Please enter username or email and password");
       return;
     }
     setError("");
@@ -38,13 +38,14 @@ export default function Login({ onLogin, goChange }) {
     <div className="grid place-items-center py-16">
       <Card className="w-full max-w-md" title="Sign in">
         <form onSubmit={handleSubmit} className="grid gap-3">
-          <Field label="Username">
+          <Field label="Username or Email">
             <Input
               value={username}
               onChange={(e) => setUsername(e.target.value)}
-              placeholder="Enter username"
+              placeholder="Enter username or email"
               disabled={loading}
               autoComplete="username"
+              type="text"
             />
           </Field>
           <Field label="Password">
@@ -63,22 +64,11 @@ export default function Login({ onLogin, goChange }) {
               <span>{safeDisplay(error)}</span>
             </div>
           )}
-          <div className="flex items-center justify-between">
-            <a
-              className="text-sm text-slate-700 dark:text-slate-300 hover:underline"
-              href="#"
-              onClick={(e) => {
-                e.preventDefault();
-                goChange(username);
-              }}
-            >
-              Change password
-            </a>
+          <div className="flex justify-end">
             <Button type="submit" disabled={loading}>
               {loading ? "Signing in..." : "Sign in"}
             </Button>
           </div>
-          <div className="text-xs text-gray-500 dark:text-gray-400">Default: admin / admin123</div>
         </form>
       </Card>
     </div>

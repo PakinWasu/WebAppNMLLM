@@ -59,7 +59,7 @@ export default function ProjectIndex({
             })}
             className="inline-flex items-center justify-center rounded-lg px-3 py-1.5 text-xs font-medium transition focus:outline-none focus:ring-2 focus:ring-offset-2 bg-transparent text-gray-700 hover:bg-gray-100 focus:ring-blue-500 dark:text-gray-200 dark:hover:bg-gray-800"
           >
-            Change Password
+            Change Password & Information
           </a>
         </div>
       </div>
@@ -181,7 +181,7 @@ export default function ProjectIndex({
                         ? routeToHash({
                             name: "project",
                             projectId: p.project_id || p.id,
-                            tab: "setting",
+                            tab: "summary",
                           })
                         : "#/"
                       : "#/"
@@ -192,7 +192,7 @@ export default function ProjectIndex({
                         setRoute({
                           name: "project",
                           projectId: p.project_id || p.id,
-                          tab: "setting",
+                          tab: "summary",
                         });
                       else console.error("Project missing project_id:", p);
                     })

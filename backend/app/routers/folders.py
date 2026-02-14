@@ -28,10 +28,16 @@ async def get_folders(project_id: str, user=Depends(get_current_user)):
     if not folders_doc:
         return {"folders": []}
     
-    # Return folders list, exclude deleted ones
+    # Return folders list, exclude deleted ones; normalize parent_id "root" -> null
     folders = folders_doc.get("folders", [])
-    active_folders = [f for f in folders if not f.get("deleted", False)]
-    
+    active_folders = []
+    for f in folders:
+        if f.get("deleted", False):
+            continue
+        fcopy = dict(f)
+        if fcopy.get("parent_id") == "root":
+            fcopy["parent_id"] = None
+        active_folders.append(fcopy)
     return {"folders": active_folders}
 
 
@@ -133,7 +139,10 @@ async def update_folder(
         raise HTTPException(status_code=404, detail="Folder not found")
     
     # Check if new name conflicts with existing folder at same level
-    parent_id_clean = body.parent_id if body.parent_id and body.parent_id.strip() else None
+    # Normalize "root" to None so root folders are stored correctly
+    parent_id_clean = body.parent_id if body.parent_id and str(body.parent_id).strip() else None
+    if parent_id_clean == "root":
+        parent_id_clean = None
     for folder in folders:
         if (folder.get("id") != folder_id and 
             not folder.get("deleted", False) and

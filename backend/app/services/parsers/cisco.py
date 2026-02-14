@@ -21,7 +21,7 @@ class CiscoIOSParser(BaseParser):
     Returns exact JSON spec: device_overview, interfaces, vlans (list), routing.routes,
     arp_mac_table, neighbors, stp, security_mgmt, ha.
     """
-
+    
     def detect_vendor(self, content: str) -> bool:
         """Detect if this is a Cisco configuration or command output."""
         indicators = [
@@ -38,7 +38,7 @@ class CiscoIOSParser(BaseParser):
             r"Cisco\s+IOS\s+Software",
         ]
         return sum(1 for p in indicators if re.search(p, content, re.IGNORECASE)) >= 2
-
+    
     def parse(self, content: str, filename: str) -> Dict[str, Any]:
         """Return exact spec structure (2.3.2.1-2.3.2.9)."""
         return {
@@ -52,7 +52,7 @@ class CiscoIOSParser(BaseParser):
             "security_mgmt": self.extract_security(content),
             "ha": self.extract_ha(content),
         }
-
+    
     def extract_device_overview(self, content: str) -> Dict[str, Any]:
         """2.3.2.1 - hostname, role, model, os_version, serial_number, management_ip, uptime, cpu_utilization, memory_utilization."""
         overview = {
@@ -78,13 +78,13 @@ class CiscoIOSParser(BaseParser):
         if overview.get("hostname"):
             h = overview["hostname"].lower()
             if "core" in h:
-                overview["role"] = "Core"
+                    overview["role"] = "Core"
             elif "dist" in h or "distribution" in h:
-                overview["role"] = "Distribution"
+                    overview["role"] = "Distribution"
             elif "access" in h or "acc" in h:
-                overview["role"] = "Access"
+                    overview["role"] = "Access"
             else:
-                overview["role"] = "Switch"
+                    overview["role"] = "Switch"
         # show version section
         version_block = _get_section(content, r"show\s+version")
         if version_block:
@@ -175,7 +175,7 @@ class CiscoIOSParser(BaseParser):
                 except ValueError:
                     pass
         return overview
-
+    
     def extract_interfaces(self, content: str) -> List[Dict[str, Any]]:
         """2.3.2.2 - name, description, ip_address, status, protocol, mac_address, speed, duplex, mode (access/trunk/routed)."""
         iface_map: Dict[str, Dict[str, Any]] = {}
@@ -187,13 +187,13 @@ class CiscoIOSParser(BaseParser):
             if name not in iface_map:
                 iface_map[name] = {
                     "name": name,
-                    "description": None,
+                "description": None,
                     "ip_address": None,
                     "status": "up",
                     "protocol": "up",
-                    "mac_address": None,
-                    "speed": None,
-                    "duplex": None,
+                "mac_address": None,
+                "speed": None,
+                "duplex": None,
                     "mode": None,
                 }
             iface = iface_map[name]
@@ -285,7 +285,7 @@ class CiscoIOSParser(BaseParser):
                     else:
                         iface_map[name_m.group(1)]["mode"] = "routed"
         return list(iface_map.values())
-
+    
     def extract_vlans(self, content: str) -> Dict[str, Any]:
         """2.3.2.3 - return dict with vlan_list: [{id (int), name, status}]."""
         vlan_list: List[Dict[str, Any]] = []
@@ -317,7 +317,7 @@ class CiscoIOSParser(BaseParser):
                 status = parts[2].lower() if len(parts) > 2 else "active"
                 vlan_list.append({"id": vid, "name": name, "status": status})
         return {"vlan_list": vlan_list}
-
+    
     def extract_stp(self, content: str) -> Dict[str, Any]:
         """2.3.2 - mode (PVST/MST), root_bridges (list of VLANs where this device is root)."""
         stp: Dict[str, Any] = {"mode": None, "root_bridges": []}
@@ -337,7 +337,7 @@ class CiscoIOSParser(BaseParser):
             if "this bridge is the root" in show_stp.lower() and not stp["root_bridges"]:
                 stp["root_bridges"].append(1)
         return stp
-
+    
     def extract_routing(self, content: str) -> Dict[str, Any]:
         """2.3.2.4 - routes: [{protocol, network, next_hop, interface}] (protocol C, S, O, B, L)."""
         routes: List[Dict[str, Any]] = []
@@ -433,14 +433,14 @@ class CiscoIOSParser(BaseParser):
                     n = {
                         "local_interface": local_m.group(1),
                         "neighbor_id": sys_m.group(1),
-                        "platform": None,
+                            "platform": None,
                         "remote_interface": port_m.group(1) if port_m else None,
                         "ip_address": ip_m.group(1) if ip_m else None,
                     }
                     if not any(n["local_interface"] == x["local_interface"] and n["neighbor_id"] == x["neighbor_id"] for x in neighbors):
                         neighbors.append(n)
         return neighbors
-
+    
     def extract_mac_arp(self, content: str) -> Dict[str, Any]:
         """2.3.2.5 - arp_mac_table: { arp_entries: [], mac_entries: [] }."""
         arp_entries: List[Dict[str, Any]] = []
@@ -471,7 +471,7 @@ class CiscoIOSParser(BaseParser):
                         "port": parts[3] if len(parts) > 3 else None,
                     })
         return {"arp_entries": arp_entries, "mac_entries": mac_entries}
-
+    
     def extract_security(self, content: str) -> Dict[str, Any]:
         """2.3.2.8 - security_mgmt: ssh_enabled, ssh_version, users, ntp_servers, snmp_enabled, logging_host, acls."""
         sec: Dict[str, Any] = {
@@ -507,7 +507,7 @@ class CiscoIOSParser(BaseParser):
             if acl not in sec["acls"]:
                 sec["acls"].append(acl)
         return sec
-
+    
     def extract_ha(self, content: str) -> Dict[str, Any]:
         """2.3.2.9 - etherchannels [{id, protocol, members}], hsrp_vrrp [{interface, group, virtual_ip, state}]."""
         ha: Dict[str, Any] = {"etherchannels": [], "hsrp_vrrp": []}

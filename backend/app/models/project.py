@@ -14,6 +14,7 @@ class ProjectUpdate(BaseModel):
     topo_url: str | None = None
     visibility: str | None = None
     backup_interval: str | None = None
+    status: str | None = None
 
 class ProjectInDB(BaseModel):
     project_id: str

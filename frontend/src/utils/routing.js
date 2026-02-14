@@ -10,7 +10,7 @@ export function routeToHash(route) {
   if (route.name === "userAdmin") return "#/userAdmin";
   if (route.name === "changePassword") return "#/changePassword" + (route.username ? "/" + encodeURIComponent(route.username) : "");
   if (route.name === "project" && route.projectId) {
-    const tab = route.tab || "setting";
+    const tab = route.tab || "summary";
     return "#/project/" + encodeURIComponent(route.projectId) + "/tab/" + encodeURIComponent(tab);
   }
   if (route.name === "device" && route.projectId && route.device) {
@@ -30,7 +30,7 @@ export function parseHash(hash) {
     const projectId = parts[1];
     if (parts[2] === "tab" && parts[3]) return { name: "project", projectId, tab: parts[3] };
     if (parts[2] === "device" && parts[3]) return { name: "device", projectId, device: parts[3] };
-    return { name: "project", projectId, tab: "setting" };
+    return { name: "project", projectId, tab: "summary" };
   }
   return { name: "index" };
 }

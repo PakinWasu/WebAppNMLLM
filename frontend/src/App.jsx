@@ -4,12 +4,13 @@ import { flushSync } from "react-dom";
 import * as api from "./api";
 import MainLayout from "./components/layout/MainLayout";
 import Header from "./components/layout/Header";
-import { Badge, Button, Card, ConfirmationModal, Field, Input, NotificationModal, PasswordInput, Select, SelectWithOther, Table } from "./components/ui";
+import { Badge, Button, Card, CodeBlock, ConfirmationModal, Field, Input, NotificationModal, PasswordInput, Select, SelectWithOther, Table, ToastContainer } from "./components/ui";
 import { parseHash } from "./utils/routing";
 import { formatDateTime, formatDate, safeDisplay, safeChild } from "./utils/format";
 import { CMDSET, SAMPLE_CORE_SW1, SAMPLE_DIST_SW2, createUploadRecord } from "./utils/constants";
 import { globalPollingService, notifyLLMResultReady } from "./services/llmPolling";
 import { useHashRoute, useLLMQueue } from "./hooks";
+import { useToast } from "./hooks/useToast";
 import Login from "./pages/Login";
 import ChangePassword from "./pages/ChangePassword";
 import ProjectIndex from "./pages/ProjectIndex";
@@ -36,6 +37,9 @@ export default function App() {
   // Global LLM queue: one job at a time per project (Summary + More Detail + Topology share this)
   const projectIdForLLM = (route.name === "project" || route.name === "device") ? (route.projectId || "") : "";
   const { llmBusy, requestRun, onComplete, llmBusyMessage } = useLLMQueue(projectIdForLLM);
+  
+  // Toast notification system
+  const { toasts, success, error, warning, info, removeToast } = useToast();
 
   // Apply dark mode class on mount and when dark changes
   useEffect(() => {
@@ -193,12 +197,9 @@ export default function App() {
       ? projects.find((p) => (p.project_id || p.id) === route.projectId) 
       : null;
     
-    // Build tabs for project view
+    // Build tabs for project view - Setting moved to end
     const projectTabs = [];
     if (project && route.name === "project") {
-      if (can("project-setting", project)) {
-        projectTabs.push({ id: "setting", label: "Setting", icon: "⚙️" });
-      }
       if (can("view-documents", project)) {
         projectTabs.push({ id: "summary", label: "Summary", icon: "📊" });
         projectTabs.push({ id: "documents", label: "Documents", icon: "📄" });
@@ -207,14 +208,34 @@ export default function App() {
       if (can("upload-config", project)) {
         projectTabs.push({ id: "script-generator", label: "Command Template", icon: "⚡" });
       }
+      if (can("project-setting", project)) {
+        projectTabs.push({ id: "setting", label: "Setting", icon: "⚙️" });
+      }
     }
     
     return (
-      <MainLayout
-        topBar={
+      <>
+        <ToastContainer toasts={toasts} onClose={removeToast} />
+        <MainLayout
+          topBar={
           <div className="h-full flex items-center justify-between gap-2 px-3 sm:px-4 border-b border-slate-300 dark:border-slate-800">
-            {/* Left: Logo + Platform Name + Breadcrumb */}
+            {/* Left: Hamburger menu (mobile/tablet) + Logo + Platform Name + Breadcrumb */}
             <div className="flex items-center gap-2 sm:gap-4 flex-1 min-w-0">
+              {/* Hamburger menu button - show on mobile/tablet (lg-), hide on desktop (lg+) */}
+              {project && projectTabs.length > 0 && (
+                <button
+                  onClick={() => {
+                    const event = new CustomEvent('toggleSideNav');
+                    window.dispatchEvent(event);
+                  }}
+                  className="lg:hidden p-2 rounded-lg text-slate-600 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-800 hover:text-slate-900 dark:hover:text-slate-200 transition-colors flex-shrink-0"
+                  aria-label="Open navigation menu"
+                >
+                  <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 6h16M4 12h16M4 18h16" />
+                  </svg>
+                </button>
+              )}
               <a
                 href="#/"
                 onClick={(e) => handleNavClick(e, () => setRoute({ name: "index" }))}
@@ -223,7 +244,7 @@ export default function App() {
                 <div className="h-7 w-7 rounded-xl bg-white/90 dark:bg-white/10 backdrop-blur-sm border border-slate-300/80 dark:border-slate-600/80 flex-shrink-0 shadow-sm" />
                 <span className="text-xs sm:text-sm font-semibold text-slate-800 dark:text-slate-200 whitespace-nowrap truncate">Network Project Platform</span>
               </a>
-              {/* Breadcrumb and Tabs (show when in project or device) */}
+              {/* Breadcrumb and Tabs (show when in project or device) - hide tabs on mobile/tablet, show on desktop */}
               {project && (
                 <>
                   <span className="text-slate-400 dark:text-slate-500 flex-shrink-0">/</span>
@@ -243,15 +264,16 @@ export default function App() {
                     ) : (
                       <>
                         <span className="text-xs sm:text-sm font-medium text-slate-700 dark:text-slate-300 truncate">{safeDisplay(project?.name)}</span>
+                        {/* Tabs - hidden on mobile/tablet (lg-), shown on desktop (lg+) */}
                         {projectTabs.length > 0 && (
-                          <nav className="flex items-center gap-1 ml-2 sm:ml-4 flex-wrap" aria-label="Project tabs">
+                          <nav className="hidden lg:flex items-center gap-1 ml-2 sm:ml-4 flex-wrap" aria-label="Project tabs">
                             {projectTabs.map((t) => (
                               <a
                                 key={t.id}
                                 href={`#/project/${encodeURIComponent(route.projectId)}/tab/${encodeURIComponent(t.id)}`}
                                 onClick={(e) => handleNavClick(e, () => setRoute({ ...route, tab: t.id }))}
                                 className={`flex items-center gap-1.5 px-2.5 py-1.5 text-xs font-medium transition rounded-xl whitespace-nowrap border ${
-                                  (route.tab || "setting") === t.id
+                                  (route.tab || "summary") === t.id
                                     ? "bg-white/90 dark:bg-white/10 backdrop-blur-sm border-slate-300/80 dark:border-slate-600/80 text-slate-800 dark:text-slate-100 shadow-sm"
                                     : "bg-transparent dark:bg-transparent border-transparent text-slate-600 dark:text-slate-400 hover:bg-slate-100/90 dark:hover:bg-slate-800/60 hover:border-slate-300 dark:hover:border-slate-700"
                                 }`}
@@ -285,7 +307,45 @@ export default function App() {
             </div>
           </div>
         }
-        mainClassName="bg-slate-50 dark:bg-slate-950 overflow-auto"
+        sideNavigation={
+          project && projectTabs.length > 0 ? (
+            <nav className="flex flex-col gap-1 px-2">
+              {projectTabs.map((t) => {
+                const isActive = (route.tab || "summary") === t.id;
+                return (
+                  <a
+                    key={t.id}
+                    href={`#/project/${encodeURIComponent(project.project_id || project.id)}/tab/${encodeURIComponent(t.id)}`}
+                    onClick={(e) => {
+                      e.preventDefault();
+                      handleNavClick(e, () => {
+                        setRoute({ ...route, tab: t.id });
+                        // Close side nav after navigation
+                        setTimeout(() => {
+                          window.dispatchEvent(new CustomEvent('closeSideNav'));
+                        }, 100);
+                      });
+                    }}
+                    className={`
+                      flex items-center gap-3 px-4 py-3 rounded-lg text-sm font-medium transition-all
+                      ${isActive
+                        ? "bg-indigo-50 dark:bg-indigo-900/30 text-indigo-700 dark:text-indigo-300 shadow-sm"
+                        : "text-slate-600 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-800 hover:text-slate-900 dark:hover:text-slate-200"
+                      }
+                    `}
+                  >
+                    <span className="text-lg">{safeDisplay(t.icon)}</span>
+                    <span className="flex-1">{safeDisplay(t.label)}</span>
+                    {isActive && (
+                      <span className="text-indigo-600 dark:text-indigo-400">▶</span>
+                    )}
+                  </a>
+                );
+              })}
+            </nav>
+          ) : null
+        }
+        mainClassName="bg-slate-50 dark:bg-slate-950"
       >
         {route.name === "index" && (
           <ProjectIndex
@@ -301,7 +361,7 @@ export default function App() {
         {route.name === "project" && project && (
           <ProjectView
             project={project}
-            tab={route.tab || "setting"}
+            tab={route.tab || "summary"}
             onChangeTab={(tab) => setRoute({ ...route, tab })}
             openDevice={(device) => setRoute({ name: "device", projectId: route.projectId, device })}
             goIndex={() => setRoute({ name: "index" })}
@@ -316,6 +376,7 @@ export default function App() {
             onComplete={onComplete}
             routeToHash={routeToHash}
             handleNavClick={handleNavClick}
+            toast={{ success, error, warning, info }}
           />
         )}
         {route.name === "project" && !project && (
@@ -341,6 +402,7 @@ export default function App() {
           />
         )}
       </MainLayout>
+      </>
     );
   }
 
@@ -362,12 +424,7 @@ export default function App() {
       <div className="mx-auto max-w-[1440px] px-4 py-4 sm:px-6 sm:py-6">
           <div className="mt-4 sm:mt-6">
             {(!authedUser && route.name !== "changePassword") && (
-              <Login
-                onLogin={handleLogin}
-                goChange={(username) =>
-                  setRoute({ name: "changePassword", username })
-                }
-              />
+              <Login onLogin={handleLogin} />
             )}
             {route.name === "changePassword" && (
               <ChangePassword
@@ -492,6 +549,7 @@ const ProjectView = ({
   onComplete,
   routeToHash,
   handleNavClick,
+  toast,
 }) => {
   if (!project)
     return <div className="text-sm text-rose-400">Project not found</div>;
@@ -499,11 +557,8 @@ const ProjectView = ({
   const projectId = project?.project_id || project?.id;
   const [llmNotification, setLlmNotification] = React.useState(null);
   
-  // Show tabs based on permissions
+  // Show tabs based on permissions - Setting moved to end
   const tabs = [];
-  if (can("project-setting", project)) {
-    tabs.push({ id: "setting", label: "Setting", icon: "⚙️" });
-  }
   if (can("view-documents", project)) {
     tabs.push({ id: "summary", label: "Summary", icon: "📊" });
     tabs.push({ id: "documents", label: "Documents", icon: "📄" });
@@ -511,6 +566,9 @@ const ProjectView = ({
   }
   if (can("upload-config", project)) {
     tabs.push({ id: "script-generator", label: "Command Template", icon: "⚡" });
+  }
+  if (can("project-setting", project)) {
+    tabs.push({ id: "setting", label: "Setting", icon: "⚙️" });
   }
 
   return (
@@ -528,7 +586,7 @@ const ProjectView = ({
         />
       )}
       {/* Main content - full width (header is now in MainLayout topBar) */}
-      <main className="flex-1 min-h-0 overflow-hidden flex flex-col gap-3 px-4 py-3">
+      <main className="flex-1 min-h-0 overflow-y-auto flex flex-col gap-3 px-4 py-3">
         {tab === "setting" && can("project-setting", project) && (
           <SettingPage
             project={project}
@@ -538,7 +596,7 @@ const ProjectView = ({
           />
         )}
         {tab === "summary" && can("view-documents", project) && (
-          <div className="flex-1 min-h-0 overflow-hidden flex flex-col">
+          <div className="flex-1 min-h-0 overflow-y-auto flex flex-col">
             <SummaryPage
               project={project}
               projectId={projectId}
@@ -557,7 +615,7 @@ const ProjectView = ({
           </div>
         )}
         {tab === "documents" && can("view-documents", project) && (
-          <div className="flex-1 min-h-0 overflow-hidden flex flex-col">
+          <div className="flex-1 min-h-0 overflow-y-auto flex flex-col">
             <DocumentsPage
               project={project}
               can={can}
@@ -578,11 +636,12 @@ const ProjectView = ({
           </div>
         )}
         {tab === "script-generator" && can("upload-config", project) && (
-          <div className="flex-1 min-h-0 overflow-hidden flex flex-col">
+          <div className="flex-1 min-h-0 overflow-y-auto flex flex-col">
             <ScriptGeneratorPage
               project={project}
               can={can}
               authedUser={authedUser}
+              toast={toast}
             />
           </div>
         )}
@@ -2043,95 +2102,95 @@ const SummaryPage = ({ project, projectId: projectIdProp, routeToHash, handleNav
   const distCount = dashboardMetrics?.dist ?? summaryRows.filter((r) => /dist|distribution/i.test(r.device || "")).length;
   const accessCount = dashboardMetrics?.access ?? summaryRows.filter((r) => /access/i.test(r.device || "")).length;
 
-  // ====== UI: Single-pane, above-the-fold (1920x1080) ======
+  // ====== UI: Single-pane, responsive layout ======
   // No overlay when LLM is running - all controls (Search, CSV, Upload, tabs in header) stay usable
   return (
     <div className="h-full flex flex-col gap-0 overflow-hidden min-h-0" style={{ pointerEvents: 'auto' }}>
-      {/* Content section header - integrated design */}
-      <div className="flex-shrink-0 flex items-center justify-between gap-2 py-1 px-2">
-        <h2 className="text-base font-bold text-slate-800 dark:text-slate-200 flex items-center gap-2">
-          <span className="w-1 h-4 bg-slate-500 dark:bg-slate-400 rounded-full" />
-          Summary Config
-        </h2>
-        <div className="flex gap-1.5 items-center">
-          <div className="relative">
-            <Input 
-              placeholder="Search..." 
-              value={q} 
-              onChange={(e)=>setQ(e.target.value)} 
-              className="w-28 text-[9px] py-1 px-2.5 h-6 bg-slate-100 dark:bg-slate-900/80 border-slate-300 dark:border-slate-700 focus:border-slate-400 dark:focus:border-slate-500 focus:ring-1 focus:ring-slate-400/50 dark:focus:ring-slate-500/50 rounded-lg text-slate-800 dark:text-slate-200 placeholder:text-slate-600 dark:placeholder:text-slate-500" 
-            />
-            <span className="absolute right-2.5 top-1/2 -translate-y-1/2 text-[9px] text-slate-600 dark:text-slate-500 pointer-events-none">🔍</span>
-          </div>
-          <button
-            className="px-2.5 py-0.5 h-6 flex items-center justify-center rounded-lg border border-slate-300 dark:border-slate-700 bg-slate-100 dark:bg-slate-900/80 hover:bg-slate-200 dark:hover:bg-slate-800 text-slate-700 dark:text-slate-300 text-[9px] font-medium transition-colors whitespace-nowrap"
-            onClick={exportCSV}
-            title="Export CSV"
-          >
-            CSV
-          </button>
-          <button
-            className="px-2.5 py-0.5 h-6 flex items-center justify-center rounded-lg border border-slate-300 dark:border-slate-700 bg-slate-100 dark:bg-slate-900/80 hover:bg-slate-200 dark:hover:bg-slate-800 text-slate-700 dark:text-slate-300 text-[9px] font-medium transition-colors whitespace-nowrap"
-            onClick={() => setShowCompareConfig(true)}
-            title="Compare two config files line by line"
-          >
-            Compare Config
-          </button>
-          {can("upload-config", project) && (
+      {/* Top section: 55% — header + topology + network overview */}
+      <div className="flex-[0_0_55%] min-h-0 flex flex-col overflow-hidden">
+        <div className="flex-shrink-0 flex items-center justify-between gap-2 py-1 px-2">
+          <h2 className="text-base font-bold text-slate-800 dark:text-slate-200 flex items-center gap-2">
+            <span className="w-1 h-4 bg-slate-500 dark:bg-slate-400 rounded-full" />
+            Summary Config
+          </h2>
+          <div className="flex gap-1.5 items-center">
+            <div className="relative">
+              <Input 
+                placeholder="Search..." 
+                value={q} 
+                onChange={(e)=>setQ(e.target.value)} 
+                className="w-28 text-[9px] py-1 px-2.5 h-6 bg-slate-100 dark:bg-slate-900/80 border-slate-300 dark:border-slate-700 focus:border-slate-400 dark:focus:border-slate-500 focus:ring-1 focus:ring-slate-400/50 dark:focus:ring-slate-500/50 rounded-lg text-slate-800 dark:text-slate-200 placeholder:text-slate-600 dark:placeholder:text-slate-500" 
+              />
+              <span className="absolute right-2.5 top-1/2 -translate-y-1/2 text-[9px] text-slate-600 dark:text-slate-500 pointer-events-none">🔍</span>
+            </div>
             <button
               className="px-2.5 py-0.5 h-6 flex items-center justify-center rounded-lg border border-slate-300 dark:border-slate-700 bg-slate-100 dark:bg-slate-900/80 hover:bg-slate-200 dark:hover:bg-slate-800 text-slate-700 dark:text-slate-300 text-[9px] font-medium transition-colors whitespace-nowrap"
-              onClick={() => setShowUploadConfig(true)}
-              title="Upload Config"
+              onClick={exportCSV}
+              title="Export CSV"
             >
-              Upload
+              CSV
             </button>
-          )}
+            <button
+              className="px-2.5 py-0.5 h-6 flex items-center justify-center rounded-lg border border-slate-300 dark:border-slate-700 bg-slate-100 dark:bg-slate-900/80 hover:bg-slate-200 dark:hover:bg-slate-800 text-slate-700 dark:text-slate-300 text-[9px] font-medium transition-colors whitespace-nowrap"
+              onClick={() => setShowCompareConfig(true)}
+              title="Compare two config files line by line"
+            >
+              Compare Config
+            </button>
+            {can("upload-config", project) && (
+              <button
+                className="px-2.5 py-0.5 h-6 flex items-center justify-center rounded-lg border border-slate-300 dark:border-slate-700 bg-slate-100 dark:bg-slate-900/80 hover:bg-slate-200 dark:hover:bg-slate-800 text-slate-700 dark:text-slate-300 text-[9px] font-medium transition-colors whitespace-nowrap"
+                onClick={() => setShowUploadConfig(true)}
+                title="Upload Config"
+              >
+                Upload
+              </button>
+            )}
+          </div>
+        </div>
+
+        {showUploadConfig && folderStructure && (
+          <UploadDocumentForm
+            project={project}
+            authedUser={authedUser}
+            onClose={() => setShowUploadConfig(false)}
+            onUpload={handleUpload}
+            folderStructure={folderStructure}
+            defaultFolderId="Config"
+          />
+        )}
+
+        {llmBusy && (
+          <div className="flex-shrink-0 px-2 py-0.5 text-[10px] text-slate-600 dark:text-slate-500 bg-slate-200 dark:bg-slate-800/30 rounded-lg" title={llmBusyMessage || undefined}>
+            {llmBusyMessage ? `⏳ ${llmBusyMessage}` : "Waiting for LLM — You can click Summary / Documents / History tabs above to switch pages."}
+          </div>
+        )}
+        <div className="flex-1 min-h-0 grid grid-cols-1 lg:grid-cols-12 gap-3 overflow-hidden">
+          <div className="lg:col-span-6 min-h-0 overflow-hidden rounded-xl border border-slate-300 dark:border-slate-800 bg-white dark:bg-slate-900/50 shadow-sm dark:shadow-none">
+            <TopologyGraph project={project} projectId={projectId} routeToHash={routeToHash} handleNavClick={handleNavClick} onOpenDevice={(id)=>openDevice(id)} can={can} authedUser={authedUser} setProjects={setProjects} setTopologyLLMMetrics={setTopologyLLMMetrics} topologyLLMMetrics={topologyLLMMetrics} llmBusy={llmBusy} llmBusyMessage={llmBusyMessage} requestRun={requestRun} onComplete={onComplete} setLlmNotification={setLlmNotification} />
+          </div>
+          <ProjectAnalysisPanel 
+            project={project}
+            summaryRows={summaryRows}
+            coreCount={coreCount}
+            distCount={distCount}
+            accessCount={accessCount}
+            llmBusy={llmBusy}
+            llmBusyMessage={llmBusyMessage}
+            requestRun={requestRun}
+            onComplete={onComplete}
+            setLlmNotification={setLlmNotification}
+          />
         </div>
       </div>
 
-      {showUploadConfig && folderStructure && (
-        <UploadDocumentForm
-          project={project}
-          authedUser={authedUser}
-          onClose={() => setShowUploadConfig(false)}
-          onUpload={handleUpload}
-          folderStructure={folderStructure}
-          defaultFolderId="Config"
-        />
-      )}
-
-      {/* When LLM is running, tabs (Summary/Documents/History) in the header stay clickable — no overlay */}
-      {llmBusy && (
-        <div className="flex-shrink-0 px-2 py-0.5 text-[10px] text-slate-600 dark:text-slate-500 bg-slate-200 dark:bg-slate-800/30 rounded-lg" title={llmBusyMessage || undefined}>
-          {llmBusyMessage ? `⏳ ${llmBusyMessage}` : "Waiting for LLM — You can click Summary / Documents / History tabs above to switch pages."}
-        </div>
-      )}
-      {/* Topology (2/3) + Project Analysis (1/3) */}
-      <div className="flex-shrink-0 grid grid-cols-1 lg:grid-cols-12 gap-3" style={{ height: '60%', minHeight: '320px' }}>
-        <div className="lg:col-span-6 min-h-0 overflow-hidden rounded-xl border border-slate-300 dark:border-slate-800 bg-white dark:bg-slate-900/50 shadow-sm dark:shadow-none">
-          <TopologyGraph project={project} projectId={projectId} routeToHash={routeToHash} handleNavClick={handleNavClick} onOpenDevice={(id)=>openDevice(id)} can={can} authedUser={authedUser} setProjects={setProjects} setTopologyLLMMetrics={setTopologyLLMMetrics} topologyLLMMetrics={topologyLLMMetrics} llmBusy={llmBusy} llmBusyMessage={llmBusyMessage} requestRun={requestRun} onComplete={onComplete} setLlmNotification={setLlmNotification} />
-        </div>
-        <ProjectAnalysisPanel 
-          project={project}
-          summaryRows={summaryRows}
-          coreCount={coreCount}
-          distCount={distCount}
-          accessCount={accessCount}
-          llmBusy={llmBusy}
-          llmBusyMessage={llmBusyMessage}
-          requestRun={requestRun}
-          onComplete={onComplete}
-          setLlmNotification={setLlmNotification}
-        />
-      </div>
-
-      {/* Table: fills remaining height, scrolls inside */}
+      {/* Bottom section: 45% — device summary table */}
       {loading ? (
-        <div className="flex-1 min-h-0 flex items-center justify-center rounded-xl border border-slate-300 dark:border-slate-800 bg-slate-50 dark:bg-slate-900/50">
+        <div className="flex-[0_0_45%] min-h-0 flex items-center justify-center rounded-xl border border-slate-300 dark:border-slate-800 bg-slate-50 dark:bg-slate-900/50 my-3 overflow-hidden">
           <div className="text-sm text-slate-500 dark:text-slate-400">Loading summary data...</div>
         </div>
       ) : error ? (
-        <div className="flex-1 min-h-0 flex flex-col items-center justify-center rounded-xl border border-slate-300 dark:border-slate-800 bg-slate-50 dark:bg-slate-900/50 p-4">
+        <div className="flex-[0_0_45%] min-h-0 flex flex-col items-center justify-center rounded-xl border border-slate-300 dark:border-slate-800 bg-slate-50 dark:bg-slate-900/50 p-4 my-3 overflow-hidden">
           <div className="text-sm text-rose-600 dark:text-rose-400 font-semibold mb-2">Error loading summary</div>
           <div className="text-xs text-slate-500 dark:text-slate-400 mb-3">{safeDisplay(error)}</div>
           <Button variant="secondary" className="text-xs" onClick={() => {
@@ -2153,8 +2212,10 @@ const SummaryPage = ({ project, projectId: projectIdProp, routeToHash, handleNav
           }}>Retry</Button>
         </div>
       ) : (
-        <div className="flex-1 min-h-0 overflow-auto rounded-xl border border-slate-300 dark:border-slate-800 bg-white dark:bg-slate-900/50 p-1 shadow-sm dark:shadow-none">
-          <Table columns={columns} data={filtered} empty="No devices yet. Upload config files to see summary." minWidthClass="min-w-full" containerClassName="text-xs" />
+        <div className="flex-[0_0_45%] min-h-0 flex flex-col rounded-xl border border-slate-300 dark:border-slate-800 bg-white dark:bg-slate-900/50 shadow-sm dark:shadow-none my-3 overflow-hidden">
+          <div className="flex-1 min-h-0 overflow-auto p-1">
+            <Table columns={columns} data={filtered} empty="No devices yet. Upload config files to see summary." minWidthClass="min-w-full" containerClassName="text-xs" />
+          </div>
         </div>
       )}
 
@@ -2951,7 +3012,7 @@ const DeviceDetailsView = ({ project, deviceId, goBack, goBackHref, goIndex, goI
   const hasEnoughVersionsForDrift = (deviceConfigVersions?.versions?.length ?? 0) >= 2;
 
   return (
-    <div className="h-full flex flex-col gap-0 overflow-hidden min-h-0">
+    <div className="h-full flex flex-col gap-0 overflow-y-auto min-h-0">
       {deviceLlmNotification?.show && (
         <NotificationModal
           show={true}
@@ -3084,8 +3145,8 @@ const DeviceDetailsView = ({ project, deviceId, goBack, goBackHref, goIndex, goI
       {!loading && !error && tab === "overview" && (
         <div className="flex-1 min-h-0 flex flex-col gap-3 overflow-hidden p-2">
           {/* Top row: Device Image (left) + LLM section (right) */}
-          <div className="grid grid-cols-12 gap-3 min-h-0 flex-1" style={{ minHeight: "280px" }}>
-            <div className="col-span-5 min-h-0 overflow-hidden rounded-xl border border-slate-300 dark:border-slate-800 bg-white dark:bg-slate-900/50 flex flex-col shadow-sm dark:shadow-none">
+          <div className="grid grid-cols-1 md:grid-cols-12 gap-3 min-h-0 flex-1" style={{ minHeight: "280px" }}>
+            <div className="md:col-span-5 min-h-0 overflow-hidden rounded-xl border border-slate-300 dark:border-slate-800 bg-white dark:bg-slate-900/50 flex flex-col shadow-sm dark:shadow-none">
               <Card className="flex-1 min-h-0 flex flex-col overflow-hidden">
                 <div className="flex-1 min-h-0 overflow-auto">
                   <DeviceImageUpload 
@@ -3099,7 +3160,7 @@ const DeviceDetailsView = ({ project, deviceId, goBack, goBackHref, goIndex, goI
               </Card>
             </div>
             {/* LLM panel: folder-like tabs (like summary page) + AI button + content */}
-            <div className="col-span-7 min-h-0 flex flex-col rounded-xl border border-slate-300 dark:border-slate-800 bg-white/95 dark:bg-slate-900/50 overflow-hidden shadow-sm dark:shadow-none backdrop-blur-sm">
+            <div className="md:col-span-7 min-h-0 flex flex-col rounded-xl border border-slate-300 dark:border-slate-800 bg-white/95 dark:bg-slate-900/50 overflow-hidden shadow-sm dark:shadow-none backdrop-blur-sm">
               <div className="flex-shrink-0 flex items-center justify-between border-b border-slate-300 dark:border-slate-700/80 bg-slate-50/90 dark:bg-slate-900/60 backdrop-blur-sm">
                 <div className="flex">
                   <button
@@ -3297,7 +3358,7 @@ const DeviceDetailsView = ({ project, deviceId, goBack, goBackHref, goIndex, goI
           {/* Bottom: Device Facts full width */}
           <div className="flex-shrink-0 rounded-xl border border-slate-300 dark:border-slate-800 bg-white dark:bg-slate-900/50 overflow-hidden shadow-sm dark:shadow-none">
             <Card title="Device Facts">
-              <div className="grid gap-3 grid-cols-4 md:grid-cols-6 text-xs max-h-[220px] overflow-auto">
+              <div className="grid gap-3 grid-cols-2 sm:grid-cols-4 md:grid-cols-6 text-xs max-h-[220px] overflow-auto">
                 <Metric k="Model" v={facts.model || "—"} />
                 <Metric k="OS / Version" v={facts.osVersion || "—"} />
                 <Metric k="Serial" v={facts.serial || "—"} />
@@ -4426,6 +4487,7 @@ const UploadConfigForm = ({ project, authedUser, onClose, onUpload }) => {
 const UploadDocumentForm = ({ project, authedUser, onClose, onUpload, folderStructure, defaultFolderId = null }) => {
   const [files, setFiles] = useState([]);
   const [selectedFolderId, setSelectedFolderId] = useState(defaultFolderId || '');
+  const [newFolderName, setNewFolderName] = useState('');
   const [details, setDetails] = useState({
     who: authedUser?.username || '',
     what: '',
@@ -4537,7 +4599,18 @@ const UploadDocumentForm = ({ project, authedUser, onClose, onUpload, folderStru
     setError(null);
     
     try {
-      // Upload using real API
+      const projectId = project.project_id || project.id;
+      let folderIdToUse = selectedFolderId || null;
+
+      // If user entered a new folder name, create the folder first then upload into it
+      if (newFolderName.trim()) {
+        const createRes = await api.createFolder(projectId, newFolderName.trim(), null);
+        const newFolder = createRes?.folder || createRes;
+        if (newFolder?.id) {
+          folderIdToUse = newFolder.id;
+        }
+      }
+
       const metadata = {
         who: details.who,
         what: details.what,
@@ -4546,19 +4619,16 @@ const UploadDocumentForm = ({ project, authedUser, onClose, onUpload, folderStru
         why: details.why || null,
         description: details.description || null
       };
-      
-      const projectId = project.project_id || project.id;
-      const result = await api.uploadDocuments(projectId, files, metadata, selectedFolderId || null);
-      
-      // Upload successful - close modal and refresh
-      // Create upload record for UI consistency
+
+      await api.uploadDocuments(projectId, files, metadata, folderIdToUse);
+
       const uploadRecord = createUploadRecord('document', files, authedUser.username, projectId, {
         ...details,
-        folderId: selectedFolderId || null
+        folderId: folderIdToUse
       });
-      
-      onUpload(uploadRecord, selectedFolderId);
-      onClose(); // Close modal after successful upload
+
+      onUpload(uploadRecord, folderIdToUse);
+      onClose();
     } catch (error) {
       console.error('Upload failed:', error);
       // Handle error message properly
@@ -4594,15 +4664,22 @@ const UploadDocumentForm = ({ project, authedUser, onClose, onUpload, folderStru
                 </div>
               )}
 
-            <Field label="Upload to Folder (Optional)">
+            <Field label="สร้างโฟลเดอร์ใหม่ (ถ้ากรอก จะสร้างโฟลเดอร์แล้วอัปโหลดเข้าโฟลเดอร์นั้น)">
+              <Input
+                value={newFolderName}
+                onChange={(e) => setNewFolderName(e.target.value)}
+                placeholder="ชื่อโฟลเดอร์ใหม่ (ไม่กรอก = ใช้โฟลเดอร์ที่เลือกด้านล่าง)"
+              />
+            </Field>
+            <Field label="หรืออัปโหลดไปโฟลเดอร์ที่มีอยู่">
               <Select
                 value={selectedFolderId}
                 onChange={setSelectedFolderId}
                 options={[
-                  { value: "", label: "Root (No folder)" },
+                  { value: "", label: "Root (ไม่ใส่โฟลเดอร์)" },
                   ...folderOptions
                 ]}
-                placeholder="Select folder (leave empty for root)..."
+                placeholder="เลือกโฟลเดอร์..."
               />
             </Field>
 
@@ -4722,7 +4799,7 @@ const UploadDocumentForm = ({ project, authedUser, onClose, onUpload, folderStru
                 <input
                   type="file"
                   multiple
-                  accept=".pdf,.doc,.docx,.txt,.png,.jpg,.jpeg"
+                  accept="*/*"
                   onChange={handleFileChange}
                   className="hidden"
                   id="file-upload-input-doc"
@@ -5416,6 +5493,8 @@ const PerformanceMetricsView = ({ metrics }) => {
 };
 
 /* ========= HISTORY PAGE ========= */
+const ROWS_PER_PAGE = 10;
+
 const HistoryPage = ({ project, can, authedUser }) => {
   const [documents, setDocuments] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -5425,6 +5504,9 @@ const HistoryPage = ({ project, can, authedUser }) => {
   const [versions, setVersions] = useState([]);
   const [showVersions, setShowVersions] = useState(false);
   const [versionDocument, setVersionDocument] = useState(null);
+  const [showDescriptionModal, setShowDescriptionModal] = useState(false);
+  const [descriptionContent, setDescriptionContent] = useState({ text: "", filename: "" });
+  const [currentPage, setCurrentPage] = useState(1);
   const isOpeningVersions = useRef(false);
 
   // Load documents from API
@@ -5522,9 +5604,40 @@ const HistoryPage = ({ project, can, authedUser }) => {
     return matchSearch && matchWho && matchWhat;
   });
 
+  const totalPages = Math.max(1, Math.ceil(filteredDocs.length / ROWS_PER_PAGE));
+  const clampedPage = Math.min(Math.max(1, currentPage), totalPages);
+  const paginatedDocs = filteredDocs.slice((clampedPage - 1) * ROWS_PER_PAGE, clampedPage * ROWS_PER_PAGE);
+
+  useEffect(() => {
+    if (currentPage > totalPages && totalPages >= 1) setCurrentPage(totalPages);
+  }, [totalPages, currentPage]);
+
+  const openDescription = (r) => {
+    setDescriptionContent({
+      text: r.metadata?.description || "—",
+      filename: r.filename || "Unknown"
+    });
+    setShowDescriptionModal(true);
+  };
+
+  // Show at most 3 page number buttons; window slides with current page
+  const getPageNumbers = () => {
+    if (totalPages <= 3) {
+      return Array.from({ length: totalPages }, (_, i) => i + 1);
+    }
+    let start = Math.max(1, clampedPage - 1);
+    let end = Math.min(totalPages, start + 2);
+    if (end - start + 1 < 3) start = Math.max(1, end - 2);
+    return Array.from({ length: end - start + 1 }, (_, i) => start + i);
+  };
+
   return (
     <div className="h-full flex flex-col min-h-0 overflow-hidden">
-      <Card title="Upload History" className="flex-1 min-h-0 flex flex-col overflow-hidden">
+      {/* Header - large and prominent like Documents page */}
+      <div className="flex-shrink-0 flex items-center justify-between mb-4 px-1">
+        <h2 className="text-xl font-semibold text-gray-900 dark:text-gray-100">History</h2>
+      </div>
+      <Card className="flex-1 min-h-0 flex flex-col overflow-hidden" title={null} actions={null}>
         {loading ? (
           <div className="flex-1 flex items-center justify-center text-gray-500 dark:text-gray-400">
             <div className="text-center">
@@ -5532,8 +5645,8 @@ const HistoryPage = ({ project, can, authedUser }) => {
             </div>
           </div>
         ) : (
-          <div className="flex-1 min-h-0 flex flex-col overflow-hidden gap-4">
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-3 flex-shrink-0">
+          <div className="flex-1 min-h-0 flex flex-col overflow-hidden gap-3">
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-2 flex-shrink-0">
               <Input 
                 placeholder="Search (filename, user, description...)" 
                 value={searchDoc} 
@@ -5551,8 +5664,8 @@ const HistoryPage = ({ project, can, authedUser }) => {
                 options={[{value: "all", label: "All (Activity Type)"}, ...uniqueWhats.map(w => ({value: w, label: w}))]} 
               />
             </div>
-            <div className="flex-1 min-h-0 overflow-y-auto overflow-x-auto">
-              <div className="rounded-lg border border-slate-300 dark:border-gray-700 bg-white dark:bg-gray-900/50">
+            <div className="flex-1 min-h-0 overflow-hidden flex flex-col">
+              <div className="rounded-lg border border-slate-300 dark:border-gray-700 bg-white dark:bg-gray-900/50 flex-1 min-h-0 overflow-hidden flex flex-col">
                 <Table
                   columns={[
                     { header: "Time", key: "created_at", cell: (r) => <span className="text-xs">{formatDateTime(r.created_at)}</span> },
@@ -5563,6 +5676,20 @@ const HistoryPage = ({ project, can, authedUser }) => {
                     { header: "Operational Timing", key: "when", cell: (r) => <span className="text-sm">{r.metadata?.when || "—"}</span> },
                     { header: "Purpose", key: "why", cell: (r) => <span className="text-sm">{r.metadata?.why || "—"}</span> },
                     { header: "Version", key: "version", cell: (r) => <span className="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-blue-100 dark:bg-blue-900/30 text-blue-800 dark:text-blue-200">{`v${r.version} ${r.is_latest ? '(Latest)' : ''}`}</span> },
+                    {
+                      header: "Description",
+                      key: "description",
+                      cell: (r) => (
+                        <Button
+                          variant="secondary"
+                          size="sm"
+                          onClick={() => openDescription(r)}
+                          title="View description"
+                        >
+                          📄 View
+                        </Button>
+                      ),
+                    },
                     {
                       header: "Actions",
                       key: "actions",
@@ -5596,15 +5723,100 @@ const HistoryPage = ({ project, can, authedUser }) => {
                       ),
                     },
                   ]}
-                  data={filteredDocs}
+                  data={paginatedDocs}
                   empty="No document uploads yet"
                   minWidthClass="min-w-[1200px]"
+                  containerClassName="text-xs [&_th]:py-1 [&_td]:py-1 overflow-auto h-full min-h-0"
                 />
               </div>
             </div>
+            {/* Pagination footer: buttons row, then "Page x of y" below */}
+            {!loading && filteredDocs.length > 0 && (
+              <div className="flex-shrink-0 flex flex-col items-center justify-center gap-1.5 py-2 border-t border-slate-300 dark:border-slate-700">
+                <div className="flex items-center gap-1">
+                  <Button
+                    variant="secondary"
+                    size="sm"
+                    disabled={clampedPage <= 1}
+                    onClick={() => setCurrentPage(1)}
+                    title="หน้าแรก"
+                  >
+                    «
+                  </Button>
+                  <Button
+                    variant="secondary"
+                    size="sm"
+                    disabled={clampedPage <= 1}
+                    onClick={() => setCurrentPage(p => Math.max(1, p - 1))}
+                    title="Previous page"
+                  >
+                    ◀
+                  </Button>
+                  {getPageNumbers().map((p) => (
+                    <Button
+                      key={p}
+                      variant={p === clampedPage ? "primary" : "secondary"}
+                      size="sm"
+                      onClick={() => setCurrentPage(p)}
+                    >
+                      {p}
+                    </Button>
+                  ))}
+                  <Button
+                    variant="secondary"
+                    size="sm"
+                    disabled={clampedPage >= totalPages}
+                    onClick={() => setCurrentPage(p => Math.min(totalPages, p + 1))}
+                    title="Next page"
+                  >
+                    ▶
+                  </Button>
+                  <Button
+                    variant="secondary"
+                    size="sm"
+                    disabled={clampedPage >= totalPages}
+                    onClick={() => setCurrentPage(totalPages)}
+                    title="หน้าสุดท้าย"
+                  >
+                    »
+                  </Button>
+                </div>
+                <span className="text-sm text-slate-600 dark:text-slate-400">
+                  Page {clampedPage} of {totalPages}
+                </span>
+              </div>
+            )}
           </div>
         )}
       </Card>
+
+      {/* Description popup */}
+      {showDescriptionModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+          <div
+            className="absolute inset-0 bg-black/50"
+            onClick={() => setShowDescriptionModal(false)}
+          />
+          <div
+            className="relative z-10 w-full max-w-lg rounded-xl border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-900 shadow-lg"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="flex items-center justify-between border-b border-slate-200 dark:border-slate-700 px-4 py-3">
+              <h3 className="text-sm font-semibold text-slate-800 dark:text-slate-200">
+                Description — {descriptionContent.filename}
+              </h3>
+              <Button variant="secondary" size="sm" onClick={() => setShowDescriptionModal(false)}>
+                Close
+              </Button>
+            </div>
+            <div className="p-4 max-h-[60vh] overflow-y-auto">
+              <p className="text-sm text-slate-700 dark:text-slate-300 whitespace-pre-wrap">
+                {descriptionContent.text || "—"}
+              </p>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Version History Modal */}
       {showVersions && (
@@ -5681,7 +5893,7 @@ const HistoryPage = ({ project, can, authedUser }) => {
 };
 
 /* ========= SCRIPT GENERATOR PAGE ========= */
-const ScriptGeneratorPage = ({ project, can, authedUser }) => {
+const ScriptGeneratorPage = ({ project, can, authedUser, toast }) => {
   const projectId = project?.project_id || project?.id;
   const [deviceInventory, setDeviceInventory] = React.useState([]);
   const [ciscoCommands, setCiscoCommands] = React.useState("");
@@ -5694,6 +5906,9 @@ const ScriptGeneratorPage = ({ project, can, authedUser }) => {
   const [csvFileInput, setCsvFileInput] = React.useState(null);
   const [error, setError] = React.useState("");
   const [showCsvInfoModal, setShowCsvInfoModal] = React.useState(false);
+  const [generatedScript, setGeneratedScript] = React.useState(null);
+  const [scriptLanguage, setScriptLanguage] = React.useState(null);
+  const [scriptFilename, setScriptFilename] = React.useState(null);
 
   // Device form state
   const [deviceForm, setDeviceForm] = React.useState({
@@ -5737,7 +5952,7 @@ const ScriptGeneratorPage = ({ project, can, authedUser }) => {
         cisco_commands: ciscoCommands,
         huawei_commands: huaweiCommands
       });
-      alert("Settings saved successfully!");
+      if (toast) toast.success("Settings saved successfully!");
     } catch (err) {
       console.error("Failed to save settings:", err);
       setError("Failed to save settings: " + (err.message || err));
@@ -5887,7 +6102,7 @@ const ScriptGeneratorPage = ({ project, can, authedUser }) => {
     
     const filteredDevices = deviceInventory.filter(d => d.device_type === vendor);
     if (filteredDevices.length === 0) {
-      alert("No devices found for selected vendor type");
+      if (toast) toast.warning("No devices found for selected vendor type");
       return;
     }
     
@@ -5987,7 +6202,14 @@ const ScriptGeneratorPage = ({ project, can, authedUser }) => {
     const baseFilename = `${vendorLabel}_Backup_for_${osLabel}.${ext}`;
     const safeFilename = sanitizeFilename(baseFilename);
 
+    // Store script for preview
+    setGeneratedScript(script);
+    setScriptLanguage("bash");
+    setScriptFilename(safeFilename);
+    
+    // Also download automatically
     downloadScript(script, safeFilename);
+    if (toast) toast.success(`Linux script generated and downloaded: ${safeFilename}`);
   };
 
   const generatePythonScript = () => {
@@ -6127,7 +6349,14 @@ const ScriptGeneratorPage = ({ project, can, authedUser }) => {
     const baseFilename = `${vendorLabel}_Backup_for_${osLabel}.${ext}`;
     const safeFilename = sanitizeFilename(baseFilename);
 
+    // Store script for preview
+    setGeneratedScript(script);
+    setScriptLanguage("python");
+    setScriptFilename(safeFilename);
+    
+    // Also download automatically
     downloadScript(script, safeFilename);
+    if (toast) toast.success(`Python script generated and downloaded: ${safeFilename}`);
   };
 
   const downloadScript = (content, filename) => {
@@ -6136,8 +6365,17 @@ const ScriptGeneratorPage = ({ project, can, authedUser }) => {
     const a = document.createElement("a");
     a.href = url;
     a.download = filename;
+    document.body.appendChild(a);
     a.click();
+    document.body.removeChild(a);
     URL.revokeObjectURL(url);
+  };
+  
+  const handleDownloadScript = () => {
+    if (generatedScript && scriptFilename) {
+      downloadScript(generatedScript, scriptFilename);
+      if (toast) toast.success(`Script downloaded: ${scriptFilename}`);
+    }
   };
 
   const maskPassword = (str) => {
@@ -6328,32 +6566,47 @@ const ScriptGeneratorPage = ({ project, can, authedUser }) => {
           </div>
         </Card>
 
-        {/* Section 3: Script Export (1/3 width) — compact, no scrollbar */}
-        <Card compactHeader className="col-span-1 flex flex-col min-h-0 overflow-hidden" title="Export Script">
+        {/* Section 3: Script Export (1/3 width) */}
+        <Card compactHeader className="col-span-1 flex flex-col min-h-0 overflow-hidden" title="Generate Script">
           <div className="flex-1 min-h-0 flex flex-col p-3 gap-3 overflow-hidden">
-            <div className="flex-shrink-0 bg-blue-50 dark:bg-slate-900/50 border border-blue-200 dark:border-slate-700 rounded-lg px-3 py-2 text-blue-800 dark:text-blue-200 text-sm">
-              <div className="font-medium text-xs">Device Count</div>
-              <div className="text-xl font-bold leading-tight">{deviceInventory.filter(d => d.device_type === (activeVendorTab === "cisco" ? "cisco_ios" : "huawei_vrp")).length}</div>
-              <div className="text-xs opacity-75">devices for {activeVendorTab === "cisco" ? "Cisco IOS" : "Huawei VRP"}</div>
+            <div className="flex-shrink-0 bg-indigo-50 dark:bg-indigo-900/20 border border-indigo-200 dark:border-indigo-800 rounded-lg px-3 py-2.5 text-indigo-800 dark:text-indigo-200 text-sm">
+              <div className="font-medium text-xs mb-1">Device Count</div>
+              <div className="text-2xl font-bold leading-tight">{deviceInventory.filter(d => d.device_type === (activeVendorTab === "cisco" ? "cisco_ios" : "huawei_vrp")).length}</div>
+              <div className="text-xs opacity-75 mt-1">devices for {activeVendorTab === "cisco" ? "Cisco IOS" : "Huawei VRP"}</div>
             </div>
             <div className="flex-shrink-0 flex flex-col gap-2">
               <button
                 type="button"
                 onClick={generateLinuxScript}
                 disabled={deviceInventory.filter(d => d.device_type === (activeVendorTab === "cisco" ? "cisco_ios" : "huawei_vrp")).length === 0}
-                className="w-full py-2 bg-orange-600 hover:bg-orange-700 disabled:opacity-50 disabled:cursor-not-allowed text-white rounded-lg flex items-center justify-center gap-2 text-sm font-semibold shadow-sm focus:outline-none focus:ring-2 focus:ring-orange-400"
+                className="w-full py-2.5 bg-orange-600 hover:bg-orange-700 disabled:opacity-50 disabled:cursor-not-allowed text-white rounded-lg flex items-center justify-center gap-2 text-sm font-semibold shadow-sm focus:outline-none focus:ring-2 focus:ring-orange-400 transition-colors"
               >
-                🐧 Linux Script (.sh)
+                <span>🐧</span>
+                <span>Linux Script (.sh)</span>
               </button>
               <button
                 type="button"
                 onClick={generatePythonScript}
                 disabled={deviceInventory.filter(d => d.device_type === (activeVendorTab === "cisco" ? "cisco_ios" : "huawei_vrp")).length === 0}
-                className="w-full py-2 bg-indigo-600 hover:bg-indigo-700 disabled:opacity-50 disabled:cursor-not-allowed text-white rounded-lg flex items-center justify-center gap-2 text-sm font-semibold shadow-sm focus:outline-none focus:ring-2 focus:ring-indigo-400"
+                className="w-full py-2.5 bg-indigo-600 hover:bg-indigo-700 disabled:opacity-50 disabled:cursor-not-allowed text-white rounded-lg flex items-center justify-center gap-2 text-sm font-semibold shadow-sm focus:outline-none focus:ring-2 focus:ring-indigo-400 transition-colors"
               >
-                🐍 Windows Script (.py)
+                <span>🐍</span>
+                <span>Windows Script (.py)</span>
               </button>
             </div>
+            {generatedScript && (
+              <div className="flex-1 min-h-0 overflow-hidden mt-2">
+                <CodeBlock
+                  code={generatedScript}
+                  language={scriptLanguage}
+                  filename={scriptFilename}
+                  showCopy={true}
+                  showDownload={true}
+                  onDownload={handleDownloadScript}
+                  className="h-full"
+                />
+              </div>
+            )}
           </div>
         </Card>
       </div>
@@ -6568,12 +6821,12 @@ const DocumentsPage = ({ project, can, authedUser, uploadHistory, setUploadHisto
       try {
         const projectId = project.project_id || project.id;
         const folders = await api.getFolders(projectId);
-        // Transform API response to match expected format
-        const transformedFolders = folders.map(f => ({
+        // Transform API response: normalize parentId so "root" / undefined become null (root folders)
+        const transformedFolders = (folders || []).map(f => ({
           id: f.id,
           name: f.name,
-          parentId: f.parent_id || null,
-          deleted: f.deleted || false
+          parentId: (f.parent_id === "root" || f.parent_id == null || f.parent_id === undefined) ? null : (f.parent_id || null),
+          deleted: !!f.deleted
         }));
         setCustomFolders(transformedFolders);
       } catch (error) {
@@ -6793,18 +7046,16 @@ const DocumentsPage = ({ project, can, authedUser, uploadHistory, setUploadHisto
 
     // Helper function to ensure a folder exists in the structure at the correct location
     const ensureFolderExists = (targetFolders, folderId, folderName, parentId, customFolders, visited = new Set(), rootFolders = baseStructure.folders) => {
-      // Prevent infinite loops
-      if (visited.has(folderId)) {
-        return false;
-      }
+      if (visited.has(folderId)) return false;
       visited.add(folderId);
-      
-      // Check if folder already exists anywhere in the entire structure
+      // Treat "root" as root (null) so folders always place correctly
+      const effectiveParentId = (parentId === "root" || parentId == null) ? null : parentId;
+
       const existingFolder = findFolderInStructure(rootFolders, folderId);
-      
-      if (parentId) {
+
+      if (effectiveParentId) {
         // Find parent folder - search in entire structure, not just targetFolders
-        const parentFolder = findFolderInStructure(rootFolders, parentId);
+        const parentFolder = findFolderInStructure(rootFolders, effectiveParentId);
         if (parentFolder) {
           if (!parentFolder.folders) {
             parentFolder.folders = [];
@@ -6844,13 +7095,12 @@ const DocumentsPage = ({ project, can, authedUser, uploadHistory, setUploadHisto
           });
           return true;
         } else {
-          // Parent not found - try to create parent first if it's a custom folder
-          const parentCustomFolder = customFolders.find(f => f.id === parentId);
+          const parentCustomFolder = customFolders.find(f => f.id === effectiveParentId);
           if (parentCustomFolder) {
-            // Find where parent should be created
             let parentTargetFolders = targetFolders;
-            if (parentCustomFolder.parentId) {
-              const parentParent = findFolderInStructure(targetFolders, parentCustomFolder.parentId);
+            const pp = parentCustomFolder.parentId;
+            if (pp && pp !== "root") {
+              const parentParent = findFolderInStructure(targetFolders, pp);
               if (parentParent) {
                 if (!parentParent.folders) {
                   parentParent.folders = [];
@@ -6863,9 +7113,8 @@ const DocumentsPage = ({ project, can, authedUser, uploadHistory, setUploadHisto
             }
             
             // Recursively ensure parent exists in the correct location
-            if (ensureFolderExists(parentTargetFolders, parentId, parentCustomFolder.name, parentCustomFolder.parentId, customFolders, visited, rootFolders)) {
-              // Parent created, now create this folder
-              const parentFolderAfter = findFolderInStructure(targetFolders, parentId);
+            if (ensureFolderExists(parentTargetFolders, effectiveParentId, parentCustomFolder.name, parentCustomFolder.parentId, customFolders, visited, rootFolders)) {
+              const parentFolderAfter = findFolderInStructure(targetFolders, effectiveParentId);
               if (parentFolderAfter) {
                 if (!parentFolderAfter.folders) {
                   parentFolderAfter.folders = [];
@@ -6906,38 +7155,56 @@ const DocumentsPage = ({ project, can, authedUser, uploadHistory, setUploadHisto
           return false;
         }
       } else {
-        // Add to root
+        // Add to root (parentId === null)
         // Check if folder already exists in root
         const existingInRoot = findFolderInLocation(targetFolders, folderId);
         if (existingInRoot) {
+          // Update name if it changed (for rename operations)
+          if (existingInRoot.name !== folderName) {
+            existingInRoot.name = folderName;
+          }
           return true; // Already exists in root
         }
         
         // If folder exists elsewhere, remove it first (it's in wrong location)
+        // But be careful: only remove if it's NOT in rootFolders (baseStructure.folders)
+        // to prevent accidentally removing root folders
         if (existingFolder) {
-          const removeFromStructure = (folders, id) => {
-            const index = folders.findIndex(f => f.id === id);
-            if (index !== -1) {
-              folders.splice(index, 1);
-              return true;
-            }
-            for (const folder of folders) {
-              if (folder.folders && removeFromStructure(folder.folders, id)) {
+          // Check if it's in a nested location (not root)
+          const isInRoot = findFolderInLocation(rootFolders, folderId) !== null;
+          if (!isInRoot) {
+            // Only remove if it's nested, not if it's already in root
+            const removeFromStructure = (folders, id) => {
+              const index = folders.findIndex(f => f.id === id);
+              if (index !== -1) {
+                folders.splice(index, 1);
                 return true;
               }
+              for (const folder of folders) {
+                if (folder.folders && removeFromStructure(folder.folders, id)) {
+                  return true;
+                }
+              }
+              return false;
+            };
+            // Only remove from nested locations, preserve root folders
+            for (const folder of rootFolders) {
+              if (folder.folders && removeFromStructure(folder.folders, folderId)) {
+                break;
+              }
             }
-            return false;
-          };
-          removeFromStructure(rootFolders, folderId);
+          }
         }
         
-        // Create folder in root
-        targetFolders.push({
-          id: folderId,
-          name: folderName,
-          folders: [],
-          files: [],
-        });
+        // Create folder in root (only if it doesn't exist)
+        if (!findFolderInLocation(targetFolders, folderId)) {
+          targetFolders.push({
+            id: folderId,
+            name: folderName,
+            folders: [],
+            files: [],
+          });
+        }
         return true;
       }
     };
@@ -6946,11 +7213,14 @@ const DocumentsPage = ({ project, can, authedUser, uploadHistory, setUploadHisto
     const activeCustomFolders = customFolders.filter(f => !f.deleted);
 
     const mergeCustomFolders = (targetFolders, customFolders, parentId = null, processed = new Set()) => {
-      // Find all folders that belong to the current parent level
+      // Find all folders that belong to the current parent level (treat null/"root"/undefined as root)
+      const isRootLevel = parentId == null || parentId === "root";
       const foldersForThisLevel = customFolders.filter(customFolder => {
         if (customFolder.id === "Config") return false;
         if (processed.has(customFolder.id)) return false;
-        return customFolder.parentId === parentId;
+        const folderParent = customFolder.parentId;
+        if (isRootLevel) return folderParent == null || folderParent === "root";
+        return folderParent === parentId;
       });
       
       // First pass: create all folders at this level
@@ -6979,11 +7249,12 @@ const DocumentsPage = ({ project, can, authedUser, uploadHistory, setUploadHisto
     if (activeCustomFolders && activeCustomFolders.length > 0) {
       // Calculate depth for each folder (how many levels deep it is)
       const calculateDepth = (folderId, visited = new Set()) => {
-        if (visited.has(folderId)) return 0; // Prevent circular references
+        if (visited.has(folderId)) return 0;
         visited.add(folderId);
         const folder = activeCustomFolders.find(f => f.id === folderId);
-        if (!folder || !folder.parentId) return 0;
-        return 1 + calculateDepth(folder.parentId, visited);
+        const pid = folder?.parentId;
+        if (!folder || pid == null || pid === "root") return 0;
+        return 1 + calculateDepth(pid, visited);
       };
       
       // Sort by depth: folders with no parent first, then nested ones by depth
@@ -6994,8 +7265,30 @@ const DocumentsPage = ({ project, can, authedUser, uploadHistory, setUploadHisto
       });
       
       // Single pass merge with proper processing tracking
+      // IMPORTANT: Always merge into baseStructure.folders to preserve Config folder
+      // and ensure all root folders (parentId === null) are added correctly
       const processed = new Set();
       mergeCustomFolders(baseStructure.folders, sortedFolders, null, processed);
+      
+      // Ensure all root folders are present (parentId null/"root"/undefined; not Config)
+      const rootFolders = activeCustomFolders.filter(f => (f.parentId == null || f.parentId === "root") && f.id !== "Config");
+      rootFolders.forEach(rootFolder => {
+        const exists = findFolderInStructure(baseStructure.folders, rootFolder.id);
+        if (!exists) {
+          // Add root folder if it doesn't exist
+          baseStructure.folders.push({
+            id: rootFolder.id,
+            name: rootFolder.name,
+            folders: [],
+            files: [],
+          });
+        } else {
+          // Update name if folder exists but name changed
+          if (exists.name !== rootFolder.name) {
+            exists.name = rootFolder.name;
+          }
+        }
+      });
     }
 
     // Only show latest versions in file tree
@@ -7099,7 +7392,9 @@ const DocumentsPage = ({ project, can, authedUser, uploadHistory, setUploadHisto
       setFolderAction("edit");
       setSelectedFolder(folderId);
       setFolderName(found.node.name);
-      setFolderParent(found.parent ? found.parent.id : null);
+      // Root folders have parent.id === "root" (virtual node); API expects parent_id null, not "root"
+      const parentId = found.parent && found.parent.id !== "root" ? found.parent.id : null;
+      setFolderParent(parentId);
       setShowFolderDialog(true);
     } else {
       alert("Folder not found.");
@@ -7152,6 +7447,7 @@ const DocumentsPage = ({ project, can, authedUser, uploadHistory, setUploadHisto
 
     try {
       const projectId = project.project_id || project.id;
+      const renamedFolderId = selectedFolder; // Store folder ID before rename
       
       if (folderAction === "add") {
         // Prevent adding to Config folder
@@ -7162,24 +7458,70 @@ const DocumentsPage = ({ project, can, authedUser, uploadHistory, setUploadHisto
         
         await api.createFolder(projectId, folderName.trim(), folderParent || null);
         alert("Folder created successfully.");
+        
+        // Reload folders from API
+        const folders = await api.getFolders(projectId);
+        const transformedFolders = (folders || []).map(f => ({
+          id: f.id,
+          name: f.name,
+          parentId: (f.parent_id === "root" || f.parent_id == null) ? null : (f.parent_id || null),
+          deleted: !!f.deleted
+        }));
+        setCustomFolders(transformedFolders);
+        
+        // Find the newly created folder and expand it and its parent
+        const newFolder = transformedFolders.find(f => f.name === folderName.trim() && f.parentId === (folderParent || null));
+        const newExpanded = new Set(expanded);
+        if (newFolder?.id) {
+          newExpanded.add(newFolder.id);
+        }
+        if (folderParent) {
+          newExpanded.add(folderParent);
+        }
+        setExpanded(newExpanded);
       } else if (folderAction === "edit" && selectedFolder) {
-        await api.updateFolder(projectId, selectedFolder, folderName.trim(), folderParent || null);
+        // API expects parent_id null for root; tree uses "root" as virtual parent id
+        const parentIdForApi = (folderParent === "root" || folderParent === "") ? null : (folderParent || null);
+        await api.updateFolder(projectId, selectedFolder, folderName.trim(), parentIdForApi);
         alert("Folder updated successfully.");
+        
+        // Reload folders from API (normalize parentId so root folders use null, not "root")
+        const folders = await api.getFolders(projectId);
+        const transformedFolders = (folders || []).map(f => ({
+          id: f.id,
+          name: f.name,
+          parentId: (f.parent_id === "root" || f.parent_id == null) ? null : (f.parent_id || null),
+          deleted: !!f.deleted
+        }));
+        setCustomFolders(transformedFolders);
+        
+        // Reload documents to ensure they're properly associated with renamed folder
+        const docsResponse = await api.getDocuments(projectId);
+        const docs = Array.isArray(docsResponse) ? docsResponse : (docsResponse?.documents || []);
+        setDocuments(docs);
+        
+        // Keep the renamed folder expanded and ensure parent is expanded too
+        const newExpanded = new Set(expanded);
+        newExpanded.add(renamedFolderId); // Keep folder expanded after rename
+        if (folderParent) {
+          newExpanded.add(folderParent);
+        }
+        // Also expand parent folders recursively
+        const findParentFolders = (folderId) => {
+          const folder = transformedFolders.find(f => f.id === folderId);
+          if (folder && folder.parentId) {
+            newExpanded.add(folder.parentId);
+            findParentFolders(folder.parentId);
+          }
+        };
+        findParentFolders(renamedFolderId);
+        setExpanded(newExpanded);
       }
-      
-      // Reload folders from API
-      const folders = await api.getFolders(projectId);
-      const transformedFolders = folders.map(f => ({
-        id: f.id,
-        name: f.name,
-        parentId: f.parent_id || null,
-        deleted: f.deleted || false
-      }));
-      setCustomFolders(transformedFolders);
       
       setShowFolderDialog(false);
       setFolderName("");
       setSelectedFolder(null);
+      setFolderParent(null);
     } catch (error) {
       console.error('Failed to save folder:', error);
       alert(`Failed: ${error.message || error}`);
@@ -7867,10 +8209,10 @@ const DocumentsPage = ({ project, can, authedUser, uploadHistory, setUploadHisto
                 setFolderName("");
                 setSelectedFolder(null);
               }}>
-                ยกเลิก
+                Cancel
               </Button>
               <Button variant="primary" onClick={handleSaveFolder}>
-                {folderAction === "add" ? "สร้าง" : "บันทึก"}
+                {folderAction === "add" ? "Create" : "Save"}
               </Button>
             </div>
           </div>
@@ -10291,8 +10633,9 @@ const TopologyGraph = ({ project, projectId, routeToHash, handleNavClick, onOpen
 
   return (
     <Card 
+      headerClassName="py-2.5"
       title={
-        <div className="flex items-center justify-between w-full py-1 gap-2">
+        <div className="flex items-center justify-between w-full gap-2">
           <span className="text-xs font-semibold text-slate-800 dark:text-slate-400 flex-shrink-0">Topology</span>
           <div className="flex items-center gap-2 flex-1 justify-end min-w-0">
             {/* Topology completion popup - always in DOM so it shows when LLM finishes (even if user was on another tab and came back) */}
@@ -10321,22 +10664,8 @@ const TopologyGraph = ({ project, projectId, routeToHash, handleNavClick, onOpen
                 {formatShortDate(lastModified)}
               </span>
             )}
-            {/* Action buttons - larger and clearer */}
+            {/* Edit / Zoom controls - AI button is last (far right) like Network Overview */}
             <div className="flex gap-1 items-center flex-shrink-0">
-              {!editMode && (
-                <>
-                  <button
-                    type="button"
-                    onClick={handleGenerateTopology}
-                    disabled={generatingTopology || llmBusy}
-                    className="w-8 h-8 flex items-center justify-center rounded-xl bg-white/90 dark:bg-white/10 backdrop-blur-sm border border-slate-300/80 dark:border-slate-600/80 text-slate-700 dark:text-slate-200 shadow-sm hover:bg-white dark:hover:bg-white/15 transition-colors disabled:opacity-50 disabled:cursor-not-allowed text-base"
-                    title={generatingTopology ? "Analyzing topology... Please wait." : llmBusy ? (llmBusyMessage || "Another LLM task is running. You can switch to Documents/History tab.") : "Generate topology with AI"}
-                    aria-label={generatingTopology ? "Generating topology..." : "AI Topology"}
-                  >
-                    {generatingTopology || llmBusy ? "⏳" : "✨"}
-                  </button>
-                </>
-              )}
               {canEdit && (
                 <>
                   {!editMode ? (
@@ -10367,8 +10696,8 @@ const TopologyGraph = ({ project, projectId, routeToHash, handleNavClick, onOpen
                   )}
                 </>
               )}
-              {/* Zoom controls - larger and clearer */}
-              <div className="flex gap-1 ml-1 border-l border-slate-300 dark:border-slate-700 pl-1">
+              {/* Zoom controls */}
+              <div className="flex gap-1 border-l border-slate-300 dark:border-slate-700 pl-1">
                 <button
                   className="w-6 h-6 flex items-center justify-center rounded-lg border border-slate-300 dark:border-slate-600 bg-slate-100/80 dark:bg-slate-800/50 hover:bg-slate-200 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-300 text-xs transition-colors"
                   onClick={handleZoomIn}
@@ -10392,6 +10721,19 @@ const TopologyGraph = ({ project, projectId, routeToHash, handleNavClick, onOpen
                 </button>
               </div>
             </div>
+            {/* AI Topology - icon only (other topo buttons also icon-only) */}
+            {!editMode && (
+              <button
+                type="button"
+                onClick={handleGenerateTopology}
+                disabled={generatingTopology || llmBusy}
+                className="w-8 h-8 flex items-center justify-center rounded-xl bg-white/90 dark:bg-white/10 backdrop-blur-sm border border-slate-300/80 dark:border-slate-600/80 text-slate-700 dark:text-slate-200 shadow-sm hover:bg-white dark:hover:bg-white/15 transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex-shrink-0 text-base"
+                title={generatingTopology ? "Analyzing topology... Please wait." : llmBusy ? (llmBusyMessage || "Another LLM task is running. You can switch to Documents/History tab.") : "Generate topology with AI"}
+                aria-label={generatingTopology ? "Generating topology..." : "Generate topology with AI"}
+              >
+                {generatingTopology || llmBusy ? "⏳" : "✨"}
+              </button>
+            )}
           </div>
         </div>
       } 
@@ -10761,14 +11103,14 @@ function summarizeStp(project) {
 
   return {
     modeByDev,
-    rootCandidates, // ถ้าว่าง แปลว่ายังไม่รู้ว่าใครเป็น root
+    rootCandidates, // If empty, means we don't know who is root yet
   };
 }
 
-/* ===== จัดบทบาทโดยเดาชื่อ (core/distribution/access) ===== */
+/* ===== Assign roles by guessing from name (core/distribution/access) ===== */
 // Note: classifyRoleByName is now defined before TopologyGraph component (see above)
 
-/* ===== AI-like Device Narrative (เน้นความสัมพันธ์ + STP) ===== */
+/* ===== AI-like Device Narrative (focus on relationships + STP) ===== */
 function buildDeviceNarrative(project, row) {
   if (!row) return "No device data.";
   const links = deriveLinksFromProject(project);
@@ -10800,11 +11142,11 @@ function buildDeviceNarrative(project, row) {
   // Mgmt/Health
   parts.push(`• NTP: ${row.ntpStatus || "—"}  |  SNMP: ${row.snmp || "—"}  |  Syslog: ${row.syslog || "—"}  |  CPU ${row.cpu ?? "—"}% / MEM ${row.mem ?? "—"}%`);
 
-  // ความสัมพันธ์จากกราฟ
+  // Relationships from graph
   if (uniqNeigh.length) {
-    parts.push(`• ความสัมพันธ์ในระบบ: เชื่อมต่อกับ ${uniqNeigh.join(", ")} (จากลิงก์กราฟ)`);
+    parts.push(`• System relationships: Connected to ${uniqNeigh.join(", ")} (from graph links)`);
   } else {
-    parts.push(`• ความสัมพันธ์ในระบบ: (ยังไม่พบจากกราฟ — แนะนำอัปโหลด show cdp/lldp neighbors)`);
+    parts.push(`• System relationships: (Not found in graph — recommend uploading show cdp/lldp neighbors)`);
   }
 
   // STP overview and this device's role

@@ -119,14 +119,26 @@ async def list_project_members(project_id: str, user=Depends(get_current_user)):
 
 @router.post("/{project_id}/members")
 async def add_member(project_id: str, body: MemberAdd, user=Depends(get_current_user)):
-    """Add or update a member in a project. Only admin or project manager can do this."""
+    """Add or update a member in a project. Only admin or project manager can do this.
+    Only platform/project admin can assign admin or manager role; project manager can only add engineer/viewer."""
     # Check if project exists
     project = await db()["projects"].find_one({"project_id": project_id})
     if not project:
         raise HTTPException(status_code=404, detail="Project not found")
     
-    # Check permission - manager has same permissions as admin
     await check_project_manager_or_admin(project_id, user)
+
+    # If requester is project manager (not platform admin), they cannot assign admin or manager
+    if user.get("role") != "admin":
+        membership = await db()["project_members"].find_one(
+            {"project_id": project_id, "username": user["username"]}
+        )
+        if membership and membership.get("role") == "manager":
+            if body.role in ("admin", "manager"):
+                raise HTTPException(
+                    status_code=403,
+                    detail="Only admin can add or assign manager role"
+                )
 
     # Check if user exists
     u = await db()["users"].find_one({"username": body.username})
@@ -144,19 +156,35 @@ async def add_member(project_id: str, body: MemberAdd, user=Depends(get_current_
 
 @router.put("/{project_id}/members/{username}")
 async def update_member_role(project_id: str, username: str, body: MemberAdd, user=Depends(get_current_user)):
-    """Update a member's role in a project. Only admin or project manager can do this."""
+    """Update a member's role in a project. Only admin or project manager can do this.
+    Only admin can change to/from admin or manager role; project manager can only edit engineer/viewer."""
     # Check if project exists
     project = await db()["projects"].find_one({"project_id": project_id})
     if not project:
         raise HTTPException(status_code=404, detail="Project not found")
     
-    # Check permission - manager has same permissions as admin
     await check_project_manager_or_admin(project_id, user)
     
-    # Check if member exists
     member = await db()["project_members"].find_one({"project_id": project_id, "username": username})
     if not member:
         raise HTTPException(status_code=404, detail="Member not found in this project")
+
+    # Project manager cannot edit admin or manager members, and cannot set role to admin/manager
+    if user.get("role") != "admin":
+        requester = await db()["project_members"].find_one(
+            {"project_id": project_id, "username": user["username"]}
+        )
+        if requester and requester.get("role") == "manager":
+            if member.get("role") in ("admin", "manager"):
+                raise HTTPException(
+                    status_code=403,
+                    detail="Only admin can change manager or admin role"
+                )
+            if body.role in ("admin", "manager"):
+                raise HTTPException(
+                    status_code=403,
+                    detail="Only admin can assign manager role"
+                )
     
     # Update role
     await db()["project_members"].update_one(
@@ -167,19 +195,26 @@ async def update_member_role(project_id: str, username: str, body: MemberAdd, us
 
 @router.delete("/{project_id}/members/{username}")
 async def remove_member(project_id: str, username: str, user=Depends(get_current_user)):
-    """Remove a member from a project. Only admin or project manager can do this."""
+    """Remove a member from a project. Only admin or project manager can do this.
+    Only admin can remove admin or manager members."""
     # Check if project exists
     project = await db()["projects"].find_one({"project_id": project_id})
     if not project:
         raise HTTPException(status_code=404, detail="Project not found")
     
-    # Check permission - manager has same permissions as admin
     await check_project_manager_or_admin(project_id, user)
     
-    # Check if member exists
     member = await db()["project_members"].find_one({"project_id": project_id, "username": username})
     if not member:
         raise HTTPException(status_code=404, detail="Member not found in this project")
+
+    # Project manager cannot remove admin or manager
+    if user.get("role") != "admin":
+        if member.get("role") in ("admin", "manager"):
+            raise HTTPException(
+                status_code=403,
+                detail="Only admin can remove admin or manager from project"
+            )
     
     # Remove member
     result = await db()["project_members"].delete_one({"project_id": project_id, "username": username})
@@ -213,6 +248,8 @@ async def update_project(project_id: str, body: ProjectUpdate, user=Depends(get_
         update_data["visibility"] = body.visibility
     if body.backup_interval is not None:
         update_data["backup_interval"] = body.backup_interval
+    if body.status is not None:
+        update_data["status"] = body.status
     
     await db()["projects"].update_one(
         {"project_id": project_id},

@@ -8,12 +8,14 @@ export default function Card({
   className = "",
   compact = false,
   compactHeader = false,
+  headerClassName = "",
 }) {
   const isFlexCard =
     className.includes("flex flex-col") || className.includes("flex-1");
   const isFullScreen =
     className.includes("overflow-hidden") && isFlexCard;
   const headerCompact = compact || compactHeader;
+  const isTitleElement = React.isValidElement(title);
   return (
     <div
       className={`rounded-2xl border border-slate-300 dark:border-[#1F2937] bg-white dark:bg-[#111827] shadow-sm ${className}`}
@@ -22,18 +24,24 @@ export default function Card({
         <div
           className={`flex items-center justify-between border-b border-gray-100 dark:border-[#1F2937] flex-shrink-0 ${
             headerCompact ? "px-3 py-2" : compact ? "px-2 py-1" : "px-5 py-3"
-          }`}
+          } ${headerClassName}`}
         >
-          <h3
-            className={`${
-              compact ? "text-[10px]" : compactHeader ? "text-xs" : "text-sm"
-            } font-semibold text-gray-700 dark:text-gray-200`}
-          >
-            {safeDisplay(title)}
-          </h3>
-          <div className={`flex gap-2 ${compactHeader ? "gap-1.5" : ""}`}>
-            {safeChild(actions)}
-          </div>
+          {isTitleElement ? (
+            <div className="flex items-center justify-between w-full min-w-0">{safeChild(title)}</div>
+          ) : (
+            <h3
+              className={`${
+                compact ? "text-[10px]" : compactHeader ? "text-xs" : "text-sm"
+              } font-semibold text-gray-700 dark:text-gray-200`}
+            >
+              {safeDisplay(title)}
+            </h3>
+          )}
+          {!isTitleElement && (
+            <div className={`flex gap-2 ${compactHeader ? "gap-1.5" : ""}`}>
+              {safeChild(actions)}
+            </div>
+          )}
         </div>
       )}
       <div

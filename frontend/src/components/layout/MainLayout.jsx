@@ -1,11 +1,26 @@
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 
 /**
- * Single-Pane layout: top navbar, left sidebar (collapsible; drawer on small screens), main content.
+ * Single-Pane layout: top navbar, responsive side navigation (drawer on small screens), main content.
  * Supports light/dark via Tailwind dark: and responsive breakpoints.
+ * Side navigation appears as drawer on mobile/tablet (lg-), hidden on desktop (lg+) where tabs are shown in top bar.
  */
-export default function MainLayout({ topBar, leftSidebar, children, mainClassName = "" }) {
-  const [sidebarOpen, setSidebarOpen] = useState(false);
+export default function MainLayout({ topBar, sideNavigation, children, mainClassName = "" }) {
+  const [sideNavOpen, setSideNavOpen] = useState(false);
+
+  // Listen for custom events to toggle/close side nav
+  useEffect(() => {
+    const handleToggleSideNav = () => setSideNavOpen(prev => !prev);
+    const handleCloseSideNav = () => setSideNavOpen(false);
+    
+    window.addEventListener('toggleSideNav', handleToggleSideNav);
+    window.addEventListener('closeSideNav', handleCloseSideNav);
+    
+    return () => {
+      window.removeEventListener('toggleSideNav', handleToggleSideNav);
+      window.removeEventListener('closeSideNav', handleCloseSideNav);
+    };
+  }, []);
 
   return (
     <div className="h-screen flex flex-col overflow-hidden bg-slate-50 text-slate-800 dark:bg-slate-950 dark:text-slate-200">
@@ -16,16 +31,16 @@ export default function MainLayout({ topBar, leftSidebar, children, mainClassNam
         </header>
       )}
 
-      <div className="flex flex-1 min-h-0">
-        {/* Sidebar: overlay on mobile, inline on md+ */}
-        {leftSidebar && (
+      <div className="flex flex-1 min-h-0 overflow-hidden">
+        {/* Responsive Side Navigation: drawer on mobile/tablet (lg-), hidden on desktop (lg+) */}
+        {sideNavigation && (
           <>
-            {/* Backdrop on mobile when open */}
+            {/* Backdrop on mobile/tablet when open */}
             <div
-              className={`fixed inset-0 z-30 bg-black/30 dark:bg-black/50 md:hidden transition-opacity ${
-                sidebarOpen ? "opacity-100" : "opacity-0 pointer-events-none"
+              className={`fixed inset-0 z-30 bg-black/30 dark:bg-black/50 lg:hidden transition-opacity ${
+                sideNavOpen ? "opacity-100" : "opacity-0 pointer-events-none"
               }`}
-              onClick={() => setSidebarOpen(false)}
+              onClick={() => setSideNavOpen(false)}
               aria-hidden="true"
             />
             <aside
@@ -33,34 +48,36 @@ export default function MainLayout({ topBar, leftSidebar, children, mainClassNam
                 flex-shrink-0 flex flex-col
                 border-r border-slate-300 dark:border-slate-800
                 bg-white dark:bg-slate-900/80
-                transition-[transform,width] duration-200 ease-out
-                fixed md:relative inset-y-0 left-0 z-40
-                w-52
-                ${sidebarOpen ? "translate-x-0" : "-translate-x-full md:translate-x-0"}
-                ${sidebarOpen ? "md:w-52" : "md:w-16"}
+                transition-transform duration-200 ease-out
+                fixed lg:hidden inset-y-0 left-0 z-40
+                w-64
+                ${sideNavOpen ? "translate-x-0" : "-translate-x-full"}
               `}
             >
-              <div className="flex items-center justify-between h-11 px-3 border-b border-slate-300 dark:border-slate-800 flex-shrink-0">
-                {sidebarOpen && <span className="text-xs font-semibold text-slate-500 dark:text-slate-400 truncate">Menu</span>}
+              <div className="flex items-center justify-between h-11 px-4 border-b border-slate-300 dark:border-slate-800 flex-shrink-0">
+                <span className="text-sm font-semibold text-slate-700 dark:text-slate-300">Navigation</span>
                 <button
                   type="button"
-                  onClick={() => setSidebarOpen((o) => !o)}
+                  onClick={() => setSideNavOpen(false)}
                   className="p-2 rounded-lg text-slate-500 dark:text-slate-400 hover:text-slate-700 dark:hover:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors"
-                  aria-label={sidebarOpen ? "Collapse sidebar" : "Expand sidebar"}
+                  aria-label="Close navigation"
                 >
-                  {sidebarOpen ? "◀" : "▶"}
+                  ✕
                 </button>
               </div>
               <div className="flex-1 min-h-0 overflow-y-auto py-2">
-                {React.isValidElement(leftSidebar)
-                  ? React.cloneElement(leftSidebar, { sidebarOpen })
-                  : leftSidebar}
+                {React.isValidElement(sideNavigation)
+                  ? React.cloneElement(sideNavigation, { 
+                      sideNavOpen,
+                      onNavigate: () => setSideNavOpen(false)
+                    })
+                  : sideNavigation}
               </div>
             </aside>
           </>
         )}
 
-        <main className={`flex-1 min-h-0 overflow-hidden flex flex-col ${mainClassName}`}>
+        <main className={`flex-1 min-h-0 overflow-y-auto flex flex-col ${mainClassName}`}>
           {children}
         </main>
       </div>
