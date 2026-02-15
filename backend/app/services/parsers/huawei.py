@@ -345,6 +345,23 @@ class HuaweiParser(BaseParser):
                 import traceback
                 traceback.print_exc()
             
+            # New schema (2.3.2.1–2.3.2.9): device_info, security_audit, high_availability
+            device_info = {}
+            security_audit = {}
+            high_availability = {"ether_channels": []}
+            try:
+                device_info = self.extract_device_info(content, device_overview)
+            except Exception:
+                pass
+            try:
+                security_audit = self.extract_security_audit(content, security)
+            except Exception:
+                pass
+            try:
+                high_availability = self.extract_high_availability(content, ha)
+            except Exception:
+                pass
+            
             # Build config object
             try:
                 config = DeviceConfig(
@@ -358,13 +375,20 @@ class HuaweiParser(BaseParser):
                     security=security,
                     ha=ha,
                 )
-                return config.model_dump(mode='python')
+                out = config.model_dump(mode='python')
+                out["device_info"] = device_info
+                out["security_audit"] = security_audit
+                out["high_availability"] = high_availability
+                return out
             except Exception as e:
                 print(f"⚠️ Error building DeviceConfig from {filename}: {e}")
                 import traceback
                 traceback.print_exc()
                 # Return partial structure
                 return {
+                    "device_info": device_info,
+                    "security_audit": security_audit,
+                    "high_availability": high_availability,
                     "device_overview": device_overview,
                     "interfaces": interfaces,
                     "vlans": vlans,
@@ -381,6 +405,9 @@ class HuaweiParser(BaseParser):
             import traceback
             traceback.print_exc()
             return {
+                "device_info": {},
+                "security_audit": {},
+                "high_availability": {"ether_channels": []},
                 "device_overview": {"hostname": None},
                 "interfaces": [],
                 "vlans": {"vlan_list": [], "total_vlan_count": 0},
@@ -390,8 +417,155 @@ class HuaweiParser(BaseParser):
                 "mac_arp": {"mac_table": None, "arp_table": None},
                 "security": {"user_accounts": [], "acls": []},
                 "ha": {"etherchannel": [], "vrrp": []},
+            }
+
+    def extract_device_info(self, content: str, overview: Optional[Dict[str, Any]] = None) -> Dict[str, Any]:
+        """2.3.2.1 - device_info: hostname, vendor, model, os_version, serial_number, uptime, cpu_load, memory_usage."""
+        info = {
+            "hostname": (overview or {}).get("hostname"),
+            "vendor": "Huawei",
+            "model": None,
+            "os_version": None,
+            "serial_number": None,
+            "uptime": None,
+            "cpu_load": None,
+            "memory_usage": None,
         }
-    
+        if not info["hostname"]:
+            sysname_match = re.search(r'^\s*(?:\[\w+\])?\s*sysname\s+(\S+)', content, re.MULTILINE | re.IGNORECASE)
+            if sysname_match:
+                info["hostname"] = sysname_match.group(1)
+            else:
+                prompt_match = re.search(r'<(\S+)>', content)
+                if prompt_match and prompt_match.group(1).upper() != "HUAWEI":
+                    info["hostname"] = prompt_match.group(1)
+        version_section = re.search(r'display\s+version(.*?)(?=display|#|$)', content, re.IGNORECASE | re.DOTALL)
+        if version_section:
+            version_output = version_section.group(1)
+            for pattern in [
+                r'Quidway\s+([\w\-]+)\s+.*?uptime',
+                r'HUAWEI\s+([\w\-]+)\s+.*?uptime',
+                r"(\S+-\d+\S*)'s\s+Device\s+status",
+                r'(\S+-\d+[\w\-]*)\s+Routing\s+Switch',
+            ]:
+                m = re.search(pattern, version_output, re.IGNORECASE | re.DOTALL)
+                if m:
+                    candidate = (m.group(1) or "").strip()
+                    if candidate and len(candidate) > 2 and any(c.isdigit() for c in candidate):
+                        info["model"] = candidate
+                        break
+            vrp_m = re.search(r'Version\s+([\d.]+)', version_output, re.IGNORECASE)
+            if vrp_m:
+                info["os_version"] = "VRP " + vrp_m.group(1)
+            uptime_m = re.search(r'uptime\s+is\s+(.+?)(?:\n|<|$)', version_output, re.IGNORECASE)
+            if uptime_m:
+                info["uptime"] = uptime_m.group(1).strip()
+        # Serial: BarCode=(\w+) or Equipment Serial Number : (\w+) or ESN
+        esn_section = re.search(r'display\s+esn(.*?)(?=display|#|$)', content, re.IGNORECASE | re.DOTALL)
+        if esn_section and "Error" not in esn_section.group(1) and "Unrecognized" not in esn_section.group(1):
+            sn_m = re.search(r'ESN[:\s]+(\S+)|BarCode[=:\s]+(\w+)|Equipment\s+Serial\s+Number\s*[:\s]+(\w+)', esn_section.group(1), re.IGNORECASE)
+            if sn_m:
+                info["serial_number"] = (sn_m.group(1) or sn_m.group(2) or sn_m.group(3) or "").strip()
+                if info["serial_number"] == "^":
+                    info["serial_number"] = None
+        if overview:
+            info["model"] = info["model"] or overview.get("model")
+            info["os_version"] = info["os_version"] or (overview.get("os_version") and f"VRP {overview['os_version']}")
+            info["uptime"] = info["uptime"] or overview.get("uptime")
+            info["cpu_load"] = overview.get("cpu_utilization")
+            info["memory_usage"] = overview.get("memory_usage")
+        if info["cpu_load"] is None:
+            cpu_section = re.search(r'display\s+cpu-usage(.*?)(?=display|#|$)', content, re.IGNORECASE | re.DOTALL)
+            if cpu_section and "Warning:CPU" not in cpu_section.group(1):
+                cpu_m = re.search(r'CPU\s+Usage\s*:\s*(\d+)%|CPU\s+utilization.*?(\d+)%', cpu_section.group(1), re.IGNORECASE)
+                if cpu_m:
+                    try:
+                        info["cpu_load"] = float(cpu_m.group(1) or cpu_m.group(2))
+                    except (ValueError, TypeError):
+                        pass
+        if info["memory_usage"] is None:
+            mem_section = re.search(r'display\s+memory-usage(.*?)(?=display|#|$)', content, re.IGNORECASE | re.DOTALL)
+            if mem_section:
+                mem_m = re.search(r'Memory\s+Using\s+Percentage\s+Is\s*:\s*(\d+)%', mem_section.group(1), re.IGNORECASE)
+                if mem_m:
+                    try:
+                        info["memory_usage"] = float(mem_m.group(1))
+                    except (ValueError, TypeError):
+                        pass
+        return info
+
+    def extract_security_audit(self, content: str, security: Optional[Dict[str, Any]] = None) -> Dict[str, Any]:
+        """2.3.2.8 - security_audit: ssh, telnet, aaa, snmp, ntp, logging, acls."""
+        audit = {
+            "ssh": {"status": "Disabled", "version": None},
+            "telnet": {"status": "Disabled"},
+            "aaa": {"status": "Disabled", "protocols": []},
+            "snmp": {"status": "Disabled", "version": None, "communities": []},
+            "ntp": {"servers": [], "status": None},
+            "logging": {"syslog_servers": [], "console_logging": False},
+            "acls": [],
+        }
+        if re.search(r'stelnet\s+server\s+enable|ssh\s+server\s+version\s+2\.0|protocol\s+inbound\s+ssh', content, re.IGNORECASE):
+            audit["ssh"]["status"] = "Enabled"
+            if re.search(r'ssh\s+server\s+version\s+([\d.]+)', content, re.IGNORECASE):
+                audit["ssh"]["version"] = re.search(r'ssh\s+server\s+version\s+([\d.]+)', content, re.IGNORECASE).group(1)
+            else:
+                audit["ssh"]["version"] = "2.0"
+        if re.search(r'telnet\s+server\s+enable|protocol\s+inbound\s+telnet', content, re.IGNORECASE):
+            audit["telnet"]["status"] = "Enabled"
+        if re.search(r'authentication-scheme\s+\S+', content, re.IGNORECASE):
+            audit["aaa"]["status"] = "Enabled"
+            if re.search(r'tacacs|radius|local', content, re.IGNORECASE):
+                for p in ["tacacs+", "radius", "local"]:
+                    if p in content.lower():
+                        audit["aaa"]["protocols"].append(p)
+        for m in re.finditer(r'snmp-agent\s+community\s+(?:read\s+)?(\S+)', content, re.IGNORECASE):
+            audit["snmp"]["communities"].append(m.group(1))
+        if audit["snmp"]["communities"] or "snmp-agent" in content.lower():
+            audit["snmp"]["status"] = "Enabled"
+            audit["snmp"]["version"] = "v2c"
+        for m in re.finditer(r'ntp-service\s+unicast-server\s+(\S+)', content, re.IGNORECASE):
+            s = m.group(1)
+            if re.match(r'\d+\.\d+\.\d+\.\d+', s) and s not in audit["ntp"]["servers"]:
+                audit["ntp"]["servers"].append(s)
+        for m in re.finditer(r'info-center\s+loghost\s+(\S+)', content, re.IGNORECASE):
+            audit["logging"]["syslog_servers"].append(m.group(1))
+        acl_map = {}
+        for m in re.finditer(r'acl\s+(?:number\s+)?(\d+)\s+rule\s+\d+', content, re.IGNORECASE):
+            acl_id = m.group(1)
+            acl_map[acl_id] = acl_map.get(acl_id, 0) + 1
+        for acl_id, count in acl_map.items():
+            audit["acls"].append({"name": acl_id, "type": "Extended" if int(acl_id) >= 3000 else "Standard", "rule_count": count})
+        if security and security.get("acls"):
+            for acl in security["acls"]:
+                name = acl.get("acl_number") if isinstance(acl, dict) else str(acl)
+                if name and not any(a.get("name") == name for a in audit["acls"]):
+                    audit["acls"].append({"name": name, "type": "Extended", "rule_count": 0})
+        return audit
+
+    def extract_high_availability(self, content: str, ha: Optional[Dict[str, Any]] = None) -> Dict[str, Any]:
+        """2.3.2.9 - high_availability.ether_channels: interface, protocol, members, status."""
+        ether_channels = []
+        if ha and ha.get("etherchannel"):
+            for e in ha["etherchannel"]:
+                name = e.get("name") or f"Eth-Trunk{e.get('id', '')}"
+                protocol = (e.get("mode") or "LACP").upper()
+                if protocol not in ("LACP", "STATIC", "PAGP"):
+                    protocol = "LACP" if "lacp" in (e.get("mode") or "").lower() else "Static"
+                members = e.get("members") or []
+                status = "Up" if members else "Down"
+                ether_channels.append({"interface": name, "protocol": protocol, "members": members, "status": status})
+        # Status from display eth-trunk or display interface Eth-Trunk
+        display_trunk = re.search(r'display\s+eth-trunk\s*\d*(.*?)(?=display|#|$)', content, re.IGNORECASE | re.DOTALL)
+        if display_trunk:
+            for line in display_trunk.group(1).split("\n"):
+                if "current state" in line.lower() and "UP" in line.upper():
+                    for ec in ether_channels:
+                        if ec["interface"].lower() in line.lower():
+                            ec["status"] = "Up"
+                            break
+        return {"ether_channels": ether_channels}
+
     def extract_device_overview(self, content: str) -> Dict[str, Any]:
         """2.3.2.1 Device Overview"""
         overview = {
@@ -440,17 +614,22 @@ class HuaweiParser(BaseParser):
         version_section = re.search(r'display\s+version(.*?)(?=display|#|$)', content, re.IGNORECASE | re.DOTALL)
         if version_section:
             version_output = version_section.group(1)
-            # Extract model - try multiple patterns
+            # Extract model - try multiple patterns (Quidway S5700-28C-HI Routing Switch uptime)
             model_patterns = [
+                r'Quidway\s+([\w\-]+)\s+.*?uptime',
+                r'HUAWEI\s+([\w\-]+)\s+.*?uptime',
                 r'Quidway\s+(\S+)\s+uptime',
                 r'HUAWEI\s+(\S+)\s+uptime',
-                r'(\S+-\d+\S*)\'s\s+Device\s+status',
+                r"(\S+-\d+\S*)'s\s+Device\s+status",
+                r'(\S+-\d+[\w\-]*)\s+Routing\s+Switch',
             ]
             for pattern in model_patterns:
-                model_match = re.search(pattern, version_output, re.IGNORECASE)
+                model_match = re.search(pattern, version_output, re.IGNORECASE | re.DOTALL)
                 if model_match:
-                    overview["model"] = model_match.group(1)
-                    break
+                    candidate = model_match.group(1).strip()
+                    if candidate and len(candidate) > 2 and any(c.isdigit() for c in candidate):
+                        overview["model"] = candidate
+                        break
             
             # Extract OS version
             vrp_match = re.search(r'Version\s+([\d.]+)', version_output, re.IGNORECASE)
@@ -479,18 +658,23 @@ class HuaweiParser(BaseParser):
                     if esn_candidate != "^" and not esn_candidate.startswith("Error"):
                         overview["serial_number"] = esn_candidate
         
-        # Extract management IP from LoopBack0 or Vlanif1
+        # Extract management IP from LoopBack0, Vlanif1, or first Vlanif with IP
         mgmt_patterns = [
             r'interface\s+LoopBack0.*?ip\s+address\s+(\d+\.\d+\.\d+\.\d+)',
-            r'interface\s+Vlanif1.*?ip\s+address\s+(\d+\.\d+\.\d+\.\d+)',
+            r'interface\s+Vlanif1\s*\n.*?ip\s+address\s+(\d+\.\d+\.\d+\.\d+)',
+            r'interface\s+Vlanif\d+.*?ip\s+address\s+(\d+\.\d+\.\d+\.\d+)',
         ]
         for pattern in mgmt_patterns:
             mgmt_match = re.search(pattern, content, re.IGNORECASE | re.DOTALL)
             if mgmt_match:
                 ip_candidate = mgmt_match.group(1)
-                # Validate IP address
                 if is_valid_ipv4(ip_candidate):
                     overview["management_ip"] = ip_candidate
+                    break
+        if not overview["management_ip"]:
+            for m in re.finditer(r'interface\s+Vlanif\d+.*?ip\s+address\s+(\d+\.\d+\.\d+\.\d+)', content, re.IGNORECASE | re.DOTALL):
+                if is_valid_ipv4(m.group(1)):
+                    overview["management_ip"] = m.group(1)
                     break
         
         # Extract CPU utilization from display cpu-usage
@@ -544,22 +728,30 @@ class HuaweiParser(BaseParser):
         for i, line in enumerate(lines):
             line_stripped = line.strip()
             
-            # Check if this line starts a new interface block
+            # Check if this line starts a new interface block (config-style only; skip table headers like "Interface PHY Protocol")
             interface_match = re.match(r'^interface\s+(\S+)', line_stripped, re.IGNORECASE)
             if interface_match:
+                candidate = interface_match.group(1)
+                # Skip table headers and invalid names (PHY, IP, Protocol, Description, etc.)
+                if not is_valid_interface_name(candidate):
+                    if current_interface and current_interface not in interfaces_map:
+                        iface_config = '\n'.join(current_config_lines)
+                        interfaces_map[current_interface] = self._parse_interface_config(current_interface, iface_config)
+                    current_interface = None
+                    current_config_lines = []
+                    continue
                 # Save previous interface if exists
                 if current_interface and current_interface not in interfaces_map:
                     iface_config = '\n'.join(current_config_lines)
                     interfaces_map[current_interface] = self._parse_interface_config(
                         current_interface, iface_config
                     )
-                
                 # Start new interface
-                current_interface = interface_match.group(1)
+                current_interface = candidate
                 current_config_lines = []
                 
                 # Skip NULL0 and similar
-                if "NULL" in current_interface.upper():
+                if "NULL" in (current_interface or "").upper():
                     current_interface = None
                     current_config_lines = []
                     continue
@@ -582,6 +774,69 @@ class HuaweiParser(BaseParser):
             interfaces_map[current_interface] = self._parse_interface_config(
                 current_interface, iface_config
             )
+        
+        # Enrich from "display interface description" table (Interface PHY Protocol Description)
+        desc_section = re.search(r'display\s+interface\s+description(.*?)(?=display|#|$)', content, re.IGNORECASE | re.DOTALL)
+        if desc_section:
+            for line in desc_section.group(1).split('\n'):
+                parts = line.split()
+                if len(parts) >= 3 and is_valid_interface_name(parts[0]):
+                    name = parts[0]
+                    if name in interfaces_map:
+                        phy = parts[1].lower() if len(parts) > 1 else None
+                        protocol = parts[2].lower() if len(parts) > 2 else None
+                        if phy in ('up', 'down'):
+                            interfaces_map[name]["oper_status"] = phy
+                        if protocol in ('up', 'down'):
+                            interfaces_map[name]["line_protocol"] = protocol
+                        if len(parts) > 3 and parts[3] and not parts[3].startswith('*') and parts[3] != 'down':
+                            desc = ' '.join(parts[3:]).strip()
+                            if desc and len(desc) < 200 and not desc.startswith('---'):
+                                interfaces_map[name]["description"] = interfaces_map[name].get("description") or desc
+        
+        # Enrich from "display interface" blocks (current state, Hardware address, MTU)
+        disp_int = re.search(r'display\s+interface\s*(.*?)(?=display\s+|\n\s*<|$)', content, re.IGNORECASE | re.DOTALL)
+        if disp_int:
+            block_text = disp_int.group(1)
+            # Split by "current state" lines (e.g. "Eth-Trunk1 current state : UP")
+            for block in re.split(r'\n(?=\S+\s+current\s+state\s*:)', block_text):
+                name_m = re.search(r'^(\S+)\s+current\s+state\s*:\s*(\w+)', block, re.IGNORECASE)
+                if not name_m or not is_valid_interface_name(name_m.group(1)):
+                    continue
+                name = name_m.group(1)
+                state = name_m.group(2).lower()
+                if name in interfaces_map:
+                    interfaces_map[name]["oper_status"] = interfaces_map[name].get("oper_status") or state
+                line_proto = re.search(r'Line\s+protocol\s+current\s+state\s*:\s*(\w+)', block, re.IGNORECASE)
+                if line_proto and name in interfaces_map:
+                    interfaces_map[name]["line_protocol"] = line_proto.group(1).lower()
+                mac_m = re.search(r'Hardware\s+address\s+is\s+([\w\-]+)', block, re.IGNORECASE)
+                if mac_m and name in interfaces_map and is_valid_mac_address(mac_m.group(1)):
+                    interfaces_map[name]["mac_address"] = mac_m.group(1)
+                mtu_m = re.search(r'(?:Maximum\s+Frame\s+Length\s+is|MTU\s+is)\s+(\d+)', block, re.IGNORECASE)
+                if mtu_m and name in interfaces_map:
+                    try:
+                        interfaces_map[name]["mtu"] = int(mtu_m.group(1))
+                    except ValueError:
+                        pass
+        
+        # Enrich from "display ip interface brief" (Interface IP Physical Protocol)
+        ip_brief = re.search(r'display\s+ip\s+interface\s+brief(.*?)(?=display|#|$)', content, re.IGNORECASE | re.DOTALL)
+        if ip_brief:
+            for line in ip_brief.group(1).split('\n'):
+                parts = line.split()
+                if len(parts) >= 4 and is_valid_interface_name(parts[0]):
+                    name = parts[0]
+                    if name in interfaces_map:
+                        ip_val = parts[1] if len(parts) > 1 else None
+                        phy = parts[2].lower() if len(parts) > 2 else None
+                        proto = parts[3].lower() if len(parts) > 3 else None
+                        if phy in ('up', 'down'):
+                            interfaces_map[name]["oper_status"] = interfaces_map[name].get("oper_status") or phy
+                        if proto in ('up', 'down'):
+                            interfaces_map[name]["line_protocol"] = interfaces_map[name].get("line_protocol") or proto
+                        if ip_val and ip_val != 'unassigned' and re.match(r'\d+\.\d+\.\d+\.\d+', ip_val):
+                            interfaces_map[name]["ipv4_address"] = interfaces_map[name].get("ipv4_address") or ip_val.split('/')[0]
         
         # Enrich interfaces with STP information from "display stp brief"
         # Format: MSTID  Port                        Role  STP State     Protection
@@ -795,14 +1050,14 @@ class HuaweiParser(BaseParser):
         return iface
     
     def _get_interface_type(self, iface_name: str) -> Optional[str]:
-        """Determine interface type from name"""
+        """Determine interface type from name (check Eth-Trunk before GE/ETH to avoid false match)"""
         iface_upper = iface_name.upper()
-        if "GIGABITETHERNET" in iface_upper or "GE" in iface_upper:
-            return "GigabitEthernet"
-        elif "ETHERNET" in iface_upper or "ETH" in iface_upper:
-            return "Ethernet"
-        elif "ETH-TRUNK" in iface_upper:
+        if "ETH-TRUNK" in iface_upper:
             return "Eth-Trunk"
+        if "GIGABITETHERNET" in iface_upper or (iface_upper.startswith("GE") and iface_upper[2:3].isdigit()):
+            return "GigabitEthernet"
+        if "ETHERNET" in iface_upper or (iface_upper.startswith("ETH") and "TRUNK" not in iface_upper):
+            return "Ethernet"
         elif "VLANIF" in iface_upper:
             return "VLAN"
         elif "LOOPBACK" in iface_upper:

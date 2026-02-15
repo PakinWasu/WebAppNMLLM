@@ -2311,9 +2311,9 @@ const SummaryPage = ({ project, projectId: projectIdProp, routeToHash, handleNav
           // STATUS column: use the actual status value, not the React element
           value = r.status || "OK";
         } else if (c.key === "ifaces") {
-          // IFACES column: format the object as T/U/D/A
-          const ifaces = r.ifaces || {};
-          value = `${ifaces.total || 0}/${ifaces.up || 0}/${ifaces.down || 0}/${ifaces.adminDown || 0}`;
+          // IFACES column: backend may send string "total/up/down/adminDown" or object
+          if (typeof r.ifaces === "string") value = r.ifaces;
+          else { const ifaces = r.ifaces || {}; value = `${ifaces.total || 0}/${ifaces.up || 0}/${ifaces.down || 0}/${ifaces.adminDown || 0}`; }
         } else {
           // For other columns, get the value directly
           value = r[c.key] ?? "";
@@ -2750,7 +2750,7 @@ const DeviceDetailsView = ({ project, deviceId, goBack, goBackHref, goIndex, goI
     model: overview.model || "—",
     osVersion: overview.os_version || "—",
     serial: overview.serial_number || "—",
-    mgmtIp: overview.mgmt_ip || "—",
+    mgmtIp: overview.management_ip || overview.mgmt_ip || "—",
     role: overview.role || "—",
     vlanCount: vlanCount || 0,
     stpMode: stpData.mode || "—",
@@ -2758,9 +2758,9 @@ const DeviceDetailsView = ({ project, deviceId, goBack, goBackHref, goIndex, goI
     trunkCount: trunkPorts || 0,
     accessCount: accessPorts || 0,
     sviCount: interfaces.filter(i => i.type === "Vlan" || i.name?.startsWith("Vlan")).length || 0,
-    hsrpGroups: haData.hsrp?.groups?.length || 0,
-    vrrpGroups: haData.vrrp?.groups?.length || 0,
-    routing: Object.keys(routingData).filter(k => routingData[k] && Object.keys(routingData[k]).length > 0 && k !== "routing_table").join(", ") || "—",
+    hsrpGroups: (Array.isArray(haData.hsrp) ? haData.hsrp : (haData.hsrp?.groups || [])).length || 0,
+    vrrpGroups: (Array.isArray(haData.vrrp) ? haData.vrrp : (haData.vrrp?.groups || [])).length || 0,
+    routing: Object.keys(routingData).filter(k => routingData[k] && k !== "routes" && k !== "routing_table" && (Array.isArray(routingData[k]) ? routingData[k].length > 0 : typeof routingData[k] === "object" && Object.keys(routingData[k]).length > 0)).join(", ") || (routingData.routes?.length ? "Route table" : "—"),
     ospfNeighbors: routingData.ospf?.neighbors?.length || 0,
     bgpAsn: routingData.bgp?.as_number ?? routingData.bgp?.local_as ?? "—",
     bgpNeighbors: routingData.bgp?.peers?.length || 0,
@@ -3144,7 +3144,8 @@ const DeviceDetailsView = ({ project, deviceId, goBack, goBackHref, goIndex, goI
       const sviInterface = interfaces.find(i => (i.type === "Vlan" || i.name?.startsWith("Vlan")) && i.name?.includes(vlanId));
       const sviIp = sviInterface?.ipv4_address || null;
       // Find HSRP VIP (if any)
-      const hsrpGroup = haData.hsrp?.groups?.find(g => g.vlan_id === vlanId);
+      const hsrpList = Array.isArray(haData.hsrp) ? haData.hsrp : (haData.hsrp?.groups || []);
+      const hsrpGroup = hsrpList.find(g => g.vlan_id === vlanId);
       const hsrpVip = hsrpGroup?.virtual_ip || null;
       
       return {
@@ -3171,6 +3172,7 @@ const DeviceDetailsView = ({ project, deviceId, goBack, goBackHref, goIndex, goI
       poeW: iface.poe_power || null,
       speed: iface.speed || "—",
       duplex: iface.duplex || "—",
+      mtu: iface.mtu != null ? String(iface.mtu) : "—",
       errors: iface.errors ? `${iface.errors.input || 0}/${iface.errors.output || 0}` : "0/0",
       stp: stpData.port_states?.[iface.name] || "—",
       stpRole: iface.stp_role || "—",  // From parser
@@ -3192,7 +3194,8 @@ const DeviceDetailsView = ({ project, deviceId, goBack, goBackHref, goIndex, goI
     { header: "STP Role", key: "stpRole", cell: (r) => r.stpRole || "—" },
     { header: "STP State", key: "stpState", cell: (r) => r.stpState || "—" },
     { header: "STP Edged", key: "stpEdgedPort", cell: (r) => r.stpEdgedPort || "—" },
-    { header: "Speed", key: "speed" }, 
+    { header: "Speed", key: "speed" },
+    { header: "MTU", key: "mtu", cell: (r) => r.mtu ?? "—" },
     { header: "Duplex", key: "duplex" },
     { header: "PoE (W)", key: "poeW", cell: (r) => r.poeW ?? "—" },
     { header: "Description", key: "desc" },
@@ -3765,6 +3768,24 @@ const DeviceDetailsView = ({ project, deviceId, goBack, goBackHref, goIndex, goI
       {/* ROUTING */}
       {!loading && !error && tab === "routing" && (
         <div className="grid gap-6">
+          {/* Full route table (O, C, L, S from show ip route) */}
+          {routingData.routes && Array.isArray(routingData.routes) && routingData.routes.length > 0 && (
+            <Card title={`Route table (${routingData.routes.length} routes)`}>
+              <div className="h-[50vh] overflow-auto rounded-2xl border border-slate-300 dark:border-[#1F2937]">
+                <Table
+                  columns={[
+                    { header: "Protocol", key: "protocol", cell: (r) => { const p = r.protocol; const labels = { O: "OSPF", C: "Connected", L: "Local", S: "Static", B: "BGP", R: "RIP", D: "EIGRP", i: "ISIS" }; return p ? (labels[p] || p) : "—"; } },
+                    { header: "Network", key: "network" },
+                    { header: "Next hop", key: "next_hop", cell: (r) => r.next_hop || "—" },
+                    { header: "Interface", key: "interface", cell: (r) => r.interface || "—" }
+                  ]}
+                  data={routingData.routes}
+                  empty="No routes"
+                  minWidthClass="min-w-[800px]"
+                />
+              </div>
+            </Card>
+          )}
           {/* Static Routes */}
           {routingData.static && ((Array.isArray(routingData.static) && routingData.static.length > 0) || (routingData.static.routes && routingData.static.routes.length > 0)) && (
             <Card title="Static Routes">
@@ -3903,7 +3924,7 @@ const DeviceDetailsView = ({ project, deviceId, goBack, goBackHref, goIndex, goI
             </Card>
           )}
 
-          {(!routingData.static || ((!Array.isArray(routingData.static) || routingData.static.length === 0) && (!routingData.static.routes || routingData.static.routes.length === 0))) && !routingData.ospf && !routingData.eigrp && !routingData.bgp && !routingData.rip && (
+          {(!routingData.routes || routingData.routes.length === 0) && (!routingData.static || ((!Array.isArray(routingData.static) || routingData.static.length === 0) && (!routingData.static.routes || routingData.static.routes.length === 0))) && !routingData.ospf && !routingData.eigrp && !routingData.bgp && !routingData.rip && (
             <Card title="Routing">
               <div className="text-sm text-gray-500 dark:text-gray-400">No routing protocol information available</div>
             </Card>
@@ -4147,7 +4168,7 @@ const DeviceDetailsView = ({ project, deviceId, goBack, goBackHref, goIndex, goI
             </Card>
           )}
 
-          {(!securityData.user_accounts || securityData.user_accounts.length === 0) && (!securityData.users || securityData.users.length === 0) && !securityData.aaa && !securityData.ssh && !securityData.snmp && !securityData.ntp && !securityData.syslog && (!securityData.acls || securityData.acls.length === 0) && (
+          {(!securityData.user_accounts || securityData.user_accounts.length === 0) && (!securityData.users || securityData.users.length === 0) && !securityData.aaa && !securityData.ssh && !securityData.snmp && !securityData.ntp && !securityData.syslog && !(securityData.logging && (securityData.logging.enabled || (securityData.logging.log_hosts && securityData.logging.log_hosts.length))) && (!securityData.acls || securityData.acls.length === 0) && (
             <Card title="Security">
               <div className="text-sm text-gray-500 dark:text-gray-400">No security information available</div>
             </Card>
@@ -4158,18 +4179,18 @@ const DeviceDetailsView = ({ project, deviceId, goBack, goBackHref, goIndex, goI
       {/* HA */}
       {!loading && !error && tab === "ha" && (
         <div className="grid gap-6">
-          {/* EtherChannel / Port-Channel */}
-          {haData.etherchannel && haData.etherchannel.length > 0 && (
+          {/* EtherChannel / Port-Channel: backend sends ha.etherchannel or ha.port_channels */}
+          {((haData.etherchannel && haData.etherchannel.length > 0) || (haData.port_channels && haData.port_channels.length > 0)) && (
             <Card title="EtherChannel / Port-Channel">
               <div className="h-[50vh] overflow-auto rounded-2xl border border-slate-300 dark:border-[#1F2937]">
                 <Table
                   columns={[
-                    { header: "Port-Channel", key: "name" },
-                    { header: "Mode", key: "mode" },
-                    { header: "Member Interfaces", key: "members", cell: (r) => r.members?.join(", ") || "—" },
-                    { header: "Status", key: "status" }
+                    { header: "Port-Channel", key: "name", cell: (r) => r.name || (r.id != null ? `Po${r.id}` : "—") },
+                    { header: "Mode", key: "mode", cell: (r) => r.mode || "—" },
+                    { header: "Member Interfaces", key: "members", cell: (r) => (Array.isArray(r.members) ? r.members.join(", ") : r.members) || "—" },
+                    { header: "Status", key: "status", cell: (r) => r.status || "—" }
                   ]}
-                  data={haData.etherchannel}
+                  data={haData.etherchannel?.length ? haData.etherchannel : (haData.port_channels || []).map(p => ({ name: p.id != null ? `Po${p.id}` : "Po", mode: p.mode, members: p.members || [], status: p.status }))}
                   empty="No Port-Channel information"
                   minWidthClass="min-w-[900px]"
                 />
@@ -4177,20 +4198,21 @@ const DeviceDetailsView = ({ project, deviceId, goBack, goBackHref, goIndex, goI
             </Card>
           )}
 
-          {/* HSRP */}
-          {haData.hsrp && haData.hsrp.groups && haData.hsrp.groups.length > 0 && (
+          {/* HSRP: backend sends ha.hsrp as array; support both array and .groups */}
+          {(() => { const hsrpList = Array.isArray(haData.hsrp) ? haData.hsrp : (haData.hsrp?.groups || []); return hsrpList.length > 0; })() && (
             <Card title="HSRP (Hot Standby Router Protocol)">
               <div className="h-[50vh] overflow-auto rounded-2xl border border-slate-300 dark:border-[#1F2937]">
                 <Table
                   columns={[
-                    { header: "Group", key: "group_id" },
-                    { header: "Virtual IP", key: "virtual_ip" },
-                    { header: "Status", key: "status" },
+                    { header: "Group", key: "group_id", cell: (r) => r.group_id ?? r.group ?? "—" },
+                    { header: "Virtual IP", key: "virtual_ip", cell: (r) => r.virtual_ip || "—" },
+                    { header: "Interface", key: "interface", cell: (r) => r.interface || "—" },
+                    { header: "Status", key: "status", cell: (r) => r.status ?? r.state ?? "—" },
                     { header: "Priority", key: "priority", cell: (r) => r.priority || "—" },
-                    { header: "Preempt", key: "preempt", cell: (r) => r.preempt ? "Yes" : "No" },
+                    { header: "Preempt", key: "preempt", cell: (r) => r.preempt !== undefined ? (r.preempt ? "Yes" : "No") : "—" },
                     { header: "VLAN", key: "vlan_id", cell: (r) => r.vlan_id || "—" }
                   ]}
-                  data={haData.hsrp.groups}
+                  data={Array.isArray(haData.hsrp) ? haData.hsrp : (haData.hsrp?.groups || [])}
                   empty="No HSRP groups"
                   minWidthClass="min-w-[900px]"
                 />
@@ -4198,21 +4220,21 @@ const DeviceDetailsView = ({ project, deviceId, goBack, goBackHref, goIndex, goI
             </Card>
           )}
 
-          {/* VRRP */}
-          {haData.vrrp && ((Array.isArray(haData.vrrp) && haData.vrrp.length > 0) || (haData.vrrp.groups && haData.vrrp.groups.length > 0)) && (
+          {/* VRRP: backend sends ha.vrrp as array; support both array and .groups */}
+          {(() => { const vrrpList = Array.isArray(haData.vrrp) ? haData.vrrp : (haData.vrrp?.groups || []); return vrrpList.length > 0; })() && (
             <Card title="VRRP (Virtual Router Redundancy Protocol)">
               <div className="h-[50vh] overflow-auto rounded-2xl border border-slate-300 dark:border-[#1F2937]">
                 <Table
                   columns={[
-                    { header: "VRID", key: "vrid" },
+                    { header: "VRID", key: "vrid", cell: (r) => r.vrid ?? r.group ?? "—" },
                     { header: "Interface", key: "interface", cell: (r) => r.interface || "—" },
-                    { header: "Virtual IP", key: "virtual_ip" },
+                    { header: "Virtual IP", key: "virtual_ip", cell: (r) => r.virtual_ip || "—" },
                     { header: "State", key: "state", cell: (r) => r.state || r.status || "—" },
                     { header: "Master IP", key: "master_ip", cell: (r) => r.master_ip || "—" },
                     { header: "Priority", key: "priority", cell: (r) => r.priority ?? r.priority_run ?? "—" },
                     { header: "Preempt", key: "preempt", cell: (r) => r.preempt !== undefined ? (r.preempt ? "Yes" : "No") : "—" }
                   ]}
-                  data={Array.isArray(haData.vrrp) ? haData.vrrp : (haData.vrrp.groups || [])}
+                  data={Array.isArray(haData.vrrp) ? haData.vrrp : (haData.vrrp?.groups || [])}
                   empty="No VRRP groups"
                   minWidthClass="min-w-[1000px]"
                 />
@@ -4220,7 +4242,7 @@ const DeviceDetailsView = ({ project, deviceId, goBack, goBackHref, goIndex, goI
             </Card>
           )}
 
-          {(!haData.etherchannel || haData.etherchannel.length === 0) && (!haData.hsrp || !haData.hsrp.groups || haData.hsrp.groups.length === 0) && (!haData.vrrp || ((!Array.isArray(haData.vrrp) || haData.vrrp.length === 0) && (!haData.vrrp.groups || haData.vrrp.groups.length === 0))) && (
+          {(!haData.etherchannel || haData.etherchannel.length === 0) && (!haData.port_channels || haData.port_channels.length === 0) && (() => { const h = Array.isArray(haData.hsrp) ? haData.hsrp : (haData.hsrp?.groups || []); return h.length === 0; })() && (() => { const v = Array.isArray(haData.vrrp) ? haData.vrrp : (haData.vrrp?.groups || []); return v.length === 0; })() && (
             <Card title="High Availability">
               <div className="text-sm text-gray-500 dark:text-gray-400">No HA information available</div>
             </Card>

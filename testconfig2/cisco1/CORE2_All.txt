@@ -1,0 +1,248 @@
+CORE2#show ip interface brief
+Interface              IP-Address      OK? Method Status                Protocol
+GigabitEthernet0/0     10.0.0.5        YES manual up                    up
+GigabitEthernet0/1     10.0.0.10       YES manual up                    up
+GigabitEthernet0/2     10.0.1.2        YES manual up                    up
+GigabitEthernet0/3     10.0.1.6        YES manual up                    up
+GigabitEthernet1/2     unassigned      YES unset  up                    up
+GigabitEthernet1/3     unassigned      YES unset  up                    up
+GigabitEthernet1/0     10.0.1.10       YES manual up                    up
+GigabitEthernet1/1     10.0.1.14       YES manual up                    up
+Port-channel1          unassigned      YES unset  up                    up
+Vlan901                192.168.1.2     YES manual up                    up
+CORE2#show interfaces description
+Interface                      Status         Protocol Description
+Gi0/0                          up             up       CORE2-to-BR2
+Gi0/1                          up             up
+Gi0/2                          up             up       CORE2-to-DIST1
+Gi0/3                          up             up       CORE2-to-DIST2
+Gi1/2                          up             up       CORE2-to-CORE1
+Gi1/3                          up             up
+Gi1/0                          up             up       CORE2-to-DIST3
+Gi1/1                          up             up       CORE2-to-DIST4
+Po1                            up             up       CORE2-CORE1-TRUNK
+Vl901                          up             up       USER-GW
+CORE2#show interfaces switchport
+
+Name: Gi1/2
+Switchport: Enabled
+Administrative Mode: trunk
+Operational Mode: trunk (member of bundle Po1)
+Administrative Trunking Encapsulation: dot1q
+Operational Trunking Encapsulation: dot1q
+Negotiation of Trunking: On
+Access Mode VLAN: 1 (default)
+Trunking Native Mode VLAN: 1 (default)
+Administrative Native VLAN tagging: enabled
+Voice VLAN: none
+Administrative private-vlan host-association: none
+Administrative private-vlan mapping: none
+Administrative private-vlan trunk native VLAN: none
+Administrative private-vlan trunk Native VLAN tagging: enabled
+Administrative private-vlan trunk encapsulation: dot1q
+Administrative private-vlan trunk normal VLANs: none
+Administrative private-vlan trunk associations: none
+Administrative private-vlan trunk mappings: none
+Operational private-vlan: none
+Trunking VLANs Enabled: 801-803,901-903
+Pruning VLANs Enabled: 2-1001
+Capture Mode Disabled
+Capture VLANs Allowed: ALL
+
+Protected: false
+Appliance trust: none
+
+Name: Gi1/3
+Switchport: Enabled
+Administrative Mode: dynamic auto
+Operational Mode: static access
+Administrative Trunking Encapsulation: negotiate
+Operational Trunking Encapsulation: native
+Negotiation of Trunking: On
+Access Mode VLAN: 1 (default)
+Trunking Native Mode VLAN: 1 (default)
+Administrative Native VLAN tagging: enabled
+Voice VLAN: none
+Administrative private-vlan host-association: none
+Administrative private-vlan mapping: none
+Administrative private-vlan trunk native VLAN: none
+Administrative private-vlan trunk Native VLAN tagging: enabled
+Administrative private-vlan trunk encapsulation: dot1q
+Administrative private-vlan trunk normal VLANs: none
+Administrative private-vlan trunk associations: none
+Administrative private-vlan trunk mappings: none
+Operational private-vlan: none
+Trunking VLANs Enabled: ALL
+Pruning VLANs Enabled: 2-1001
+Capture Mode Disabled
+Capture VLANs Allowed: ALL
+
+Protected: false
+Appliance trust: none
+
+Name: Po1
+Switchport: Enabled
+Administrative Mode: trunk
+Operational Mode: trunk
+Administrative Trunking Encapsulation: dot1q
+Operational Trunking Encapsulation: dot1q
+Negotiation of Trunking: On
+Access Mode VLAN: 1 (default)
+Trunking Native Mode VLAN: 1 (default)
+Administrative Native VLAN tagging: enabled
+Voice VLAN: none
+Administrative private-vlan host-association: none
+Administrative private-vlan mapping: none
+Administrative private-vlan trunk native VLAN: none
+Administrative private-vlan trunk Native VLAN tagging: enabled
+Administrative private-vlan trunk encapsulation: dot1q
+Administrative private-vlan trunk normal VLANs: none
+Administrative private-vlan trunk associations: none
+Administrative private-vlan trunk mappings: none
+Operational private-vlan: none
+Trunking VLANs Enabled: 801-803,901-903
+Pruning VLANs Enabled: 2-1001
+
+Protected: false
+Appliance trust: none
+CORE2#show interfaces trunk
+
+Port        Mode             Encapsulation  Status        Native vlan
+Po1         on               802.1q         trunking      1
+
+Port        Vlans allowed on trunk
+Po1         801-803,901-903
+
+Port        Vlans allowed and active in management domain
+Po1         801-803,901-903
+
+Port        Vlans in spanning tree forwarding state and not pruned
+Po1         801-803,901-903
+CORE2#show vlan brief
+
+VLAN Name                             Status    Ports
+---- -------------------------------- --------- -------------------------------
+1    default                          active    Gi1/3
+801  CORE-BR                          active
+802  CORE-BR-BACKUP                   active
+803  CORE-CORE-TRUNK                  active
+901  USER-ACCESS                      active
+902  DIST-TRANSIT1                    active
+903  DIST-TRANSIT2                    active
+1002 fddi-default                     act/unsup
+1003 token-ring-default               act/unsup
+1004 fddinet-default                  act/unsup
+1005 trnet-default                    act/unsup
+CORE2#show spanning-tree summary
+Switch is in rapid-pvst mode
+Root bridge for: VLAN0001
+Extended system ID                      is enabled
+Portfast Default                        is disabled
+Portfast Edge BPDU Guard Default        is disabled
+Portfast Edge BPDU Filter Default       is disabled
+Loopguard Default                       is disabled
+PVST Simulation Default                 is enabled but inactive in rapid-pvst mode
+Bridge Assurance                        is enabled
+EtherChannel misconfig guard            is enabled
+Configured Pathcost method used is short
+UplinkFast                              is disabled
+BackboneFast                            is disabled
+
+Name                   Blocking Listening Learning Forwarding STP Active
+---------------------- -------- --------- -------- ---------- ----------
+VLAN0001                     0         0        0          1          1
+VLAN0801                     0         0        0          1          1
+VLAN0802                     0         0        0          1          1
+VLAN0803                     0         0        0          1          1
+VLAN0901                     0         0        0          1          1
+
+Name                   Blocking Listening Learning Forwarding STP Active
+---------------------- -------- --------- -------- ---------- ----------
+VLAN0902                     0         0        0          1          1
+VLAN0903                     0         0        0          1          1
+---------------------- -------- --------- -------- ---------- ----------
+7 vlans                      0         0        0          7          7
+CORE2#show ip route
+Codes: L - local, C - connected, S - static, R - RIP, M - mobile, B - BGP
+       D - EIGRP, EX - EIGRP external, O - OSPF, IA - OSPF inter area
+       N1 - OSPF NSSA external type 1, N2 - OSPF NSSA external type 2
+       E1 - OSPF external type 1, E2 - OSPF external type 2
+       i - IS-IS, su - IS-IS summary, L1 - IS-IS level-1, L2 - IS-IS level-2
+       ia - IS-IS inter area, * - candidate default, U - per-user static route
+       o - ODR, P - periodic downloaded static route, H - NHRP, l - LISP
+       a - application route
+       + - replicated route, % - next hop override
+
+Gateway of last resort is 192.168.1.1 to network 0.0.0.0
+
+O*E2  0.0.0.0/0 [110/1] via 192.168.1.1, 01:25:13, Vlan901
+      10.0.0.0/8 is variably subnetted, 14 subnets, 2 masks
+O        10.0.0.0/30 [110/2] via 192.168.1.1, 02:01:05, Vlan901
+C        10.0.0.4/30 is directly connected, GigabitEthernet0/0
+L        10.0.0.5/32 is directly connected, GigabitEthernet0/0
+C        10.0.0.8/30 is directly connected, GigabitEthernet0/1
+L        10.0.0.10/32 is directly connected, GigabitEthernet0/1
+O        10.0.0.12/30 [110/2] via 192.168.1.1, 02:01:05, Vlan901
+C        10.0.1.0/30 is directly connected, GigabitEthernet0/2
+L        10.0.1.2/32 is directly connected, GigabitEthernet0/2
+C        10.0.1.4/30 is directly connected, GigabitEthernet0/3
+L        10.0.1.6/32 is directly connected, GigabitEthernet0/3
+C        10.0.1.8/30 is directly connected, GigabitEthernet1/0
+L        10.0.1.10/32 is directly connected, GigabitEthernet1/0
+C        10.0.1.12/30 is directly connected, GigabitEthernet1/1
+L        10.0.1.14/32 is directly connected, GigabitEthernet1/1
+      192.168.1.0/24 is variably subnetted, 2 subnets, 2 masks
+C        192.168.1.0/24 is directly connected, Vlan901
+L        192.168.1.2/32 is directly connected, Vlan901
+CORE2#show ip ospf neighbor
+
+Neighbor ID     Pri   State           Dead Time   Address         Interface
+11.11.11.11       1   FULL/DR         00:00:39    192.168.1.1     Vlan901
+CORE2#show ntp status
+Clock is unsynchronized, stratum 16, no reference clock
+nominal freq is 1000.0003 Hz, actual freq is 1000.0003 Hz, precision is 2**17
+ntp uptime is 296800 (1/100 of seconds), resolution is 1000
+reference time is 00000000.00000000 (00:00:00.000 UTC Mon Jan 1 1900)
+clock offset is 0.0000 msec, root delay is 0.00 msec
+root dispersion is 44.51 msec, peer dispersion is 0.00 msec
+loopfilter state is 'NSET' (Never set), drift is 0.000000000 s/s
+system poll interval is 8, never updated.
+CORE2#show ntp associations
+
+  address         ref clock       st   when   poll reach  delay  offset   disp
+ ~10.0.0.1        .INIT.          16    801   1024     0  0.000   0.000 15937.
+ ~10.0.0.6        .INIT.          16      -   1024     0  0.000   0.000 15937.
+ * sys.peer, # selected, + candidate, - outlyer, x falseticker, ~ configured
+CORE2#show snmp
+Chassis: 9CS4TQ43R87
+Contact: admin@lab.local
+Location: EVE-NG-LAB
+0 SNMP packets input
+    0 Bad SNMP version errors
+    0 Unknown community name
+    0 Illegal operation for community name supplied
+    0 Encoding errors
+    0 Number of requested variables
+    0 Number of altered variables
+    0 Get-request PDUs
+    0 Get-next PDUs
+    0 Set-request PDUs
+    0 Input queue packet drops (Maximum queue size 1000)
+0 SNMP packets output
+    0 Too big errors (Maximum packet size 1500)
+    0 No such name errors
+    0 Bad values errors
+    0 General errors
+    0 Response PDUs
+    0 Trap PDUs
+SNMP global trap: disabled
+
+SNMP logging: disabled
+CORE2#show cdp neighbors detail
+
+Total cdp entries displayed : 0
+CORE2#show lldp neighbors detail
+
+Total entries displayed: 0
+
+CORE2#
