@@ -6,7 +6,7 @@ import MainLayout from "./components/layout/MainLayout";
 import Header from "./components/layout/Header";
 import { Badge, Button, Card, CodeBlock, ConfirmationModal, Field, Input, NotificationModal, PasswordInput, Select, SelectWithOther, Table, ToastContainer } from "./components/ui";
 import { parseHash } from "./utils/routing";
-import { formatDateTime, formatDate, safeDisplay, safeChild } from "./utils/format";
+import { formatDateTime, formatDate, safeDisplay, safeChild, formatError } from "./utils/format";
 import { CMDSET, SAMPLE_CORE_SW1, SAMPLE_DIST_SW2, createUploadRecord } from "./utils/constants";
 import { globalPollingService, notifyLLMResultReady } from "./services/llmPolling";
 import { useHashRoute, useLLMQueue } from "./hooks";
@@ -19,6 +19,52 @@ import UserAdminPage from "./pages/UserAdminPage";
 import SettingPage from "./pages/SettingPage";
 import { fileToDataURL } from "./utils/file";
 import AddMemberInline from "./components/AddMemberInline";
+
+/**
+ * Renders LLM summary text as Markdown-style bullet list with styled bold keys.
+ * - Bullet lines (starting with * or -) become list items with spacing.
+ * - **Key:** is rendered in a brighter color (e.g. text-sky-400); other **bold** stays bold.
+ * - leading-relaxed and vertical spacing for readability; content kept inside card (break-words).
+ */
+function SummaryMarkdown({ text, className = "", size = "sm" }) {
+  if (text == null || String(text).trim() === "") return null;
+  const raw = String(text);
+  const lines = raw.split(/\r?\n/).map((l) => l.trim()).filter((l) => l.length > 0);
+  const textSize = size === "xs" ? "text-xs" : "text-sm";
+  const keyClass = "text-sky-400 dark:text-sky-400 font-semibold";
+
+  function renderLineContent(lineContent, lineIdx) {
+    const parts = lineContent.split(/(\*\*[^*]+\*\*)/g);
+    return parts.map((part, i) => {
+      if (part.startsWith("**") && part.endsWith("**")) {
+        const inner = part.slice(2, -2);
+        const isKey = inner.endsWith(":");
+        return (
+          <span key={`${lineIdx}-${i}`} className={isKey ? keyClass : "font-semibold text-inherit"}>
+            {inner}
+          </span>
+        );
+      }
+      return part;
+    });
+  }
+
+  return (
+    <ul
+      className={`list-disc list-inside space-y-2 leading-relaxed break-words overflow-hidden ${textSize} text-slate-800 dark:text-slate-300 ${className}`}
+      style={{ marginLeft: "0.25rem" }}
+    >
+      {lines.map((line, idx) => {
+        const lineContent = line.replace(/^[\s*\-]+\s*/, "");
+        return (
+          <li key={idx} className="pl-0.5">
+            {renderLineContent(lineContent, idx)}
+          </li>
+        );
+      })}
+    </ul>
+  );
+}
 
 /* ========= ROOT APP ========= */
 export default function App() {
@@ -33,6 +79,7 @@ export default function App() {
   const { route, setRoute, routeToHash, handleNavClick } = useHashRoute(api.getToken, authedUser);
   const [uploadHistory, setUploadHistory] = useState([]);
   const [loading, setLoading] = useState(false);
+  const [projectAccessDenied, setProjectAccessDenied] = useState(null); // null = checking, true = denied, false = allowed
 
   // Global LLM queue: one job at a time per project (Summary + More Detail + Topology share this)
   const projectIdForLLM = (route.name === "project" || route.name === "device") ? (route.projectId || "") : "";
@@ -40,6 +87,26 @@ export default function App() {
   
   // Toast notification system
   const { toasts, success, error, warning, info, removeToast } = useToast();
+
+  // When on project page, verify access (Shared projects: everyone sees in list but only members can open)
+  useEffect(() => {
+    if (route.name !== "project" || !route.projectId) {
+      setProjectAccessDenied(null);
+      return;
+    }
+    setProjectAccessDenied(null);
+    let cancelled = false;
+    api.getProject(route.projectId)
+      .then(() => { if (!cancelled) setProjectAccessDenied(false); })
+      .catch((err) => {
+        if (!cancelled) {
+          const msg = err?.message ? String(err.message) : "";
+          const denied = msg.includes("403") || msg.toLowerCase().includes("not a member") || msg.toLowerCase().includes("forbidden");
+          setProjectAccessDenied(denied);
+        }
+      });
+    return () => { cancelled = true; };
+  }, [route.name, route.projectId]);
 
   // Apply dark mode class on mount and when dark changes
   useEffect(() => {
@@ -90,11 +157,15 @@ export default function App() {
       const data = await api.getProjects();
       // Transform backend format to frontend format
       const transformed = await Promise.all(data.map(async (p) => {
-        const members = await api.getProjectMembers(p.project_id).catch(() => []);
+        const [members, metrics] = await Promise.all([
+          api.getProjectMembers(p.project_id).catch(() => []),
+          api.getSummaryMetrics(p.project_id).catch(() => null),
+        ]);
         // Find manager (first manager or admin, or created_by)
         const manager = members.find(m => m.role === "manager")?.username || 
                        members.find(m => m.role === "admin")?.username || 
                        p.created_by;
+        const deviceCount = metrics?.total_devices ?? 0;
         return {
           id: p.project_id,
           project_id: p.project_id,
@@ -103,9 +174,9 @@ export default function App() {
           description: p.description || "",
           manager: manager,
           updated: formatDateTime(p.updated_at || p.created_at),
-          status: p.visibility === "Shared" ? "Shared" : "Active",
+          status: p.status ?? (p.visibility === "Shared" ? "Shared" : "Active"),
           members: members.map(m => ({ username: m.username, role: m.role })),
-          devices: 0,
+          devices: deviceCount,
           lastBackup: "—",
           services: 0,
           visibility: p.visibility || "Private",
@@ -176,7 +247,7 @@ export default function App() {
         await loadUsers();
       }
     } catch (e) {
-      alert("Login failed: " + e.message);
+      alert("Login failed: " + formatError(e));
     }
   };
 
@@ -358,7 +429,20 @@ export default function App() {
             handleNavClick={handleNavClick}
           />
         )}
-        {route.name === "project" && project && (
+        {route.name === "project" && project && projectAccessDenied === true && (
+          <div className="flex-1 flex flex-col items-center justify-center p-8 text-center">
+            <p className="text-slate-600 dark:text-slate-300 font-medium mb-2">You are not a member of this project.</p>
+            <p className="text-sm text-slate-500 dark:text-slate-400 mb-4">Only members can open and view its content.</p>
+            <a
+              href="#/"
+              onClick={(e) => handleNavClick(e, () => setRoute({ name: "index" }))}
+              className="inline-flex items-center justify-center rounded-xl px-4 py-2 text-sm font-medium bg-slate-200 dark:bg-slate-700 text-slate-800 dark:text-slate-200 hover:bg-slate-300 dark:hover:bg-slate-600"
+            >
+              Back to My Projects
+            </a>
+          </div>
+        )}
+        {route.name === "project" && project && projectAccessDenied === false && (
           <ProjectView
             project={project}
             tab={route.tab || "summary"}
@@ -378,6 +462,11 @@ export default function App() {
             handleNavClick={handleNavClick}
             toast={{ success, error, warning, info }}
           />
+        )}
+        {route.name === "project" && project && projectAccessDenied === null && (
+          <div className="flex-1 flex items-center justify-center p-8">
+            <span className="text-sm text-slate-500 dark:text-slate-400">Checking access...</span>
+          </div>
         )}
         {route.name === "project" && !project && (
           <div className="p-6 text-sm text-rose-400">Project not found.</div>
@@ -410,7 +499,7 @@ export default function App() {
     <div
       className="min-h-screen bg-slate-50 text-slate-900 dark:bg-[#0B0F19] dark:text-slate-100"
     >
-      <div className="mx-auto max-w-[1440px] px-4 py-4 sm:px-6 sm:py-6">
+      <div className="mx-auto max-w-[1440px] px-4 pt-4 pb-2 sm:px-6 sm:pt-6 sm:pb-3">
         <Header
           dark={dark}
           setDark={setDark}
@@ -419,10 +508,19 @@ export default function App() {
           onLogout={handleLogout}
           routeToHash={routeToHash}
           handleNavClick={handleNavClick}
+          pageTitle={
+            route.name === "newProject"
+              ? "Create New Project"
+              : route.name === "userAdmin"
+                ? "User Administration"
+                : route.name === "index"
+                  ? "My Projects"
+                  : ""
+          }
         />
       </div>
-      <div className="mx-auto max-w-[1440px] px-4 py-4 sm:px-6 sm:py-6">
-          <div className="mt-4 sm:mt-6">
+      <div className="mx-auto max-w-[1440px] px-4 pt-2 pb-4 sm:px-6 sm:pt-3 sm:pb-6">
+          <div className="mt-2 sm:mt-3">
             {(!authedUser && route.name !== "changePassword") && (
               <Login onLogin={handleLogin} />
             )}
@@ -460,29 +558,34 @@ export default function App() {
             {authedUser &&
               route.name === "newProject" &&
               can("create-project") && (
-                <NewProjectPage
-                  indexHref="#/"
-                  onCancel={() => setRoute({ name: "index" })}
-                  onCreate={async (proj) => {
-                    await loadProjects();
-                    setRoute({ name: "index" });
-                  }}
-                  handleNavClick={handleNavClick}
-                />
+                <div className="-mt-2 sm:-mt-3">
+                  <NewProjectPage
+                    indexHref="#/"
+                    authedUser={authedUser}
+                    onCancel={() => setRoute({ name: "index" })}
+                    onCreate={async (proj) => {
+                      await loadProjects();
+                      setRoute({ name: "index" });
+                    }}
+                    handleNavClick={handleNavClick}
+                  />
+                </div>
               )}
             {authedUser &&
               route.name === "userAdmin" &&
               can("user-management") && (
-                <UserAdminPage
-                  indexHref="#/"
-                  users={users}
-                  setUsers={setUsers}
-                  onClose={async () => {
-                    await loadUsers();
-                    setRoute({ name: "index" });
-                  }}
-                  handleNavClick={handleNavClick}
-                />
+                <div className="-mt-2 sm:-mt-3">
+                  <UserAdminPage
+                    indexHref="#/"
+                    users={users}
+                    setUsers={setUsers}
+                    onClose={async () => {
+                      await loadUsers();
+                      setRoute({ name: "index" });
+                    }}
+                    handleNavClick={handleNavClick}
+                  />
+                </div>
               )}
             {authedUser && route.name === "project" && (
               <ProjectView
@@ -1192,7 +1295,7 @@ const NetworkOverviewCard = ({ project, summaryRows, fullHeight, onRegisterGener
         // Don't set error here - might be slow, polling will catch it
         // Only set error if it's immediate failure (not timeout)
         if (err.message && !err.message.includes("timeout")) {
-          setError(err.message || err.detail || "Failed to start analysis. Check backend/LLM server.");
+          setError(formatError(err) || "Failed to start analysis. Check backend/LLM server.");
           setGenerating(false);
           localStorage.removeItem(storageKeyOverview);
           onComplete?.();
@@ -1254,9 +1357,7 @@ const NetworkOverviewCard = ({ project, summaryRows, fullHeight, onRegisterGener
                   </div>
                 )}
                 {overviewText != null ? (
-                  <div className="text-slate-800 dark:text-slate-300 leading-relaxed break-words whitespace-pre-wrap">
-                    {safeDisplay(overviewText)}
-                  </div>
+                  <SummaryMarkdown text={overviewText} className={fullHeight ? "text-base" : ""} />
                 ) : (
                   <div className="text-slate-600 dark:text-slate-400 italic">
                     Click the AI button above to generate network overview.
@@ -1536,7 +1637,7 @@ const RecommendationsCard = ({ project, summaryRows, fullHeight, onRegisterGener
         console.error("Recommendations analysis request failed:", err);
         // Only set error for immediate failures (not timeout - that's expected)
         if (err.message && !err.message.includes("timeout") && !err.message.includes("ECONNRESET")) {
-          setError(err.message || err.detail || "Failed to start analysis. Check backend/LLM server.");
+          setError(formatError(err) || "Failed to start analysis. Check backend/LLM server.");
           setGeneratingRecOnly(false);
           localStorage.removeItem(storageKeyRec);
           onComplete?.();
@@ -1691,7 +1792,7 @@ const CompareConfigModal = ({ project, deviceList = [], onClose }) => {
         setLeftConfigs(list);
         if (list.length) setLeftConfigId(list[0].id);
       })
-      .catch((err) => setError(err.message || "Failed to load config list"))
+      .catch((err) => setError(formatError(err) || "Failed to load config list"))
       .finally(() => setLoadingLeftConfigs(false));
   }, [projectId, sourceDevice]);
 
@@ -1709,7 +1810,7 @@ const CompareConfigModal = ({ project, deviceList = [], onClose }) => {
         setRightConfigs(list);
         if (list.length) setRightConfigId(list[0].id);
       })
-      .catch((err) => setError(err.message || "Failed to load config list"))
+      .catch((err) => setError(formatError(err) || "Failed to load config list"))
       .finally(() => setLoadingRightConfigs(false));
   }, [projectId, targetDevice]);
 
@@ -1742,7 +1843,7 @@ const CompareConfigModal = ({ project, deviceList = [], onClose }) => {
         setRightContent(textRight ?? "");
       })
       .catch((err) => {
-        setError(err.message || "Failed to load config content");
+        setError(formatError(err) || "Failed to load config content");
         setLeftContent(null);
         setRightContent(null);
       })
@@ -1787,7 +1888,7 @@ const CompareConfigModal = ({ project, deviceList = [], onClose }) => {
               <Select
                 options={leftConfigs.map((c) => ({
                   value: c.id,
-                  label: `${c.filename}${c.created_at ? ` — ${new Date(c.created_at).toLocaleString()}` : ""}`.trim(),
+                  label: `${c.filename}${c.created_at ? ` — ${formatDateTime(c.created_at)}` : ""}`.trim(),
                 }))}
                 value={leftConfigId}
                 onChange={setLeftConfigId}
@@ -1799,7 +1900,7 @@ const CompareConfigModal = ({ project, deviceList = [], onClose }) => {
               <Select
                 options={rightConfigs.map((c) => ({
                   value: c.id,
-                  label: `${c.filename}${c.created_at ? ` — ${new Date(c.created_at).toLocaleString()}` : ""}`.trim(),
+                  label: `${c.filename}${c.created_at ? ` — ${formatDateTime(c.created_at)}` : ""}`.trim(),
                 }))}
                 value={rightConfigId}
                 onChange={setRightConfigId}
@@ -1808,7 +1909,7 @@ const CompareConfigModal = ({ project, deviceList = [], onClose }) => {
             </div>
           </div>
           {error && !leftContent && (
-            <div className="text-sm text-rose-600 dark:text-rose-400">{error}</div>
+            <div className="text-sm text-rose-600 dark:text-rose-400">{safeDisplay(error)}</div>
           )}
           {loadingConfigs && <div className="text-sm text-slate-500 dark:text-slate-400">Loading config list…</div>}
           {!loadingConfigs && (
@@ -1923,7 +2024,7 @@ const SummaryPage = ({ project, projectId: projectIdProp, routeToHash, handleNav
       } catch (err) {
         if (cancelled) return;
         console.error('Failed to load config summary:', err);
-        setError(err.message || 'Failed to load summary data');
+        setError(formatError(err) || 'Failed to load summary data');
         setSummaryRows(prev => prev.length ? prev : []);
         setDashboardMetrics(null);
       } finally {
@@ -2207,7 +2308,7 @@ const SummaryPage = ({ project, projectId: projectIdProp, routeToHash, handleNav
                   setDashboardMetrics(metrics || null);
                   setLoading(false);
                 })
-                .catch(err => { setError(err.message || 'Failed to load summary data'); setLoading(false); });
+                .catch(err => { setError(formatError(err) || 'Failed to load summary data'); setLoading(false); });
             }
           }}>Retry</Button>
         </div>
@@ -2333,7 +2434,7 @@ const DeviceDetailsView = ({ project, deviceId, goBack, goBackHref, goIndex, goI
         setDeviceData(details);
       } catch (err) {
         console.error('Failed to load device details:', err);
-        setError(err.message || 'Failed to load device details');
+        setError(formatError(err) || 'Failed to load device details');
       } finally {
         setLoading(false);
       }
@@ -2815,7 +2916,7 @@ const DeviceDetailsView = ({ project, deviceId, goBack, goBackHref, goIndex, goI
     setDeviceOverviewGenerating(true);
     api.analyzeDeviceOverview(projectId, deviceId).catch((err) => {
       if (err.message && (err.message.includes("timeout") || err.message.includes("abort"))) return;
-      setDeviceOverviewError(err.message || "Failed to start analysis.");
+      setDeviceOverviewError(formatError(err) || "Failed to start analysis.");
       setDeviceOverviewGenerating(false);
       clearDeviceLlmAndComplete();
     });
@@ -2828,7 +2929,7 @@ const DeviceDetailsView = ({ project, deviceId, goBack, goBackHref, goIndex, goI
     setDeviceRecsGenerating(true);
     api.analyzeDeviceRecommendations(projectId, deviceId).catch((err) => {
       if (err.message && (err.message.includes("timeout") || err.message.includes("abort"))) return;
-      setDeviceRecsError(err.message || "Failed to start analysis.");
+      setDeviceRecsError(formatError(err) || "Failed to start analysis.");
       setDeviceRecsGenerating(false);
       clearDeviceLlmAndComplete();
     });
@@ -2849,7 +2950,7 @@ const DeviceDetailsView = ({ project, deviceId, goBack, goBackHref, goIndex, goI
       toVersion: newer.version,
     }).catch((err) => {
       if (err.message && (err.message.includes("timeout") || err.message.includes("abort"))) return;
-      setDeviceDriftError(err.message || "Failed to start analysis.");
+      setDeviceDriftError(formatError(err) || "Failed to start analysis.");
       setDeviceDriftGenerating(false);
       clearDeviceLlmAndComplete();
     });
@@ -3115,7 +3216,7 @@ const DeviceDetailsView = ({ project, deviceId, goBack, goBackHref, goIndex, goI
                     if (loadProjects) await loadProjects();
                     if (goBack) goBack();
                   } catch (e) {
-                    alert("Failed to delete device: " + (e.message || e));
+                    alert("Failed to delete device: " + formatError(e));
                   } finally {
                     setDeleteDeviceLoading(false);
                   }
@@ -3226,7 +3327,7 @@ const DeviceDetailsView = ({ project, deviceId, goBack, goBackHref, goIndex, goI
                           </div>
                         )}
                         {deviceOverviewText != null ? (
-                          <pre className="whitespace-pre-wrap text-xs leading-relaxed text-slate-700 dark:text-slate-300">{safeDisplay(deviceOverviewText)}</pre>
+                          <SummaryMarkdown text={deviceOverviewText} size="xs" className="text-slate-700 dark:text-slate-300" />
                         ) : (
                           <div className="text-slate-500 dark:text-slate-400 italic text-xs">
                             Click the AI button above to generate summary.
@@ -4277,19 +4378,7 @@ const UploadConfigForm = ({ project, authedUser, onClose, onUpload }) => {
       onClose(); // Close modal after successful upload
     } catch (error) {
       console.error('Upload failed:', error);
-      // Handle error message properly
-      let errorMessage = 'Upload failed. Please try again.';
-      if (error instanceof Error) {
-        errorMessage = error.message;
-      } else if (typeof error === 'string') {
-        errorMessage = error;
-      } else if (error && error.message) {
-        errorMessage = error.message;
-      } else if (error && error.detail) {
-        errorMessage = error.detail;
-      }
-      setError(errorMessage);
-      // Don't close modal on error - let user see the error and retry
+      setError(formatError(error) || 'Upload failed. Please try again.');
     } finally {
       setIsUploading(false);
     }
@@ -4487,7 +4576,6 @@ const UploadConfigForm = ({ project, authedUser, onClose, onUpload }) => {
 const UploadDocumentForm = ({ project, authedUser, onClose, onUpload, folderStructure, defaultFolderId = null }) => {
   const [files, setFiles] = useState([]);
   const [selectedFolderId, setSelectedFolderId] = useState(defaultFolderId || '');
-  const [newFolderName, setNewFolderName] = useState('');
   const [details, setDetails] = useState({
     who: authedUser?.username || '',
     what: '',
@@ -4600,16 +4688,7 @@ const UploadDocumentForm = ({ project, authedUser, onClose, onUpload, folderStru
     
     try {
       const projectId = project.project_id || project.id;
-      let folderIdToUse = selectedFolderId || null;
-
-      // If user entered a new folder name, create the folder first then upload into it
-      if (newFolderName.trim()) {
-        const createRes = await api.createFolder(projectId, newFolderName.trim(), null);
-        const newFolder = createRes?.folder || createRes;
-        if (newFolder?.id) {
-          folderIdToUse = newFolder.id;
-        }
-      }
+      const folderIdToUse = selectedFolderId || null;
 
       const metadata = {
         who: details.who,
@@ -4631,19 +4710,7 @@ const UploadDocumentForm = ({ project, authedUser, onClose, onUpload, folderStru
       onClose();
     } catch (error) {
       console.error('Upload failed:', error);
-      // Handle error message properly
-      let errorMessage = 'Upload failed. Please try again.';
-      if (error instanceof Error) {
-        errorMessage = error.message;
-      } else if (typeof error === 'string') {
-        errorMessage = error;
-      } else if (error && error.message) {
-        errorMessage = error.message;
-      } else if (error && error.detail) {
-        errorMessage = error.detail;
-      }
-      setError(errorMessage);
-      // Don't close modal on error - let user see the error and retry
+      setError(formatError(error) || 'Upload failed. Please try again.');
     } finally {
       setIsUploading(false);
     }
@@ -4664,22 +4731,15 @@ const UploadDocumentForm = ({ project, authedUser, onClose, onUpload, folderStru
                 </div>
               )}
 
-            <Field label="สร้างโฟลเดอร์ใหม่ (ถ้ากรอก จะสร้างโฟลเดอร์แล้วอัปโหลดเข้าโฟลเดอร์นั้น)">
-              <Input
-                value={newFolderName}
-                onChange={(e) => setNewFolderName(e.target.value)}
-                placeholder="ชื่อโฟลเดอร์ใหม่ (ไม่กรอก = ใช้โฟลเดอร์ที่เลือกด้านล่าง)"
-              />
-            </Field>
-            <Field label="หรืออัปโหลดไปโฟลเดอร์ที่มีอยู่">
+            <Field label="Upload to folder">
               <Select
                 value={selectedFolderId}
                 onChange={setSelectedFolderId}
                 options={[
-                  { value: "", label: "Root (ไม่ใส่โฟลเดอร์)" },
+                  { value: "", label: "Root (no folder)" },
                   ...folderOptions
                 ]}
-                placeholder="เลือกโฟลเดอร์..."
+                placeholder="Select folder..."
               />
             </Field>
 
@@ -4900,7 +4960,7 @@ const AnalysisPage = ({ project, authedUser, onChangeTab }) => {
       setAnalyses(data);
     } catch (e) {
       console.error("Failed to load analyses:", e);
-      alert("Failed to load analyses: " + e.message);
+      alert("Failed to load analyses: " + formatError(e));
     } finally {
       setLoading(false);
     }
@@ -4929,7 +4989,7 @@ const AnalysisPage = ({ project, authedUser, onChangeTab }) => {
       setSelectedAnalysis(newAnalysis);
       setShowCreate(false);
     } catch (e) {
-      alert("Failed to create analysis: " + e.message);
+      alert("Failed to create analysis: " + formatError(e));
     } finally {
       setLoading(false);
     }
@@ -4948,7 +5008,7 @@ const AnalysisPage = ({ project, authedUser, onChangeTab }) => {
       await loadAnalyses();
       setSelectedAnalysis(updated);
     } catch (e) {
-      alert("Failed to verify analysis: " + e.message);
+      alert("Failed to verify analysis: " + formatError(e));
     } finally {
       setLoading(false);
     }
@@ -5569,7 +5629,7 @@ const HistoryPage = ({ project, can, authedUser }) => {
       console.error('Failed to load versions:', error);
       setVersions([]);
       isOpeningVersions.current = false;
-      alert('Failed to load version history: ' + (error.message || 'Unknown error'));
+      alert('Failed to load version history: ' + formatError(error));
     }
   };
 
@@ -5703,7 +5763,7 @@ const HistoryPage = ({ project, can, authedUser }) => {
                                 const projectId = project.project_id || project.id;
                                 await api.downloadDocument(projectId, r.document_id);
                               } catch (error) {
-                                alert('Download failed: ' + error.message);
+                                alert('Download failed: ' + formatError(error));
                               }
                             }}
                           >
@@ -5739,7 +5799,7 @@ const HistoryPage = ({ project, can, authedUser }) => {
                     size="sm"
                     disabled={clampedPage <= 1}
                     onClick={() => setCurrentPage(1)}
-                    title="หน้าแรก"
+                    title="First page"
                   >
                     «
                   </Button>
@@ -5776,7 +5836,7 @@ const HistoryPage = ({ project, can, authedUser }) => {
                     size="sm"
                     disabled={clampedPage >= totalPages}
                     onClick={() => setCurrentPage(totalPages)}
-                    title="หน้าสุดท้าย"
+                    title="Last page"
                   >
                     »
                   </Button>
@@ -5870,7 +5930,7 @@ const HistoryPage = ({ project, can, authedUser }) => {
                                   const docId = versionDocument?.document_id;
                                   await api.downloadDocument(projectId, docId, v.version);
                                 } catch (error) {
-                                  alert('Download failed: ' + error.message);
+                                  alert('Download failed: ' + formatError(error));
                                 }
                               }}
                             >
@@ -5933,7 +5993,7 @@ const ScriptGeneratorPage = ({ project, can, authedUser, toast }) => {
         setHuaweiCommands(settings.huawei_commands || "");
       } catch (err) {
         console.error("Failed to load script settings:", err);
-        setError("Failed to load settings: " + (err.message || err));
+        setError("Failed to load settings: " + formatError(err));
       } finally {
         setLoading(false);
       }
@@ -5955,7 +6015,7 @@ const ScriptGeneratorPage = ({ project, can, authedUser, toast }) => {
       if (toast) toast.success("Settings saved successfully!");
     } catch (err) {
       console.error("Failed to save settings:", err);
-      setError("Failed to save settings: " + (err.message || err));
+      setError("Failed to save settings: " + formatError(err));
     } finally {
       setSaving(false);
     }
@@ -5974,7 +6034,7 @@ const ScriptGeneratorPage = ({ project, can, authedUser, toast }) => {
       });
     } catch (err) {
       console.error("Failed to save device list:", err);
-      setError("Failed to save: " + (err.message || err));
+      setError("Failed to save: " + formatError(err));
     } finally {
       setSaving(false);
     }
@@ -6122,7 +6182,9 @@ const ScriptGeneratorPage = ({ project, can, authedUser, toast }) => {
     script += "fi\n\n";
     script += "DATE_DIR=\"$(date +%Y-%m-%d)\"\n";
     script += "OUTPUT_DIR=\"backups/$DATE_DIR\"\n";
-    script += "mkdir -p \"$OUTPUT_DIR\"\n\n";
+    script += "mkdir -p \"$OUTPUT_DIR\"\n";
+    script += "SUCCESS_COUNT=0\n";
+    script += "TOTAL_DEVICES=" + filteredDevices.length + "\n\n";
     
     // Build command list
     const commandLines = commands.split("\n").map(c => c.trim()).filter(c => c && !c.startsWith("!"));
@@ -6172,15 +6234,18 @@ const ScriptGeneratorPage = ({ project, can, authedUser, toast }) => {
         script += "exit\n";
         script += "EOF\n";
       }
-      script += `if [ $? -eq 0 ]; then\n`;
-      script += `    echo "Backup completed for ${hostname}"\n`;
+      script += "SSH_EXIT_CODE=${PIPESTATUS[0]}\n";
+      script += `if [ "$SSH_EXIT_CODE" -eq 0 ]; then\n`;
+      script += `    echo "✅ Backup successful for ${hostname}"\n`;
+      script += `    SUCCESS_COUNT=$((SUCCESS_COUNT + 1))\n`;
       script += `else\n`;
-      script += `    echo "Warning: Backup may have failed for ${hostname} (check output file)\"\n`;
+      script += `    echo "❌ Error: Backup failed for ${hostname}"\n`;
+      script += `    rm -f "$OUTPUT_FILE"\n`;
       script += `fi\n`;
       script += `echo ""\n\n`;
     });
     
-    script += "echo \"All backups completed!\"\n";
+    script += "echo \"Backup process completed. $SUCCESS_COUNT/$TOTAL_DEVICES device(s) backed up successfully.\"\n";
     
     // Determine vendor label for filename (Cisco / Huawei / Mixed_Network)
     const deviceTypes = new Set(filteredDevices.map(d => d.device_type));
@@ -6265,6 +6330,7 @@ const ScriptGeneratorPage = ({ project, can, authedUser, toast }) => {
     script += "        print(f\"Connecting to {device_info['hostname']} ({device_info['host']})...\")\n";
     script += "        \n";
     script += "        # Create connection handler with robust parameters\n";
+    script += "        # Rely on explicit password; do not pass look_for_keys/allow_agent (not in all Netmiko versions)\n";
     script += "        connection_params = {\n";
     script += "            'device_type': device_info['device_type'],\n";
     script += "            'host': device_info['host'],\n";
@@ -6274,9 +6340,7 @@ const ScriptGeneratorPage = ({ project, can, authedUser, toast }) => {
     script += "            'global_delay_factor': 4,      # Handle very slow / legacy devices\n";
     script += "            'auth_timeout': 60,\n";
     script += "            'banner_timeout': 60,\n";
-    script += "            'look_for_keys': False,        # CRITICAL: Ignore local SSH keys (Windows-friendly)\n";
-    script += "            'allow_agent': False,          # CRITICAL: Disable SSH agent, force password auth\n";
-    script += "            'conn_timeout': 60,           # Extended timeout for initial connection\n";
+    script += "            'conn_timeout': 60,            # Extended timeout for initial connection\n";
     script += "        }\n";
     script += "        \n";
     script += "        # Add enable secret only if provided\n";
@@ -6395,7 +6459,7 @@ const ScriptGeneratorPage = ({ project, can, authedUser, toast }) => {
     <div className="h-full flex flex-col overflow-hidden">
       {error && (
         <div className="flex-shrink-0 px-4 py-2 bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded-lg text-red-700 dark:text-red-400 text-sm">
-          {error}
+          {safeDisplay(error)}
         </div>
       )}
 
@@ -6544,7 +6608,7 @@ const ScriptGeneratorPage = ({ project, can, authedUser, toast }) => {
                 ]}
                 className="w-32 text-xs py-1"
               />
-              <Button variant="primary" onClick={handleSave} disabled={saving} className="text-xs py-1 px-2">
+              <Button variant="success" onClick={handleSave} disabled={saving} className="text-xs py-1 px-2">
                 {saving ? "Saving..." : "Save"}
               </Button>
             </>
@@ -6594,19 +6658,6 @@ const ScriptGeneratorPage = ({ project, can, authedUser, toast }) => {
                 <span>Windows Script (.py)</span>
               </button>
             </div>
-            {generatedScript && (
-              <div className="flex-1 min-h-0 overflow-hidden mt-2">
-                <CodeBlock
-                  code={generatedScript}
-                  language={scriptLanguage}
-                  filename={scriptFilename}
-                  showCopy={true}
-                  showDownload={true}
-                  onDownload={handleDownloadScript}
-                  className="h-full"
-                />
-              </div>
-            )}
           </div>
         </Card>
       </div>
@@ -6698,7 +6749,7 @@ const ScriptGeneratorPage = ({ project, can, authedUser, toast }) => {
                 <Button variant="secondary" onClick={() => setShowDeviceModal(false)}>
                   Cancel
                 </Button>
-                <Button variant="primary" onClick={handleSaveDevice}>
+                <Button variant="success" onClick={handleSaveDevice}>
                   {editingDevice !== null ? "Update" : "Add"}
                 </Button>
               </div>
@@ -6932,7 +6983,7 @@ const DocumentsPage = ({ project, can, authedUser, uploadHistory, setUploadHisto
         }
       } catch (error) {
         console.error('Failed to load preview:', error);
-        setPreviewContent({ error: error.message });
+        setPreviewContent({ error: formatError(error) });
       } finally {
         setPreviewLoading(false);
       }
@@ -7000,7 +7051,7 @@ const DocumentsPage = ({ project, can, authedUser, uploadHistory, setUploadHisto
       setVersions([]);
       isOpeningVersions.current = false;
       // Don't close modal on error, show error message instead
-      alert('Failed to load version history: ' + (error.message || 'Unknown error'));
+      alert('Failed to load version history: ' + formatError(error));
     }
   };
 
@@ -7425,7 +7476,7 @@ const DocumentsPage = ({ project, can, authedUser, uploadHistory, setUploadHisto
           alert("Folder deleted successfully.");
         } catch (error) {
           console.error('Failed to delete folder:', error);
-          alert(`Failed to delete folder: ${error.message || error}`);
+          alert(`Failed to delete folder: ${formatError(error)}`);
         }
       }
     }
@@ -7524,7 +7575,7 @@ const DocumentsPage = ({ project, can, authedUser, uploadHistory, setUploadHisto
       setFolderParent(null);
     } catch (error) {
       console.error('Failed to save folder:', error);
-      alert(`Failed: ${error.message || error}`);
+      alert(`Failed: ${formatError(error)}`);
     }
   };
 
@@ -7582,7 +7633,7 @@ const DocumentsPage = ({ project, can, authedUser, uploadHistory, setUploadHisto
       setFileToRename(null);
     } catch (error) {
       console.error('Failed to rename file:', error);
-      alert(`Failed: ${error.message || error}`);
+      alert(`Failed: ${formatError(error)}`);
     }
   };
 
@@ -7626,16 +7677,19 @@ const DocumentsPage = ({ project, can, authedUser, uploadHistory, setUploadHisto
         </div>
       }
       actions={
-        selectedFile && selectedDocument ? (
-          <div className="flex gap-2">
+        (() => {
+          const doc = selectedDocument || (selectedFile?.document_id && documents?.find(d => d.document_id === selectedFile.document_id));
+          if (!selectedFile || !doc) return null;
+          return (
+          <div className="flex gap-2 flex-wrap">
           <Button
             variant="secondary"
               onClick={async () => {
                 try {
                   const projectId = project.project_id || project.id;
-                  await api.downloadDocument(projectId, selectedDocument.document_id);
+                  await api.downloadDocument(projectId, doc.document_id);
                 } catch (error) {
-                  alert('Download failed: ' + error.message);
+                  alert('Download failed: ' + formatError(error));
                 }
             }}
           >
@@ -7645,13 +7699,12 @@ const DocumentsPage = ({ project, can, authedUser, uploadHistory, setUploadHisto
               variant="secondary"
               onClick={(e) => {
                 e.stopPropagation();
-                loadVersions(selectedDocument.document_id, selectedDocument);
+                loadVersions(doc.document_id, doc);
               }}
             >
               📜 Versions
             </Button>
-            {/* Only show Rename button if document is not in Config folder */}
-            {selectedDocument.folder_id !== "Config" && (
+            {doc.folder_id !== "Config" && (
               <Button
                 variant="secondary"
                 onClick={(e) => {
@@ -7662,40 +7715,36 @@ const DocumentsPage = ({ project, can, authedUser, uploadHistory, setUploadHisto
                 ✏️ Rename
               </Button>
             )}
-            {/* Only show Move button if document is not in Config folder */}
-            {selectedDocument.folder_id !== "Config" && (
+            {doc.folder_id !== "Config" && (
               <Button
                 variant="secondary"
                 onClick={(e) => {
                   e.stopPropagation();
-                  setMoveFolderTarget(selectedDocument);
-                  setMoveFolderId(selectedDocument.folder_id || '');
+                  setMoveFolderTarget(doc);
+                  setMoveFolderId(doc.folder_id ?? '');
                   setShowMoveFolder(true);
                 }}
               >
                 📁 Move
               </Button>
             )}
-            {/* Only show Delete button if document is not in Config folder and user has permission */}
-            {selectedDocument.folder_id !== "Config" && can("project-setting", project) && (
+            {doc.folder_id !== "Config" && can("project-setting", project) && (
               <Button
                 variant="danger"
                 onClick={async (e) => {
                   e.stopPropagation();
-                  if (confirm(`Are you sure you want to delete "${selectedDocument.filename}"?`)) {
+                  if (confirm(`Are you sure you want to delete "${doc.filename || selectedFile?.name}"?`)) {
                     try {
                       const projectId = project.project_id || project.id;
-                      await api.deleteDocument(projectId, selectedDocument.document_id);
+                      await api.deleteDocument(projectId, doc.document_id);
                       alert("Document deleted successfully");
-                      // Reload documents
                       const docs = await api.getDocuments(projectId);
                       setDocuments(Array.isArray(docs) ? docs : []);
-                      // Clear selection
                       setSelectedFile(null);
                       setSelectedDocument(null);
                       setPreviewContent(null);
                     } catch (error) {
-                      alert("Failed to delete document: " + (error.message || error));
+                      alert("Failed to delete document: " + formatError(error));
                     }
                   }
                 }}
@@ -7704,7 +7753,8 @@ const DocumentsPage = ({ project, can, authedUser, uploadHistory, setUploadHisto
               </Button>
             )}
           </div>
-        ) : null
+          );
+        })()
       }
       className="flex-1 min-h-0 flex flex-col overflow-hidden"
     >
@@ -7735,7 +7785,7 @@ const DocumentsPage = ({ project, can, authedUser, uploadHistory, setUploadHisto
                 <div className="text-center">
                   <div className="text-rose-500 dark:text-rose-400 text-lg mb-2">⚠️</div>
                   <div className="text-sm text-rose-500 dark:text-rose-400">
-                    Error loading preview: {previewContent.error}
+                    Error loading preview: {safeDisplay(previewContent.error)}
                   </div>
                 </div>
               </div>
@@ -7898,6 +7948,7 @@ const DocumentsPage = ({ project, can, authedUser, uploadHistory, setUploadHisto
                         setPreviewContent(null);
                       }
                     }}
+                    onEditFile={handleEditFile}
                     selectedFile={selectedFile}
                     selectedFolder={selectedFolder}
                   />
@@ -8024,7 +8075,7 @@ const DocumentsPage = ({ project, can, authedUser, uploadHistory, setUploadHisto
                                   const docId = versionDocument?.document_id || selectedDocument?.document_id;
                                   await api.downloadDocument(projectId, docId, v.version);
                                 } catch (error) {
-                                  alert('Download failed: ' + error.message);
+                                  alert('Download failed: ' + formatError(error));
                                 }
                               }}
                             >
@@ -8139,7 +8190,7 @@ const DocumentsPage = ({ project, can, authedUser, uploadHistory, setUploadHisto
                         
                         alert('Document moved successfully');
                       } catch (error) {
-                        alert('Failed to move document: ' + (error.message || 'Unknown error'));
+                        alert('Failed to move document: ' + formatError(error));
                       }
                     }}
                   >
@@ -8211,7 +8262,7 @@ const DocumentsPage = ({ project, can, authedUser, uploadHistory, setUploadHisto
               }}>
                 Cancel
               </Button>
-              <Button variant="primary" onClick={handleSaveFolder}>
+              <Button variant="success" onClick={handleSaveFolder}>
                 {folderAction === "add" ? "Create" : "Save"}
               </Button>
             </div>
@@ -8244,7 +8295,7 @@ const DocumentsPage = ({ project, can, authedUser, uploadHistory, setUploadHisto
               }}>
                 Cancel
               </Button>
-              <Button variant="primary" onClick={handleSaveFileRename}>
+              <Button variant="success" onClick={handleSaveFileRename}>
                 Save
               </Button>
             </div>
@@ -9129,7 +9180,7 @@ const DeviceImageUpload = ({ project, deviceName, authedUser, setProjects, can: 
       }
     } catch (err) {
       console.error("Upload failed:", err);
-      setError(err.message || "Failed to upload image");
+      setError(formatError(err) || "Failed to upload image");
     } finally {
       setUploading(false);
       // Reset file input
@@ -9164,7 +9215,7 @@ const DeviceImageUpload = ({ project, deviceName, authedUser, setProjects, can: 
       }
     } catch (err) {
       console.error("Delete failed:", err);
-      setError(err.message || "Failed to delete image");
+      setError(formatError(err) || "Failed to delete image");
     }
   };
   
@@ -10142,7 +10193,7 @@ const TopologyGraph = ({ project, projectId, routeToHash, handleNavClick, onOpen
         console.error("Topology generation request failed:", err);
         // Only set error for immediate failures (not timeout - that's expected for long-running LLM)
         if (err.message && !err.message.includes("timeout") && !err.message.includes("ECONNRESET") && !err.message.includes("socket hang up")) {
-          setTopologyError(err.message || err.detail || "Failed to start topology generation. Check backend/LLM server.");
+          setTopologyError(formatError(err) || "Failed to start topology generation. Check backend/LLM server.");
           setGeneratingTopology(false);
           localStorage.removeItem(storageKeyTopo);
           onComplete?.();
@@ -10187,7 +10238,12 @@ const TopologyGraph = ({ project, projectId, routeToHash, handleNavClick, onOpen
   });
   const [linkMode, setLinkMode] = useState("none"); // "none", "add", "edit"
   const [reroutingLink, setReroutingLink] = useState(null); // For re-routing link connectors
-  
+  const [hiddenNodeIds, setHiddenNodeIds] = useState(() => project.topoHiddenNodes || []);
+  const [showRestoreNodeList, setShowRestoreNodeList] = useState(false);
+
+  // Snapshot of last saved/loaded layout — used by Cancel to restore to that state
+  const lastSavedLayoutRef = React.useRef(null);
+
   // Step 1: Fetch fast topology (DB only, no LLM) on mount so graph shows immediately
   React.useEffect(() => {
     const projectId = project.project_id || project.id;
@@ -10195,6 +10251,15 @@ const TopologyGraph = ({ project, projectId, routeToHash, handleNavClick, onOpen
       setIsGraphLoading(false);
       return;
     }
+    // Initialize ref from project so Cancel has something before API returns
+    lastSavedLayoutRef.current = {
+      positions: project.topoPositions || {},
+      links: project.topoLinks || [],
+      node_labels: project.topoNodeLabels || null,
+      node_roles: project.topoNodeRoles || null,
+      hidden_node_ids: project.topoHiddenNodes || [],
+    };
+
     let cancelled = false;
     (async () => {
       try {
@@ -10203,6 +10268,7 @@ const TopologyGraph = ({ project, projectId, routeToHash, handleNavClick, onOpen
         const topo = data.topology || {};
         const apiNodes = topo.nodes || [];
         const apiEdges = topo.edges || [];
+        const layout = data.layout || {};
         if (apiNodes.length > 0 || apiEdges.length > 0) {
           const roleCounts = {};
           const roleIndices = {};
@@ -10229,10 +10295,14 @@ const TopologyGraph = ({ project, projectId, routeToHash, handleNavClick, onOpen
             evidence: e.evidence || "",
             type: "trunk",
           }));
+          // Prefer saved layout links when present so display matches saved state
+          const linksToUse = layout.links && layout.links.length > 0 ? layout.links : newLinks;
           setTopologyNodes(newNodes);
-          setLinks(newLinks);
-          const layout = data.layout || {};
+          setLinks(linksToUse);
+
+          let positionsToUse;
           if (layout.positions && Object.keys(layout.positions).length > 0) {
+            positionsToUse = layout.positions;
             setPositions(layout.positions);
           } else {
             const pos = {};
@@ -10243,10 +10313,21 @@ const TopologyGraph = ({ project, projectId, routeToHash, handleNavClick, onOpen
               pos[n.id] = getDefaultPos(n.id, role, posRoleIndices[role], roleCounts);
               posRoleIndices[role]++;
             });
-            setPositions(nudgePositionsNoOverlap(pos, newNodes.map(n => n.id)));
+            positionsToUse = nudgePositionsNoOverlap(pos, newNodes.map(n => n.id));
+            setPositions(positionsToUse);
           }
           if (layout.node_labels) setNodeLabels(layout.node_labels);
           if (layout.node_roles) setNodeRoles(layout.node_roles);
+          if (Array.isArray(layout.hidden_node_ids)) setHiddenNodeIds(layout.hidden_node_ids);
+
+          // Store loaded layout as "last saved" so Cancel restores to this
+          lastSavedLayoutRef.current = {
+            positions: positionsToUse,
+            links: linksToUse,
+            node_labels: layout.node_labels || null,
+            node_roles: layout.node_roles || null,
+            hidden_node_ids: Array.isArray(layout.hidden_node_ids) ? layout.hidden_node_ids : [],
+          };
         }
       } catch (err) {
         if (!cancelled) console.warn("Fast topology load failed, using fallback:", err);
@@ -10530,13 +10611,22 @@ const TopologyGraph = ({ project, projectId, routeToHash, handleNavClick, onOpen
     
     try {
       // Save to backend
-      await api.saveTopologyLayout(projectId, positions, links, nodeLabels, nodeRoles);
+      await api.saveTopologyLayout(projectId, positions, links, nodeLabels, nodeRoles, hiddenNodeIds);
+      
+      // Update "last saved" snapshot so Cancel restores to this state
+      lastSavedLayoutRef.current = {
+        positions: { ...positions },
+        links: links.map(l => ({ ...l })),
+        node_labels: { ...nodeLabels },
+        node_roles: { ...nodeRoles },
+        hidden_node_ids: [...hiddenNodeIds],
+      };
       
       // Update local state with current timestamp
       const now = new Date().toISOString();
       setProjects(prev => prev.map(p => 
         p.id === project.id 
-          ? { ...p, topoPositions: positions, topoLinks: links, topoNodeLabels: nodeLabels, topoNodeRoles: nodeRoles, topoUpdatedAt: now }
+          ? { ...p, topoPositions: positions, topoLinks: links, topoNodeLabels: nodeLabels, topoNodeRoles: nodeRoles, topoHiddenNodes: hiddenNodeIds, topoUpdatedAt: now }
           : p
       ));
       
@@ -10549,62 +10639,55 @@ const TopologyGraph = ({ project, projectId, routeToHash, handleNavClick, onOpen
       alert("Topology layout saved successfully.");
     } catch (error) {
       console.error("Failed to save topology layout:", error);
-      alert(`Failed to save: ${error.message}`);
+      alert(`Failed to save: ${formatError(error)}`);
     }
   };
 
-  // Cancel edit
+  // Cancel edit — restore to last saved/loaded layout (so Cancel shows the saved topology, not a default)
   const handleCancel = () => {
-    // Reset positions
-    if (project.topoPositions) {
-      setPositions(project.topoPositions);
+    const saved = lastSavedLayoutRef.current;
+    if (saved) {
+      setPositions(saved.positions || {});
+      setLinks(saved.links || []);
+      if (saved.node_labels != null) setNodeLabels(saved.node_labels);
+      else {
+        const labels = {};
+        nodes.forEach(n => { labels[n.id] = n.label; });
+        setNodeLabels(labels);
+      }
+      if (saved.node_roles != null) setNodeRoles(saved.node_roles);
+      else {
+        const roles = {};
+        nodes.forEach(n => { roles[n.id] = n.role; });
+        setNodeRoles(roles);
+      }
+      setHiddenNodeIds(Array.isArray(saved.hidden_node_ids) ? saved.hidden_node_ids : []);
     } else {
-      const pos = {};
-      // Count nodes by role for better distribution
-      const roleCounts = {};
-      const roleIndices = {};
-      nodes.forEach(n => {
-        const role = (n.role || "default").toLowerCase();
-        roleCounts[role] = (roleCounts[role] || 0) + 1;
-      });
-      nodes.forEach(n => {
-        const role = (n.role || "default").toLowerCase();
-        roleIndices[role] = (roleIndices[role] || 0);
-        pos[n.id] = getDefaultPos(n.id, role, roleIndices[role], roleCounts);
-        roleIndices[role]++;
-      });
-      setPositions(pos);
+      // Fallback to project when no snapshot (e.g. API never loaded)
+      if (project.topoPositions && Object.keys(project.topoPositions).length > 0) {
+        setPositions(project.topoPositions);
+      } else {
+        const pos = {};
+        const roleCounts = {};
+        const roleIndices = {};
+        nodes.forEach(n => {
+          const role = (n.role || "default").toLowerCase();
+          roleCounts[role] = (roleCounts[role] || 0) + 1;
+        });
+        nodes.forEach(n => {
+          const role = (n.role || "default").toLowerCase();
+          roleIndices[role] = (roleIndices[role] || 0);
+          pos[n.id] = getDefaultPos(n.id, role, roleIndices[role], roleCounts);
+          roleIndices[role]++;
+        });
+        setPositions(pos);
+      }
+      setLinks(project.topoLinks && project.topoLinks.length > 0 ? project.topoLinks : deriveLinksFromProject(project));
+      setNodeLabels(project.topoNodeLabels || Object.fromEntries(nodes.map(n => [n.id, n.label])));
+      setNodeRoles(project.topoNodeRoles || Object.fromEntries(nodes.map(n => [n.id, n.role])));
+      setHiddenNodeIds(project.topoHiddenNodes || []);
     }
     
-    // Reset links
-    if (project.topoLinks) {
-      setLinks(project.topoLinks);
-    } else {
-      setLinks(deriveLinksFromProject(project));
-    }
-    
-    // Reset node labels and roles
-    if (project.topoNodeLabels) {
-      setNodeLabels(project.topoNodeLabels);
-    } else {
-      const labels = {};
-      nodes.forEach(n => {
-        labels[n.id] = n.label;
-      });
-      setNodeLabels(labels);
-    }
-    
-    if (project.topoNodeRoles) {
-      setNodeRoles(project.topoNodeRoles);
-    } else {
-      const roles = {};
-      nodes.forEach(n => {
-        roles[n.id] = n.role;
-      });
-      setNodeRoles(roles);
-    }
-    
-    // Reset all states
     setEditMode(false);
     setLinkStart(null);
     setSelectedNode(null);
@@ -10613,6 +10696,22 @@ const TopologyGraph = ({ project, projectId, routeToHash, handleNavClick, onOpen
     setReroutingLink(null);
     setZoom(1.0);
     setPan({ x: 0, y: 0 });
+    setShowRestoreNodeList(false);
+  };
+
+  // Remove node from topology (hide it and remove its links)
+  const handleRemoveNode = (nodeId) => {
+    setHiddenNodeIds(prev => [...prev, nodeId]);
+    setLinks(prev => prev.filter(l => l.a !== nodeId && l.b !== nodeId));
+    setSelectedNode(null);
+    setShowNodeDialog(false);
+    setEditingNode(null);
+  };
+
+  // Restore a hidden node to the topology
+  const handleRestoreNode = (nodeId) => {
+    setHiddenNodeIds(prev => prev.filter(id => id !== nodeId));
+    setShowRestoreNodeList(false);
   };
 
   const getPos = id => positions[id] || { x: 50, y: 50 };
@@ -10625,7 +10724,7 @@ const TopologyGraph = ({ project, projectId, routeToHash, handleNavClick, onOpen
     if (!dateStr) return null;
     try {
       const date = new Date(dateStr);
-      return date.toLocaleDateString('en-US', { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' });
+      return date.toLocaleDateString('en-US', { timeZone: 'Asia/Bangkok', month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' });
     } catch {
       return dateStr.split(' ')[0] || dateStr;
     }
@@ -10763,7 +10862,7 @@ const TopologyGraph = ({ project, projectId, routeToHash, handleNavClick, onOpen
         );
       })()}
       {editMode && (
-        <div className="mb-2 px-2 py-1 bg-gray-50 dark:bg-gray-800 rounded">
+        <div className="mb-2 px-2 py-1.5 bg-gray-50 dark:bg-gray-800 rounded">
           <div className="flex items-center gap-1.5 flex-wrap">
             <Button 
               variant={linkMode === "add" ? "primary" : "secondary"} 
@@ -10780,24 +10879,78 @@ const TopologyGraph = ({ project, projectId, routeToHash, handleNavClick, onOpen
                 setReroutingLink(null);
               }}
             >
-              {linkMode === "edit" ? "Cancel" : "Edit"}
+              {linkMode === "edit" ? "Cancel" : "Edit links"}
             </Button>
             {selectedLink !== null && linkMode === "edit" && (
-              <Button 
-                variant={reroutingLink === selectedLink ? "primary" : "secondary"} 
+              <>
+                <Button 
+                  variant="danger"
+                  className="text-[10px] px-2 py-0.5 h-6"
+                  onClick={() => {
+                    handleLinkDelete(selectedLink, { preventDefault: () => {}, stopPropagation: () => {} });
+                    setShowLinkDialog(false);
+                    setSelectedLink(null);
+                  }}
+                >
+                  Delete link
+                </Button>
+                <Button 
+                  variant={reroutingLink === selectedLink ? "primary" : "secondary"} 
+                  className="text-[10px] px-2 py-0.5 h-6"
+                  onClick={() => {
+                    if (reroutingLink === selectedLink) {
+                      setReroutingLink(null);
+                    } else {
+                      startRerouteLink(selectedLink);
+                    }
+                  }}
+                >
+                  {reroutingLink === selectedLink ? "Cancel" : "Reroute"}
+                </Button>
+              </>
+            )}
+            {selectedNode !== null && linkMode === "none" && (
+              <Button
+                variant="danger"
                 className="text-[10px] px-2 py-0.5 h-6"
                 onClick={() => {
-                  if (reroutingLink === selectedLink) {
-                    setReroutingLink(null);
-                  } else {
-                    startRerouteLink(selectedLink);
+                  if (confirm(`Remove "${getNodeName(selectedNode)}" from topology? Its links will be deleted.`)) {
+                    handleRemoveNode(selectedNode);
                   }
                 }}
               >
-                {reroutingLink === selectedLink ? "Cancel" : "Reroute"}
+                Remove node
               </Button>
             )}
+            {hiddenNodeIds.length > 0 && (
+              <div className="relative">
+                <Button
+                  variant="secondary"
+                  className="text-[10px] px-2 py-0.5 h-6"
+                  onClick={() => setShowRestoreNodeList(prev => !prev)}
+                >
+                  Add node
+                </Button>
+                {showRestoreNodeList && (
+                  <div className="absolute left-0 top-full mt-1 z-50 py-1 bg-white dark:bg-gray-800 border border-slate-200 dark:border-slate-600 rounded-lg shadow-lg min-w-[140px] max-h-48 overflow-y-auto">
+                    {hiddenNodeIds.map(id => (
+                      <button
+                        key={id}
+                        type="button"
+                        className="w-full text-left px-3 py-1.5 text-xs hover:bg-slate-100 dark:hover:bg-slate-700 text-slate-800 dark:text-slate-200"
+                        onClick={() => handleRestoreNode(id)}
+                      >
+                        {getNodeName(id)}
+                      </button>
+                    ))}
+                  </div>
+                )}
+              </div>
+            )}
           </div>
+          <p className="text-[10px] text-slate-600 dark:text-slate-400 mt-1.5">
+            Node: double-click to edit name/role; select then &quot;Remove node&quot; to hide • Link: click to select, then Delete/Reroute or right-click to delete • Add Link: click two nodes • Add node: show hidden nodes
+          </p>
         </div>
       )}
       <div className="relative h-[calc(100vh-380px)] min-h-[450px] rounded-xl bg-slate-100 dark:bg-[#0B1220] overflow-hidden">
@@ -10832,6 +10985,7 @@ const TopologyGraph = ({ project, projectId, routeToHash, handleNavClick, onOpen
           />
           {/* edges */}
           {links.map((e, i) => {
+            if (hiddenNodeIds.includes(e.a) || hiddenNodeIds.includes(e.b)) return null;
             const A = getPos(e.a), B = getPos(e.b);
             const isSelected = selectedLink === i;
             const isRerouting = reroutingLink === i;
@@ -10880,6 +11034,7 @@ const TopologyGraph = ({ project, projectId, routeToHash, handleNavClick, onOpen
           })}
           {/* nodes */}
           {nodes.map((n) => {
+            if (hiddenNodeIds.includes(n.id)) return null;
             const p = getPos(n.id);
             const isSelected = selectedNode === n.id;
             const isLinkStart = linkStart === n.id;
@@ -10973,7 +11128,7 @@ const TopologyGraph = ({ project, projectId, routeToHash, handleNavClick, onOpen
                 </span>
               </div>
               <div>
-                <span className="text-sm text-gray-600 dark:text-gray-400">ไปยัง:</span>
+                <span className="text-sm text-gray-600 dark:text-gray-400">To:</span>
                 <span className="ml-2 font-medium text-gray-900 dark:text-gray-100">
                   {getNodeName(links[selectedLink].b)}
                 </span>
@@ -11054,16 +11209,30 @@ const TopologyGraph = ({ project, projectId, routeToHash, handleNavClick, onOpen
                 />
               </Field>
             </div>
-            <div className="flex gap-2 mt-6 justify-end">
-              <Button variant="secondary" onClick={() => {
-                setShowNodeDialog(false);
-                setEditingNode(null);
-              }}>
-                Close
+            <div className="flex gap-2 mt-6 justify-between">
+              <Button
+                variant="danger"
+                onClick={() => {
+                  if (confirm(`Remove "${getNodeName(editingNode)}" from topology? Its links will be deleted.`)) {
+                    handleRemoveNode(editingNode);
+                    setShowNodeDialog(false);
+                    setEditingNode(null);
+                  }
+                }}
+              >
+                Remove from topology
               </Button>
-              <Button variant="primary" onClick={handleSaveNode}>
-                Save
-              </Button>
+              <div className="flex gap-2">
+                <Button variant="secondary" onClick={() => {
+                  setShowNodeDialog(false);
+                  setEditingNode(null);
+                }}>
+                  Close
+                </Button>
+                <Button variant="success" onClick={handleSaveNode}>
+                  Save
+                </Button>
+              </div>
             </div>
           </div>
         </div>

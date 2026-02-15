@@ -20,7 +20,7 @@ export default function Login({ onLogin }) {
     try {
       await onLogin(username.trim(), password);
     } catch (e) {
-      let errorMsg = e.message || "Login failed";
+      let errorMsg = formatError(e) || "Login failed";
       if (errorMsg.includes("Cannot connect")) {
         errorMsg = "Cannot connect to server. Please check if the backend is running.";
       } else if (errorMsg.includes("401") || errorMsg.includes("Invalid")) {

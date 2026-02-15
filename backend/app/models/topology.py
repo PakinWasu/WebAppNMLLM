@@ -7,3 +7,4 @@ class TopologyLayoutUpdate(BaseModel):
     links: List[Dict[str, Any]]  # List of link objects with a, b, type, label, etc.
     node_labels: Optional[Dict[str, str]] = None  # {node_id: label}
     node_roles: Optional[Dict[str, str]] = None  # {node_id: role}
+    hidden_node_ids: Optional[List[str]] = None  # Node IDs hidden from topology view

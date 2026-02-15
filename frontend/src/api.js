@@ -17,6 +17,32 @@ export function clearToken() {
 
 const DEFAULT_TIMEOUT_MS = 60000; // 60s so slow LLM backend doesn't hang the app forever
 
+/**
+ * Convert FastAPI-style error detail to a single string for display.
+ * Prevents [object Object] when detail is an object or array of { msg }.
+ * @param {unknown} detail - detail from response (string | array of { msg? } | object)
+ * @returns {string|null} - message string or null if not extractable
+ */
+function detailToMessage(detail) {
+  if (detail == null) return null;
+  if (typeof detail === 'string') return detail;
+  if (Array.isArray(detail) && detail.length) {
+    const parts = detail.map((e) => (e && typeof e.msg === 'string' ? e.msg : (e && typeof e === 'object' ? JSON.stringify(e) : String(e))));
+    return parts.join('. ');
+  }
+  if (typeof detail === 'object' && detail !== null && typeof detail.message === 'string') return detail.message;
+  if (typeof detail === 'object' && detail !== null) return JSON.stringify(detail);
+  return String(detail);
+}
+
+/** Ensure we never pass non-string to new Error (avoids [object Object]). */
+function toErrorMessage(msg, fallback) {
+  if (typeof msg === 'string' && msg && msg !== '[object Object]') return msg;
+  const fromDetail = detailToMessage(msg);
+  if (typeof fromDetail === 'string' && fromDetail) return fromDetail;
+  return fallback;
+}
+
 export async function api(endpoint, options = {}) {
  const token = getToken();
  const headers = {
@@ -42,7 +68,8 @@ export async function api(endpoint, options = {}) {
 
   if (!response.ok) {
    const error = await response.json().catch(() => ({ detail: 'Request failed' }));
-   throw new Error(error.detail || `Request failed with status ${response.status}`);
+   const msg = toErrorMessage(error.detail, `Request failed with status ${response.status}`);
+   throw new Error(msg);
   }
 
   return response.json();
@@ -234,11 +261,10 @@ export async function uploadDocuments(projectId, files, metadata, folderId) {
   } catch {
    errorData = { detail: `Upload failed with status ${response.status}` };
   }
-  // Handle different error formats
-  const errorMessage = errorData.detail || errorData.message || errorData.error || `Upload failed with status ${response.status}`;
-  throw new Error(errorMessage);
+  const msg = toErrorMessage(errorData.detail, null) || toErrorMessage(errorData.message, null) || toErrorMessage(errorData.error, null) || `Upload failed with status ${response.status}`;
+  throw new Error(msg);
  }
- 
+
  return response.json();
 }
 
@@ -310,7 +336,8 @@ export async function getDocumentContentText(projectId, documentId, version = nu
  });
  if (!response.ok) {
   const err = await response.json().catch(() => ({ detail: 'Failed to load content' }));
-  throw new Error(err.detail || `Failed with status ${response.status}`);
+  const msg = toErrorMessage(err.detail, `Failed with status ${response.status}`);
+  throw new Error(msg);
  }
  return response.text();
 }
@@ -333,10 +360,10 @@ export async function moveDocumentFolder(projectId, documentId, folderId) {
   } catch {
    errorData = { detail: `Move failed with status ${response.status}` };
   }
-  const errorMessage = errorData.detail || errorData.message || errorData.error || `Move failed with status ${response.status}`;
-  throw new Error(errorMessage);
+  const msg = toErrorMessage(errorData.detail, null) || toErrorMessage(errorData.message, null) || toErrorMessage(errorData.error, null) || `Move failed with status ${response.status}`;
+  throw new Error(msg);
  }
- 
+
  return response.json();
 }
 
@@ -414,9 +441,10 @@ export async function uploadDeviceImage(projectId, deviceName, file) {
   
   if (!response.ok) {
     const errorData = await response.json().catch(() => ({ detail: `Upload failed with status ${response.status}` }));
-    throw new Error(errorData.detail || errorData.message || `Upload failed with status ${response.status}`);
+    const msg = toErrorMessage(errorData.detail, null) || toErrorMessage(errorData.message, null) || `Upload failed with status ${response.status}`;
+    throw new Error(msg);
   }
-  
+
   return response.json();
 }
 
@@ -628,14 +656,15 @@ export async function getTopology(projectId) {
   return api(`/projects/${projectId}/topology`);
 }
 
-export async function saveTopologyLayout(projectId, positions, links, nodeLabels = null, nodeRoles = null) {
+export async function saveTopologyLayout(projectId, positions, links, nodeLabels = null, nodeRoles = null, hiddenNodeIds = null) {
   return api(`/projects/${projectId}/topology/layout`, {
     method: 'PUT',
     body: JSON.stringify({
       positions,
       links,
       node_labels: nodeLabels,
-      node_roles: nodeRoles
+      node_roles: nodeRoles,
+      hidden_node_ids: hiddenNodeIds
     }),
   });
 }

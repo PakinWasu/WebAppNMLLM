@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from "react";
 import * as api from "../api";
 import { Card, Field, Input, PasswordInput, Button, Table } from "../components/ui";
-import { safeDisplay, formatDateTime } from "../utils/format";
+import { formatError, formatDateTime, safeDisplay } from "../utils/format";
 
 function PasswordDisplayCell({ tempPassword }) {
   const [showPassword, setShowPassword] = useState(false);
@@ -156,25 +156,24 @@ export default function UserAdminPage({
       setPhoneNumber("");
       setTempPwd("");
     } catch (e) {
-      setError(e.message || "Failed to create user");
+      setError(formatError(e) || "Failed to create user");
     } finally {
       setLoading(false);
     }
   };
 
   return (
-    <div className="grid gap-6">
-      <div className="flex items-center justify-between">
-        <h2 className="text-xl font-semibold">User Administration</h2>
-        <a
-          href={indexHref}
-          onClick={(e) => handleNavClick(e, onClose)}
-          className="inline-flex items-center justify-center rounded-lg px-3 py-1.5 text-xs font-medium shadow-sm transition focus:outline-none focus:ring-2 focus:ring-offset-2 bg-white text-gray-900 ring-1 ring-gray-300 hover:bg-gray-50 focus:ring-blue-500 dark:bg-gray-800 dark:text-gray-100 dark:ring-gray-600 dark:hover:bg-gray-700"
-        >
-          ← Back to Index
-        </a>
+    <div className="h-full flex flex-col min-h-0 overflow-y-auto">
+      <div className="sticky top-0 z-10 flex-shrink-0 flex items-center justify-between py-3 px-1 mb-4 bg-slate-50 dark:bg-slate-950 border-b border-slate-200 dark:border-slate-800 shadow-sm dark:shadow-none">
+        <h2 className="text-xl font-semibold text-gray-900 dark:text-gray-100">User Administration</h2>
+        <div className="flex items-center gap-2 flex-wrap justify-end">
+          <Button variant="secondary" onClick={(e) => handleNavClick && handleNavClick(e, onClose)}>
+            ← Back to Index
+          </Button>
+        </div>
       </div>
-      <Card title="Create Account">
+      <div className="flex-1 min-h-0 space-y-6">
+      <Card title="Create Account" className="flex-shrink-0">
         <div className="grid gap-4">
           <div className="grid gap-3 md:grid-cols-2">
             <Field label="Username">
@@ -217,7 +216,7 @@ export default function UserAdminPage({
         </div>
         {error && (
           <div className="mt-3 text-sm text-rose-500 dark:text-rose-400 bg-rose-50 dark:bg-rose-900/20 border border-rose-200 dark:border-rose-800 rounded-lg px-3 py-2">
-            {safeDisplay(error)}
+            {formatError(error)}
           </div>
         )}
         <div className="mt-4 flex gap-2">
@@ -229,7 +228,7 @@ export default function UserAdminPage({
           </Button>
         </div>
       </Card>
-      <Card title="Existing Users">
+      <Card title="Existing Users" className="flex-shrink-0">
         <Table
           columns={[
             {
@@ -291,7 +290,7 @@ export default function UserAdminPage({
                         setUsers(updated);
                         alert(`User "${row.username}" deleted successfully`);
                       } catch (e) {
-                        alert("Failed to delete user: " + e.message);
+                        alert("Failed to delete user: " + formatError(e));
                       }
                     }}
                   />
@@ -306,6 +305,7 @@ export default function UserAdminPage({
           empty="No users yet"
         />
       </Card>
+      </div>
     </div>
   );
 }

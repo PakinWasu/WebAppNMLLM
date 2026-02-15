@@ -40,17 +40,26 @@ class CiscoIOSParser(BaseParser):
         return sum(1 for p in indicators if re.search(p, content, re.IGNORECASE)) >= 2
     
     def parse(self, content: str, filename: str) -> Dict[str, Any]:
-        """Return exact spec structure (2.3.2.1-2.3.2.9)."""
+        """Return exact spec structure (2.3.2.1-2.3.2.9). On any extract failure, return partial result so device at least has hostname for topology."""
+        def _safe(fn, default=None):
+            try:
+                return fn()
+            except Exception:
+                return default
+        overview = _safe(lambda: self.extract_device_overview(content), {})
+        interfaces = _safe(lambda: self.extract_interfaces(content), [])
+        vlans = _safe(lambda: self.extract_vlans(content), {})
+        vlan_list = vlans.get("vlan_list", []) if isinstance(vlans, dict) else []
         return {
-            "device_overview": self.extract_device_overview(content),
-            "interfaces": self.extract_interfaces(content),
-            "vlans": self.extract_vlans(content).get("vlan_list", []),
-            "routing": self.extract_routing(content),
-            "arp_mac_table": self.extract_mac_arp(content),
-            "neighbors": self.extract_neighbors(content),
-            "stp": self.extract_stp(content),
-            "security_mgmt": self.extract_security(content),
-            "ha": self.extract_ha(content),
+            "device_overview": overview or {},
+            "interfaces": interfaces or [],
+            "vlans": vlan_list,
+            "routing": _safe(lambda: self.extract_routing(content), {"routes": []}),
+            "arp_mac_table": _safe(lambda: self.extract_mac_arp(content), {}),
+            "neighbors": _safe(lambda: self.extract_neighbors(content), []),
+            "stp": _safe(lambda: self.extract_stp(content), {}),
+            "security_mgmt": _safe(lambda: self.extract_security(content), {}),
+            "ha": _safe(lambda: self.extract_ha(content), {}),
         }
     
     def extract_device_overview(self, content: str) -> Dict[str, Any]:

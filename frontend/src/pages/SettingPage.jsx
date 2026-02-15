@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useMemo } from "react";
 import * as api from "../api";
 import { fileToDataURL } from "../utils/file";
-import { safeDisplay } from "../utils/format";
+import { safeDisplay, formatError } from "../utils/format";
 import { Card, Button, Field, Input, Select, Table } from "../components/ui";
 
 export default function SettingPage({ project, setProjects, authedUser, goIndex }) {
@@ -119,7 +119,7 @@ export default function SettingPage({ project, setProjects, authedUser, goIndex 
       };
       img.src = data;
     } catch (e) {
-      setError("Failed to process image: " + (e.message || "Unknown error"));
+      setError("Failed to process image: " + formatError(e));
     }
   };
 
@@ -169,7 +169,7 @@ export default function SettingPage({ project, setProjects, authedUser, goIndex 
       );
       alert("✅ Project saved successfully");
     } catch (e) {
-      setError("Failed to save: " + e.message);
+      setError("Failed to save: " + formatError(e));
     }
   };
 
@@ -184,13 +184,7 @@ export default function SettingPage({ project, setProjects, authedUser, goIndex 
       setMembers(members.map((m) => (m.username === username ? { ...m, role } : m)));
       setError("");
     } catch (e) {
-      const errorMessage =
-        e && typeof e === "object"
-          ? e.message || e.detail || (typeof e.detail !== "string" ? JSON.stringify(e) : e.detail)
-          : typeof e === "string"
-            ? e
-            : "Failed to update role";
-      setError("Failed to update role: " + errorMessage);
+      setError("Failed to update role: " + formatError(e));
     }
   };
 
@@ -220,7 +214,7 @@ export default function SettingPage({ project, setProjects, authedUser, goIndex 
       alert("✅ Project deleted successfully");
       goIndex();
     } catch (e) {
-      setError("Failed to delete project: " + e.message);
+      setError("Failed to delete project: " + formatError(e));
     }
   };
 
@@ -269,16 +263,31 @@ export default function SettingPage({ project, setProjects, authedUser, goIndex 
                 ]}
               />
             </Field>
-            <Field label="Visibility">
-              <Select
-                value={visibility}
-                onChange={setVisibility}
-                options={[
-                  { value: "Private", label: "Private" },
-                  { value: "Shared", label: "Shared" },
-                ]}
-              />
-            </Field>
+            <div>
+              <Field
+                label={
+                  <span className="inline-flex items-center gap-1.5">
+                    Visibility
+                    <span
+                      title="Private: only members see this project. Shared: everyone can see it in the list, but only members can open and view content."
+                      className="inline-flex items-center justify-center w-4 h-4 rounded-full bg-slate-200 dark:bg-slate-600 text-slate-600 dark:text-slate-300 text-xs font-bold cursor-help"
+                      aria-label="Visibility info"
+                    >
+                      i
+                    </span>
+                  </span>
+                }
+              >
+                <Select
+                  value={visibility}
+                  onChange={setVisibility}
+                  options={[
+                    { value: "Private", label: "Private" },
+                    { value: "Shared", label: "Shared" },
+                  ]}
+                />
+              </Field>
+            </div>
           </div>
 
           {/* Row 2: Description */}
@@ -374,7 +383,7 @@ export default function SettingPage({ project, setProjects, authedUser, goIndex 
                     setNewMemberRole("viewer");
                     setError("");
                   } catch (e) {
-                    setError("Failed to add member: " + e.message);
+                    setError("Failed to add member: " + formatError(e));
                   }
                 }}
                 disabled={!newMemberUsername}

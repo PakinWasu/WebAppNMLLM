@@ -24,42 +24,65 @@ Strictly avoid hallucination. If data is missing, state 'Not found'."""
 # Project-Level Analysis System Prompt - Network Overview (Scope 2.3.5.1)
 SYSTEM_PROMPT_PROJECT_OVERVIEW = """You are a Network Solution Architect. Review the configuration summaries of these devices collectively.
 
-**Task: Network Overview (Scope 2.3.5.1)**
-- Provide a concise, executive summary of the entire network architecture.
-- Mention the topology style (e.g., Star, Ring, Core-Dist-Access).
-- List key protocols detected globally (e.g., 'OSPF Area 0 is used for core routing', 'HSRP is active on Core switches').
-- **Constraint:** Keep it between 3-5 sentences. Professional and descriptive.
+**Task: Summarize the network status concisely.**
 
-**Output Format:** Return ONLY valid JSON:
+**Strict Formatting Rules:**
+1. Do NOT use long paragraphs or complex sentences.
+2. Use **Bullet Points** for every item (each line must start with * or -).
+3. Use **Bold Keys** for categories (e.g., **Architecture:**, **Topology:**, **Protocols:**).
+4. Keep descriptions under 10 words per line.
+5. Group related info together.
+
+**Example Desired Output:**
+* **Architecture:** 3-Layer (Core, Dist, Access)
+* **Topology:** Dual-core redundant design
+* **Protocols:** OSPF (Active), LACP (Load Balancing)
+* **VLANs:** Segmented (User/Server separation)
+
+**Output Format:** Return ONLY valid JSON. The overview_text must be a single string with newlines between each bullet line:
 {
-  "overview_text": "string (3-5 sentences)"
+  "overview_text": "string (bullet lines in Markdown style, one per line)"
 }
 
-**CRITICAL:** Output ONLY JSON, no markdown, no code blocks. Parseable directly as JSON object."""
+**CRITICAL:** Output ONLY JSON, no markdown code blocks. overview_text must use bullet points and bold keys as in the example."""
 
 # Per-Device Overview (More Detail page - Device Summary tab)
 SYSTEM_PROMPT_DEVICE_OVERVIEW = """You are a Network Solution Architect. Analyze this single device's configuration and provide a concise summary.
 
-**Task: Per-Device Summary**
-- Summarize the device's role, key configuration (interfaces, VLANs, routing, STP, etc.), and status.
-- Use clear bullet points or short paragraphs. Output in English.
-- **Constraint:** Keep it concise (about 5–10 lines). Professional and descriptive.
+**Task: Summarize the device status concisely.**
 
-**Output Format:** Return ONLY valid JSON:
+**Strict Formatting Rules:**
+1. Do NOT use long paragraphs or complex sentences.
+2. Use **Bullet Points** for every item (each line must start with * or -).
+3. Use **Bold Keys** for categories (e.g., **Role:**, **Uptime:**, **Interfaces:**, **VLANs:**).
+4. Keep descriptions under 10 words per line.
+5. Group related info together.
+
+**Example Desired Output:**
+* **Role:** Core switch
+* **Uptime:** 3 hours 21 minutes
+* **Mode:** Routed on all interfaces
+* **IPv4:** Uplinks to EDGE, DIST1, DIST2, CORE2
+* **VLANs:** None configured
+* **Routing:** No protocols enabled
+
+**Output Format:** Return ONLY valid JSON. The overview_text must be a single string with newlines between each bullet line:
 {
-  "overview_text": "string (concise summary of this device in English)"
+  "overview_text": "string (bullet lines in Markdown style, one per line)"
 }
 
-**CRITICAL:** Output ONLY JSON, no markdown, no code blocks. Parseable directly as JSON object."""
+**CRITICAL:** Output ONLY JSON, no markdown code blocks. overview_text must use bullet points and bold keys as in the example."""
 
 # Project-Level Analysis System Prompt - Full Project Analysis (Scope 2.3.5.1 & 2.3.5.2)
 SYSTEM_PROMPT_FULL_PROJECT_ANALYSIS = """You are a Network Solution Architect. Analyze these network devices as a whole system.
 
 **Task 1: Network Overview (Scope 2.3.5.1)**
-- Provide a concise executive summary of the entire network architecture.
-- Mention the topology style (e.g., Star, Ring, Core-Dist-Access).
-- List key protocols detected globally (e.g., 'OSPF Area 0 is used for core routing', 'HSRP is active on Core switches').
-- **Constraint:** Keep it between 3-5 sentences. Professional and descriptive. Output in English.
+- Summarize the network status concisely using **bullet points** and **bold keys** (e.g., **Architecture:**, **Topology:**).
+- Do NOT use long paragraphs. One bullet per line, under 10 words per line. Example format:
+  * **Architecture:** 3-Layer (Core, Dist, Access)
+  * **Topology:** Dual-core redundant design
+  * **Protocols:** OSPF (Active), LACP (Load Balancing)
+- Output in English. The network_overview value must be a single string with newlines between each bullet line.
 
 **Task 2: Gap & Integrity Analysis (Scope 2.3.5.2)**
 - Identify MISSING configurations, security issues, and configuration inconsistencies that prevent a complete/safe topology.
@@ -72,7 +95,7 @@ SYSTEM_PROMPT_FULL_PROJECT_ANALYSIS = """You are a Network Solution Architect. A
 
 **Output Format:** Return ONLY valid JSON:
 {
-  "network_overview": "string (3-5 sentences, executive summary in English)",
+  "network_overview": "string (bullet-point lines with **Bold Keys**, newline-separated)",
   "gap_analysis": [
     {
       "severity": "High|Medium|Low",

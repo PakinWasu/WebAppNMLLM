@@ -10,9 +10,10 @@ export default function Header({
   onLogout,
   routeToHash,
   handleNavClick,
+  pageTitle = "",
 }) {
   return (
-    <div className="flex items-center justify-between gap-4 w-full flex-wrap sm:flex-nowrap">
+    <div className="flex items-center gap-4 w-full flex-wrap sm:flex-nowrap min-h-10">
       <a
         href={routeToHash ? routeToHash(authedUser ? { name: "index" } : { name: "login" }) : "#/"}
         onClick={(e) => {
@@ -20,13 +21,22 @@ export default function Header({
           if (authedUser) setRoute({ name: "index" });
           else setRoute({ name: "login" });
         }}
-        className="flex items-center gap-3 hover:opacity-85 transition-opacity cursor-pointer min-w-0"
+        className="flex items-center gap-3 hover:opacity-85 transition-opacity cursor-pointer min-w-0 flex-shrink-0"
       >
         <div className="h-8 w-8 sm:h-9 sm:w-9 rounded-xl bg-white/90 dark:bg-white/10 backdrop-blur-sm border border-slate-300/80 dark:border-slate-600/80 flex-shrink-0 shadow-sm" />
         <span className="text-base sm:text-lg font-semibold text-slate-800 dark:text-slate-100 truncate">
           Network Project Platform
         </span>
       </a>
+      {pageTitle ? (
+        <div className="flex-1 min-w-0 flex justify-center hidden sm:block">
+          <span className="text-sm font-medium text-slate-600 dark:text-slate-400 truncate">
+            {pageTitle}
+          </span>
+        </div>
+      ) : (
+        <div className="flex-1 min-w-0 hidden sm:block" aria-hidden="true" />
+      )}
       <div className="flex items-center gap-2 flex-shrink-0">
         <Button
           variant="ghost"

@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from "react";
 import * as api from "../api";
 import { Card, Button, Field, Input, PasswordInput } from "../components/ui";
-import { safeDisplay } from "../utils/format";
+import { safeDisplay, formatError } from "../utils/format";
 
 export default function ChangePassword({
   initialUsername = "",
@@ -84,7 +84,7 @@ export default function ChangePassword({
       setMsg("✅ " + (done.length ? done.join(". ") : "Saved") + (isLoggedIn ? "" : " You can sign in now."));
       setTimeout(() => goBack(), 2000);
     } catch (e) {
-      let errorMsg = e.message || "Failed to save.";
+      let errorMsg = formatError(e) || "Failed to save.";
       if (errorMsg.includes("401") || errorMsg.includes("Unauthorized")) {
         errorMsg = "Session expired. Please login again.";
       } else if (errorMsg.includes("400") || errorMsg.includes("Wrong")) {

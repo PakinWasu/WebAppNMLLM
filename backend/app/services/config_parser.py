@@ -99,7 +99,10 @@ def normalize_cisco_to_legacy(parsed: Dict[str, Any]) -> Dict[str, Any]:
     vrrp = []
     ha = {"port_channels": port_channels, "hsrp": hsrp, "vrrp": vrrp}
 
+    # Ensure device_name is set (Cisco stores hostname in device_overview only; topology/summary expect top-level device_name)
+    device_name = (overview.get("hostname") or "").strip() if isinstance(overview.get("hostname"), str) else None
     return {
+        "device_name": device_name,
         "device_overview": overview,
         "interfaces": interfaces,
         "vlans": vlans,
@@ -141,7 +144,25 @@ class ConfigParser:
                     return parsed_data
                 except Exception as e:
                     print(f"Error parsing config with {type(parser).__name__}: {e}")
-                    return None
+                    # Return minimal legacy shape so we can still store device_name (e.g. for topology)
+                    try:
+                        device_name = self.extract_device_name(content, filename)
+                        overview = {"hostname": device_name} if device_name else {}
+                        return {
+                            "device_name": device_name or None,
+                            "device_overview": overview,
+                            "interfaces": [],
+                            "vlans": {"vlan_list": [], "vlan_names": {}, "vlan_status": {}, "total_vlan_count": 0},
+                            "stp": {"stp_mode": None, "root_bridges": [], "mode": None},
+                            "routing": {"static": [], "ospf": {}, "eigrp": {}, "bgp": {}, "rip": {}},
+                            "neighbors": [],
+                            "mac_arp": {"mac_table": [], "arp_table": []},
+                            "security": {},
+                            "ha": {"port_channels": [], "hsrp": [], "vrrp": []},
+                            "vendor": self._get_vendor_name(parser),
+                        }
+                    except Exception:
+                        return None
         return None
     
     def extract_device_name(self, content: str, filename: str) -> str:

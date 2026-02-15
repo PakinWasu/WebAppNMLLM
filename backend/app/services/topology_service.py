@@ -29,6 +29,29 @@ def _topology_use_llm() -> bool:
     return v in ("true", "1", "yes")
 
 
+def _resolve_neighbor_name_to_device(neighbor_name: Any, known_device_names: set) -> Optional[str]:
+    """
+    Resolve a neighbor identifier (e.g. FQDN like DIST1.lab.local from CDP/LLDP)
+    to the canonical device name used in the project (e.g. DIST1).
+    Uses hostname (first label before dot) and case-insensitive match; no hardcoded domains.
+    """
+    if neighbor_name is None or not known_device_names:
+        return None
+    s = str(neighbor_name).strip()
+    if not s:
+        return None
+    if s in known_device_names:
+        return s
+    hostname = s.split(".")[0].strip() if "." in s else s
+    if hostname in known_device_names:
+        return hostname
+    hostname_lower = hostname.lower()
+    for d in known_device_names:
+        if d.lower() == hostname_lower:
+            return d
+    return None
+
+
 class TopologyService:
     """Service for generating network topology using LLM analysis"""
 
@@ -108,28 +131,23 @@ Project: {project_id} ({device_count} devices)"""
             if not device_name:
                 continue
             
-            overview = device.get("device_overview", {})
-            neighbors = device.get("neighbors", [])
+            overview = device.get("device_overview", {}) or {}
+            neighbors = device.get("neighbors", []) or []
             
             # Filter only CDP/LLDP neighbors (exclude routing protocol neighbors)
             cdp_lldp_neighbors = []
             for neighbor in neighbors:
-                # Only include neighbors that have local_port/remote_port (CDP/LLDP indicators)
-                # Exclude routing protocol neighbors (OSPF/BGP/EIGRP)
+                if not isinstance(neighbor, dict):
+                    continue
                 if neighbor.get("local_port") or neighbor.get("remote_port") or \
                    neighbor.get("local_interface") or neighbor.get("remote_interface"):
                     cdp_lldp_neighbors.append(neighbor)
             
-            # Skip devices with no CDP/LLDP neighbors (they won't contribute to topology)
-            if not cdp_lldp_neighbors:
-                continue
-            
-            # Prepare minimal device info - ONLY CDP/LLDP neighbors for topology
+            # Include every device (even with no neighbors) so LLM/rule-based can create nodes; edges from neighbors only
             device_info = {
                 "device_id": device_name,
-                "hostname": overview.get("hostname", device_name),
-                # Send ONLY CDP/LLDP neighbors - NO VLAN, NO interface, NO routing data
-                "neighbors": cdp_lldp_neighbors
+                "hostname": (overview.get("hostname") or device_name) if isinstance(overview, dict) else device_name,
+                "neighbors": cdp_lldp_neighbors,
             }
             topology_data["devices"].append(device_info)
         
@@ -163,6 +181,120 @@ Project: {project_id} ({device_count} devices)"""
         
         return "".join(prompt_parts)
     
+    async def _get_devices_data(self, project_id: str) -> List[Dict[str, Any]]:
+        """
+        Load device data for topology from parsed_configs; if empty, fallback to
+        documents collection (Config folder, parsed_config metadata) so that configs
+        uploaded to Config folder are used even when parsed_configs write failed.
+        """
+        project_id = (project_id or "").strip()
+        devices_data = []
+        device_names = set()
+
+        # 1) Try parsed_configs collection first
+        try:
+            cursor = db()["parsed_configs"].find(
+                {"project_id": project_id},
+                sort=[("device_name", 1), ("upload_timestamp", -1)]
+            )
+            async for device_doc in cursor:
+                device_doc.pop("_id", None)
+                device_name = device_doc.get("device_name")
+                if not device_name or device_name in device_names:
+                    continue
+                device_names.add(device_name)
+                devices_data.append({
+                    "device_name": device_name,
+                    "device_overview": device_doc.get("device_overview", {}),
+                    "interfaces": device_doc.get("interfaces", []),
+                    "neighbors": device_doc.get("neighbors", []),
+                    "routing": device_doc.get("routing", {}),
+                })
+        except Exception as e:
+            print(f"[Topology] parsed_configs read failed: {e}")
+
+        # 2) Fallback: documents with parsed_config (same condition as Summary API)
+        # Do not filter by folder_id - in DB configs may be Config, null, or missing
+        if not devices_data:
+            try:
+                cursor = db()["documents"].find(
+                    {
+                        "project_id": project_id,
+                        "is_latest": True,
+                        "parsed_config": {"$exists": True},
+                    },
+                    sort=[("created_at", -1)],
+                    projection={"parsed_config": 1, "filename": 1},
+                )
+                async for doc in cursor:
+                    pc = doc.get("parsed_config") or {}
+                    device_name = pc.get("device_name") if isinstance(pc.get("device_name"), str) else None
+                    if not device_name and isinstance(pc.get("device_overview"), dict):
+                        device_name = pc.get("device_overview").get("hostname")
+                    device_name = (device_name or "").strip() if isinstance(device_name, str) else None
+                    if not device_name and doc.get("filename"):
+                        device_name = (os.path.splitext(doc["filename"])[0] or "").strip()
+                    if not device_name or device_name in device_names:
+                        continue
+                    device_names.add(device_name)
+                    devices_data.append({
+                        "device_name": device_name,
+                        "device_overview": pc.get("device_overview") if isinstance(pc.get("device_overview"), dict) else {},
+                        "interfaces": pc.get("interfaces") if isinstance(pc.get("interfaces"), list) else [],
+                        "neighbors": pc.get("neighbors") if isinstance(pc.get("neighbors"), list) else [],
+                        "routing": pc.get("routing") if isinstance(pc.get("routing"), dict) else {},
+                    })
+                if devices_data:
+                    print(f"[Topology] Using {len(devices_data)} devices from documents.parsed_config fallback")
+            except Exception as e:
+                print(f"[Topology] documents fallback failed: {e}")
+
+        # 3) Last resort: Config folder docs without parsed_config (e.g. old uploads or parse never ran)
+        # Use filename (stem) as device_name so topology at least shows nodes
+        if not devices_data:
+            try:
+                cursor = db()["documents"].find(
+                    {
+                        "project_id": project_id,
+                        "is_latest": True,
+                        "folder_id": "Config",
+                    },
+                    sort=[("created_at", -1)],
+                    projection={"filename": 1},
+                )
+                async for doc in cursor:
+                    fn = doc.get("filename")
+                    device_name = (os.path.splitext(fn)[0] or "").strip() if isinstance(fn, str) else None
+                    if not device_name or device_name in device_names:
+                        continue
+                    device_names.add(device_name)
+                    devices_data.append({
+                        "device_name": device_name,
+                        "device_overview": {"hostname": device_name},
+                        "interfaces": [],
+                        "neighbors": [],
+                        "routing": {},
+                    })
+                if devices_data:
+                    print(f"[Topology] Using {len(devices_data)} devices from Config folder filenames (no parsed_config)")
+            except Exception as e:
+                print(f"[Topology] Config-folder fallback failed: {e}")
+
+        # If still empty, log DB counts to help debug (e.g. testCisco)
+        if not devices_data:
+            try:
+                n_parsed = await db()["parsed_configs"].count_documents({"project_id": project_id})
+                n_docs = await db()["documents"].count_documents({
+                    "project_id": project_id,
+                    "is_latest": True,
+                    "parsed_config": {"$exists": True},
+                })
+                print(f"[Topology] No devices for project_id={project_id!r}: parsed_configs={n_parsed}, documents(with parsed_config)={n_docs}")
+            except Exception as e:
+                print(f"[Topology] Debug count failed: {e}")
+
+        return devices_data
+
     def _generate_rule_based_topology(self, devices_data: List[Dict[str, Any]]) -> Dict[str, Any]:
         """
         Generate topology using rule-based approach (fallback when LLM fails).
@@ -193,9 +325,11 @@ Project: {project_id} ({device_count} devices)"""
                 "type": device_type
             })
             device_map[device_name] = device
+
+        known_device_names = set(device_map.keys())
         
-        # Create edges based on LLDP/CDP neighbors
-        edge_set = set()  # To avoid duplicates
+        # Create edges based on LLDP/CDP neighbors (neighbor names may be FQDN e.g. DIST1.lab.local)
+        edge_set = set()
         
         for device in devices_data:
             device_name = device.get("device_name")
@@ -203,21 +337,19 @@ Project: {project_id} ({device_count} devices)"""
                 continue
             
             neighbors = device.get("neighbors", [])
-            # Filter only CDP/LLDP neighbors (exclude routing protocol neighbors)
             for neighbor in neighbors:
-                neighbor_name = neighbor.get("device_name")
-                if not neighbor_name or neighbor_name not in device_map:
+                if not isinstance(neighbor, dict):
+                    continue
+                raw_neighbor_name = neighbor.get("device_name") or neighbor.get("neighbor_device") or neighbor.get("remote_device") or neighbor.get("system_name")
+                neighbor_name = _resolve_neighbor_name_to_device(raw_neighbor_name, known_device_names)
+                if not neighbor_name:
                     continue
                 
-                # Only process neighbors with local_port/remote_port (CDP/LLDP indicators)
                 local_port = neighbor.get("local_port") or neighbor.get("local_interface")
                 remote_port = neighbor.get("remote_port") or neighbor.get("remote_interface")
-                
-                # Skip routing protocol neighbors (no port info) - use ONLY CDP/LLDP
                 if not local_port and not remote_port:
                     continue
                 
-                # Create edge key to avoid duplicates
                 edge_key = tuple(sorted([device_name, neighbor_name]))
                 if edge_key not in edge_set:
                     edge_set.add(edge_key)
@@ -226,7 +358,7 @@ Project: {project_id} ({device_count} devices)"""
                         "to": neighbor_name,
                         "label": f"{local_port}-{remote_port}" if local_port and remote_port else "",
                         "evidence": f"CDP/LLDP neighbor: {device_name} sees {neighbor_name}"
-                        })
+                    })
         
         # NO subnet matching - use ONLY CDP/LLDP neighbors
         # This ensures topology matches actual physical connections
@@ -250,32 +382,9 @@ Project: {project_id} ({device_count} devices)"""
             Dict with 'topology' (nodes/edges), 'metrics', and 'analysis_summary'
         """
         
-        # Fetch all devices for this project (strict project isolation)
-        devices_cursor = db()["parsed_configs"].find(
-            {"project_id": project_id},
-            sort=[("device_name", 1)]
-        )
-        
-        devices_data = []
-        device_names = set()
-        
-        async for device_doc in devices_cursor:
-            # Remove MongoDB _id
-            device_doc.pop("_id", None)
-            
-            # Extract key fields for topology analysis
-            device_data = {
-                "device_name": device_doc.get("device_name"),
-                "device_overview": device_doc.get("device_overview", {}),
-                "interfaces": device_doc.get("interfaces", []),
-                "neighbors": device_doc.get("neighbors", []),
-                "routing": device_doc.get("routing", {}),
-            }
-            
-            if device_data["device_name"] and device_data["device_name"] not in device_names:
-                devices_data.append(device_data)
-                device_names.add(device_data["device_name"])
-        
+        # Fetch devices from parsed_configs, or from documents.parsed_config (Config folder) if empty
+        devices_data = await self._get_devices_data(project_id)
+
         if not devices_data:
             return {
                 "topology": {"nodes": [], "edges": []},
@@ -508,61 +617,58 @@ Project: {project_id} ({device_count} devices)"""
                 continue
             device_name_normalized = str(device_name).strip().lower()
             device_name_map[device_name_normalized] = device_name
-            
+            hostname_part = device_name_normalized.split(".")[0]
+            if hostname_part and hostname_part != device_name_normalized:
+                device_name_map[hostname_part] = device_name
+
             neighbors = device.get("neighbors", [])
             neighbor_set = set()
             for neighbor in neighbors:
-                # Only process CDP/LLDP neighbors (have local_port/remote_port)
+                if not isinstance(neighbor, dict):
+                    continue
                 local_port = neighbor.get("local_port") or neighbor.get("local_interface")
                 remote_port = neighbor.get("remote_port") or neighbor.get("remote_interface")
-                
-                # Skip routing protocol neighbors (no port info) - use ONLY CDP/LLDP
                 if not local_port and not remote_port:
                     continue
-                
-                # Try multiple field names for neighbor device name
                 neighbor_name = (
-                    neighbor.get("device_name") or 
-                    neighbor.get("neighbor_device") or 
+                    neighbor.get("device_name") or
+                    neighbor.get("neighbor_device") or
                     neighbor.get("remote_device") or
                     neighbor.get("system_name")
                 )
                 if neighbor_name:
-                    neighbor_set.add(str(neighbor_name).strip().lower())
+                    n_lower = str(neighbor_name).strip().lower()
+                    neighbor_set.add(n_lower)
+                    if "." in n_lower:
+                        neighbor_set.add(n_lower.split(".")[0])
             if neighbor_set:
                 neighbor_map[device_name_normalized] = neighbor_set
-        
-        # Validate each edge
+
+        # Validate each edge (resolve FQDN to hostname for lookup)
         validated_edges = []
         removed_count = 0
         removed_edges = []
-        
+
         for edge in llm_edges:
             if not isinstance(edge, dict) or "from" not in edge or "to" not in edge:
                 continue
-            
             from_dev = str(edge["from"]).strip()
             to_dev = str(edge["to"]).strip()
-            
             if not from_dev or not to_dev or from_dev == to_dev:
                 continue
-            
-            # Normalize device names for matching
             from_dev_norm = from_dev.lower()
             to_dev_norm = to_dev.lower()
-            
-            # Check if this edge exists in neighbor data
-            # Edge A->B is valid if: A has neighbor B OR B has neighbor A (bidirectional)
+            from_key = from_dev_norm.split(".")[0] if "." in from_dev_norm else from_dev_norm
+            to_key = to_dev_norm.split(".")[0] if "." in to_dev_norm else to_dev_norm
+
             is_valid = (
-                (from_dev_norm in neighbor_map and to_dev_norm in neighbor_map[from_dev_norm]) or
-                (to_dev_norm in neighbor_map and from_dev_norm in neighbor_map[to_dev_norm])
+                (from_key in neighbor_map and to_key in neighbor_map[from_key]) or
+                (to_key in neighbor_map and from_key in neighbor_map[to_key])
             )
-            
             if is_valid:
-                # Use original device names (not normalized) in output
                 validated_edges.append({
-                    "from": device_name_map.get(from_dev_norm, from_dev),
-                    "to": device_name_map.get(to_dev_norm, to_dev),
+                    "from": device_name_map.get(from_key, device_name_map.get(from_dev_norm, from_dev)),
+                    "to": device_name_map.get(to_key, device_name_map.get(to_dev_norm, to_dev)),
                     "label": edge.get("label", ""),
                     "evidence": edge.get("evidence", "neighbor")
                 })
@@ -585,28 +691,11 @@ Project: {project_id} ({device_count} devices)"""
         if not project:
             return {
                 "topology": {"nodes": [], "edges": []},
-                "layout": {"positions": {}, "links": [], "node_labels": {}, "node_roles": {}},
+                "layout": {"positions": {}, "links": [], "node_labels": {}, "node_roles": {}, "hidden_node_ids": []},
                 "generated_at": None,
                 "llm_used": False,
             }
-        devices_cursor = db()["parsed_configs"].find(
-            {"project_id": project_id},
-            sort=[("device_name", 1)]
-        )
-        devices_data = []
-        device_names = set()
-        async for device_doc in devices_cursor:
-            device_doc.pop("_id", None)
-            device_data = {
-                "device_name": device_doc.get("device_name"),
-                "device_overview": device_doc.get("device_overview", {}),
-                "interfaces": device_doc.get("interfaces", []),
-                "neighbors": device_doc.get("neighbors", []),
-                "routing": device_doc.get("routing", {}),
-            }
-            if device_data["device_name"] and device_data["device_name"] not in device_names:
-                devices_data.append(device_data)
-                device_names.add(device_data["device_name"])
+        devices_data = await self._get_devices_data(project_id)
         if not devices_data:
             return {
                 "topology": {"nodes": [], "edges": []},
@@ -615,6 +704,7 @@ Project: {project_id} ({device_count} devices)"""
                     "links": project.get("topoLinks", []),
                     "node_labels": project.get("topoNodeLabels", {}),
                     "node_roles": project.get("topoNodeRoles", {}),
+                    "hidden_node_ids": project.get("topoHiddenNodes", []),
                 },
                 "generated_at": None,
                 "llm_used": False,
@@ -627,6 +717,7 @@ Project: {project_id} ({device_count} devices)"""
                 "links": project.get("topoLinks", []),
                 "node_labels": project.get("topoNodeLabels", {}),
                 "node_roles": project.get("topoNodeRoles", {}),
+                "hidden_node_ids": project.get("topoHiddenNodes", []),
             },
             "generated_at": None,
             "llm_used": False,

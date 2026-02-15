@@ -127,7 +127,8 @@ async def get_topology(
                 "positions": project.get("topoPositions", {}),
                 "links": project.get("topoLinks", []),
                 "node_labels": project.get("topoNodeLabels", {}),
-                "node_roles": project.get("topoNodeRoles", {})
+                "node_roles": project.get("topoNodeRoles", {}),
+                "hidden_node_ids": project.get("topoHiddenNodes", [])
             },
             "llm_metrics": llm_result.get("metrics"),
             "llm_summary": llm_result.get("analysis_summary"),
@@ -146,7 +147,8 @@ async def get_topology(
             "positions": project.get("topoPositions", {}),
             "links": project.get("topoLinks", []),
             "node_labels": project.get("topoNodeLabels", {}),
-            "node_roles": project.get("topoNodeRoles", {})
+            "node_roles": project.get("topoNodeRoles", {}),
+            "hidden_node_ids": project.get("topoHiddenNodes", [])
         },
         "llm_metrics": project.get("topology_llm_metrics"),
         "llm_summary": project.get("topology_llm_summary"),
@@ -402,7 +404,9 @@ async def save_topology_layout(
         update_data["topoNodeLabels"] = layout.node_labels
     if layout.node_roles is not None:
         update_data["topoNodeRoles"] = layout.node_roles
-    
+    if layout.hidden_node_ids is not None:
+        update_data["topoHiddenNodes"] = layout.hidden_node_ids
+
     await db()["projects"].update_one(
         {"project_id": project_id},
         {"$set": update_data}

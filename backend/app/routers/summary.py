@@ -492,14 +492,17 @@ async def get_summary(
                     "upload_timestamp": upload_ts,
                 })
     
-    # Fallback: Also check documents collection for parsed_config metadata
+    # Fallback: Also check documents collection for parsed_config metadata (Cisco may have only device_overview.hostname)
     async for doc in db()["documents"].find(
         {"project_id": project_id, "is_latest": True, "parsed_config": {"$exists": True}},
         sort=[("created_at", -1)]
     ):
         parsed_config = doc.get("parsed_config", {})
         device_name = parsed_config.get("device_name")
-        
+        if not device_name and isinstance(parsed_config.get("device_overview"), dict):
+            device_name = parsed_config.get("device_overview").get("hostname")
+        device_name = (device_name or "").strip() if isinstance(device_name, str) else None
+
         if device_name and device_name not in device_names:
             device_names.add(device_name)
             # Use parsed_config from documents collection - reuse the same formatting logic

@@ -128,7 +128,7 @@ async def upload_documents_endpoint(
                         # Parse config
                         parsed_data = parser.parse_config(content, doc["filename"])
                         if parsed_data:
-                            device_name = parser.extract_device_name(content, doc["filename"])
+                            device_name = parsed_data.get("device_name") or parser.extract_device_name(content, doc["filename"])
                             
                             # Get device overview for summary fields
                             overview = parsed_data.get("device_overview", {})
@@ -349,6 +349,38 @@ async def upload_documents_endpoint(
                                 print(f"Error saving parsed config for {device_name}: {db_error}")
                                 import traceback
                                 print(f"Traceback: {traceback.format_exc()}")
+                        # When parse_config returned None (no vendor matched), still save minimal parsed_config so topology can show device (Cisco/Huawei detection or parse error)
+                        elif content:
+                            try:
+                                device_name = parser.extract_device_name(content, doc["filename"])
+                                if device_name:
+                                    parsed_doc = {
+                                        "project_id": project_id,
+                                        "document_id": doc["document_id"],
+                                        "device_name": device_name,
+                                        "vendor": "unknown",
+                                        "version": 1,
+                                        "config_hash": hashlib.sha256((device_name + doc["filename"]).encode("utf-8")).hexdigest(),
+                                        "upload_timestamp": datetime.now(timezone.utc),
+                                        "device_overview": {"hostname": device_name},
+                                        "interfaces": [],
+                                        "vlans": {"vlan_list": [], "vlan_names": {}, "vlan_status": {}, "total_vlan_count": 0},
+                                        "stp": {"stp_mode": None, "root_bridges": [], "mode": None},
+                                        "routing": {"static": [], "ospf": {}, "eigrp": {}, "bgp": {}, "rip": {}},
+                                        "neighbors": [],
+                                        "mac_arp": {"mac_table": [], "arp_table": []},
+                                        "security": {},
+                                        "ha": {"port_channels": [], "hsrp": [], "vrrp": []},
+                                        "created_at": datetime.now(timezone.utc),
+                                        "updated_at": datetime.now(timezone.utc),
+                                    }
+                                    await db()["documents"].update_many(
+                                        {"document_id": doc["document_id"], "project_id": project_id},
+                                        {"$set": {"parsed_config": parsed_doc}},
+                                    )
+                                    print(f"[Config] Saved minimal parsed_config for device_name={device_name!r} (parse did not match vendor or parse failed)")
+                            except Exception as minimal_err:
+                                print(f"[Config] Could not save minimal parsed_config: {minimal_err}")
                 except Exception as parse_error:
                     # Log error but don't fail upload
                     import traceback

@@ -27,7 +27,7 @@ export default function Card({
           } ${headerClassName}`}
         >
           {isTitleElement ? (
-            <div className="flex items-center justify-between w-full min-w-0">{safeChild(title)}</div>
+            <div className="flex items-center justify-between w-full min-w-0 flex-1 min-w-0">{safeChild(title)}</div>
           ) : (
             <h3
               className={`${
@@ -37,8 +37,8 @@ export default function Card({
               {safeDisplay(title)}
             </h3>
           )}
-          {!isTitleElement && (
-            <div className={`flex gap-2 ${compactHeader ? "gap-1.5" : ""}`}>
+          {actions != null && actions !== false && (
+            <div className={`flex gap-2 flex-shrink-0 ${compactHeader ? "gap-1.5" : ""}`}>
               {safeChild(actions)}
             </div>
           )}

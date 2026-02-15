@@ -10,20 +10,30 @@ router = APIRouter(prefix="/projects", tags=["projects"])
 
 @router.get("")
 async def list_projects(user=Depends(get_current_user)):
-    """List projects - admin sees all, others see only projects they're members of"""
+    """List projects.
+    - Admin: sees all projects.
+    - Others: see projects where they are members, OR visibility is Shared.
+    Private = only members see the project. Shared = everyone sees it in the list (but only members can open/view).
+    """
     projects = []
     if user.get("role") == "admin":
         async for p in db()["projects"].find({}, {"_id": 0}):
             projects.append(p)
     else:
-        # Get project IDs where user is a member
+        # Project IDs where user is a member
         memberships = []
         async for m in db()["project_members"].find({"username": user["username"]}, {"_id": 0, "project_id": 1}):
             memberships.append(m["project_id"])
-        
+        # Show: (1) projects user is member of, (2) projects with visibility Shared (everyone can see in list)
+        seen = set()
         if memberships:
             async for p in db()["projects"].find({"project_id": {"$in": memberships}}, {"_id": 0}):
                 projects.append(p)
+                seen.add(p["project_id"])
+        async for p in db()["projects"].find({"visibility": "Shared"}, {"_id": 0}):
+            if p["project_id"] not in seen:
+                projects.append(p)
+                seen.add(p["project_id"])
     
     # Convert datetime objects to ISO strings
     for p in projects:
