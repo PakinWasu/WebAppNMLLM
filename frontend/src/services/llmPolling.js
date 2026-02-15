@@ -28,7 +28,7 @@ if (typeof window !== "undefined" && !window.llmPollingService) {
           const isNewResult =
             currentGeneratedAt &&
             (lastStr === null || currentGeneratedAt !== lastStr);
-          if (result.overview_text && isNewResult) {
+          if ((result.overview_text || (result.overview && typeof result.overview === "object")) && isNewResult) {
             this.stopPolling(key);
             if (onUpdate) onUpdate(result);
             return;
@@ -56,6 +56,7 @@ if (typeof window !== "undefined" && !window.llmPollingService) {
           ) {
             const hasContent =
               result.overview_text ||
+              (result.overview && typeof result.overview === "object") ||
               (result.recommendations && result.recommendations.length >= 0) ||
               hasTopology;
             if (hasContent) {

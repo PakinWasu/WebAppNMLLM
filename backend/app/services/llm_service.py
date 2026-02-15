@@ -22,56 +22,52 @@ Output must be in JSON format with the following keys:
 Strictly avoid hallucination. If data is missing, state 'Not found'."""
 
 # Project-Level Analysis System Prompt - Network Overview (Scope 2.3.5.1)
+# Response must be a strictly valid JSON object (no markdown, no code fences).
 SYSTEM_PROMPT_PROJECT_OVERVIEW = """You are a Network Solution Architect. Review the configuration summaries of these devices collectively.
 
-**Task: Summarize the network status concisely.**
+**Task:** Return a strictly valid JSON object describing the network overview. No prose, no markdown—only JSON.
 
-**Strict Formatting Rules:**
-1. Do NOT use long paragraphs or complex sentences.
-2. Use **Bullet Points** for every item (each line must start with * or -).
-3. Use **Bold Keys** for categories (e.g., **Architecture:**, **Topology:**, **Protocols:**).
-4. Keep descriptions under 10 words per line.
-5. Group related info together.
-
-**Example Desired Output:**
-* **Architecture:** 3-Layer (Core, Dist, Access)
-* **Topology:** Dual-core redundant design
-* **Protocols:** OSPF (Active), LACP (Load Balancing)
-* **VLANs:** Segmented (User/Server separation)
-
-**Output Format:** Return ONLY valid JSON. The overview_text must be a single string with newlines between each bullet line:
+**Required JSON structure (use exactly these keys):**
 {
-  "overview_text": "string (bullet lines in Markdown style, one per line)"
+  "topology": { "type": "Star" | "Mesh" | "Tree" | "Ring" | "Hybrid", "redundancy": "High" | "Low" | "None" },
+  "stats": { "core_devices": number, "distribution": number, "access": number },
+  "protocols": ["OSPF", "LACP", "MSTP", ...],
+  "health_status": "Healthy" | "Warning" | "Critical",
+  "key_insights": ["Short bullet 1", "Short bullet 2", "Short bullet 3 or 4"],
+  "recommendations": ["Actionable advice 1", "Actionable advice 2", ...]
 }
 
-**CRITICAL:** Output ONLY JSON, no markdown code blocks. overview_text must use bullet points and bold keys as in the example."""
+- topology.type: overall topology style. redundancy: level of redundancy (High/Low/None).
+- stats: counts of devices by layer (use 0 if a layer is not present).
+- protocols: list of key protocols detected (routing, link aggregation, STP, etc.).
+- health_status: overall network health.
+- key_insights: 3–4 short bullet-point strings.
+- recommendations: list of actionable recommendations (can be empty).
+
+**CRITICAL:** Output ONLY valid JSON. No markdown, no code blocks, no text before or after the JSON object."""
 
 # Per-Device Overview (More Detail page - Device Summary tab)
-SYSTEM_PROMPT_DEVICE_OVERVIEW = """You are a Network Solution Architect. Analyze this single device's configuration and provide a concise summary.
+# Response must be a strictly valid JSON object (no markdown, no code fences).
+SYSTEM_PROMPT_DEVICE_OVERVIEW = """You are a Network Solution Architect. Analyze this single device's configuration.
 
-**Task: Summarize the device status concisely.**
+**Task:** Return a strictly valid JSON object describing the device summary. No prose, no markdown—only JSON.
 
-**Strict Formatting Rules:**
-1. Do NOT use long paragraphs or complex sentences.
-2. Use **Bullet Points** for every item (each line must start with * or -).
-3. Use **Bold Keys** for categories (e.g., **Role:**, **Uptime:**, **Interfaces:**, **VLANs:**).
-4. Keep descriptions under 10 words per line.
-5. Group related info together.
-
-**Example Desired Output:**
-* **Role:** Core switch
-* **Uptime:** 3 hours 21 minutes
-* **Mode:** Routed on all interfaces
-* **IPv4:** Uplinks to EDGE, DIST1, DIST2, CORE2
-* **VLANs:** None configured
-* **Routing:** No protocols enabled
-
-**Output Format:** Return ONLY valid JSON. The overview_text must be a single string with newlines between each bullet line:
+**Required JSON structure (use exactly these keys):**
 {
-  "overview_text": "string (bullet lines in Markdown style, one per line)"
+  "role": "Core" | "Access" | "Distribution" | "Edge" | "Other",
+  "uptime_human": "X days, Y hours" or "N/A",
+  "critical_metrics": { "cpu_load": "Low" | "Normal" | "High" | "N/A", "memory": "Low" | "Normal" | "High" | "N/A" },
+  "config_highlights": ["Key config feature 1", "Key config feature 2", "3–4 short items"],
+  "security_issues": ["Risk 1", "Risk 2", ...] or ["None"]
 }
 
-**CRITICAL:** Output ONLY JSON, no markdown code blocks. overview_text must use bullet points and bold keys as in the example."""
+- role: device role in the network.
+- uptime_human: human-readable uptime if available, else "N/A".
+- critical_metrics: infer from config if possible; use "N/A" if unknown.
+- config_highlights: 3–4 short strings of key configuration aspects (interfaces, VLANs, routing, etc.).
+- security_issues: list of potential risks, or ["None"] if none found.
+
+**CRITICAL:** Output ONLY valid JSON. No markdown, no code blocks, no text before or after the JSON object."""
 
 # Project-Level Analysis System Prompt - Full Project Analysis (Scope 2.3.5.1 & 2.3.5.2)
 SYSTEM_PROMPT_FULL_PROJECT_ANALYSIS = """You are a Network Solution Architect. Analyze these network devices as a whole system.
@@ -448,9 +444,7 @@ class LLMService:
 {aggregated_json}
 
 === ANALYSIS REQUEST ===
-Provide a Network Overview: executive summary of architecture, topology style, and key protocols.
-
-Return ONLY valid JSON with 'overview_text' key as specified in system prompt."""
+Return a strictly valid JSON object with keys: topology, stats, protocols, health_status, key_insights, recommendations (as in the system prompt). No other text."""
 
         url = f"{self.base_url}/api/chat"
         payload = {
@@ -495,24 +489,20 @@ Return ONLY valid JSON with 'overview_text' key as specified in system prompt.""
             # Parse JSON response
             parsed_response = self._parse_json_response(ai_response)
             
-            # Check if JSON parsing failed (returns fallback format)
             if isinstance(parsed_response, dict) and parsed_response.get("format") == "text":
-                # JSON parsing failed, treat as error
                 logger.warning(f"Failed to parse JSON response for project overview. Raw response: {ai_response[:500]}")
                 return self._error_result(
-                    f"[ERROR] LLM returned non-JSON response. Expected JSON with 'overview_text' key. Response: {ai_response[:200]}",
+                    f"[ERROR] LLM returned non-JSON response. Expected JSON object. Response: {ai_response[:200]}",
                     "json_parse_failed",
                     inference_time_ms,
                     details=ai_response[:500],
                 )
             
-            # Ensure required fields exist
             if not isinstance(parsed_response, dict):
                 parsed_response = {}
             
-            if "overview_text" not in parsed_response:
-                logger.warning(f"LLM response missing 'overview_text' key. Response: {parsed_response}")
-                parsed_response["overview_text"] = "Analysis completed. Overview text not provided."
+            # Normalize to required structure (fill defaults if keys missing)
+            parsed_response = self._normalize_network_overview_response(parsed_response)
 
             return {
                 "content": ai_response,
@@ -619,7 +609,7 @@ Return ONLY valid JSON with 'overview_text' key as specified in system prompt.""
 {aggregated_json}
 
 === REQUEST ===
-Provide a concise summary of this device: its role, key configuration, and status. Return ONLY valid JSON with 'overview_text' key."""
+Return a strictly valid JSON object with keys: role, uptime_human, critical_metrics, config_highlights, security_issues (as in the system prompt). No other text."""
 
         url = f"{self.base_url}/api/chat"
         payload = {
@@ -649,8 +639,7 @@ Provide a concise summary of this device: its role, key configuration, and statu
                 parsed_response = {}
             if not isinstance(parsed_response, dict):
                 parsed_response = {}
-            if "overview_text" not in parsed_response:
-                parsed_response["overview_text"] = "Analysis completed. Overview not provided."
+            parsed_response = self._normalize_device_overview_response(parsed_response)
             logger.info(
                 "device_overview_analysis model_used=%s inference_time_ms=%.0f project_id=%s device_name=%s",
                 self.model_name, inference_time_ms, project_id, device_name,
@@ -1234,6 +1223,66 @@ Return ONLY valid JSON with 'network_overview' and 'gap_analysis' keys as specif
             return json.loads(ai_response)
         except json.JSONDecodeError:
             return {"analysis": ai_response, "format": "text"}
+
+    @staticmethod
+    def _normalize_network_overview_response(data: Dict[str, Any]) -> Dict[str, Any]:
+        """Ensure parsed project overview has the required JSON structure. Fill defaults for missing keys."""
+        if not isinstance(data, dict):
+            data = {}
+        topology = data.get("topology")
+        if not isinstance(topology, dict):
+            topology = {"type": "Unknown", "redundancy": "Unknown"}
+        stats = data.get("stats")
+        if not isinstance(stats, dict):
+            stats = {"core_devices": 0, "distribution": 0, "access": 0}
+        protocols = data.get("protocols")
+        if not isinstance(protocols, list):
+            protocols = []
+        health_status = data.get("health_status")
+        if not isinstance(health_status, str):
+            health_status = "Unknown"
+        key_insights = data.get("key_insights")
+        if not isinstance(key_insights, list):
+            key_insights = []
+        recommendations = data.get("recommendations")
+        if not isinstance(recommendations, list):
+            recommendations = []
+        return {
+            "topology": topology,
+            "stats": stats,
+            "protocols": protocols,
+            "health_status": health_status,
+            "key_insights": key_insights,
+            "recommendations": recommendations,
+        }
+
+    @staticmethod
+    def _normalize_device_overview_response(data: Dict[str, Any]) -> Dict[str, Any]:
+        """Ensure parsed device overview has the required JSON structure. Fill defaults for missing keys."""
+        if not isinstance(data, dict):
+            data = {}
+        role = data.get("role")
+        if not isinstance(role, str):
+            role = "Other"
+        uptime_human = data.get("uptime_human")
+        if not isinstance(uptime_human, str):
+            uptime_human = "N/A"
+        critical_metrics = data.get("critical_metrics")
+        if not isinstance(critical_metrics, dict):
+            critical_metrics = {"cpu_load": "N/A", "memory": "N/A"}
+        config_highlights = data.get("config_highlights")
+        if not isinstance(config_highlights, list):
+            config_highlights = []
+        security_issues = data.get("security_issues")
+        if not isinstance(security_issues, list):
+            security_issues = []
+        return {
+            "role": role,
+            "uptime_human": uptime_human,
+            "critical_metrics": critical_metrics,
+            "config_highlights": config_highlights,
+            "security_issues": security_issues,
+        }
 
     def _error_result(
         self,

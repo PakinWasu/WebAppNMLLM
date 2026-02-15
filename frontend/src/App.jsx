@@ -19,6 +19,7 @@ import UserAdminPage from "./pages/UserAdminPage";
 import SettingPage from "./pages/SettingPage";
 import { fileToDataURL } from "./utils/file";
 import AddMemberInline from "./components/AddMemberInline";
+import { Activity, Share2, Shield, CheckCircle2, Info } from "lucide-react";
 
 /**
  * Renders LLM summary text as Markdown-style bullet list with styled bold keys.
@@ -63,6 +64,132 @@ function SummaryMarkdown({ text, className = "", size = "sm" }) {
         );
       })}
     </ul>
+  );
+}
+
+/** Dashboard widget for structured Network Overview (summaryData from backend). */
+function StructuredNetworkOverview({ data, className = "" }) {
+  if (!data || typeof data !== "object") return null;
+  const topology = data.topology || {};
+  const protocols = Array.isArray(data.protocols) ? data.protocols : [];
+  const health = (data.health_status || "Unknown").toString();
+  const isHealthy = /healthy/i.test(health);
+  const isWarning = /warning/i.test(health);
+  const insights = Array.isArray(data.key_insights) ? data.key_insights : [];
+  const recommendations = Array.isArray(data.recommendations) ? data.recommendations : [];
+  const mainProtocol = protocols.length > 0 ? protocols[0] : "—";
+  const topologyType = topology.type || "—";
+
+  return (
+    <div className={`grid grid-cols-1 md:grid-cols-2 gap-4 text-sm ${className}`}>
+      {/* Top row: 3 key stat badges */}
+      <div className="md:col-span-2 grid grid-cols-1 sm:grid-cols-3 gap-3">
+        <div className="flex items-center gap-2 rounded-lg bg-slate-800/50 dark:bg-slate-800/50 border border-slate-700/50 dark:border-slate-600/50 px-3 py-2.5">
+          <Activity className="w-4 h-4 flex-shrink-0 text-slate-400 dark:text-slate-400" aria-hidden />
+          <div className="min-w-0 flex-1">
+            <div className="text-xs font-medium text-slate-500 dark:text-slate-400 uppercase tracking-wide">Health</div>
+            <div className="flex items-center gap-1.5 truncate">
+              <span
+                className={`w-2 h-2 rounded-full flex-shrink-0 ${
+                  isHealthy ? "bg-green-500" : isWarning ? "bg-amber-500" : "bg-red-500"
+                }`}
+                aria-hidden
+              />
+              <span className="text-slate-200 dark:text-slate-300 truncate">{health}</span>
+            </div>
+          </div>
+        </div>
+        <div className="flex items-center gap-2 rounded-lg bg-slate-800/50 dark:bg-slate-800/50 border border-slate-700/50 dark:border-slate-600/50 px-3 py-2.5">
+          <Share2 className="w-4 h-4 flex-shrink-0 text-slate-400 dark:text-slate-400" aria-hidden />
+          <div className="min-w-0 flex-1">
+            <div className="text-xs font-medium text-slate-500 dark:text-slate-400 uppercase tracking-wide">Topology</div>
+            <div className="text-slate-200 dark:text-slate-300 truncate">{topologyType}</div>
+          </div>
+        </div>
+        <div className="flex items-center gap-2 rounded-lg bg-slate-800/50 dark:bg-slate-800/50 border border-slate-700/50 dark:border-slate-600/50 px-3 py-2.5">
+          <Shield className="w-4 h-4 flex-shrink-0 text-slate-400 dark:text-slate-400" aria-hidden />
+          <div className="min-w-0 flex-1">
+            <div className="text-xs font-medium text-slate-500 dark:text-slate-400 uppercase tracking-wide">Protocol</div>
+            <div className="text-slate-200 dark:text-slate-300 truncate">{mainProtocol}</div>
+          </div>
+        </div>
+      </div>
+
+      {/* Middle: Insight items (vertical stack with icon) */}
+      <div className="space-y-2">
+        <div className="text-xs font-medium text-slate-500 dark:text-slate-400 uppercase tracking-wide mb-2">Insights</div>
+        {insights.length > 0 ? (
+          <div className="space-y-2">
+            {insights.map((item, i) => (
+              <div key={i} className="flex items-start gap-2">
+                {i === 0 ? (
+                  <CheckCircle2 className="w-4 h-4 flex-shrink-0 text-green-500 dark:text-green-500 mt-0.5" aria-hidden />
+                ) : (
+                  <Info className="w-4 h-4 flex-shrink-0 text-blue-400 dark:text-blue-400 mt-0.5" aria-hidden />
+                )}
+                <span className="text-slate-300 dark:text-slate-300 text-sm leading-snug">{item}</span>
+              </div>
+            ))}
+          </div>
+        ) : (
+          <p className="text-slate-500 dark:text-slate-500 text-sm">No insights available.</p>
+        )}
+      </div>
+
+      {/* Bottom: Recommendations (amber left border box) */}
+      <div className="space-y-2">
+        <div className="text-xs font-medium text-slate-500 dark:text-slate-400 uppercase tracking-wide mb-2">Recommendations</div>
+        {recommendations.length > 0 ? (
+          <div className="rounded-lg bg-slate-800/50 dark:bg-slate-800/50 border-l-4 border-amber-500 pl-3 py-2 pr-2 space-y-1.5">
+            {recommendations.map((item, i) => (
+              <div key={i} className="text-slate-300 dark:text-slate-300 text-sm leading-snug">
+                {item}
+              </div>
+            ))}
+          </div>
+        ) : (
+          <p className="text-slate-500 dark:text-slate-500 text-sm">No recommendations.</p>
+        )}
+      </div>
+    </div>
+  );
+}
+
+/** Renders structured Device Summary (role, uptime, critical_metrics, config_highlights, security_issues). */
+function StructuredDeviceSummary({ data, className = "" }) {
+  if (!data || typeof data !== "object") return null;
+  const role = data.role || "—";
+  const uptime = data.uptime_human || "N/A";
+  const metrics = data.critical_metrics || {};
+  const highlights = Array.isArray(data.config_highlights) ? data.config_highlights : [];
+  const security = Array.isArray(data.security_issues) ? data.security_issues : [];
+  const keyClass = "text-sky-400 dark:text-sky-400 font-semibold";
+  return (
+    <div className={`space-y-3 leading-relaxed text-xs text-slate-700 dark:text-slate-300 ${className}`}>
+      <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+        <div><span className={keyClass}>Role:</span> {role}</div>
+        <div><span className={keyClass}>Uptime:</span> {uptime}</div>
+      </div>
+      <div>
+        <span className={keyClass}>Metrics:</span> CPU: {metrics.cpu_load ?? "N/A"}, Memory: {metrics.memory ?? "N/A"}
+      </div>
+      {highlights.length > 0 && (
+        <ul className="list-disc list-inside space-y-0.5">
+          <span className={keyClass}>Config:</span>
+          {highlights.map((item, i) => (
+            <li key={i}>{item}</li>
+          ))}
+        </ul>
+      )}
+      {security.length > 0 && (
+        <ul className="list-disc list-inside space-y-0.5">
+          <span className={keyClass}>Security:</span>
+          {security.map((item, i) => (
+            <li key={i}>{item}</li>
+          ))}
+        </ul>
+      )}
+    </div>
   );
 }
 
@@ -1056,8 +1183,13 @@ const ProjectAnalysisPanel = ({ project, summaryRows, coreCount, distCount, acce
 
 /* ========= Network Overview Card Component ========= */
 const NetworkOverviewCard = ({ project, summaryRows, fullHeight, onRegisterGenerate, onRegisterGetAction, onGeneratingChange, onComplete, requestRun, setLlmNotification }) => {
+  const [overviewData, setOverviewData] = React.useState(null);
   const [overviewText, setOverviewText] = React.useState(null);
   const [llmMetrics, setLlmMetrics] = React.useState(null);
+  const applyOverviewResult = (result) => {
+    setOverviewData(result.overview && typeof result.overview === "object" ? result.overview : null);
+    setOverviewText(result.overview_text || null);
+  };
   const [generating, setGenerating] = React.useState(false);
   const [error, setError] = React.useState(null);
   const [loading, setLoading] = React.useState(true);
@@ -1087,7 +1219,7 @@ const NetworkOverviewCard = ({ project, summaryRows, fullHeight, onRegisterGener
           api.getProjectOverview,
           (result) => {
             notifyLLMResultReady("Network Overview", "LLM analysis completed. Open Summary to view.");
-            setOverviewText(result.overview_text || null);
+            applyOverviewResult(result);
             setLlmMetrics(result.metrics || null);
             setGenerating(false);
             localStorage.removeItem(storageKey);
@@ -1114,7 +1246,7 @@ const NetworkOverviewCard = ({ project, summaryRows, fullHeight, onRegisterGener
           pollingKey,
           (result) => {
             notifyLLMResultReady("Network Overview", "LLM analysis completed. Open Summary to view.");
-            setOverviewText(result.overview_text || null);
+            applyOverviewResult(result);
             setLlmMetrics(result.metrics || null);
             setGenerating(false);
             localStorage.removeItem(storageKey);
@@ -1160,7 +1292,8 @@ const NetworkOverviewCard = ({ project, summaryRows, fullHeight, onRegisterGener
           timeoutPromise
         ]);
         if (isMounted) {
-          setOverviewText(fullResult.network_overview || null);
+          setOverviewData(fullResult.overview && typeof fullResult.overview === "object" ? fullResult.overview : null);
+          setOverviewText(fullResult.overview_text || (typeof fullResult.overview === "string" ? fullResult.overview : null));
           setLlmMetrics(fullResult.metrics || null);
           return;
         }
@@ -1174,6 +1307,7 @@ const NetworkOverviewCard = ({ project, summaryRows, fullHeight, onRegisterGener
               timeoutPromise
             ]);
             if (isMounted) {
+              setOverviewData(result.overview && typeof result.overview === "object" ? result.overview : null);
               setOverviewText(result.overview_text || null);
               setLlmMetrics(result.metrics || null);
             }
@@ -1216,7 +1350,7 @@ const NetworkOverviewCard = ({ project, summaryRows, fullHeight, onRegisterGener
         pollingKey,
         (result) => {
           notifyLLMResultReady("Network Overview", "LLM analysis completed. Open Summary to view.");
-          setOverviewText(result.overview_text || null);
+          applyOverviewResult(result);
           setLlmMetrics(result.metrics || null);
           setGenerating(false);
           localStorage.removeItem(storageKey);
@@ -1244,7 +1378,7 @@ const NetworkOverviewCard = ({ project, summaryRows, fullHeight, onRegisterGener
         api.getProjectOverview,
         (result) => {
           notifyLLMResultReady("Network Overview", "LLM analysis completed. Open Summary to view.");
-          setOverviewText(result.overview_text || null);
+          applyOverviewResult(result);
           setLlmMetrics(result.metrics || null);
           setGenerating(false);
           localStorage.removeItem(storageKey);
@@ -1311,14 +1445,15 @@ const NetworkOverviewCard = ({ project, summaryRows, fullHeight, onRegisterGener
     return () => onRegisterGenerate?.(null);
   }, [onRegisterGenerate]);
 
+  const hasOverview = overviewData != null || overviewText != null;
   React.useEffect(() => {
     onRegisterGetAction?.(() => (
-      overviewText != null
+      hasOverview
         ? { action: "show", data: { show: true, type: "success", title: "Network Overview Generated", message: "LLM analysis completed successfully.", metrics: llmMetrics, onRegenerate: () => requestRun?.(generateRef.current) } }
         : { action: "generate" }
     ));
     return () => onRegisterGetAction?.(null);
-  }, [overviewText, llmMetrics, onRegisterGetAction, requestRun]);
+  }, [hasOverview, llmMetrics, onRegisterGetAction, requestRun]);
   
   return (
     <>
@@ -1356,7 +1491,9 @@ const NetworkOverviewCard = ({ project, summaryRows, fullHeight, onRegisterGener
                     Error: {safeDisplay(error)}
                   </div>
                 )}
-                {overviewText != null ? (
+                {overviewData != null && (overviewData.topology != null || overviewData.key_insights != null) ? (
+                  <StructuredNetworkOverview data={overviewData} className={fullHeight ? "text-base" : ""} />
+                ) : overviewText != null ? (
                   <SummaryMarkdown text={overviewText} className={fullHeight ? "text-base" : ""} />
                 ) : (
                   <div className="text-slate-600 dark:text-slate-400 italic">
@@ -2692,10 +2829,15 @@ const DeviceDetailsView = ({ project, deviceId, goBack, goBackHref, goIndex, goI
   // ----- Per-device LLM (Device Summary / AI Recommendations / Config Drift) -----
   const projectId = project?.project_id || project?.id;
   const deviceStorageKey = projectId ? `llm_generating_device_${projectId}` : null;
+  const [deviceOverviewData, setDeviceOverviewData] = React.useState(null);
   const [deviceOverviewText, setDeviceOverviewText] = React.useState(null);
   const [deviceOverviewLoading, setDeviceOverviewLoading] = React.useState(true);
   const [deviceOverviewGenerating, setDeviceOverviewGenerating] = React.useState(false);
   const [deviceOverviewError, setDeviceOverviewError] = React.useState(null);
+  const applyDeviceOverviewResult = (r) => {
+    setDeviceOverviewData(r.overview && typeof r.overview === "object" ? r.overview : null);
+    setDeviceOverviewText(r.overview_text || null);
+  };
 
   const [deviceRecsList, setDeviceRecsList] = React.useState([]);
   const [deviceRecsLoading, setDeviceRecsLoading] = React.useState(true);
@@ -2716,8 +2858,8 @@ const DeviceDetailsView = ({ project, deviceId, goBack, goBackHref, goIndex, goI
     }
     let cancelled = false;
     api.getDeviceOverview(projectId, deviceId)
-      .then((r) => { if (!cancelled) setDeviceOverviewText(r.overview_text || null); })
-      .catch(() => { if (!cancelled) setDeviceOverviewText(null); })
+      .then((r) => { if (!cancelled) applyDeviceOverviewResult(r); })
+      .catch(() => { if (!cancelled) { setDeviceOverviewData(null); setDeviceOverviewText(null); } })
       .finally(() => { if (!cancelled) setDeviceOverviewLoading(false); });
     return () => { cancelled = true; };
   }, [projectId, deviceId]);
@@ -2757,7 +2899,7 @@ const DeviceDetailsView = ({ project, deviceId, goBack, goBackHref, goIndex, goI
     const key = `device_overview_${projectId}_${deviceId}`;
     const endpoint = (pid) => api.getDeviceOverview(pid, deviceId);
     const onUpdate = (result) => {
-      setDeviceOverviewText(result.overview_text || null);
+      applyDeviceOverviewResult(result);
       setDeviceOverviewGenerating(false);
       if (deviceStorageKey) localStorage.removeItem(deviceStorageKey);
       onComplete?.();
@@ -2852,7 +2994,7 @@ const DeviceDetailsView = ({ project, deviceId, goBack, goBackHref, goIndex, goI
       if (typeof requestRun === "function") requestRun(fn);
       else fn();
     };
-    if (llmPanelTab === "summary" && deviceOverviewText != null) {
+    if (llmPanelTab === "summary" && (deviceOverviewData != null || deviceOverviewText != null)) {
       return {
         action: "show",
         data: {
@@ -3326,7 +3468,9 @@ const DeviceDetailsView = ({ project, deviceId, goBack, goBackHref, goIndex, goI
                             Error: {safeDisplay(deviceOverviewError)}
                           </div>
                         )}
-                        {deviceOverviewText != null ? (
+                        {deviceOverviewData != null && (deviceOverviewData.role != null || deviceOverviewData.config_highlights != null) ? (
+                          <StructuredDeviceSummary data={deviceOverviewData} className="text-slate-700 dark:text-slate-300" />
+                        ) : deviceOverviewText != null ? (
                           <SummaryMarkdown text={deviceOverviewText} size="xs" className="text-slate-700 dark:text-slate-300" />
                         ) : (
                           <div className="text-slate-500 dark:text-slate-400 italic text-xs">

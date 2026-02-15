@@ -114,9 +114,16 @@ async def get_project_overview(
             )
         
         result_data = saved_result.get("result_data", {})
-        overview_text = result_data.get("overview_text", "No overview available.")
+        # New format: structured overview (topology, stats, protocols, etc.)
+        if result_data.get("topology") is not None or result_data.get("key_insights") is not None:
+            overview = result_data
+            overview_text = None
+        else:
+            overview = None
+            overview_text = result_data.get("overview_text", "No overview available.")
         
         return {
+            "overview": overview,
             "overview_text": overview_text,
             "metrics": saved_result.get("metrics", {}),
             "devices_analyzed": saved_result.get("result_data", {}).get("devices_analyzed", 0),
@@ -157,8 +164,14 @@ async def get_device_overview(
                 detail="No saved overview for this device. Generate one first.",
             )
         result_data = saved_result.get("result_data", {})
-        overview_text = result_data.get("overview_text", "No overview available.")
+        if result_data.get("role") is not None or result_data.get("config_highlights") is not None:
+            overview = {k: v for k, v in result_data.items() if k != "device_name"}
+            overview_text = None
+        else:
+            overview = None
+            overview_text = result_data.get("overview_text", "No overview available.")
         return {
+            "overview": overview,
             "overview_text": overview_text,
             "metrics": saved_result.get("metrics", {}),
             "project_id": project_id,
@@ -218,19 +231,20 @@ async def analyze_device_overview(
                 status_code=500,
                 detail=result.get("content", "LLM device analysis failed."),
             )
-        overview_text = (result.get("parsed_response") or {}).get("overview_text", "Analysis completed.")
+        overview_data = result.get("parsed_response") or {}
+        overview_data["device_name"] = device_name
         metrics = result.get("metrics", {})
-        # Save per-device (one doc per project + device)
+        summary = overview_data.get("role") or (overview_data.get("config_highlights") or [None])[0] or "Device overview"
+        summary_str = summary[:500] if isinstance(summary, str) else str(summary)[:500]
         from ..services.topology_service import topology_service
         await topology_service._save_llm_result(
             project_id=project_id,
             result_type="device_overview",
-            result_data={"overview_text": overview_text, "device_name": device_name},
-            analysis_summary=overview_text[:500],
+            result_data=overview_data,
+            analysis_summary=summary_str,
             metrics=metrics,
             llm_used=True,
         )
-        # Device overview stores one per device; update the doc so GET can find it by result_data.device_name
         await db()["llm_results"].update_one(
             {
                 "project_id": project_id,
@@ -239,8 +253,8 @@ async def analyze_device_overview(
             },
             {
                 "$set": {
-                    "result_data": {"overview_text": overview_text, "device_name": device_name},
-                    "analysis_summary": overview_text[:500],
+                    "result_data": overview_data,
+                    "analysis_summary": summary_str,
                     "metrics": metrics,
                     "llm_used": True,
                     "generated_at": datetime.utcnow(),
@@ -249,7 +263,8 @@ async def analyze_device_overview(
             upsert=True,
         )
         return {
-            "overview_text": overview_text,
+            "overview": {k: v for k, v in overview_data.items() if k != "device_name"},
+            "overview_text": None,
             "metrics": metrics,
             "project_id": project_id,
             "device_name": device_name,
@@ -684,29 +699,30 @@ async def analyze_project_overview(
                 detail=error_message
             )
         
-        # Extract parsed response
-        overview_text = parsed_response.get("overview_text", "Analysis completed.")
+        # Parsed response is the normalized structure (topology, stats, protocols, health_status, key_insights, recommendations)
+        overview_data = parsed_response
         
         # Save to database for persistence
         try:
             from ..services.topology_service import topology_service
+            summary = overview_data.get("health_status") or (overview_data.get("key_insights") or [None])[0] or "Overview"
             await topology_service._save_llm_result(
                 project_id=project_id,
                 result_type="project_overview",
-                result_data={"overview_text": overview_text},
-                analysis_summary=overview_text,
+                result_data=overview_data,
+                analysis_summary=summary[:500] if isinstance(summary, str) else str(summary)[:500],
                 metrics=result.get("metrics", {}),
                 llm_used=True
             )
             logger.info(f"Saved project overview to database for project {project_id}")
         except Exception as save_error:
             logger.warning(f"Failed to save project overview to database: {save_error}")
-            # Continue even if save fails
         
         logger.info(f"Successfully generated overview for project {project_id}")
         
         return {
-            "overview_text": overview_text,
+            "overview": overview_data,
+            "overview_text": None,
             "metrics": result.get("metrics", {}),
             "devices_analyzed": len(devices_data),
             "project_id": project_id,

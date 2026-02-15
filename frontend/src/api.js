@@ -498,7 +498,7 @@ export async function getProjectLlmStatus(projectId) {
 /** Combined overview + recommendations for Summary/Device detail (gap_analysis from recommendations). */
 export async function getFullProjectAnalysis(projectId) {
   const [overviewRes, recRes] = await Promise.all([
-    api(`/projects/${projectId}/analyze/overview`, { method: 'GET' }).catch(() => ({ overview_text: null, metrics: null })),
+    api(`/projects/${projectId}/analyze/overview`, { method: 'GET' }).catch(() => ({ overview: null, overview_text: null, metrics: null })),
     api(`/projects/${projectId}/analyze/recommendations`, { method: 'GET' }).catch(() => ({ recommendations: [], metrics: null })),
   ]);
   const recommendations = recRes.recommendations || [];
@@ -509,7 +509,8 @@ export async function getFullProjectAnalysis(projectId) {
     recommendation: r.recommendation ?? r.message ?? '',
   }));
   return {
-    network_overview: overviewRes.overview_text ?? null,
+    overview: overviewRes.overview ?? null,
+    overview_text: overviewRes.overview_text ?? null,
     gap_analysis,
     metrics: overviewRes.metrics || recRes.metrics || null,
   };
