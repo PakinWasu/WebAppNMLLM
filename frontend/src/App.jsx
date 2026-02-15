@@ -301,7 +301,7 @@ export default function App() {
           description: p.description || "",
           manager: manager,
           updated: formatDateTime(p.updated_at || p.created_at),
-          status: p.status ?? (p.visibility === "Shared" ? "Shared" : "Active"),
+          status: p.status ?? null,
           members: members.map(m => ({ username: m.username, role: m.role })),
           devices: deviceCount,
           lastBackup: "—",
@@ -951,7 +951,7 @@ const OverviewPage = ({ project, uploadHistory }) => {
       <Card title="Active Services"><div className="text-3xl font-semibold">{safeDisplay(project?.services)}</div></Card>
     </div>
 
-    {/* Topology (ถ้ามี) */}
+    {/* Topology */}
     {(project.topoUrl || project.topo_url) && (
       <Card title="Topology Diagram">
         <div className="w-full rounded-xl border border-slate-300 dark:border-gray-700 overflow-hidden bg-gray-50 dark:bg-gray-900/50 flex items-center justify-center p-4">
@@ -965,7 +965,7 @@ const OverviewPage = ({ project, uploadHistory }) => {
       </Card>
     )}
 
-    {/* NEW: Drift & Changes (30 days) — ทุกอุปกรณ์ในโปรเจ็กต์ */}
+    {/* Drift & Changes (30 days) — all devices in project */}
     <Card title="Drift & Changes (30 days)">
       <div className="grid gap-4">
         {(project.summaryRows || []).map((r) => {
@@ -2672,7 +2672,7 @@ const DeviceDetailsView = ({ project, deviceId, goBack, goBackHref, goIndex, goI
     return () => { cancelled = true; };
   }, [project?.project_id || project?.id, deviceId, deviceBackups]);
 
-  // default: 2 ไฟล์ล่าสุด
+  // default: 2 most recent files
   const [compareOpen, setCompareOpen] = React.useState(false);
   const [leftFileName, setLeftFileName] = React.useState("");
   const [rightFileName, setRightFileName] = React.useState("");
@@ -2691,7 +2691,7 @@ const DeviceDetailsView = ({ project, deviceId, goBack, goBackHref, goIndex, goI
   const leftFile = deviceBackups.find((f) => f.filename === leftFileName);
   const rightFile = deviceBackups.find((f) => f.filename === rightFileName);
 
-  // diff แบบง่าย (บรรทัดต่อบรรทัด)
+  // simple line-by-line diff
   const simpleDiff = React.useCallback((aText = "", bText = "") => {
     const a = (aText || "").split(/\r?\n/);
     const b = (bText || "").split(/\r?\n/);
@@ -2780,6 +2780,34 @@ const DeviceDetailsView = ({ project, deviceId, goBack, goBackHref, goIndex, goI
     },
     allowedVlansShort: "—", // Not available from parsed data
   };
+
+  // Device Facts per scope 2.3.2.1.1–2.3.2.1.9: 9 primary fields only, for Overview card
+  const lastConfigUpload = deviceData?.upload_timestamp || (deviceBackups[0] && deviceBackups[0].created_at);
+  const deviceFactsPrimary = React.useMemo(() => {
+    const ov = deviceData?.device_overview || {};
+    const hostname = ov.hostname || deviceData?.device_name || deviceId || "—";
+    const role = ov.role || ov.device_status?.role || "—";
+    const model = ov.model || "—";
+    const osVersion = ov.os_version || "—";
+    const serial = ov.serial_number || "—";
+    const mgmtIp = ov.management_ip || ov.mgmt_ip || "—";
+    const uptime = ov.uptime || "—";
+    const cpuVal = ov.cpu_utilization ?? ov.cpu_util;
+    const memVal = ov.memory_usage ?? ov.mem_util;
+    const cpuMem = [cpuVal != null ? `${cpuVal}%` : "", memVal != null ? `${memVal}%` : ""].filter(Boolean).join(" / ") || "—";
+    const lastUpload = lastConfigUpload ? formatDateTime(lastConfigUpload) : "—";
+    return [
+      { key: "hostname", label: "Hostname", value: hostname },
+      { key: "role", label: "Device Type / Role", value: role },
+      { key: "model", label: "Model / Platform", value: model },
+      { key: "osVersion", label: "OS / Firmware Version", value: osVersion },
+      { key: "serial", label: "Serial Number", value: serial },
+      { key: "mgmtIp", label: "Management IP Address", value: mgmtIp },
+      { key: "uptime", label: "Uptime", value: uptime },
+      { key: "cpuMem", label: "CPU / Memory Utilization", value: cpuMem },
+      { key: "lastUpload", label: "Last Configuration Upload", value: lastUpload },
+    ];
+  }, [deviceData, deviceId, deviceBackups, lastConfigUpload]);
   
   // Device narrative - use facts from API data only
   const deviceNarrative = React.useMemo(() => {
@@ -3159,46 +3187,61 @@ const DeviceDetailsView = ({ project, deviceId, goBack, goBackHref, goIndex, goI
     });
   }, [vlansData, interfaces, haData]);
 
-  // Interfaces - transform from API data (include STP fields from parser)
+  // Interfaces - transform from API (scope 2.3.2.2.1–2.3.2.2.16); derive type from name if missing
   const ifaces = React.useMemo(() => {
+    const inferType = (name) => {
+      if (!name || name === "—") return "—";
+      const n = String(name);
+      if (/^Gi(gabit)?Ethernet|^GE/i.test(n)) return "GigabitEthernet";
+      if (/^TenGigabit|^10GE|^XGigabit/i.test(n)) return "TenGigabitEthernet";
+      if (/^FastEthernet|^Fa\b/i.test(n)) return "FastEthernet";
+      if (/^Ethernet\b/i.test(n)) return "Ethernet";
+      if (/^Eth-Trunk|^Port-channel|^Po\b/i.test(n)) return "Aggregate";
+      if (/^Vlan|^Vlanif/i.test(n)) return "SVI";
+      if (/^Loopback|^Lo\b/i.test(n)) return "Loopback";
+      return n.split(/\d/)[0] || "—";
+    };
     return interfaces.map(iface => ({
       port: iface.name || "—",
+      type: iface.type || inferType(iface.name),
       admin: iface.admin_status || "—",
       oper: iface.oper_status || "—",
-      mode: iface.port_mode || "—",
-      accessVlan: iface.access_vlan || null,
-      nativeVlan: iface.native_vlan || null,
-      allowedShort: (Array.isArray(iface.allowed_vlans) ? iface.allowed_vlans.join(",") : (typeof iface.allowed_vlans === 'string' ? iface.allowed_vlans : null)) || "—",
-      poeW: iface.poe_power || null,
+      lineProto: iface.line_protocol || iface.protocol || "—",
+      desc: iface.description || "—",
+      ipv4: iface.ipv4_address || "—",
+      ipv6: iface.ipv6_address || "—",
+      mac: iface.mac_address || "—",
       speed: iface.speed || "—",
       duplex: iface.duplex || "—",
       mtu: iface.mtu != null ? String(iface.mtu) : "—",
-      errors: iface.errors ? `${iface.errors.input || 0}/${iface.errors.output || 0}` : "0/0",
-      stp: stpData.port_states?.[iface.name] || "—",
-      stpRole: iface.stp_role || "—",  // From parser
-      stpState: iface.stp_state || "—",  // From parser
-      stpEdgedPort: iface.stp_edged_port !== undefined ? (iface.stp_edged_port ? "Yes" : "No") : "—",  // From parser
-      ipv4: iface.ipv4_address || "—",
-      desc: iface.description || ""
+      mode: iface.port_mode || "—",
+      accessVlan: iface.access_vlan ?? "—",
+      nativeVlan: iface.native_vlan ?? "—",
+      allowedShort: (Array.isArray(iface.allowed_vlans) ? iface.allowed_vlans.join(", ") : (typeof iface.allowed_vlans === "string" ? iface.allowed_vlans : null)) || "—",
+      stpRole: iface.stp_role || "—",
+      stpState: iface.stp_state || "—",
+      stpEdgedPort: iface.stp_edged_port !== undefined ? (iface.stp_edged_port ? "Yes" : "No") : "—",
+      poeW: iface.poe_power ?? "—",
     }));
   }, [interfaces, stpData]);
+  // Columns per 2.3.2.2: Name, Type, Admin, Oper, Line Proto, Desc, IPv4, IPv6, MAC, Speed, Duplex, MTU, Mode, Access VLAN, Native, Allowed
   const ifaceColumns = [
-    { header: "Port", key: "port" }, 
-    { header: "Admin", key: "admin" }, 
-    { header: "Oper", key: "oper" }, 
-    { header: "Mode", key: "mode" },
-    { header: "IPv4", key: "ipv4", cell: (r) => r.ipv4 || "—" },
-    { header: "Access VLAN", key: "accessVlan", cell: (r) => r.accessVlan ?? "—" },
-    { header: "Native", key: "nativeVlan", cell: (r) => r.nativeVlan ?? "—" },
-    { header: "Allowed VLANs", key: "allowedShort" },
-    { header: "STP Role", key: "stpRole", cell: (r) => r.stpRole || "—" },
-    { header: "STP State", key: "stpState", cell: (r) => r.stpState || "—" },
-    { header: "STP Edged", key: "stpEdgedPort", cell: (r) => r.stpEdgedPort || "—" },
-    { header: "Speed", key: "speed" },
-    { header: "MTU", key: "mtu", cell: (r) => r.mtu ?? "—" },
-    { header: "Duplex", key: "duplex" },
-    { header: "PoE (W)", key: "poeW", cell: (r) => r.poeW ?? "—" },
-    { header: "Description", key: "desc" },
+    { header: "Name", key: "port", title: "2.3.2.2.1 Interface Name", cell: (r) => <span className="font-medium text-slate-800 dark:text-slate-200">{r.port}</span> },
+    { header: "Type", key: "type", title: "2.3.2.2.2 Interface Type", cell: (r) => r.type || "—" },
+    { header: "Admin", key: "admin", title: "2.3.2.2.3 Administrative Status", cell: (r) => r.admin || "—" },
+    { header: "Oper", key: "oper", title: "2.3.2.2.4 Operational Status", cell: (r) => r.oper || "—" },
+    { header: "Line", key: "lineProto", title: "2.3.2.2.5 Line Protocol Status", cell: (r) => r.lineProto || "—" },
+    { header: "Description", key: "desc", title: "2.3.2.2.6 Description", cell: (r) => (r.desc && r.desc !== "—" ? <span className="max-w-[200px] truncate block" title={r.desc}>{r.desc}</span> : "—") },
+    { header: "IPv4", key: "ipv4", title: "2.3.2.2.7 IPv4 Address", cell: (r) => r.ipv4 || "—" },
+    { header: "IPv6", key: "ipv6", title: "2.3.2.2.8 IPv6 Address", cell: (r) => r.ipv6 || "—" },
+    { header: "MAC", key: "mac", title: "2.3.2.2.9 MAC Address", cell: (r) => r.mac || "—" },
+    { header: "Speed", key: "speed", title: "2.3.2.2.10 Speed", cell: (r) => r.speed || "—" },
+    { header: "Duplex", key: "duplex", title: "2.3.2.2.11 Duplex Mode", cell: (r) => r.duplex || "—" },
+    { header: "MTU", key: "mtu", title: "2.3.2.2.12 MTU Value", cell: (r) => r.mtu || "—" },
+    { header: "Mode", key: "mode", title: "2.3.2.2.13 Port Mode", cell: (r) => r.mode || "—" },
+    { header: "Access", key: "accessVlan", title: "2.3.2.2.14 Access VLAN", cell: (r) => r.accessVlan ?? "—" },
+    { header: "Native", key: "nativeVlan", title: "2.3.2.2.15 Native VLAN", cell: (r) => r.nativeVlan ?? "—" },
+    { header: "Allowed VLANs", key: "allowedShort", title: "2.3.2.2.16 Allowed VLAN List", cell: (r) => r.allowedShort || "—" },
   ];
   const [qMode, setQMode] = React.useState("all");
   const [qState, setQState] = React.useState("all");
@@ -3213,7 +3256,7 @@ const DeviceDetailsView = ({ project, deviceId, goBack, goBackHref, goIndex, goI
         if (qState === "down" && isUp) return false;
       }
       if (qVlan && String(r.accessVlan || "") !== String(qVlan)) return false;
-      if (qSpeed !== "all" && r.speed !== qSpeed) return false;
+      if (qSpeed !== "all" && String(r.speed || "").toLowerCase() !== String(qSpeed).toLowerCase()) return false;
       return true;
     });
   }, [ifaces, qMode, qState, qVlan, qSpeed]);
@@ -3241,6 +3284,20 @@ const DeviceDetailsView = ({ project, deviceId, goBack, goBackHref, goIndex, goI
   const [tab, setTab] = React.useState("overview"); // overview | interfaces | vlans | stp | routing | neighbors | macarp | security | ha | raw
   const [rawSubTab, setRawSubTab] = React.useState("parsed"); // parsed | original
   const [llmPanelTab, setLlmPanelTab] = React.useState("summary"); // summary | recommendations | drift — folder-like selection for LLM section
+  const [routeTableSearch, setRouteTableSearch] = React.useState("");
+  const filteredRouteTable = React.useMemo(() => {
+    const r = routingData.routes || [];
+    if (!routeTableSearch.trim()) return r;
+    const q = routeTableSearch.trim().toLowerCase();
+    const protocolLabels = { O: "ospf", C: "connected", L: "local", S: "static", B: "bgp", R: "rip", D: "eigrp", i: "isis" };
+    return r.filter((row) => {
+      const protoLabel = (row.protocol && protocolLabels[row.protocol]) || (row.protocol || "").toLowerCase();
+      return (protoLabel && protoLabel.includes(q))
+        || (row.network && row.network.toLowerCase().includes(q))
+        || (row.next_hop && String(row.next_hop).toLowerCase().includes(q))
+        || (row.interface && String(row.interface).toLowerCase().includes(q));
+    });
+  }, [routingData.routes, routeTableSearch]);
 
   // Config drift: compare two latest versions from version history (raw config files)
   const driftSummary = React.useMemo(() => {
@@ -3603,51 +3660,13 @@ const DeviceDetailsView = ({ project, deviceId, goBack, goBackHref, goIndex, goI
             </div>
           </div>
 
-          {/* Bottom: Device Facts full width */}
+          {/* Bottom: Device Facts — scope 2.3.2.1.1–2.3.2.1.9 (9 primary fields) */}
           <div className="flex-shrink-0 rounded-xl border border-slate-300 dark:border-slate-800 bg-white dark:bg-slate-900/50 overflow-hidden shadow-sm dark:shadow-none">
             <Card title="Device Facts">
-              <div className="grid gap-3 grid-cols-2 sm:grid-cols-4 md:grid-cols-6 text-xs max-h-[220px] overflow-auto">
-                <Metric k="Model" v={facts.model || "—"} />
-                <Metric k="OS / Version" v={facts.osVersion || "—"} />
-                <Metric k="Serial" v={facts.serial || "—"} />
-                <Metric k="Mgmt IP" v={facts.mgmtIp || "—"} />
-                <Metric k="Role" v={facts.role || "—"} />
-                <Metric k="Uptime" v={facts.uptime || "—"} />
-                <Metric k="VLAN Count" v={facts.vlanCount ?? "—"} />
-                <Metric k="Allowed VLANs (short)" v={facts.allowedVlansShort || "—"} />
-                <Metric k="STP Mode" v={facts.stpMode || "—"} />
-                <Metric k="STP Root" v={facts.stpRoot || "—"} />
-                <Metric k="SVIs" v={facts.sviCount ?? "—"} />
-                <Metric k="HSRP Groups" v={facts.hsrpGroups ?? "—"} />
-                <Metric k="Routing" v={facts.routing || "—"} />
-                <Metric k="OSPF Neighbors" v={facts.ospfNeighbors ?? "—"} />
-                <Metric k="BGP ASN" v={facts.bgpAsn ?? "—"} />
-                <Metric k="BGP Neighbors" v={facts.bgpNeighbors ?? "—"} />
-                <Metric k="CDP / LLDP" v={`${facts.cdpNeighbors ?? "—"} / ${facts.lldpNeighbors ?? "—"}`} />
-                <Metric k="NTP" v={facts.ntpStatus || "—"} />
-                <Metric k="SNMP" v={facts.snmp || "—"} />
-                <Metric k="Syslog" v={facts.syslog || "—"} />
-                <Metric k="CPU %" v={facts.cpu != null && facts.cpu !== "—" ? `${facts.cpu}%` : "—"} />
-                <Metric k="Memory %" v={facts.mem != null && facts.mem !== "—" ? `${facts.mem}%` : "—"} />
-                <Metric k="Hostname" v={overview.hostname || "—"} />
-                <Metric k="Management IP" v={overview.management_ip || overview.mgmt_ip || "—"} />
-                {overview.device_status && Object.keys(overview.device_status).length > 0 && (
-                  <>
-                    <Metric k="Device Slot" v={overview.device_status.slot || "—"} />
-                    <Metric k="Device Type" v={overview.device_status.type || "—"} />
-                    <Metric k="Device Status" v={overview.device_status.status || "—"} />
-                    <Metric k="Device Role" v={overview.device_status.role || "—"} />
-                  </>
-                )}
-                <Metric
-                  k="Ifaces (T/U/D/A)"
-                  v={
-                    facts.ifaces
-                      ? `${facts.ifaces.total} / ${facts.ifaces.up} / ${facts.ifaces.down} / ${facts.ifaces.adminDown}`
-                      : "—"
-                  }
-                />
-                <Metric k="Ports (Access/Trunk)" v={`${facts.accessCount ?? "—"}/${facts.trunkCount ?? "—"}`} />
+              <div className="grid gap-3 grid-cols-1 sm:grid-cols-2 md:grid-cols-3 text-xs">
+                {deviceFactsPrimary.map((item) => (
+                  <Metric key={item.key} k={item.label} v={item.value} />
+                ))}
               </div>
             </Card>
           </div>
@@ -3677,7 +3696,7 @@ const DeviceDetailsView = ({ project, deviceId, goBack, goBackHref, goIndex, goI
             </Field>
             <Field label="Speed">
               <Select value={qSpeed} onChange={setQSpeed} options={[
-                {value:"all",label:"All"},{value:"10G",label:"10G"},{value:"1G",label:"1G"},{value:"auto",label:"auto"}
+                {value:"all",label:"All"},{value:"10Gbps",label:"10Gbps"},{value:"2Gbps",label:"2Gbps"},{value:"1Gbps",label:"1Gbps"},{value:"100Mbps",label:"100Mbps"},{value:"auto",label:"Auto"}
               ]}/>
             </Field>
             <div className="flex items-end">
@@ -3768,9 +3787,17 @@ const DeviceDetailsView = ({ project, deviceId, goBack, goBackHref, goIndex, goI
       {/* ROUTING */}
       {!loading && !error && tab === "routing" && (
         <div className="grid gap-6">
-          {/* Full route table (O, C, L, S from show ip route) */}
+          {/* Full route table (Cisco show ip route / Huawei display ip routing-table) */}
           {routingData.routes && Array.isArray(routingData.routes) && routingData.routes.length > 0 && (
-            <Card title={`Route table (${routingData.routes.length} routes)`}>
+            <Card title={`Route table (${filteredRouteTable.length}${routeTableSearch.trim() ? ` / ${routingData.routes.length}` : ""} routes)`}>
+              <div className="mb-3">
+                <Input
+                  placeholder="Search protocol, network, next hop, interface..."
+                  value={routeTableSearch}
+                  onChange={(e) => setRouteTableSearch(e.target.value)}
+                  className="w-full max-w-md rounded-xl border-slate-300 dark:border-slate-600"
+                />
+              </div>
               <div className="h-[50vh] overflow-auto rounded-2xl border border-slate-300 dark:border-[#1F2937]">
                 <Table
                   columns={[
@@ -3779,8 +3806,8 @@ const DeviceDetailsView = ({ project, deviceId, goBack, goBackHref, goIndex, goI
                     { header: "Next hop", key: "next_hop", cell: (r) => r.next_hop || "—" },
                     { header: "Interface", key: "interface", cell: (r) => r.interface || "—" }
                   ]}
-                  data={routingData.routes}
-                  empty="No routes"
+                  data={filteredRouteTable}
+                  empty={routeTableSearch.trim() ? "No routes match search" : "No routes"}
                   minWidthClass="min-w-[800px]"
                 />
               </div>
@@ -9142,7 +9169,7 @@ function getComparePair(project, device) {
     .filter(f => f.name.toLowerCase().includes(device.replace(/-/g, "_")))
     .sort((a,b)=> (b.modified||"").localeCompare(a.modified||""));
 
-  if (hits.length >= 2) return [hits[1].name, hits[0].name]; // เก่ากว่า -> ใหม่กว่า
+  if (hits.length >= 2) return [hits[1].name, hits[0].name]; // older -> newer
   return ["—", "—"];
 }
 
@@ -9153,13 +9180,13 @@ function getDriftLines(device) {
 
 
 
-// 2) กราฟอย่างง่ายด้วย SVG (จัดวางแบบวงกลม)
+// 2) Simple SVG graph (circular layout)
 const TopoGraph = ({ nodes = [], links = [], getNodeTooltip, onNodeClick }) => {
   const size = { w: 780, h: 420 };
   const R = Math.min(size.w, size.h) * 0.36;
   const cx = size.w / 2, cy = size.h / 2;
 
-  // จัดวาง: โหนดแรก (ถ้า role=Core) อยู่กลาง, ที่เหลือวางรอบวง
+  // Layout: first node (if role=Core) at center, rest around circle
   const coreIdx = nodes.findIndex(n => n.role === "Core");
   const ordered = coreIdx >= 0 ? [nodes[coreIdx], ...nodes.filter((_,i)=>i!==coreIdx)] : nodes;
   const positions = {};
@@ -9173,7 +9200,7 @@ const TopoGraph = ({ nodes = [], links = [], getNodeTooltip, onNodeClick }) => {
     }
   });
 
-  // สีโหนดตามบทบาท
+  // Node color by role
   const colorByRole = (role) =>
     role === "Core" ? "#2563eb" : role === "Distribution" ? "#16a34a" : "#f59e0b";
 
@@ -9531,7 +9558,7 @@ const NetworkDeviceIcon = ({ role, isSelected, isLinkStart, size = 8, imageUrl =
   );
 };
 
-/* ===== จัดบทบาทโดยเดาชื่อ (core/distribution/access) ===== */
+/* ===== Infer role from name (core/distribution/access) ===== */
 function classifyRoleByName(name = "") {
   const n = (name || "").toLowerCase();
   if (n.includes("core")) return "core";
@@ -11409,8 +11436,7 @@ const TopologyGraph = ({ project, projectId, routeToHash, handleNavClick, onOpen
 
 /* ===== Topology helpers (fallback when deriveLinksFromProject not available) ===== */
 function deriveLinksFromProject(project) {
-  // ถ้าคุณมีฟังก์ชันนี้อยู่แล้ว ให้ใช้ของเดิมได้เลย
-  // ตรงนี้คือ fallback: เดาว่า core เชื่อม distribution และ access
+  // Fallback: assume core connects to distribution and access
   const names = (project.summaryRows || []).map(r => r.device);
   const core = names.find(n => /core/i.test(n));
   const dist = names.find(n => /dist|distribution/i.test(n));
@@ -11421,7 +11447,7 @@ function deriveLinksFromProject(project) {
   return links;
 }
 
-/* ===== สรุปโครง STP โดยกว้าง ===== */
+/* ===== STP structure summary ===== */
 function summarizeStp(project) {
   const rows = project.summaryRows || [];
   const modeByDev = {};
@@ -11429,7 +11455,7 @@ function summarizeStp(project) {
   rows.forEach(r => {
     if (r.device) {
       modeByDev[r.device] = r.stpMode || "—";
-      rootStatus[r.device] = r.stpRoot; // อาจเป็น "Yes"/"No"/"—"
+      rootStatus[r.device] = r.stpRoot; // e.g. "Yes"/"No"/"—"
     }
   });
   const rootCandidates = Object.entries(rootStatus)

@@ -7,6 +7,8 @@ export default function Table({
   empty = "No data",
   containerClassName = "",
   minWidthClass = "min-w-full",
+  onRowClick,
+  selectedIndex,
 }) {
   const textSizeClass = containerClassName.includes("text-[")
     ? containerClassName.match(/text-\[[^\]]+\]/)?.[0]
@@ -28,6 +30,7 @@ export default function Table({
             {columns.map((c) => (
               <th
                 key={c.key || c.header}
+                title={c.title || undefined}
                 className={`px-2 py-1.5 text-left ${headerAtLeastXs} font-semibold uppercase tracking-wider text-slate-800 dark:text-gray-200 border-b border-slate-300 dark:border-gray-700 whitespace-nowrap`}
                 style={c.width ? { minWidth: c.width } : undefined}
               >
@@ -50,7 +53,11 @@ export default function Table({
           {data.map((row, i) => (
             <tr
               key={i}
-              className="hover:bg-gray-50 dark:hover:bg-gray-800/50 transition-colors"
+              role={onRowClick ? "button" : undefined}
+              tabIndex={onRowClick ? 0 : undefined}
+              onClick={onRowClick ? () => onRowClick(row, i) : undefined}
+              onKeyDown={onRowClick ? (e) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); onRowClick(row, i); } } : undefined}
+              className={`transition-colors ${onRowClick ? "cursor-pointer" : ""} ${selectedIndex === i ? "bg-sky-100 dark:bg-sky-900/30 ring-inset ring-1 ring-sky-300 dark:ring-sky-600" : "hover:bg-gray-50 dark:hover:bg-gray-800/50"}`}
             >
               {columns.map((c) => {
                 let cellContent;

@@ -96,21 +96,25 @@ export default function ProjectIndex({
               key={p.id || p.project_id}
               className="overflow-hidden flex flex-col hover:shadow-xl transition-all duration-300 hover:-translate-y-0.5 border-slate-200 dark:border-slate-700"
               title={
-                <div className="flex items-center gap-2 min-w-0 w-full">
+                <div className="flex items-center justify-between gap-2 w-full min-w-0">
                   <span className="truncate font-semibold text-slate-800 dark:text-slate-100" title={safeDisplay(p.name)}>
                     {safeDisplay(p.name)}
                   </span>
-                  <Badge
-                    className={`flex-shrink-0 ml-auto ${
-                      (p.status || "").toLowerCase() === "shared"
-                        ? "bg-blue-100 text-blue-800 dark:bg-blue-900/40 dark:text-blue-200"
-                        : (p.status || "").toLowerCase() === "inactive" || (p.status || "").toLowerCase() === "archived"
-                        ? "bg-slate-200 text-slate-700 dark:bg-slate-600 dark:text-slate-200"
-                        : "bg-emerald-100 text-emerald-800 dark:bg-emerald-900/40 dark:text-emerald-200"
-                    }`}
-                  >
-                    {safeDisplay(p.status) || "Active"}
-                  </Badge>
+                  <span className="flex-shrink-0">
+                    <Badge
+                      className={
+                        (p.status || "").toLowerCase() === "shared"
+                          ? "bg-blue-100 text-blue-800 dark:bg-blue-900/40 dark:text-blue-200"
+                          : (p.status || "").toLowerCase() === "inactive" || (p.status || "").toLowerCase() === "archived"
+                          ? "bg-slate-200 text-slate-700 dark:bg-slate-600 dark:text-slate-200"
+                          : (p.status || "").toLowerCase() === "production"
+                          ? "bg-emerald-100 text-emerald-800 dark:bg-emerald-900/40 dark:text-emerald-200"
+                          : "bg-slate-100 text-slate-700 dark:bg-slate-600 dark:text-slate-200"
+                      }
+                    >
+                      {safeDisplay(p.status) || "—"}
+                    </Badge>
+                  </span>
                 </div>
               }
             >
@@ -154,8 +158,14 @@ export default function ProjectIndex({
                 </p>
               )}
 
-              {/* Metadata: manager, updated, devices (real data) */}
+              {/* Metadata: status, manager, updated, devices (real data) */}
               <div className="flex flex-wrap gap-x-5 gap-y-2 text-xs text-slate-500 dark:text-slate-400 pt-2 border-t border-slate-200 dark:border-slate-700">
+                <span className="flex items-center gap-1.5" title="Status">
+                  <svg className="w-4 h-4 text-slate-400 dark:text-slate-500 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
+                  </svg>
+                  <span className="font-medium text-slate-700 dark:text-slate-300">{safeDisplay(p.status) || "—"}</span>
+                </span>
                 <span className="flex items-center gap-1.5" title="Manager">
                   <svg className="w-4 h-4 text-slate-400 dark:text-slate-500 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
