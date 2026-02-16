@@ -762,14 +762,20 @@ class CiscoIOSParser(BaseParser):
                     "allowed_vlans": (allow_m.group(1).strip() if allow_m else "all"),
                 })
         # Source 2 (Verbose): show vlan or show vlan brief - ^(\d+)\s+(\S+)\s+(active|act/lshut|suspend|act/unsup)
+        # Skip header lines: VLAN, VID, Type, Ports, ----, etc. Do not parse "Vlan" as VLAN id.
         show_vlan = _get_section(content, r"show\s+vlan\s+brief") or _get_section(content, r"show\s+vlan\s")
+        vlan_ids_seen_in_table = set()
         if show_vlan:
             status_re = re.compile(r"^(\d+)\s+(\S+)\s+(active|act/lshut|suspend|act/unsup)", re.IGNORECASE)
             lines = show_vlan.split("\n")
             i = 0
             while i < len(lines):
                 line = lines[i]
-                mm = status_re.search(line.strip())
+                line_strip = line.strip()
+                if line_strip.startswith("VLAN") or line_strip.startswith("VID") or line_strip.startswith("----") or (line_strip.startswith("Vlan") and not line_strip[4:5].isdigit()):
+                    i += 1
+                    continue
+                mm = status_re.search(line_strip)
                 if mm:
                     try:
                         vid = int(mm.group(1))
@@ -784,6 +790,7 @@ class CiscoIOSParser(BaseParser):
                         ports_str += " " + lines[i].strip()
                         i += 1
                     port_list = re.findall(r"(?:Gi|Fa|Eth|Po|GigabitEthernet|FastEthernet|Port-channel)\S*", ports_str, re.IGNORECASE)
+                    vlan_ids_seen_in_table.add(vid)
                     if vid not in details_by_id:
                         details_by_id[vid] = {"id": str(vid), "name": name, "status": status, "ports": []}
                     else:
@@ -792,6 +799,15 @@ class CiscoIOSParser(BaseParser):
                     if port_list:
                         details_by_id[vid]["ports"] = list(dict.fromkeys(port_list))
                 i += 1
+        # Config-only VLANs: if show was parsed, set status to "Configured (Inactive)" when not in table
+        if show_vlan and vlan_ids_seen_in_table:
+            for vid, d in list(details_by_id.items()):
+                try:
+                    v = int(d["id"])
+                    if v not in vlan_ids_seen_in_table and d.get("status") == "active":
+                        d["status"] = "Configured (Inactive)"
+                except (ValueError, TypeError):
+                    pass
         vlan_list = [{"id": d["id"], "name": d["name"], "status": d.get("status", "active")} for d in sorted(details_by_id.values(), key=lambda d: int(d["id"]) if d["id"].isdigit() else 9999) if d["id"].isdigit()]
         details = [{"id": d["id"], "name": d["name"], "status": d.get("status", "active"), "ports": d.get("ports") or []} for d in sorted(details_by_id.values(), key=lambda d: int(d["id"]) if d["id"].isdigit() else 9999)]
         return {
@@ -828,25 +844,44 @@ class CiscoIOSParser(BaseParser):
                     pass
             if "this bridge is the root" in show_stp.lower() and not stp["root_bridges"]:
                 stp["root_bridges"].append(1)
-            # Port table: "Port 1 (GigabitEthernet0/0) of VLAN0001 is designated forwarding" or "Port ... is root forwarding"
-            port_block_re = re.compile(r"Port\s+\d+\s+\((\S+)\)\s+of\s+VLAN\d+\s+is\s+(\w+)\s+(\w+)", re.IGNORECASE)
-            for pm in port_block_re.finditer(show_stp):
-                port_name = pm.group(1)
-                role_raw = (pm.group(2) or "").lower()
-                state_raw = (pm.group(3) or "").lower()
-                role = "Desg" if "designated" in role_raw or "desg" in role_raw else "Root" if "root" in role_raw else "Altn" if "alternate" in role_raw else "Back" if "backup" in role_raw else role_raw[:4].capitalize()
-                state = "FWD" if "forward" in state_raw else "BLK" if "block" in state_raw else "LRN" if "learn" in state_raw else state_raw[:3].upper()
-                cost_m = re.search(re.escape(port_name) + r".*?Port\s+path\s+cost\s+(\d+)", show_stp, re.IGNORECASE | re.DOTALL)
-                prio_m = re.search(re.escape(port_name) + r".*?Port\s+priority\s+(\d+)", show_stp, re.IGNORECASE | re.DOTALL)
-                edge_m = re.search(re.escape(port_name) + r".*?Edge\s+P2p|portfast", show_stp, re.IGNORECASE | re.DOTALL)
-                rec = {"port": port_name, "role": role, "state": state}
-                if cost_m:
-                    rec["cost"] = int(cost_m.group(1))
-                if prio_m:
-                    rec["priority"] = int(prio_m.group(1))
-                if edge_m:
-                    rec["edge_p2p"] = True
-                stp["interfaces"].append(rec)
+            # Port table (line-based): skip headers; regex ^(\S+)\s+(Desg|Root|Altn|Back)\s+(FWD|BLK|LRN)\s+(\d+)\s+(\d+\.\d+)
+            port_line_re = re.compile(r"^(\S+)\s+(Desg|Root|Altn|Back)\s+(FWD|BLK|LRN)\s+(\d+)\s+(\d+\.\d+)", re.IGNORECASE)
+            for line in show_stp.split("\n"):
+                line_strip = line.strip()
+                if not line_strip or line_strip.startswith("Port") and "Role" in line_strip or line_strip.startswith("----"):
+                    continue
+                pm = port_line_re.match(line_strip)
+                if pm:
+                    port_name, role, state = pm.group(1), pm.group(2), pm.group(3)
+                    cost_val = int(pm.group(4)) if pm.group(4).isdigit() else None
+                    prio_val = float(pm.group(5)) if pm.group(5) else None
+                    rec = {"port": port_name, "role": role, "state": state}
+                    if cost_val is not None:
+                        rec["cost"] = cost_val
+                    if prio_val is not None:
+                        rec["priority"] = int(prio_val)
+                    if not any(x.get("port") == port_name for x in stp["interfaces"]):
+                        stp["interfaces"].append(rec)
+            # Fallback: block-style "Port N (Gi0/0) of VLAN0001 is designated forwarding"
+            if not stp["interfaces"]:
+                port_block_re = re.compile(r"Port\s+\d+\s+\((\S+)\)\s+of\s+VLAN\d+\s+is\s+(\w+)\s+(\w+)", re.IGNORECASE)
+                for pm in port_block_re.finditer(show_stp):
+                    port_name = pm.group(1)
+                    role_raw = (pm.group(2) or "").lower()
+                    state_raw = (pm.group(3) or "").lower()
+                    role = "Desg" if "designated" in role_raw or "desg" in role_raw else "Root" if "root" in role_raw else "Altn" if "alternate" in role_raw else "Back" if "backup" in role_raw else role_raw[:4].capitalize()
+                    state = "FWD" if "forward" in state_raw else "BLK" if "block" in state_raw else "LRN" if "learn" in state_raw else state_raw[:3].upper()
+                    cost_m = re.search(re.escape(port_name) + r".*?Port\s+path\s+cost\s+(\d+)", show_stp, re.IGNORECASE | re.DOTALL)
+                    prio_m = re.search(re.escape(port_name) + r".*?Port\s+priority\s+(\d+)", show_stp, re.IGNORECASE | re.DOTALL)
+                    edge_m = re.search(re.escape(port_name) + r".*?Edge\s+P2p|portfast", show_stp, re.IGNORECASE | re.DOTALL)
+                    rec = {"port": port_name, "role": role, "state": state}
+                    if cost_m:
+                        rec["cost"] = int(cost_m.group(1))
+                    if prio_m:
+                        rec["priority"] = int(prio_m.group(1))
+                    if edge_m:
+                        rec["edge_p2p"] = True
+                    stp["interfaces"].append(rec)
         return stp
     
     def extract_routing(self, content: str) -> Dict[str, Any]:
@@ -1070,7 +1105,7 @@ class CiscoIOSParser(BaseParser):
         """2.3.2.7 - MAC & ARP tables; filter headers (Vlan, Mac Address, Type, Interface, ----, Total)."""
         arp_entries: List[Dict[str, Any]] = []
         mac_entries: List[Dict[str, Any]] = []
-        _skip = lambda line: any(kw in line for kw in ("Vlan", "Mac Address", "Type", "Interface", "----", "Total")) or not line.strip()
+        _skip = lambda line: any(kw in line for kw in ("Vlan", "Mac Address", "Type", "Interface", "Protocol", "Address", "----", "Total")) or not line.strip()
         # show ip arp: Internet  IP  Age  Hardware Addr  Type  Interface
         arp_block = _get_section(content, r"show\s+ip\s+arp") or _get_section(content, r"show\s+arp")
         if arp_block:
@@ -1093,10 +1128,14 @@ class CiscoIOSParser(BaseParser):
                     continue
                 m = re.search(r"^\s*(\d+)\s+([0-9a-fA-F\.]+)\s+(\w+)\s+(\S+)", line)
                 if m:
-                    vlan, mac, typ, port = m.group(1), m.group(2), m.group(3), m.group(4)
-                    if not re.match(r"[\da-fA-F\.]{12,}", mac.replace(".", "")):
+                    vlan_s, mac, typ, port = m.group(1), m.group(2), m.group(3), m.group(4)
+                    if vlan_s.lower() == "vlan" or not re.match(r"[\da-fA-F\.]{12,}", mac.replace(".", "").replace("-", "")):
                         continue
-                    mac_entries.append({"vlan": int(vlan), "mac_address": mac, "type": typ, "port": port})
+                    try:
+                        vlan = int(vlan_s)
+                    except ValueError:
+                        continue
+                    mac_entries.append({"vlan": vlan, "mac_address": mac, "type": typ, "port": port})
         return {"arp_entries": arp_entries, "mac_entries": mac_entries}
     
     def extract_security(self, content: str) -> Dict[str, Any]:

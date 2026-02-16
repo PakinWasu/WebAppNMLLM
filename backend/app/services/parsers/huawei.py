@@ -1510,18 +1510,23 @@ class HuaweiParser(BaseParser):
                     "native_vlan": pvid_m.group(1) if pvid_m else "1",
                     "allowed_vlans": allow_m.group(1).strip() if allow_m else "all",
                 })
-        # Source 2 (Verbose): display vlan - ^(\d+)\s+(\S+)\s+(common)\s+(enable|disable)
+        # Source 2 (Verbose): display vlan - skip headers (VID, Type, Ports, ----); ^(\d+)\s+(\S+)\s+(common)\s+(enable|disable) or ^(\d+)\s+(enable|disable)
         disp_vlan = re.search(r'display\s+vlan(.*?)(?=display\s+|#\s*$|\n\s*<)', content, re.IGNORECASE | re.DOTALL)
+        vlan_ids_seen_in_table = set()
         if disp_vlan:
             block = disp_vlan.group(1)
             for line in block.split('\n'):
-                # VLAN ID, Name, Type (common), Status (enable/disable)
-                vm = re.match(r'^\s*(\d+)\s+(\S+)\s+(common)\s+(enable|disable)', line.strip(), re.IGNORECASE)
+                line_strip = line.strip()
+                if line_strip.startswith('VID') or line_strip.startswith('---') or line_strip.startswith('U:') or 'Ports' in line_strip and 'Type' in line_strip:
+                    continue
+                # VID Name common enable|disable
+                vm = re.match(r'^\s*(\d+)\s+(\S+)\s+(common)\s+(enable|disable)', line_strip, re.IGNORECASE)
                 if vm:
                     try:
                         vid = int(vm.group(1))
                         name = vm.group(2)
                         status = "active" if (vm.group(4) or "").lower() == "enable" else "inactive"
+                        vlan_ids_seen_in_table.add(vid)
                     except (ValueError, IndexError):
                         continue
                     if vid not in details_by_id:
@@ -1529,6 +1534,25 @@ class HuaweiParser(BaseParser):
                     else:
                         details_by_id[vid]["name"] = name
                         details_by_id[vid]["status"] = status
+                else:
+                    # VID Status Property (e.g. "1    enable  default")
+                    vm2 = re.match(r'^\s*(\d+)\s+(enable|disable)\s+(\S+)', line_strip, re.IGNORECASE)
+                    if vm2:
+                        try:
+                            vid = int(vm2.group(1))
+                            status = "active" if (vm2.group(2) or "").lower() == "enable" else "inactive"
+                            vlan_ids_seen_in_table.add(vid)
+                        except (ValueError, IndexError):
+                            continue
+                        if vid in details_by_id:
+                            details_by_id[vid]["status"] = status
+                        else:
+                            details_by_id[vid] = {"id": str(vid), "name": f"VLAN{vid:04d}", "status": status, "ports": []}
+        # Config-only VLANs: status = "Configured (Inactive)" when not in display vlan table
+        if disp_vlan and vlan_ids_seen_in_table:
+            for vid, d in list(details_by_id.items()):
+                if vid not in vlan_ids_seen_in_table and d.get("status") == "active":
+                    d["status"] = "Configured (Inactive)"
         vlan_list = [{"id": str(vid), "name": d["name"], "status": d.get("status", "active")} for vid, d in sorted(details_by_id.items())]
         details = [{"id": d["id"], "name": d["name"], "status": d.get("status", "active"), "ports": d.get("ports") or []} for d in sorted(details_by_id.values(), key=lambda x: int(x["id"]) if x["id"].isdigit() else 9999)]
         return {
@@ -1591,44 +1615,30 @@ class HuaweiParser(BaseParser):
             if stp_mode_match:
                 stp["stp_mode"] = stp_mode_match.group(1).upper()
         
-        # Extract STP interfaces from "display stp brief"
+        # Extract STP interfaces from "display stp brief" - regex ^(\S+)\s+(DESI|ROOT|ALTE)\s+(FORWARDING|DISCARDING)
         stp_brief_section = re.search(r'display\s+stp\s+brief(.*?)(?=display|#|$)', content, re.IGNORECASE | re.DOTALL)
         if stp_brief_section:
             brief_output = stp_brief_section.group(1)
-            # Parse table format: "MSTID  Port                        Role  STP State     Protection"
-            # Example: "   0    GigabitEthernet0/0/1        DESI  FORWARDING      NONE"
+            # Format: "0  GigabitEthernet0/0/1  DESI  FORWARDING" (MSTID optional first column)
+            port_line_re = re.compile(r'^\s*(?:\d+\s+)?(\S+)\s+(DESI|ROOT|ALTE|BACK)\s+(FORWARDING|DISCARDING|LEARNING)', re.IGNORECASE)
             lines = brief_output.split('\n')
-            header_found = False
             for line in lines:
                 line_stripped = line.strip()
-                # Skip empty lines
                 if not line_stripped:
                     continue
-                
-                # Skip header lines
-                if 'MSTID' in line_stripped or ('Port' in line_stripped and 'Role' in line_stripped and 'STP' in line_stripped):
-                    header_found = True
+                if line_stripped.startswith('MSTID') or ('Port' in line_stripped and 'Role' in line_stripped) or line_stripped.startswith('---') or line_stripped.startswith('===') or line_stripped.startswith('<'):
                     continue
-                
-                # Skip separator lines
-                if line_stripped.startswith('---') or line_stripped.startswith('===') or line_stripped.startswith('<'):
-                    continue
-                
-                # Parse data lines - split by whitespace but handle multiple spaces
-                parts = [p for p in line_stripped.split() if p]  # Remove empty strings
-                if len(parts) >= 4:
-                    mstid = parts[0]  # First column is MSTID
-                    port = parts[1]  # Second column is port name
-                    role = parts[2]  # Third column is role (DESI, ROOT, ALTE, etc.)
-                    state = parts[3]  # Fourth column is state (FORWARDING, BLOCKING, etc.)
-                    
-                    # Validate port is an interface name
-                    if is_valid_interface_name(port):
-                        stp["interfaces"].append({
-                            "port": port,
-                        "role": role,
-                        "state": state,
-                        })
+                pm = port_line_re.match(line_stripped)
+                if pm:
+                    port, role, state = pm.group(1), pm.group(2).upper(), pm.group(3).upper()
+                    if is_valid_interface_name(port) and not any(x.get("port") == port for x in stp["interfaces"]):
+                        stp["interfaces"].append({"port": port, "role": role, "state": state})
+                else:
+                    parts = [p for p in line_stripped.split() if p]
+                    if len(parts) >= 4 and is_valid_interface_name(parts[1]):
+                        port, role, state = parts[1], parts[2], parts[3]
+                        if not any(x.get("port") == port for x in stp["interfaces"]):
+                            stp["interfaces"].append({"port": port, "role": role, "state": state})
         
         # Check for portfast (edged-port)
         if re.search(r'stp\s+edged-port\s+default', content, re.IGNORECASE):
@@ -2041,7 +2051,7 @@ class HuaweiParser(BaseParser):
                 line = line.strip()
                 if not line:
                     continue
-                if '----' in line or 'Vlan' in line or 'Mac Address' in line or 'Type' in line or 'Interface' in line or 'Total' in line:
+                if any(kw in line for kw in ('----', 'Vlan', 'Mac Address', 'Type', 'Interface', 'Total', 'Protocol', 'Address')):
                     continue
                 if line.startswith('---'):
                     continue
@@ -2083,7 +2093,7 @@ class HuaweiParser(BaseParser):
                     continue
                 if line.startswith('---') or '---' in line:
                     continue
-                if any(keyword in line for keyword in ['IP ADDRESS', 'Total:', 'Dynamic:', 'Static:', 'Interface:', 'Slot', 'Type']):
+                if any(keyword in line for keyword in ['IP ADDRESS', 'Total:', 'Dynamic:', 'Static:', 'Interface:', 'Slot', 'Type', 'Protocol', 'Address', 'Vlan']):
                     continue
                 
                 parts = line.split()
