@@ -7262,7 +7262,6 @@ const DocumentsPage = ({ project, can, authedUser, uploadHistory, setUploadHisto
           files: [],
         },
       ],
-      files: [],
     };
 
     // Merge custom folders into base structure

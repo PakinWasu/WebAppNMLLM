@@ -13,6 +13,18 @@ from .parsers.cisco import CiscoIOSParser
 from .parsers.huawei import HuaweiParser
 
 
+def _normalize_acls(audit_acls: Any, mgmt_acls: Any) -> List[Dict[str, Any]]:
+    """Produce unified acls list: [{ name, type, rules }]. Prefer audit_acls when present and structured."""
+    if isinstance(audit_acls, list) and audit_acls and isinstance(audit_acls[0], dict):
+        return [
+            {"name": a.get("name"), "type": a.get("type") or "Extended", "rules": a.get("rules") or []}
+            for a in audit_acls if a.get("name") is not None
+        ]
+    if isinstance(mgmt_acls, list):
+        return [{"name": a, "type": "Extended", "rules": []} for a in mgmt_acls if isinstance(a, (str, int))]
+    return []
+
+
 def normalize_cisco_to_legacy(parsed: Dict[str, Any]) -> Dict[str, Any]:
     """
     Map Cisco IOS parser spec output to legacy stored format so that
@@ -62,16 +74,27 @@ def normalize_cisco_to_legacy(parsed: Dict[str, Any]) -> Dict[str, Any]:
             "allowed_vlans": i.get("allowed_vlans"),
         })
 
-    # vlans: dict with vlan_list/details/access_ports/trunk_ports or list [{id,name,status}]
+    # vlans: dict with vlan_list (IDs as strings or list of dicts), details, access_ports, trunk_ports
     _vlans_raw = parsed.get("vlans")
     if isinstance(_vlans_raw, dict):
         vlan_list_spec = _vlans_raw.get("vlan_list") or []
+        details_spec = _vlans_raw.get("details") or []
+        # Support vlan_list as ["1", "10", ...] or as [{"id": "1", "name": "...", "status": "..."}, ...]
+        if vlan_list_spec and isinstance(vlan_list_spec[0], dict):
+            vlan_list = [str(v.get("id")) for v in vlan_list_spec if v.get("id") is not None]
+            vlan_names = {str(v["id"]): v.get("name") or str(v["id"]) for v in vlan_list_spec if v.get("id") is not None}
+            vlan_status = {str(v["id"]): v.get("status") or "active" for v in vlan_list_spec if v.get("id") is not None}
+        else:
+            vlan_list = [str(v) for v in vlan_list_spec if v is not None]
+            detail_by_id = {str(d.get("id")): d for d in details_spec if d.get("id") is not None}
+            vlan_names = {vid: (detail_by_id.get(vid) or {}).get("name") or vid for vid in vlan_list}
+            vlan_status = {vid: (detail_by_id.get(vid) or {}).get("status") or "active" for vid in vlan_list}
         vlans = {
-            "vlan_list": [str(v.get("id")) for v in vlan_list_spec if v.get("id") is not None],
-            "vlan_names": {str(v["id"]): v.get("name") or str(v["id"]) for v in vlan_list_spec if v.get("id") is not None},
-            "vlan_status": {str(v["id"]): v.get("status") or "active" for v in vlan_list_spec if v.get("id") is not None},
-            "total_vlan_count": _vlans_raw.get("total_count", len(vlan_list_spec)),
-            "details": _vlans_raw.get("details", []),
+            "vlan_list": vlan_list,
+            "vlan_names": vlan_names,
+            "vlan_status": vlan_status,
+            "total_vlan_count": _vlans_raw.get("total_vlan_count") or _vlans_raw.get("total_count") or len(vlan_list),
+            "details": details_spec,
             "access_ports": _vlans_raw.get("access_ports", []),
             "trunk_ports": _vlans_raw.get("trunk_ports", []),
         }
@@ -89,35 +112,57 @@ def normalize_cisco_to_legacy(parsed: Dict[str, Any]) -> Dict[str, Any]:
             "trunk_ports": [],
         }
 
-    # routing: routes[] -> static (list) + full route table for UI; ospf, eigrp, bgp from parser when present
+    # routing: Scope 2.3.2.5 - routes (distance, metric), ospf (interfaces, learned_prefix_count), eigrp, bgp, rip
     routing_raw = parsed.get("routing") or {}
     routes = routing_raw.get("routes") or []
-    static_routes = [{"network": r["network"], "next_hop": r.get("next_hop") or "", "interface": r.get("interface") or ""} for r in routes if r.get("protocol") == "S"]
-    route_table = [{"protocol": r.get("protocol"), "network": r.get("network"), "next_hop": r.get("next_hop") or "", "interface": r.get("interface") or ""} for r in routes]
+    static_routes = [{"network": r["network"], "next_hop": r.get("next_hop") or "", "interface": r.get("interface") or "", "distance": r.get("distance"), "metric": r.get("metric")} for r in routes if r.get("protocol") == "S"]
+    route_table = [{"protocol": r.get("protocol"), "network": r.get("network"), "next_hop": r.get("next_hop") or "", "interface": r.get("interface") or "", "distance": r.get("distance"), "metric": r.get("metric")} for r in routes]
     _ospf = routing_raw.get("ospf")
-    ospf = (_ospf if isinstance(_ospf, dict) and (_ospf.get("router_id") or _ospf.get("process_id") or _ospf.get("areas")) else None) or {"router_id": None, "process_id": None, "areas": [], "interfaces": [], "neighbors": [], "dr_bdr": {}}
+    _ospf_default = {"router_id": None, "process_id": None, "areas": [], "interfaces": [], "neighbors": [], "dr_bdr": {}, "learned_prefix_count": None}
+    ospf = (_ospf if isinstance(_ospf, dict) and (_ospf.get("router_id") or _ospf.get("process_id") or _ospf.get("areas")) else None) or _ospf_default.copy()
+    if isinstance(_ospf, dict):
+        if "learned_prefix_count" in _ospf:
+            ospf["learned_prefix_count"] = _ospf["learned_prefix_count"]
+        if _ospf.get("interfaces"):
+            ospf["interfaces"] = _ospf["interfaces"]
     _eigrp = routing_raw.get("eigrp")
     eigrp = (_eigrp if isinstance(_eigrp, dict) and (_eigrp.get("as_number") or _eigrp.get("router_id")) else None) or {"as_number": None, "router_id": None, "neighbors": [], "hold_time": None, "learned_routes": []}
     _bgp = routing_raw.get("bgp")
-    bgp = (_bgp if isinstance(_bgp, dict) and (_bgp.get("local_as") or _bgp.get("peers")) else None) or {"local_as": None, "peers": []}
+    bgp = (_bgp if isinstance(_bgp, dict) and (_bgp.get("local_as") or _bgp.get("peers")) else None) or {"local_as": None, "peers": [], "router_id": None}
+    if isinstance(_bgp, dict) and _bgp.get("peers"):
+        for p in bgp.get("peers") or []:
+            if "neighbor_ip" not in p and p.get("peer"):
+                p["neighbor_ip"] = p["peer"]
+    _rip = routing_raw.get("rip")
+    rip_default = {"version": None, "timers": {"update": None, "invalid": None, "hold": None, "flush": None}, "interfaces": [], "passive_interfaces": []}
+    rip = (_rip if isinstance(_rip, dict) else None) or rip_default.copy()
+    if isinstance(_rip, dict):
+        rip["version"] = _rip.get("version")
+        rip["timers"] = _rip.get("timers") or rip_default["timers"]
+        rip["interfaces"] = _rip.get("interfaces") or []
+        rip["passive_interfaces"] = _rip.get("passive_interfaces") or []
     routing = {
         "static": static_routes,
         "routes": route_table,
         "ospf": ospf,
         "eigrp": eigrp,
         "bgp": bgp,
-        "rip": {"version": None, "networks": [], "interfaces": [], "hop_count": {}, "auto_summary": None, "passive_interfaces": [], "timers": {"update": None, "invalid": None, "holddown": None, "flush": None}, "admin_distance": None},
+        "rip": rip,
     }
 
-    # neighbors: neighbor_id -> device_name, local_interface -> local_port, remote_interface -> remote_port
+    # neighbors: map to legacy keys and 2.3.2.6 fields (neighbor_device_name, neighbor_ip, platform, local_port, remote_port, capabilities, discovery_protocol)
     neighbors = []
     for n in parsed.get("neighbors") or []:
         neighbors.append({
-            "device_name": n.get("neighbor_id"),
-            "local_port": n.get("local_interface"),
-            "remote_port": n.get("remote_interface"),
+            "device_name": n.get("neighbor_id") or n.get("neighbor_device_name"),
+            "neighbor_device_name": n.get("neighbor_device_name") or n.get("neighbor_id"),
+            "neighbor_ip": n.get("neighbor_ip") or n.get("ip_address"),
+            "local_port": n.get("local_port") or n.get("local_interface"),
+            "remote_port": n.get("remote_port") or n.get("remote_interface"),
             "platform": n.get("platform"),
-            "ip_address": n.get("ip_address"),
+            "ip_address": n.get("ip_address") or n.get("neighbor_ip"),
+            "capabilities": n.get("capabilities"),
+            "discovery_protocol": n.get("discovery_protocol"),
         })
 
     # arp_mac_table -> mac_arp
@@ -134,14 +179,15 @@ def normalize_cisco_to_legacy(parsed: Dict[str, Any]) -> Dict[str, Any]:
         ntp = sec_audit.get("ntp") or {}
         logging_obj = sec_audit.get("logging") or {}
         _log_host = (logging_obj.get("syslog_servers") or [None])[0] if logging_obj.get("syslog_servers") else sec_mgmt.get("logging_host")
+        _logging_enabled = logging_obj.get("syslog_enabled") if logging_obj.get("syslog_enabled") is not None else bool(_log_host)
         security = {
             "users": sec_mgmt.get("users") or [],
             "aaa": {"protocols": sec_audit.get("aaa") and sec_audit["aaa"].get("protocols") or []},
             "ssh": {"version": ssh.get("version"), "enabled": ssh.get("status") == "Enabled"},
             "snmp": {"enabled": snmp.get("status") == "Enabled", "communities": snmp.get("communities") or []},
-            "ntp": {"enabled": bool(ntp.get("servers")), "servers": ntp.get("servers") or []},
-            "logging": {"enabled": bool(_log_host), "log_hosts": [_log_host] if _log_host else []},
-            "acls": [a.get("name") for a in (sec_audit.get("acls") or []) if a.get("name")] or sec_mgmt.get("acls") or [],
+            "ntp": {"enabled": bool(ntp.get("servers")), "servers": ntp.get("servers") or [], "sync_status": ntp.get("sync_status") or "unknown"},
+            "logging": {"enabled": _logging_enabled, "console_level": logging_obj.get("console_level"), "log_hosts": [_log_host] if _log_host else []},
+            "acls": _normalize_acls(sec_audit.get("acls"), sec_mgmt.get("acls")),
         }
     else:
         _log_host = sec_mgmt.get("logging_host")
@@ -150,12 +196,12 @@ def normalize_cisco_to_legacy(parsed: Dict[str, Any]) -> Dict[str, Any]:
             "aaa": {},
             "ssh": {"version": sec_mgmt.get("ssh_version"), "enabled": sec_mgmt.get("ssh_enabled") or False},
             "snmp": {"enabled": sec_mgmt.get("snmp_enabled") or False, "communities": []},
-            "ntp": {"enabled": bool(sec_mgmt.get("ntp_servers")), "servers": sec_mgmt.get("ntp_servers") or []},
-            "logging": {"enabled": bool(_log_host), "log_hosts": [_log_host] if _log_host else []},
+            "ntp": {"enabled": bool(sec_mgmt.get("ntp_servers")), "servers": sec_mgmt.get("ntp_servers") or [], "sync_status": "unknown"},
+            "logging": {"enabled": bool(_log_host), "console_level": None, "log_hosts": [_log_host] if _log_host else []},
             "acls": sec_mgmt.get("acls") or [],
         }
 
-    # stp: mode, root_bridges, root_bridge_id, interfaces (port/role/state), portfast_enabled
+    # stp: mode, root_bridges, root_bridge_id, interfaces (port/role/state/cost/portfast/bpduguard), portfast_enabled
     stp_spec = parsed.get("stp") or {}
     root_bridges = stp_spec.get("root_bridges") or []
     stp = {
@@ -165,28 +211,52 @@ def normalize_cisco_to_legacy(parsed: Dict[str, Any]) -> Dict[str, Any]:
         "mode": stp_spec.get("mode"),
         "interfaces": stp_spec.get("interfaces") or [],
         "portfast_enabled": stp_spec.get("portfast_enabled"),
+        "bpduguard_enabled": stp_spec.get("bpduguard_enabled"),
     }
+    if stp_spec.get("stp_info") is not None:
+        stp["stp_info"] = stp_spec["stp_info"]
 
-    # high_availability (new) or ha -> port_channels, hsrp_vrrp -> hsrp / vrrp
+    # high_availability (new) or ha -> single etherchannels list; hsrp/vrrp with priority and preempt (Scope 2.3.2.9)
     high_avail = parsed.get("high_availability") or {}
     ha_spec = parsed.get("ha") or {}
-    ether_channels = high_avail.get("ether_channels") or []
-    if not ether_channels and ha_spec.get("etherchannels"):
-        ether_channels = [{"interface": f"Po{e.get('id')}", "protocol": e.get("protocol"), "members": e.get("members") or [], "status": "up" if e.get("members") else "down"} for e in ha_spec["etherchannels"]]
+    etherchannels = []
+    # Scope 2.3.2.9.1: etherchannels with group, name, protocol, status, members[{ interface, status }]
+    if ha_spec.get("etherchannels"):
+        for e in ha_spec["etherchannels"]:
+            if isinstance(e, dict):
+                group = e.get("group", e.get("id"))
+                name = e.get("name") or f"Po{e.get('group', e.get('id', 0))}"
+                protocol = e.get("protocol") or e.get("mode") or "LACP"
+                members = e.get("members") or []
+                members_norm = [m if isinstance(m, dict) and ("interface" in m or "port" in m) else {"interface": m, "status": "Bundled"} for m in members]
+                for m in members_norm:
+                    if isinstance(m, dict) and "interface" not in m and "port" in m:
+                        m["interface"] = m.pop("port", m.get("port"))
+                etherchannels.append({"group": group, "name": name, "protocol": protocol, "status": e.get("status") or "up", "members": members_norm})
+    if not etherchannels:
+        ether_channels = high_avail.get("ether_channels") or []
+        for e in ether_channels:
+            if isinstance(e, dict):
+                name = e.get("interface") or f"Po{e.get('id', 0)}"
+                members = e.get("members") or []
+                members_norm = [m if isinstance(m, dict) else {"interface": m, "status": "Bundled"} for m in members]
+                for m in members_norm:
+                    if isinstance(m, dict) and "interface" not in m and "port" in m:
+                        m["interface"] = m.pop("port", m.get("port"))
+                etherchannels.append({"group": None, "name": name, "protocol": e.get("protocol") or "LACP", "status": e.get("status") or "up", "members": members_norm})
+    # Backward compat: port_channels and etherchannel derived from etherchannels
     port_channels = []
-    for e in ether_channels:
-        if isinstance(e, dict):
-            po_name = e.get("interface") or ""
-            po_id = int(po_name.replace("Po", "")) if po_name and po_name.upper().startswith("PO") else None
-            port_channels.append({"id": po_id, "mode": e.get("protocol"), "members": e.get("members") or [], "status": (e.get("status") or "up").lower()})
-    if not port_channels:
-        port_channels = [{"id": e.get("id"), "mode": e.get("protocol"), "members": e.get("members") or [], "status": "up" if e.get("members") else "down"} for e in ha_spec.get("etherchannels") or []]
-    hsrp_vrrp_list = ha_spec.get("hsrp_vrrp") or []
-    hsrp = [{"group": h.get("group"), "virtual_ip": h.get("virtual_ip"), "interface": h.get("interface"), "state": h.get("state")} for h in hsrp_vrrp_list]
-    vrrp = []
-    # etherchannel: frontend expects list of {name, mode, members, status}; derive from port_channels
-    etherchannel = [{"name": f"Po{p.get('id')}" if p.get("id") is not None else "Po", "mode": p.get("mode"), "members": p.get("members") or [], "status": p.get("status") or "up"} for p in port_channels]
-    ha = {"port_channels": port_channels, "etherchannel": etherchannel, "hsrp": hsrp, "vrrp": vrrp}
+    for e in etherchannels:
+        po_name = (e.get("name") or "").strip()
+        po_id = e.get("group") if e.get("group") is not None else (int(po_name.replace("Po", "")) if po_name.upper().startswith("PO") and len(po_name) > 2 and po_name[2:].isdigit() else None)
+        members_list = [m.get("interface", m.get("port", m)) if isinstance(m, dict) else m for m in (e.get("members") or [])]
+        port_channels.append({"id": po_id, "mode": e.get("protocol") or e.get("mode"), "members": members_list, "status": (e.get("status") or "up").lower()})
+    hsrp = []
+    for h in ha_spec.get("hsrp") or []:
+        hsrp.append({"group": h.get("group"), "virtual_ip": h.get("virtual_ip"), "interface": h.get("interface"), "state": h.get("state"), "priority": h.get("priority"), "preempt": h.get("preempt")})
+    vrrp = list(ha_spec.get("vrrp") or [])
+    etherchannel = [{"name": e.get("name") or "Po", "mode": e.get("protocol") or e.get("mode"), "members": e.get("members") or [], "status": e.get("status") or "up"} for e in etherchannels]
+    ha = {"etherchannels": etherchannels, "port_channels": port_channels, "etherchannel": etherchannel, "hsrp": hsrp, "vrrp": vrrp}
 
     # Ensure device_name is set (Cisco stores hostname in device_overview only; topology/summary expect top-level device_name)
     device_name = (overview.get("hostname") or "").strip() if isinstance(overview.get("hostname"), str) else None

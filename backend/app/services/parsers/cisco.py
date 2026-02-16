@@ -79,7 +79,55 @@ def _canonical_interface_name(name: str) -> str:
         return "Serial" + s[2:]
     if lower.startswith("serial"):
         return s
+    if lower.startswith("tu") and (len(s) == 2 or s[2:3].isdigit()):
+        return "Tunnel" + s[2:]
+    if lower.startswith("tunnel"):
+        return s
     return s
+
+
+def _determine_interface_type(name: str) -> Optional[str]:
+    """
+    Determine interface type based on interface name.
+    
+    Returns:
+        - "Physical" for GigabitEthernet, FastEthernet, Ethernet, TenGigabitEthernet (and abbreviations)
+        - "Port-Channel" for Port-channel (or Po)
+        - "SVI" for Vlan interfaces
+        - "Loopback" for Loopback interfaces (or Lo)
+        - "Tunnel" for Tunnel interfaces (or Tu)
+        - None for unknown types
+    """
+    if not name:
+        return None
+    
+    normalized = _canonical_interface_name(name)
+    lower = normalized.lower()
+    
+    # Physical interfaces
+    if (lower.startswith("gigabitethernet") or 
+        lower.startswith("fastethernet") or 
+        lower.startswith("ethernet") or 
+        lower.startswith("tengigabitethernet")):
+        return "Physical"
+    
+    # Port-Channel
+    if lower.startswith("port-channel"):
+        return "Port-Channel"
+    
+    # SVI (Switched Virtual Interface)
+    if lower.startswith("vlan"):
+        return "SVI"
+    
+    # Loopback
+    if lower.startswith("loopback"):
+        return "Loopback"
+    
+    # Tunnel
+    if lower.startswith("tunnel"):
+        return "Tunnel"
+    
+    return None
 
 
 def _mask_to_cidr(mask: str) -> Optional[int]:
@@ -94,6 +142,27 @@ def _mask_to_cidr(mask: str) -> Optional[int]:
         return bin(n).count("1")
     except (ValueError, AttributeError):
         return None
+
+
+def _ip_to_int(ip_str: str) -> Optional[int]:
+    """Convert dotted-decimal IP to 32-bit int."""
+    try:
+        parts = [int(x) for x in ip_str.strip().split(".")]
+        if len(parts) != 4 or any(p < 0 or p > 255 for p in parts):
+            return None
+        return (parts[0] << 24) | (parts[1] << 16) | (parts[2] << 8) | parts[3]
+    except (ValueError, AttributeError):
+        return None
+
+
+def _ip_in_ospf_network(ip_str: str, network_str: str, wildcard_str: str) -> bool:
+    """Return True if IP matches OSPF network/wildcard (network A B area Z)."""
+    ip_i = _ip_to_int(ip_str)
+    net_i = _ip_to_int(network_str)
+    wc_i = _ip_to_int(wildcard_str)
+    if ip_i is None or net_i is None or wc_i is None:
+        return False
+    return (ip_i & ~wc_i) == (net_i & ~wc_i)
 
 
 def _section_content(content: str) -> Dict[str, str]:
@@ -589,6 +658,7 @@ class CiscoIOSParser(BaseParser):
         """Return a single default interface record. Used so we never append; we only merge by key."""
         return {
             "name": canonical_name,
+            "type": _determine_interface_type(canonical_name),
             "description": None,
             "ip_address": None,
             "status": "up",
@@ -659,6 +729,8 @@ class CiscoIOSParser(BaseParser):
                 pass
             if "switchport mode access" in block.lower():
                 iface["mode"] = "access"
+                # For access mode, allowed_vlans should be None
+                iface["allowed_vlans"] = None
                 try:
                     acc_m = re.search(r"switchport\s+access\s+vlan\s+(\d+)", block, re.IGNORECASE)
                     if acc_m:
@@ -668,17 +740,33 @@ class CiscoIOSParser(BaseParser):
             elif "switchport mode trunk" in block.lower():
                 iface["mode"] = "trunk"
                 try:
-                    trunk_m = re.search(r"switchport\s+trunk\s+allowed\s+vlan\s+(.+)", block, re.IGNORECASE)
+                    # Extract allowed VLANs from running-config
+                    # Pattern: switchport trunk allowed vlan <vlan_list>
+                    # vlan_list can be: 1,2,3 or 1-100 or 1-100,200-300 or "all" or "none"
+                    trunk_m = re.search(r"switchport\s+trunk\s+allowed\s+vlan\s+(.+?)(?:\n|$)", block, re.IGNORECASE | re.MULTILINE)
                     if trunk_m:
-                        iface["allowed_vlans"] = trunk_m.group(1).strip()
+                        allowed_vlans_str = trunk_m.group(1).strip()
+                        # Handle "all", "none", or specific VLAN ranges
+                        if allowed_vlans_str.lower() in ["all", "none"]:
+                            iface["allowed_vlans"] = allowed_vlans_str.lower()
+                        else:
+                            # Normalize whitespace in VLAN list (e.g., "1, 2, 3" -> "1,2,3")
+                            iface["allowed_vlans"] = re.sub(r'\s+', '', allowed_vlans_str)
+                    else:
+                        # Default: if trunk mode but no explicit allowed vlan line, allow all (1-4094)
+                        iface["allowed_vlans"] = "1-4094"
                     native_m = re.search(r"switchport\s+trunk\s+native\s+vlan\s+(\d+)", block, re.IGNORECASE)
                     if native_m:
                         iface["native_vlan"] = int(native_m.group(1))
                 except Exception:
-                    pass
+                    # On error, default to "1-4094" for trunk mode
+                    iface["allowed_vlans"] = "1-4094"
             elif "no switchport" in block.lower() or iface.get("ip_address"):
                 iface["mode"] = "routed"
+                # For routed ports, allowed_vlans should be None
+                iface["allowed_vlans"] = None
         # Source B: show ip interface brief - merge oper_status / admin_status (same key = update, no new row)
+        # Note: Interface names here may be short (Gi0/1), so we normalize them before lookup
         brief = _get_section(content, r"show\s+ip\s+interface\s+brief")
         if not brief:
             brief = re.search(r"show\s+ip\s+interface\s+brief\s*(.*?)(?=show\s+|\n\s*[\w-]+#|$)", content, re.IGNORECASE | re.DOTALL)
@@ -692,7 +780,11 @@ class CiscoIOSParser(BaseParser):
                 ip_val = parts[1] if len(parts) > 1 else None
                 status = parts[3] if len(parts) > 3 else None
                 protocol = parts[4] if len(parts) > 4 else None
+                # Normalize interface name (short -> canonical) before lookup
                 iface = _get_or_create(name)
+                # Ensure type is set if not already set
+                if not iface.get("type"):
+                    iface["type"] = _determine_interface_type(iface["name"])
                 if ip_val and ip_val != "unassigned":
                     iface["ip_address"] = ip_val if "/" in ip_val or " " in ip_val else ip_val
                 if status:
@@ -700,41 +792,145 @@ class CiscoIOSParser(BaseParser):
                 if protocol:
                     iface["protocol"] = protocol.lower()
         # Deep parse: block-based extraction from "show interfaces" (Description, MAC, IP, MTU, BW, Duplex, Speed, Media, Encapsulation)
+        # Note: Interface names here may be short (Gi0/1), so we normalize them before lookup
         deep_blocks = self._parse_show_interfaces_blocks(content)
         for name, data in deep_blocks.items():
             if name.startswith("Null") or "NULL" in name.upper():
                 continue
             iface = _get_or_create(name)
+            # Ensure type is set if not already set
+            if not iface.get("type"):
+                iface["type"] = _determine_interface_type(iface["name"])
             for k, v in data.items():
                 if k == "name":
                     continue
                 if v is not None and (v != "" or k in ("description",)):
                     iface[k] = v
         # show interfaces switchport for mode if not set (merge by canonical name)
+        # Also extract allowed_vlans from switchport output if not already set from config
         switchport = _get_section(content, r"show\s+interfaces\s+switchport")
         if switchport:
             for block in re.split(r"\n(?=\w)", switchport):
                 name_m = re.search(r"Name\s*:\s*(\S+)", block, re.IGNORECASE)
                 mode_m = re.search(r"Switchport\s+Mode[:\s]+(\w+)", block, re.IGNORECASE)
-                if name_m and mode_m:
+                if name_m:
                     key = _canonical_interface_name(name_m.group(1))
-                    if key in interfaces_dict and interfaces_dict[key].get("mode") is None:
-                        mode_val = mode_m.group(1).lower()
-                        if "access" in mode_val:
-                            interfaces_dict[key]["mode"] = "access"
-                        elif "trunk" in mode_val:
-                            interfaces_dict[key]["mode"] = "trunk"
-                        else:
-                            interfaces_dict[key]["mode"] = "routed"
+                    if key in interfaces_dict:
+                        iface = interfaces_dict[key]
+                        # Ensure type is set
+                        if not iface.get("type"):
+                            iface["type"] = _determine_interface_type(key)
+                        # Set mode if not already set
+                        if mode_m and iface.get("mode") is None:
+                            mode_val = mode_m.group(1).lower()
+                            if "access" in mode_val:
+                                iface["mode"] = "access"
+                                iface["allowed_vlans"] = None
+                            elif "trunk" in mode_val:
+                                iface["mode"] = "trunk"
+                                # Try to extract allowed VLANs from switchport output
+                                allowed_m = re.search(r"Trunking\s+VLANs\s+Enabled[:\s]+(.+?)(?:\n|$)", block, re.IGNORECASE | re.MULTILINE)
+                                if allowed_m:
+                                    allowed_str = allowed_m.group(1).strip()
+                                    if allowed_str.lower() in ["all", "none"]:
+                                        iface["allowed_vlans"] = allowed_str.lower()
+                                    else:
+                                        # Normalize whitespace
+                                        iface["allowed_vlans"] = re.sub(r'\s+', '', allowed_str)
+                                elif iface.get("allowed_vlans") is None:
+                                    # Default for trunk mode
+                                    iface["allowed_vlans"] = "1-4094"
+                            else:
+                                iface["mode"] = "routed"
+                                iface["allowed_vlans"] = None
+        
+        # Final pass: ensure type is set for all interfaces and handle allowed_vlans defaults
+        for iface in interfaces_dict.values():
+            # Ensure type is set
+            if not iface.get("type"):
+                iface["type"] = _determine_interface_type(iface["name"])
+            
+            # Final allowed_vlans logic: set to None for access/routed, default "1-4094" for trunk without explicit setting
+            mode = iface.get("mode")
+            if mode == "access" or mode == "routed":
+                iface["allowed_vlans"] = None
+            elif mode == "trunk" and iface.get("allowed_vlans") is None:
+                iface["allowed_vlans"] = "1-4094"
+        
         return list(interfaces_dict.values())
     
+    def _parse_vlan_brief_ports(self, ports_str: str) -> List[str]:
+        """Parse ports string from 'show vlan brief' (e.g. 'Gi0/2, Gi0/3, Gi1/0'). Clean trailing commas, normalize to full names."""
+        if not ports_str or not ports_str.strip():
+            return []
+        # Remove trailing commas and normalize whitespace
+        cleaned = re.sub(r",\s*$", "", ports_str.strip())
+        cleaned = re.sub(r"\s+", " ", cleaned)
+        # Match Cisco interface tokens (short or full): Gi0/1, Fa0/1, Eth0/1, Po1, GigabitEthernet0/1, etc.
+        raw_tokens = re.findall(
+            r"(?:Gi|Fa|Eth|Te|Po|Lo|GigabitEthernet|FastEthernet|Ethernet|TenGigabitEthernet|Port-channel|Loopback)\S*",
+            cleaned,
+            re.IGNORECASE,
+        )
+        # Normalize each to canonical name and deduplicate preserving order
+        seen = set()
+        result: List[str] = []
+        for token in raw_tokens:
+            token = token.strip().rstrip(",")
+            if not token:
+                continue
+            canonical = _canonical_interface_name(token)
+            if canonical not in seen:
+                seen.add(canonical)
+                result.append(canonical)
+        return result
+
     def extract_vlans(self, content: str) -> Dict[str, Any]:
-        """2.3.2.3 - VLAN name, status, port memberships. Multi-source: config first, then show vlan / show vlan brief."""
+        """
+        2.3.2.3 - VLAN and Layer 2 Switching.
+        Produces: total_vlan_count, vlan_list (IDs as strings), details (per-VLAN id/name/status/access_ports),
+        trunk_ports (port, native_vlan, allowed_vlans). Port names normalized (Gi0/1 -> GigabitEthernet0/1).
+        Access ports: from show vlan brief AND verified by switchport mode access in running-config.
+        """
         details_by_id: Dict[int, Dict[str, Any]] = {}
-        access_ports: List[str] = []
-        trunk_ports: List[Dict[str, Any]] = []
         config_block = _get_section(content, r"show\s+running-config") or content
-        # Source 1 (Config): vlan <id> name <name>; interface blocks for access/trunk
+        if not config_block.strip():
+            config_block = content
+
+        # Build: which interfaces are in access mode (canonical name -> True)
+        access_mode_interfaces: Dict[str, bool] = {}
+        # Build: interface -> access vlan id (for mapping port to VLAN when building details)
+        interface_to_access_vlan: Dict[str, int] = {}
+        trunk_entries: List[Dict[str, Any]] = []
+
+        for m in re.finditer(r"interface\s+(\S+)\s*\n(.*?)(?=\ninterface\s+|^end\s|$)", config_block, re.IGNORECASE | re.DOTALL):
+            iface_name, block = m.group(1), m.group(2)
+            if "NULL" in (iface_name or "").upper():
+                continue
+            canonical = _canonical_interface_name(iface_name)
+            if "switchport mode access" in block.lower():
+                access_mode_interfaces[canonical] = True
+                acc_m = re.search(r"switchport\s+access\s+vlan\s+(\d+)", block, re.IGNORECASE)
+                if acc_m:
+                    try:
+                        interface_to_access_vlan[canonical] = int(acc_m.group(1))
+                    except ValueError:
+                        pass
+            elif "switchport mode trunk" in block.lower():
+                native_m = re.search(r"switchport\s+trunk\s+native\s+vlan\s+(\d+)", block, re.IGNORECASE)
+                allow_m = re.search(r"switchport\s+trunk\s+allowed\s+vlan\s+(.+?)(?:\n|$)", block, re.IGNORECASE | re.MULTILINE)
+                allowed_str = (allow_m.group(1).strip() if allow_m else "1-4094")
+                if allowed_str.lower() in ("all", "none"):
+                    allowed_str = allowed_str.lower()
+                else:
+                    allowed_str = re.sub(r"\s+", "", allowed_str)
+                trunk_entries.append({
+                    "port": canonical,
+                    "native_vlan": (native_m.group(1) if native_m else "1"),
+                    "allowed_vlans": allowed_str,
+                })
+
+        # Config-only VLAN definitions (vlan X / name Y)
         for m in re.finditer(r"vlan\s+(\d+)\s*\n(.*?)(?=\nvlan\s+|^end\s|$)", config_block, re.IGNORECASE | re.DOTALL):
             try:
                 vid = int(m.group(1))
@@ -743,36 +939,23 @@ class CiscoIOSParser(BaseParser):
             block = m.group(2)
             name_m = re.search(r"name\s+(\S+)", block, re.IGNORECASE)
             if vid not in details_by_id:
-                details_by_id[vid] = {"id": str(vid), "name": name_m.group(1) if name_m else str(vid), "status": "active", "ports": []}
-        for m in re.finditer(r"interface\s+(\S+)\s*\n(.*?)(?=\ninterface\s+|^end\s|$)", config_block, re.IGNORECASE | re.DOTALL):
-            iface_name, block = m.group(1), m.group(2)
-            if "NULL" in (iface_name or "").upper():
-                continue
-            if "switchport mode access" in block.lower():
-                access_ports.append(iface_name)
-                acc_m = re.search(r"switchport\s+access\s+vlan\s+(\d+)", block, re.IGNORECASE)
-                if acc_m and details_by_id.get(int(acc_m.group(1))) is not None:
-                    details_by_id[int(acc_m.group(1))].setdefault("ports", []).append(iface_name)
-            elif "switchport mode trunk" in block.lower():
-                native_m = re.search(r"switchport\s+trunk\s+native\s+vlan\s+(\d+)", block, re.IGNORECASE)
-                allow_m = re.search(r"switchport\s+trunk\s+allowed\s+vlan\s+(.+)", block, re.IGNORECASE)
-                trunk_ports.append({
-                    "port": iface_name,
-                    "native_vlan": (native_m.group(1) if native_m else "1"),
-                    "allowed_vlans": (allow_m.group(1).strip() if allow_m else "all"),
-                })
-        # Source 2 (Verbose): show vlan or show vlan brief - ^(\d+)\s+(\S+)\s+(active|act/lshut|suspend|act/unsup)
-        # Skip header lines: VLAN, VID, Type, Ports, ----, etc. Do not parse "Vlan" as VLAN id.
+                details_by_id[vid] = {"id": str(vid), "name": name_m.group(1) if name_m else str(vid), "status": "active", "access_ports": []}
+
+        # Parse show vlan brief: VLAN inventory (id, name, status) and port assignments
         show_vlan = _get_section(content, r"show\s+vlan\s+brief") or _get_section(content, r"show\s+vlan\s")
-        vlan_ids_seen_in_table = set()
+        vlan_ids_seen_in_table: set = set()
         if show_vlan:
-            status_re = re.compile(r"^(\d+)\s+(\S+)\s+(active|act/lshut|suspend|act/unsup)", re.IGNORECASE)
+            # Match: VID (digits), name (single token), status (active|act/unsup|suspend|etc)
+            status_re = re.compile(
+                r"^(\d+)\s+(\S+)\s+(active|act/lshut|suspend|act/unsup)",
+                re.IGNORECASE,
+            )
             lines = show_vlan.split("\n")
             i = 0
             while i < len(lines):
                 line = lines[i]
                 line_strip = line.strip()
-                if line_strip.startswith("VLAN") or line_strip.startswith("VID") or line_strip.startswith("----") or (line_strip.startswith("Vlan") and not line_strip[4:5].isdigit()):
+                if line_strip.startswith("VLAN") or line_strip.startswith("VID") or line_strip.startswith("----") or (line_strip.startswith("Vlan") and len(line_strip) > 4 and not line_strip[4:5].isdigit()):
                     i += 1
                     continue
                 mm = status_re.search(line_strip)
@@ -784,22 +967,48 @@ class CiscoIOSParser(BaseParser):
                     except (ValueError, IndexError):
                         i += 1
                         continue
+                    # Ports: rest of line, then continuation lines (no leading VLAN number)
                     ports_str = line[mm.end():].strip() if mm.end() < len(line) else ""
-                    i += 1
-                    while i < len(lines) and lines[i].strip() and not status_re.match(lines[i].strip()) and re.search(r"Gi\d|Fa\d|Eth\d|Po\d", lines[i], re.IGNORECASE):
-                        ports_str += " " + lines[i].strip()
-                        i += 1
-                    port_list = re.findall(r"(?:Gi|Fa|Eth|Po|GigabitEthernet|FastEthernet|Port-channel)\S*", ports_str, re.IGNORECASE)
+                    j = i + 1
+                    while j < len(lines):
+                        next_line = lines[j].strip()
+                        if not next_line:
+                            j += 1
+                            continue
+                        if status_re.match(next_line):
+                            break
+                        if re.search(r"^(?:Gi|Fa|Eth|Te|Po|GigabitEthernet|FastEthernet|Port-channel)\S", next_line, re.IGNORECASE):
+                            ports_str += " " + next_line
+                            j += 1
+                        else:
+                            j += 1
+                            break
+                    i = j
+                    port_list_raw = self._parse_vlan_brief_ports(ports_str)
                     vlan_ids_seen_in_table.add(vid)
                     if vid not in details_by_id:
-                        details_by_id[vid] = {"id": str(vid), "name": name, "status": status, "ports": []}
+                        details_by_id[vid] = {"id": str(vid), "name": name, "status": status, "access_ports": []}
                     else:
                         details_by_id[vid]["name"] = name
                         details_by_id[vid]["status"] = status
-                    if port_list:
-                        details_by_id[vid]["ports"] = list(dict.fromkeys(port_list))
-                i += 1
-        # Config-only VLANs: if show was parsed, set status to "Configured (Inactive)" when not in table
+                    # Only include ports that are in access mode AND assigned to this VLAN in running-config
+                    access_ports_for_vlan = [
+                        p for p in port_list_raw
+                        if access_mode_interfaces.get(p) and interface_to_access_vlan.get(p) == vid
+                    ]
+                    details_by_id[vid]["access_ports"] = list(dict.fromkeys(access_ports_for_vlan))
+                else:
+                    i += 1
+
+        # If we only have config (no show vlan brief), still assign access_ports from config
+        if not vlan_ids_seen_in_table and interface_to_access_vlan:
+            for canonical, vlan_id in interface_to_access_vlan.items():
+                if vlan_id not in details_by_id:
+                    details_by_id[vlan_id] = {"id": str(vlan_id), "name": str(vlan_id), "status": "active", "access_ports": []}
+                if canonical not in details_by_id[vlan_id]["access_ports"]:
+                    details_by_id[vlan_id]["access_ports"].append(canonical)
+
+        # Config-only VLANs: in config but not in show vlan brief -> "Configured (Inactive)"
         if show_vlan and vlan_ids_seen_in_table:
             for vid, d in list(details_by_id.items()):
                 try:
@@ -808,29 +1017,258 @@ class CiscoIOSParser(BaseParser):
                         d["status"] = "Configured (Inactive)"
                 except (ValueError, TypeError):
                     pass
-        vlan_list = [{"id": d["id"], "name": d["name"], "status": d.get("status", "active")} for d in sorted(details_by_id.values(), key=lambda d: int(d["id"]) if d["id"].isdigit() else 9999) if d["id"].isdigit()]
-        details = [{"id": d["id"], "name": d["name"], "status": d.get("status", "active"), "ports": d.get("ports") or []} for d in sorted(details_by_id.values(), key=lambda d: int(d["id"]) if d["id"].isdigit() else 9999)]
+
+        # Build sorted vlan_list (IDs as strings) and details with access_ports only
+        sorted_details = sorted(
+            details_by_id.values(),
+            key=lambda d: int(d["id"]) if (isinstance(d["id"], str) and d["id"].isdigit()) else 9999,
+        )
+        vlan_list_ids = [d["id"] for d in sorted_details if isinstance(d["id"], str) and d["id"].isdigit()]
+        details = [
+            {
+                "id": d["id"],
+                "name": d.get("name") or d["id"],
+                "status": d.get("status", "active"),
+                "access_ports": list(d.get("access_ports") or []),
+            }
+            for d in sorted_details
+        ]
+        # Flat list of all access-mode interfaces (canonical names) for backward compatibility
+        access_ports_flat = sorted(access_mode_interfaces.keys())
+
         return {
-            "vlan_list": vlan_list,
+            "total_vlan_count": len(details_by_id),
+            "vlan_list": vlan_list_ids,
             "details": details,
-            "access_ports": access_ports,
-            "trunk_ports": trunk_ports,
+            "access_ports": access_ports_flat,
+            "trunk_ports": trunk_entries,
             "total_count": len(details_by_id),
         }
     
+    def _parse_stp_detail_blocks(self, detail_text: str, config_block: str) -> Dict[str, Any]:
+        """
+        Parse 'show spanning-tree detail' output block-by-block (per VLAN).
+        Returns dict with mode, root_bridge (id, priority, is_local_device_root), and per-interface
+        role/state/cost/portfast/bpduguard. Aggregates by interface name (prioritize Root role, Forwarding state).
+        """
+        result: Dict[str, Any] = {
+            "mode": None,
+            "root_bridge_id": None,
+            "root_bridge_priority": None,
+            "is_local_device_root": False,
+            "root_bridges": [],
+            "port_data_by_iface": {},  # canonical_name -> {role, state, cost, portfast_enabled, bpduguard_enabled}
+        }
+        # Protocol name -> mode mapping
+        def protocol_to_mode(proto: str) -> str:
+            if not proto:
+                return None
+            p = proto.lower()
+            if "rstp" in p or "rapid" in p:
+                return "RAPID-PVST"
+            if "mst" in p or "mstp" in p:
+                return "MST"
+            if "ieee" in p or "pvst" in p:
+                return "PVST"
+            return proto.upper() if proto else None
+
+        # Split into VLAN blocks (VLAN0001 is executing ... until next VLAN or end)
+        vlan_blocks = re.split(r"\n(?=\s*VLAN\d+\s+is\s+executing)", detail_text, re.IGNORECASE)
+        for block in vlan_blocks:
+            if not block.strip():
+                continue
+            # Mode: "VLAN0001 is executing the rstp compatible Spanning Tree protocol"
+            mode_m = re.search(r"VLAN\d+\s+is\s+executing\s+the\s+(.+?)\s+[Ss]panning\s+[Tt]ree\s+protocol", block, re.IGNORECASE)
+            if mode_m and not result["mode"]:
+                result["mode"] = protocol_to_mode(mode_m.group(1))
+
+            # Current root: "Current root has priority 32769, address 5000.0003.0000"
+            current_root_m = re.search(r"Current\s+root\s+has\s+priority\s+(\d+),\s*address\s+([0-9a-fA-F.]+)", block, re.IGNORECASE)
+            # Local bridge: "Bridge Identifier has priority 32768, sysid 1, address 5000.0004.0000"
+            bridge_m = re.search(r"Bridge\s+Identifier\s+has\s+priority\s+(\d+).*?address\s+([0-9a-fA-F.]+)", block, re.IGNORECASE | re.DOTALL)
+            # "We are the root of the spanning tree"
+            we_are_root = bool(re.search(r"We\s+are\s+the\s+root\s+of\s+the\s+spanning\s+tree", block, re.IGNORECASE))
+
+            root_priority = None
+            root_address = None
+            local_priority = None
+            local_address = None
+            if current_root_m:
+                root_priority = int(current_root_m.group(1))
+                root_address = (current_root_m.group(2) or "").strip().lower()
+            if bridge_m:
+                local_priority = int(bridge_m.group(1))
+                local_address = (bridge_m.group(2) or "").strip().lower()
+            if we_are_root and bridge_m:
+                root_priority = local_priority
+                root_address = local_address
+                result["is_local_device_root"] = True
+                vlan_num_m = re.search(r"VLAN(\d+)", block, re.IGNORECASE)
+                if vlan_num_m:
+                    try:
+                        v = int(vlan_num_m.group(1))
+                        if v not in result["root_bridges"]:
+                            result["root_bridges"].append(v)
+                    except ValueError:
+                        pass
+            if root_address and result["root_bridge_id"] is None:
+                result["root_bridge_id"] = root_address
+            if root_priority is not None and result["root_bridge_priority"] is None:
+                result["root_bridge_priority"] = root_priority
+
+            # Port lines: "Port 2 (GigabitEthernet0/1) of VLAN0001 is root forwarding"
+            port_line_re = re.compile(r"Port\s+\d+\s+\((.+?)\)\s+of\s+VLAN\d+\s+is\s+(\w+)\s+(\w+)", re.IGNORECASE)
+            for pm in port_line_re.finditer(block):
+                iface_raw = (pm.group(1) or "").strip()
+                role_raw = (pm.group(2) or "").lower()
+                state_raw = (pm.group(3) or "").lower()
+                canonical = _canonical_interface_name(iface_raw)
+                # Role: root | designated | alternate | backup
+                role = "Root" if "root" in role_raw else "Designated" if "designated" in role_raw or "desg" in role_raw else "Alternate" if "alternate" in role_raw else "Backup" if "backup" in role_raw else role_raw.capitalize()
+                state = "Forwarding" if "forward" in state_raw else "Blocking" if "block" in state_raw else "Learning" if "learn" in state_raw else "Discarding" if "discard" in state_raw else state_raw.capitalize()
+                # Sub-attributes: indented "Port path cost 4"
+                port_block_start = pm.start()
+                port_block_end = pm.end()
+                next_port = port_line_re.search(block, port_block_end)
+                port_block = block[port_block_start : next_port.start() if next_port else len(block)]
+                cost_m = re.search(r"Port\s+path\s+cost\s+(\d+)", port_block, re.IGNORECASE)
+                cost = int(cost_m.group(1)) if cost_m else None
+                portfast = bool(re.search(r"port\s+is\s+in\s+the\s+portfast\s+(?:edge\s+)?mode", port_block, re.IGNORECASE))
+                bpduguard = bool(re.search(r"[Bb]pdu\s+guard\s+is\s+enabled", port_block, re.IGNORECASE))
+
+                if canonical not in result["port_data_by_iface"]:
+                    result["port_data_by_iface"][canonical] = {"role": role, "state": state, "cost": cost, "portfast_enabled": portfast, "bpduguard_enabled": bpduguard}
+                else:
+                    cur = result["port_data_by_iface"][canonical]
+                    # Prefer Root over Designated over Alternate over Backup
+                    role_order = {"Root": 0, "Designated": 1, "Alternate": 2, "Backup": 3}
+                    if role_order.get(role, 99) < role_order.get(cur["role"], 99):
+                        cur["role"] = role
+                    if state == "Forwarding":
+                        cur["state"] = "Forwarding"
+                    elif cur["state"] != "Forwarding" and state == "Learning":
+                        cur["state"] = "Learning"
+                    elif cur["state"] not in ("Forwarding", "Learning") and state in ("Blocking", "Discarding"):
+                        cur["state"] = state
+                    if cost is not None and cur.get("cost") is None:
+                        cur["cost"] = cost
+                    cur["portfast_enabled"] = cur.get("portfast_enabled") or portfast
+                    cur["bpduguard_enabled"] = cur.get("bpduguard_enabled") or bpduguard
+        return result
+
     def extract_stp(self, content: str) -> Dict[str, Any]:
-        """2.3.2.4 - Root Bridge, port roles/states, cost, priority; PortFast from config. Multi-source: config + show spanning-tree."""
-        stp: Dict[str, Any] = {"mode": None, "root_bridges": [], "root_bridge_id": None, "interfaces": [], "portfast_enabled": None}
+        """2.3.2.4 - STP: mode, root bridge (id, priority, is_root), port role/state/cost, PortFast, BPDU Guard. Supports show spanning-tree detail."""
+        stp: Dict[str, Any] = {"mode": None, "root_bridges": [], "root_bridge_id": None, "interfaces": [], "portfast_enabled": None, "bpduguard_enabled": None}
         config_block = _get_section(content, r"show\s+running-config") or content
+        if not config_block.strip():
+            config_block = content
         mode_m = re.search(r"spanning-tree\s+mode\s+(\S+)", config_block, re.IGNORECASE)
         if mode_m:
-            stp["mode"] = mode_m.group(1).upper()
+            raw = mode_m.group(1).upper()
+            stp["mode"] = "RAPID-PVST" if "RAPID" in raw or "RPVST" in raw else "MST" if "MST" in raw else raw
         if re.search(r"spanning-tree\s+portfast", config_block, re.IGNORECASE):
             stp["portfast_enabled"] = True
-        show_stp = _get_section(content, r"show\s+spanning-tree")
+        if re.search(r"spanning-tree\s+bpduguard\s+enable", config_block, re.IGNORECASE):
+            stp["bpduguard_enabled"] = True
+
+        # Prefer 'show spanning-tree detail' when summary is not available
+        show_detail = _get_section(content, r"show\s+spanning-tree\s+detail")
+        if not show_detail:
+            show_detail = re.search(r"show\s+spanning-tree\s+detail\s*(.*?)(?=\n\s*\S+#|\n\s*\S+>|$)", content, re.IGNORECASE | re.DOTALL)
+            show_detail = (show_detail.group(1) or "").strip() if show_detail else ""
+        show_stp = _get_section(content, r"show\s+spanning-tree(?:\s+detail)?")
         if not show_stp:
-            show_stp = re.search(r"show\s+spanning-tree\s*(.*?)(?=\n\s*\S+#|\n\s*\S+>|$)", content, re.IGNORECASE | re.DOTALL)
+            show_stp = re.search(r"show\s+spanning-tree(?:\s+detail)?\s*(.*?)(?=\n\s*\S+#|\n\s*\S+>|$)", content, re.IGNORECASE | re.DOTALL)
             show_stp = (show_stp.group(1) or "").strip() if show_stp else ""
+
+        if show_detail:
+            parsed = self._parse_stp_detail_blocks(show_detail, config_block)
+            if parsed.get("mode"):
+                stp["mode"] = parsed["mode"]
+            if parsed.get("root_bridge_id"):
+                stp["root_bridge_id"] = parsed["root_bridge_id"]
+            if parsed.get("root_bridges"):
+                stp["root_bridges"] = parsed["root_bridges"]
+            if parsed.get("port_data_by_iface"):
+                for canonical, data in parsed["port_data_by_iface"].items():
+                    rec = {
+                        "port": canonical,
+                        "role": data.get("role"),
+                        "state": data.get("state"),
+                        "cost": data.get("cost"),
+                        "portfast_enabled": data.get("portfast_enabled", False),
+                        "bpduguard_enabled": data.get("bpduguard_enabled", False),
+                    }
+                    stp["interfaces"].append(rec)
+                    if data.get("portfast_enabled"):
+                        stp["portfast_enabled"] = True
+                    if data.get("bpduguard_enabled"):
+                        stp["bpduguard_enabled"] = True
+            if parsed.get("is_local_device_root") and not stp["root_bridges"]:
+                stp["root_bridges"].append(1)
+            stp["stp_info"] = {
+                "mode": stp["mode"],
+                "root_bridge": {
+                    "root_bridge_id": stp.get("root_bridge_id"),
+                    "priority": parsed.get("root_bridge_priority"),
+                    "is_local_device_root": parsed.get("is_local_device_root", False),
+                },
+                "interfaces": [
+                    {
+                        "port": r["port"],
+                        "role": r.get("role"),
+                        "state": r.get("state"),
+                        "cost": r.get("cost"),
+                        "portfast_enabled": r.get("portfast_enabled", False),
+                        "bpduguard_enabled": r.get("bpduguard_enabled", False),
+                    }
+                    for r in stp["interfaces"]
+                ],
+            }
+            return stp
+
+        # Fallback: if only "show spanning-tree" block exists but it looks like detail (VLANxxxx is executing), parse as detail
+        if not show_detail and show_stp and re.search(r"VLAN\d+\s+is\s+executing", show_stp, re.IGNORECASE):
+            show_detail = show_stp
+            parsed = self._parse_stp_detail_blocks(show_detail, config_block)
+            if parsed.get("mode"):
+                stp["mode"] = parsed["mode"]
+            if parsed.get("root_bridge_id"):
+                stp["root_bridge_id"] = parsed["root_bridge_id"]
+            if parsed.get("root_bridges"):
+                stp["root_bridges"] = parsed["root_bridges"]
+            if parsed.get("port_data_by_iface"):
+                for canonical, data in parsed["port_data_by_iface"].items():
+                    rec = {
+                        "port": canonical,
+                        "role": data.get("role"),
+                        "state": data.get("state"),
+                        "cost": data.get("cost"),
+                        "portfast_enabled": data.get("portfast_enabled", False),
+                        "bpduguard_enabled": data.get("bpduguard_enabled", False),
+                    }
+                    stp["interfaces"].append(rec)
+                    if data.get("portfast_enabled"):
+                        stp["portfast_enabled"] = True
+                    if data.get("bpduguard_enabled"):
+                        stp["bpduguard_enabled"] = True
+            if parsed.get("is_local_device_root") and not stp["root_bridges"]:
+                stp["root_bridges"].append(1)
+            stp["stp_info"] = {
+                "mode": stp["mode"],
+                "root_bridge": {
+                    "root_bridge_id": stp.get("root_bridge_id"),
+                    "priority": parsed.get("root_bridge_priority"),
+                    "is_local_device_root": parsed.get("is_local_device_root", False),
+                },
+                "interfaces": [
+                    {"port": r["port"], "role": r.get("role"), "state": r.get("state"), "cost": r.get("cost"), "portfast_enabled": r.get("portfast_enabled", False), "bpduguard_enabled": r.get("bpduguard_enabled", False)}
+                    for r in stp["interfaces"]
+                ],
+            }
+            return stp
+
+        # Legacy: summary output (show spanning-tree without detail)
         if show_stp:
             root_id_m = re.search(r"Root\s+ID\s+.*?Address\s+([\da-fA-F.]+)", show_stp, re.IGNORECASE)
             if root_id_m:
@@ -844,48 +1282,32 @@ class CiscoIOSParser(BaseParser):
                     pass
             if "this bridge is the root" in show_stp.lower() and not stp["root_bridges"]:
                 stp["root_bridges"].append(1)
-            # Port table (line-based): skip headers; regex ^(\S+)\s+(Desg|Root|Altn|Back)\s+(FWD|BLK|LRN)\s+(\d+)\s+(\d+\.\d+)
             port_line_re = re.compile(r"^(\S+)\s+(Desg|Root|Altn|Back)\s+(FWD|BLK|LRN)\s+(\d+)\s+(\d+\.\d+)", re.IGNORECASE)
             for line in show_stp.split("\n"):
                 line_strip = line.strip()
-                if not line_strip or line_strip.startswith("Port") and "Role" in line_strip or line_strip.startswith("----"):
+                if not line_strip or (line_strip.startswith("Port") and "Role" in line_strip) or line_strip.startswith("----"):
                     continue
                 pm = port_line_re.match(line_strip)
                 if pm:
                     port_name, role, state = pm.group(1), pm.group(2), pm.group(3)
                     cost_val = int(pm.group(4)) if pm.group(4).isdigit() else None
-                    prio_val = float(pm.group(5)) if pm.group(5) else None
-                    rec = {"port": port_name, "role": role, "state": state}
-                    if cost_val is not None:
-                        rec["cost"] = cost_val
-                    if prio_val is not None:
-                        rec["priority"] = int(prio_val)
-                    if not any(x.get("port") == port_name for x in stp["interfaces"]):
+                    rec = {"port": _canonical_interface_name(port_name), "role": role, "state": state, "cost": cost_val, "portfast_enabled": False, "bpduguard_enabled": False}
+                    if not any(x.get("port") == rec["port"] for x in stp["interfaces"]):
                         stp["interfaces"].append(rec)
-            # Fallback: block-style "Port N (Gi0/0) of VLAN0001 is designated forwarding"
             if not stp["interfaces"]:
                 port_block_re = re.compile(r"Port\s+\d+\s+\((\S+)\)\s+of\s+VLAN\d+\s+is\s+(\w+)\s+(\w+)", re.IGNORECASE)
                 for pm in port_block_re.finditer(show_stp):
-                    port_name = pm.group(1)
+                    port_name = _canonical_interface_name(pm.group(1))
                     role_raw = (pm.group(2) or "").lower()
                     state_raw = (pm.group(3) or "").lower()
-                    role = "Desg" if "designated" in role_raw or "desg" in role_raw else "Root" if "root" in role_raw else "Altn" if "alternate" in role_raw else "Back" if "backup" in role_raw else role_raw[:4].capitalize()
-                    state = "FWD" if "forward" in state_raw else "BLK" if "block" in state_raw else "LRN" if "learn" in state_raw else state_raw[:3].upper()
-                    cost_m = re.search(re.escape(port_name) + r".*?Port\s+path\s+cost\s+(\d+)", show_stp, re.IGNORECASE | re.DOTALL)
-                    prio_m = re.search(re.escape(port_name) + r".*?Port\s+priority\s+(\d+)", show_stp, re.IGNORECASE | re.DOTALL)
-                    edge_m = re.search(re.escape(port_name) + r".*?Edge\s+P2p|portfast", show_stp, re.IGNORECASE | re.DOTALL)
-                    rec = {"port": port_name, "role": role, "state": state}
-                    if cost_m:
-                        rec["cost"] = int(cost_m.group(1))
-                    if prio_m:
-                        rec["priority"] = int(prio_m.group(1))
-                    if edge_m:
-                        rec["edge_p2p"] = True
+                    role = "Designated" if "designated" in role_raw or "desg" in role_raw else "Root" if "root" in role_raw else "Alternate" if "alternate" in role_raw else "Backup" if "backup" in role_raw else role_raw.capitalize()
+                    state = "Forwarding" if "forward" in state_raw else "Blocking" if "block" in state_raw else "Learning" if "learn" in state_raw else state_raw.capitalize()
+                    rec = {"port": port_name, "role": role, "state": state, "cost": None, "portfast_enabled": stp.get("portfast_enabled") or False, "bpduguard_enabled": stp.get("bpduguard_enabled") or False}
                     stp["interfaces"].append(rec)
         return stp
     
     def extract_routing(self, content: str) -> Dict[str, Any]:
-        """2.3.2.4 - routes: [{protocol, network, next_hop, interface}] (protocol C, S, O, B, L)."""
+        """2.3.2.5 - routes (with distance/metric), ospf (interfaces, learned_prefix_count), eigrp, bgp, rip."""
         routes: List[Dict[str, Any]] = []
         route_block = _get_section(content, r"show\s+ip\s+route")
         if route_block:
@@ -893,13 +1315,10 @@ class CiscoIOSParser(BaseParser):
                 line_stripped = line.strip()
                 if not line_stripped or line_stripped.startswith("Codes:") or line_stripped.startswith("Gateway"):
                     continue
-                # Skip "X.0.0.0/8 is subnetted" / "is variably subnetted" (not a route line)
                 if " is subnetted" in line_stripped or " is variably subnetted" in line_stripped:
                     continue
-                # Skip continuation line: only "[metric] via ..." (multi-path), no protocol+network
                 if re.match(r"^\s*\[\d+/\d+\]\s+via\s+", line):
                     continue
-                # Protocol code can be O*E2, IA, S*, etc. Require first char to be protocol letter.
                 proto_m = re.match(r"^\s*(\S+)\s+(\d+\.\d+\.\d+\.\d+(?:/\d+)?)\s", line_stripped)
                 if not proto_m:
                     continue
@@ -910,6 +1329,12 @@ class CiscoIOSParser(BaseParser):
                 network = proto_m.group(2)
                 next_hop = None
                 interface = None
+                distance = None
+                metric = None
+                ad_metric_m = re.search(r"\[\s*(\d+)\s*/\s*(\d+)\s*\]", line_stripped)
+                if ad_metric_m:
+                    distance = int(ad_metric_m.group(1))
+                    metric = int(ad_metric_m.group(2))
                 if "directly connected" in line_stripped.lower():
                     if_m = re.search(r"directly\s+connected,?\s*(\S+)", line_stripped, re.IGNORECASE)
                     if if_m:
@@ -921,8 +1346,14 @@ class CiscoIOSParser(BaseParser):
                     if_m = re.search(r",\s*(\S+)\s*$", line_stripped)
                     if if_m:
                         interface = if_m.group(1)
-                routes.append({"protocol": protocol, "network": network, "next_hop": next_hop or "", "interface": interface or ""})
-        # Static from config: ip route <network> <mask> <next_hop> [ad] [interface]; AD default 1
+                routes.append({
+                    "protocol": protocol,
+                    "network": network,
+                    "next_hop": next_hop or "",
+                    "interface": interface or "",
+                    "distance": distance,
+                    "metric": metric,
+                })
         config_block = _get_section(content, r"show\s+running-config") or content
         for m in re.finditer(
             r"ip\s+route\s+(\d+\.\d+\.\d+\.\d+)\s+(\d+\.\d+\.\d+\.\d+)\s+(\d+\.\d+\.\d+\.\d+)(?:\s+(\d+))?(?:\s+(\S+))?",
@@ -944,13 +1375,14 @@ class CiscoIOSParser(BaseParser):
             network = f"{network_addr}/{cidr}" if cidr is not None else network_addr
             if next((r for r in routes if r["network"] == network and r.get("protocol") == "S"), None):
                 continue
-            routes.append({"protocol": "S", "network": network, "next_hop": next_hop, "interface": interface, "admin_distance": ad})
+            routes.append({"protocol": "S", "network": network, "next_hop": next_hop, "interface": interface, "distance": ad, "metric": 0})
 
-        # OSPF / EIGRP / BGP from config + operational (neighbors, state)
-        ospf = {"router_id": None, "process_id": None, "areas": [], "interfaces": [], "neighbors": [], "dr_bdr": {}}
+        ospf = {"router_id": None, "process_id": None, "areas": [], "interfaces": [], "neighbors": [], "dr_bdr": {}, "learned_prefix_count": None}
         eigrp = {"as_number": None, "router_id": None, "neighbors": [], "hold_time": None, "learned_routes": []}
         bgp = {"local_as": None, "peers": [], "router_id": None}
-        # OSPF config: router ospf 1 / router-id / network ... area
+        rip = {"version": None, "timers": {"update": None, "invalid": None, "hold": None, "flush": None}, "interfaces": [], "passive_interfaces": []}
+
+        # --- OSPF (Scope 2.3.2.5.2) ---
         ospf_m = re.search(r"router\s+ospf\s+(\d+)", config_block, re.IGNORECASE)
         if ospf_m:
             try:
@@ -961,17 +1393,38 @@ class CiscoIOSParser(BaseParser):
                 section = re.search(r"router\s+ospf\s+\d+(.*?)(?=router\s+|ip\s+|^!\s*$|\n\s*end\s*$|$)", config_block, re.IGNORECASE | re.DOTALL)
                 if section:
                     body = section.group(1)
-                    for area_m in re.finditer(r"network\s+\S+\s+\S+\s+area\s+(\S+)", body, re.IGNORECASE):
-                        a = area_m.group(1)
+                    for area_m in re.finditer(r"network\s+(\S+)\s+(\S+)\s+area\s+(\S+)", body, re.IGNORECASE):
+                        a = area_m.group(3)
                         if a not in ospf["areas"]:
                             ospf["areas"].append(a)
             except (ValueError, TypeError):
                 pass
-        # OSPF operational: show ip ospf neighbor - Neighbor ID Pri State Dead Time Address Interface
+        ospf_interfaces_by_name: Dict[str, str] = {}
+        for if_m in re.finditer(r"interface\s+(\S+)\s*\n(.*?)(?=\ninterface\s+|^!\s*$|\n\s*end\s*$|$)", config_block, re.IGNORECASE | re.DOTALL):
+            iface_name, block = if_m.group(1), if_m.group(2)
+            ip_ospf_m = re.search(r"ip\s+ospf\s+\d+\s+area\s+(\S+)", block, re.IGNORECASE)
+            if ip_ospf_m:
+                ospf_interfaces_by_name[iface_name] = ip_ospf_m.group(1)
+        ospf_section = re.search(r"router\s+ospf\s+\d+(.*?)(?=router\s+|ip\s+|^!\s*$|\n\s*end\s*$|$)", config_block, re.IGNORECASE | re.DOTALL)
+        if ospf_section:
+            body = ospf_section.group(1)
+            net_area_list = [(m.group(1), m.group(2), m.group(3)) for m in re.finditer(r"network\s+(\d+\.\d+\.\d+\.\d+)\s+(\d+\.\d+\.\d+\.\d+)\s+area\s+(\S+)", body, re.IGNORECASE)]
+            for if_m2 in re.finditer(r"interface\s+(\S+)\s*\n(.*?)(?=\ninterface\s+|^!\s*$|\n\s*end\s*$|$)", config_block, re.IGNORECASE | re.DOTALL):
+                iface_name, block = if_m2.group(1), if_m2.group(2)
+                if iface_name in ospf_interfaces_by_name:
+                    continue
+                ip_m = re.search(r"ip\s+address\s+(\d+\.\d+\.\d+\.\d+)\s+(\d+\.\d+\.\d+\.\d+)", block, re.IGNORECASE)
+                if not ip_m:
+                    continue
+                for net_addr, wildcard, area in net_area_list:
+                    if _ip_in_ospf_network(ip_m.group(1), net_addr, wildcard):
+                        ospf_interfaces_by_name[iface_name] = area
+                        break
+        for iface, area in ospf_interfaces_by_name.items():
+            ospf["interfaces"].append({"interface": iface, "area": area})
         ospf_neigh_section = _get_section(content, r"show\s+ip\s+ospf\s+neighbor")
         if ospf_neigh_section:
             for line in ospf_neigh_section.split("\n"):
-                # (\d+\.\d+\.\d+\.\d+)\s+(\d+)\s+(FULL|2WAY|EXSTART|...)
                 neigh_m = re.search(r"(\d+\.\d+\.\d+\.\d+)\s+(\d+)\s+(FULL|2WAY|EXSTART|INIT|DOWN|LOADING|EXCHANGE)\s*[/\s]*(\w*)", line, re.IGNORECASE)
                 if neigh_m:
                     nbr = {"neighbor_id": neigh_m.group(1), "priority": int(neigh_m.group(2)), "state": (neigh_m.group(3) or "").upper()}
@@ -982,17 +1435,43 @@ class CiscoIOSParser(BaseParser):
                         nbr["address"] = addr_if.group(1)
                         nbr["interface"] = addr_if.group(2)
                     ospf["neighbors"].append(nbr)
-        # EIGRP: router eigrp 1 / router-id / network
+        ospf["learned_prefix_count"] = sum(1 for r in routes if (r.get("protocol") or "").startswith("O"))
+
+        # --- EIGRP (Scope 2.3.2.5.3) ---
         eigrp_m = re.search(r"router\s+eigrp\s+(\d+)", config_block, re.IGNORECASE)
         if eigrp_m:
             try:
                 eigrp["as_number"] = int(eigrp_m.group(1))
-                rid_m = re.search(r"router\s+eigrp\s+\d+.*?router-id\s+(\d+\.\d+\.\d+\.\d+)", config_block, re.IGNORECASE | re.DOTALL)
+                rid_m = re.search(r"eigrp\s+router-id\s+(\d+\.\d+\.\d+\.\d+)", config_block, re.IGNORECASE)
+                if not rid_m:
+                    rid_m = re.search(r"router\s+eigrp\s+\d+.*?router-id\s+(\d+\.\d+\.\d+\.\d+)", config_block, re.IGNORECASE | re.DOTALL)
                 if rid_m:
                     eigrp["router_id"] = rid_m.group(1)
             except (ValueError, TypeError):
                 pass
-        # BGP config: router bgp / router-id / neighbor
+        ip_protocols = _get_section(content, r"show\s+ip\s+protocols")
+        if ip_protocols and eigrp["as_number"] is None:
+            eigrp_as = re.search(r'Routing\s+Protocol\s+is\s+"eigrp\s+(\d+)"', ip_protocols, re.IGNORECASE)
+            if eigrp_as:
+                eigrp["as_number"] = int(eigrp_as.group(1))
+        eigrp_neigh_section = _get_section(content, r"show\s+ip\s+eigrp\s+neighbors")
+        if not eigrp_neigh_section:
+            eigrp_neigh_section = _get_section(content, r"show\s+ip\s+eigrp\s+neighbour")
+        if eigrp_neigh_section:
+            for line in eigrp_neigh_section.split("\n"):
+                line_strip = line.strip()
+                if not line_strip or "Address" in line_strip and "Interface" in line_strip:
+                    continue
+                nbr_m = re.match(r"(\d+\.\d+\.\d+\.\d+)\s+(\S+)\s+(\d+)", line_strip)
+                if nbr_m:
+                    eigrp["neighbors"].append({
+                        "address": nbr_m.group(1),
+                        "interface": nbr_m.group(2),
+                        "hold_time": int(nbr_m.group(3)),
+                    })
+        eigrp["learned_routes"] = [r for r in routes if (r.get("protocol") or "").strip().startswith("D")]
+
+        # --- BGP (Scope 2.3.2.5.4) ---
         bgp_m = re.search(r"router\s+bgp\s+(\d+)", config_block, re.IGNORECASE)
         if bgp_m:
             try:
@@ -1003,25 +1482,52 @@ class CiscoIOSParser(BaseParser):
                 if rid_m:
                     bgp["router_id"] = rid_m.group(1)
                 for nb_m in re.finditer(r"neighbor\s+(\d+\.\d+\.\d+\.\d+)\s+remote-as\s+(\d+)", config_block, re.IGNORECASE):
-                    bgp["peers"].append({"peer": nb_m.group(1), "remote_as": int(nb_m.group(2)), "state": "configured_but_down", "prefixes_received": None})
+                    bgp["peers"].append({"neighbor_ip": nb_m.group(1), "remote_as": int(nb_m.group(2)), "state": "configured_but_down", "prefixes_received": None})
             except (ValueError, TypeError):
                 pass
-        # BGP operational: show ip bgp summary - Neighbor V AS MsgRcvd MsgSent TblVer ... State PfxRcd
         bgp_summary = _get_section(content, r"show\s+ip\s+bgp\s+summary")
         if bgp_summary:
             for line in bgp_summary.split("\n"):
-                # (\d+\.\d+\.\d+\.\d+)\s+(\d+)\s+.*(Established|Idle|Active)\s+(\d+)
-                peer_m = re.search(r"(\d+\.\d+\.\d+\.\d+)\s+(\d+)\s+\d+\s+\d+\s+\d+.*?(Established|Idle|Active|Connect|OpenSent|OpenConfirm)\s+(\d*)", line, re.IGNORECASE)
-                if peer_m:
-                    ip, ras, state, pfxs = peer_m.group(1), int(peer_m.group(2)), peer_m.group(3), (peer_m.group(4) or "").strip()
-                    existing = next((p for p in bgp["peers"] if p.get("peer") == ip), None)
+                line_strip = line.strip()
+                if not line_strip or line_strip.startswith("Neighbor") or line_strip.startswith("BGP"):
+                    continue
+                tokens = line_strip.split()
+                if len(tokens) >= 3 and re.match(r"^\d+\.\d+\.\d+\.\d+$", tokens[0]):
+                    neighbor_ip = tokens[0]
+                    remote_as = int(tokens[2]) if tokens[2].isdigit() else None
+                    state = None
+                    prefixes_received = None
+                    if len(tokens) >= 10:
+                        last1, last2 = tokens[-1], tokens[-2]
+                        if last1.isdigit():
+                            prefixes_received = int(last1)
+                            state = last2 if not last2.isdigit() else "Established"
+                        else:
+                            state = last1
+                            if last2.isdigit():
+                                prefixes_received = int(last2)
+                    elif len(tokens) >= 9:
+                        last = tokens[-1]
+                        if last.isdigit():
+                            prefixes_received = int(last)
+                            state = "Established"
+                        else:
+                            state = last
+                    existing = next((p for p in bgp["peers"] if p.get("neighbor_ip") == neighbor_ip or p.get("peer") == neighbor_ip), None)
                     if existing:
-                        existing["state"] = state
-                        existing["prefixes_received"] = int(pfxs) if pfxs.isdigit() else None
+                        if state is not None:
+                            existing["state"] = state
+                        if prefixes_received is not None:
+                            existing["prefixes_received"] = prefixes_received
+                        if "neighbor_ip" not in existing:
+                            existing["neighbor_ip"] = neighbor_ip
                     else:
-                        bgp["peers"].append({"peer": ip, "remote_as": ras, "state": state, "prefixes_received": int(pfxs) if pfxs.isdigit() else None})
-        # RIP: passive interface from config
-        rip = {"version": None, "networks": [], "passive_interfaces": []}
+                        bgp["peers"].append({"neighbor_ip": neighbor_ip, "remote_as": remote_as, "state": state or "Unknown", "prefixes_received": prefixes_received})
+        for p in bgp["peers"]:
+            if "neighbor_ip" not in p and p.get("peer"):
+                p["neighbor_ip"] = p["peer"]
+
+        # --- RIP (Scope 2.3.2.5.5) ---
         rip_m = re.search(r"router\s+rip", config_block, re.IGNORECASE)
         if rip_m:
             section = re.search(r"router\s+rip(.*?)(?=router\s+|ip\s+|^!\s*$|\n\s*end\s*$|$)", config_block, re.IGNORECASE | re.DOTALL)
@@ -1030,75 +1536,197 @@ class CiscoIOSParser(BaseParser):
                 ver_m = re.search(r"version\s+(\d+)", body, re.IGNORECASE)
                 if ver_m:
                     rip["version"] = int(ver_m.group(1))
-                for net_m in re.finditer(r"network\s+(\S+)", body, re.IGNORECASE):
-                    if net_m.group(1) not in rip["networks"]:
-                        rip["networks"].append(net_m.group(1))
                 for pass_m in re.finditer(r"passive-interface\s+(\S+)", body, re.IGNORECASE):
                     rip["passive_interfaces"].append(pass_m.group(1))
+        if ip_protocols:
+            rip_timers = re.search(r"Sending\s+updates\s+every\s+(\d+)\s+seconds", ip_protocols, re.IGNORECASE)
+            if rip_timers:
+                rip["timers"]["update"] = int(rip_timers.group(1))
+            inv_m = re.search(r"Invalid\s+after\s+(\d+)\s+seconds", ip_protocols, re.IGNORECASE)
+            if inv_m:
+                rip["timers"]["invalid"] = int(inv_m.group(1))
+            hold_m = re.search(r"hold\s+down\s+(\d+)", ip_protocols, re.IGNORECASE)
+            if hold_m:
+                rip["timers"]["hold"] = int(hold_m.group(1))
+            flush_m = re.search(r"flushed\s+after\s+(\d+)", ip_protocols, re.IGNORECASE)
+            if flush_m:
+                rip["timers"]["flush"] = int(flush_m.group(1))
+            rip_if_m = re.search(r"Sending\s+updates\s+every\s+\d+\s+seconds[^.]*\.\s*on\s+([^\n]+)", ip_protocols, re.IGNORECASE | re.DOTALL)
+            if rip_if_m:
+                if_str = rip_if_m.group(1).strip()
+                rip["interfaces"] = [x.strip() for x in re.split(r"[\s,]+", if_str) if x.strip() and re.match(r"^(Gi|Fa|Eth|Te|Se|Lo|Vl|Serial|GigabitEthernet)", x.strip(), re.IGNORECASE)]
 
         return {"routes": routes, "ospf": ospf, "eigrp": eigrp, "bgp": bgp, "rip": rip}
 
-    def extract_neighbors(self, content: str) -> List[Dict[str, Any]]:
-        """2.3.2.6 - Neighbor name, IP, platform, ports, capabilities. Source: show cdp neighbors detail; fallback: show cdp neighbors (IP=Unknown)."""
+    def _normalize_neighbor_device_name(self, name: str) -> str:
+        """Remove domain suffix for display (e.g. CORE1.lab.local -> CORE1). Keeps FQDN if no dot after hostname."""
+        if not name or not isinstance(name, str):
+            return name
+        s = name.strip()
+        if "." in s:
+            return s.split(".")[0]
+        return s
+
+    def _parse_capabilities_string(self, cap_str: str) -> List[str]:
+        """Parse 'Router Source-Route-Bridge' or 'Switch IGMP' into list ['Router', 'Switch', 'IGMP']."""
+        if not cap_str or not isinstance(cap_str, str):
+            return []
+        # Split on spaces; filter empty; capitalize first letter per token
+        parts = [p.strip() for p in cap_str.split() if p.strip()]
+        return parts
+
+    def _parse_cdp_neighbors_detail(self, detail_text: str) -> List[Dict[str, Any]]:
+        """Parse 'show cdp neighbors detail'. Split by separator line, extract 7 fields per neighbor."""
         neighbors: List[Dict[str, Any]] = []
-        # CDP neighbors detail: Device ID, IP address, Platform, Interface, Port ID (outgoing port), Capabilities
-        detail_block = _get_section(content, r"show\s+cdp\s+neighbors\s+detail")
-        if detail_block:
-            for section in re.split(r"(?=-------------------------|Device ID:)", detail_block):
-                if "Device ID:" not in section:
-                    continue
-                dev_m = re.search(r"Device\s+ID:\s*(\S+)", section, re.IGNORECASE)
-                ip_m = re.search(r"IP\s+address:\s*(\d+\.\d+\.\d+\.\d+)", section, re.IGNORECASE)
-                plat_m = re.search(r"Platform:\s*(.*?),", section, re.IGNORECASE)
-                intf_port_m = re.search(r"Interface:\s*(\S+),\s*Port\s+ID\s*\(outgoing\s+port\):\s*(\S+)", section, re.IGNORECASE)
-                cap_m = re.search(r"Capabilities:\s*(.*?)(?:\n|$)", section, re.IGNORECASE | re.DOTALL)
-                if dev_m and (intf_port_m or re.search(r"Interface:\s*(\S+)", section, re.IGNORECASE)):
-                    intf = intf_port_m.group(1) if intf_port_m else re.search(r"Interface:\s*(\S+)", section, re.IGNORECASE).group(1)
-                    port_id = intf_port_m.group(2) if intf_port_m else (re.search(r"Port\s+ID\s*\(outgoing\s+port\):\s*(\S+)", section, re.IGNORECASE).group(1) if re.search(r"Port\s+ID", section, re.IGNORECASE) else None)
-                    plat = (plat_m.group(1).strip() if plat_m else None)
-                    neighbors.append({
-                        "local_interface": intf,
-                        "neighbor_id": dev_m.group(1),
-                        "platform": plat or None,
-                        "remote_interface": port_id,
-                        "ip_address": ip_m.group(1) if ip_m else None,
-                        "capabilities": cap_m.group(1).strip() if cap_m and cap_m.group(1).strip() else None,
-                    })
+        blocks = re.split(r"-------------------------", detail_text)
+        for block in blocks:
+            block = block.strip()
+            if not block or "Device ID:" not in block:
+                continue
+            dev_m = re.search(r"Device\s+ID:\s*([^\n\r]+)", block, re.IGNORECASE)
+            if not dev_m:
+                continue
+            device_id_raw = dev_m.group(1).strip()
+            neighbor_device_name = device_id_raw
+            neighbor_name_normalized = self._normalize_neighbor_device_name(device_id_raw)
+
+            ip_m = re.search(r"IP\s+address:\s*(\d+\.\d+\.\d+\.\d+)", block, re.IGNORECASE)
+            neighbor_ip = ip_m.group(1) if ip_m else None
+
+            plat_m = re.search(r"Platform:\s*([^,\n]+)", block, re.IGNORECASE)
+            platform = (plat_m.group(1).strip().rstrip(",") if plat_m else None) or None
+
+            intf_port_m = re.search(r"Interface:\s*(\S+),\s*Port\s+ID\s*\(outgoing\s+port\):\s*(\S+)", block, re.IGNORECASE)
+            if not intf_port_m:
+                intf_m = re.search(r"Interface:\s*(\S+)", block, re.IGNORECASE)
+                port_m = re.search(r"Port\s+ID\s*\(outgoing\s+port\):\s*(\S+)", block, re.IGNORECASE)
+                local_port_raw = intf_m.group(1) if intf_m else None
+                remote_port_raw = port_m.group(1) if port_m else None
+            else:
+                local_port_raw = intf_port_m.group(1)
+                remote_port_raw = intf_port_m.group(2)
+            local_port = _canonical_interface_name(local_port_raw) if local_port_raw else None
+            remote_port = _canonical_interface_name(remote_port_raw) if remote_port_raw else None
+
+            cap_m = re.search(r"Capabilities:\s*([^\n]+)", block, re.IGNORECASE)
+            capabilities_raw = (cap_m.group(1).strip() if cap_m else "") or ""
+            capabilities = self._parse_capabilities_string(capabilities_raw)
+
+            rec = {
+                "neighbor_device_name": neighbor_name_normalized,
+                "neighbor_ip": neighbor_ip,
+                "platform": platform,
+                "local_port": local_port,
+                "remote_port": remote_port,
+                "capabilities": capabilities,
+                "discovery_protocol": "CDP",
+                "neighbor_id": device_id_raw,
+                "local_interface": local_port,
+                "remote_interface": remote_port,
+                "ip_address": neighbor_ip,
+            }
+            neighbors.append(rec)
+        return neighbors
+
+    def _parse_lldp_neighbors_detail(self, detail_text: str) -> List[Dict[str, Any]]:
+        """Parse 'show lldp neighbors detail'. Separator is long dash line; System Name, Management IP, Local Intf, Port id."""
+        neighbors: List[Dict[str, Any]] = []
+        blocks = re.split(r"------------------------------------------------", detail_text)
+        for block in blocks:
+            block = block.strip()
+            if not block or "Local Intf:" not in block:
+                continue
+            sys_m = re.search(r"System\s+[Nn]ame:\s*([^\n\r]+)", block, re.IGNORECASE)
+            neighbor_device_name = (sys_m.group(1).strip() if sys_m else None) or None
+            neighbor_name_normalized = self._normalize_neighbor_device_name(neighbor_device_name) if neighbor_device_name else None
+
+            ip_m = re.search(r"IP:\s*(\d+\.\d+\.\d+\.\d+)", block, re.IGNORECASE)
+            if not ip_m:
+                ip_m = re.search(r"Management\s+[Aa]ddress(?:es)?:\s*\n\s*IP:\s*(\d+\.\d+\.\d+\.\d+)", block, re.IGNORECASE | re.MULTILINE)
+            neighbor_ip = ip_m.group(1) if ip_m else None
+
+            local_m = re.search(r"Local\s+[Ii]ntf:\s*(\S+)", block, re.IGNORECASE)
+            port_m = re.search(r"Port\s+id:\s*(\S+)", block, re.IGNORECASE)
+            local_port_raw = local_m.group(1) if local_m else None
+            remote_port_raw = port_m.group(1) if port_m else None
+            local_port = _canonical_interface_name(local_port_raw) if local_port_raw else None
+            remote_port = _canonical_interface_name(remote_port_raw) if remote_port_raw else None
+
+            cap_m = re.search(r"(?:System\s+)?[Cc]apabilities:\s*([^\n]+)", block, re.IGNORECASE)
+            cap_str = (cap_m.group(1).strip() if cap_m else "") or ""
+            enabled_m = re.search(r"Enabled\s+[Cc]apabilities:\s*([^\n]+)", block, re.IGNORECASE)
+            if enabled_m:
+                cap_str = enabled_m.group(1).strip() or cap_str
+            capabilities = self._parse_capabilities_string(cap_str.replace(",", " "))
+
+            if not neighbor_device_name and not local_port:
+                continue
+            rec = {
+                "neighbor_device_name": neighbor_name_normalized or neighbor_device_name,
+                "neighbor_ip": neighbor_ip,
+                "platform": None,
+                "local_port": local_port,
+                "remote_port": remote_port,
+                "capabilities": capabilities,
+                "discovery_protocol": "LLDP",
+                "neighbor_id": neighbor_device_name,
+                "local_interface": local_port,
+                "remote_interface": remote_port,
+                "ip_address": neighbor_ip,
+            }
+            neighbors.append(rec)
+        return neighbors
+
+    def extract_neighbors(self, content: str) -> List[Dict[str, Any]]:
+        """2.3.2.6 - Neighbor & Topology: neighbor_device_name, neighbor_ip, platform, local_port, remote_port, capabilities, discovery_protocol. Source: show cdp/lldp neighbors detail."""
+        neighbors: List[Dict[str, Any]] = []
+        seen_key: set = set()
+
+        def _add_unique(n: Dict[str, Any]) -> None:
+            key = (n.get("local_port"), n.get("neighbor_device_name") or n.get("neighbor_id"), n.get("discovery_protocol"))
+            if key in seen_key:
+                return
+            seen_key.add(key)
+            neighbors.append(n)
+
+        cdp_block = _get_section(content, r"show\s+cdp\s+neighbors\s+detail")
+        if not cdp_block:
+            cdp_block = re.search(r"show\s+cdp\s+neighbors\s+detail\s*(.*?)(?=\n\s*\S+#|\n\s*\S+>|show\s+lldp|$)", content, re.IGNORECASE | re.DOTALL)
+            cdp_block = (cdp_block.group(1) or "").strip() if cdp_block else ""
+        if cdp_block:
+            for n in self._parse_cdp_neighbors_detail(cdp_block):
+                _add_unique(n)
+
         if not neighbors:
-            brief = _get_section(content, r"show\s+cdp\s+neighbors")
+            brief = _get_section(content, r"show\s+cdp\s+neighbors(?!\s+detail)")
             if brief:
                 for line in brief.split("\n"):
                     if re.match(r"^(Device|Capability|-----)", line, re.IGNORECASE):
                         continue
                     parts = line.split()
                     if len(parts) >= 4 and re.search(r"(Gi|Fa|Eth|Te|Se|Lo|Vl|Po)", parts[1], re.IGNORECASE):
-                        neighbors.append({
-                            "local_interface": parts[1],
-                            "neighbor_id": parts[0],
+                        local_port = _canonical_interface_name(parts[1])
+                        rec = {
+                            "neighbor_device_name": self._normalize_neighbor_device_name(parts[0]),
+                            "neighbor_ip": "Unknown",
                             "platform": parts[-2] if len(parts) > 4 else None,
+                            "local_port": local_port,
+                            "remote_port": _canonical_interface_name(parts[-1]) if len(parts) >= 4 else None,
+                            "capabilities": [],
+                            "discovery_protocol": "CDP",
+                            "neighbor_id": parts[0],
+                            "local_interface": local_port,
                             "remote_interface": parts[-1] if len(parts) >= 4 else None,
                             "ip_address": "Unknown",
-                        })
-        # LLDP neighbors detail
+                        }
+                        _add_unique(rec)
         lldp_block = _get_section(content, r"show\s+lldp\s+neighbors\s+detail")
+        if not lldp_block:
+            lldp_block = re.search(r"show\s+lldp\s+neighbors\s+detail\s*(.*?)(?=\n\s*\S+#|\n\s*\S+>|show\s+|$)", content, re.IGNORECASE | re.DOTALL)
+            lldp_block = (lldp_block.group(1) or "").strip() if lldp_block else ""
         if lldp_block:
-            for section in re.split(r"(?=-------------------------|Chassis id:)", lldp_block):
-                if "Chassis id:" not in section and "Local Intf:" not in section:
-                    continue
-                sys_m = re.search(r"System\s+name:\s*(\S+)", section, re.IGNORECASE)
-                ip_m = re.search(r"Management\s+address:\s*(\d+\.\d+\.\d+\.\d+)", section, re.IGNORECASE)
-                port_m = re.search(r"Port\s+id:\s*(\S+)", section, re.IGNORECASE)
-                local_m = re.search(r"Local\s+intf:\s*(\S+)", section, re.IGNORECASE)
-                if sys_m and local_m:
-                    n = {
-                        "local_interface": local_m.group(1),
-                        "neighbor_id": sys_m.group(1),
-                        "platform": None,
-                        "remote_interface": port_m.group(1) if port_m else None,
-                        "ip_address": ip_m.group(1) if ip_m else None,
-                    }
-                    if not any(n["local_interface"] == x.get("local_interface") and n["neighbor_id"] == x.get("neighbor_id") for x in neighbors):
-                        neighbors.append(n)
+            for n in self._parse_lldp_neighbors_detail(lldp_block):
+                _add_unique(n)
         return neighbors
     
     def extract_mac_arp(self, content: str) -> Dict[str, Any]:
@@ -1232,44 +1860,100 @@ class CiscoIOSParser(BaseParser):
             audit["snmp"]["version"] = "v3" if ("snmp-server group" in cfg and "v3" in cfg) else "v2c"
         else:
             audit["snmp"]["status"] = "Disabled"
-        # NTP: if ntp server <ip> in config -> status "Configured", servers list; never null
+        # NTP: servers from config; sync_status from show ntp status (2.3.2.8.5)
         for m in re.finditer(r"ntp\s+server\s+(\S+)", content, re.IGNORECASE):
             s = m.group(1)
             if re.match(r"\d+\.\d+\.\d+\.\d+", s) and s not in audit["ntp"]["servers"]:
                 audit["ntp"]["servers"].append(s)
         if audit["ntp"]["servers"]:
             audit["ntp"]["status"] = "Configured"
-        else:
-            ntp_status = _get_section(content, r"show\s+ntp\s+status")
-            if ntp_status and "synchronized" in ntp_status.lower():
-                audit["ntp"]["status"] = "Synchronized"
-            elif ntp_status:
-                audit["ntp"]["status"] = "Unsynchronized"
+        ntp_status_block = _get_section(content, r"show\s+ntp\s+status")
+        if not ntp_status_block:
+            ntp_status_block = re.search(r"show\s+ntp\s+status\s*(.*?)(?=\n\s*\S+#|\n\s*\S+>|$)", content, re.IGNORECASE | re.DOTALL)
+            ntp_status_block = (ntp_status_block.group(1) or "").strip() if ntp_status_block else ""
+        if ntp_status_block:
+            ntp_lower = ntp_status_block.lower()
+            if "clock is synchronized" in ntp_lower:
+                audit["ntp"]["sync_status"] = "synchronized"
+            elif "clock is unsynchronized" in ntp_lower or "clock is 'nset'" in ntp_lower:
+                audit["ntp"]["sync_status"] = "unsynchronized"
             else:
-                audit["ntp"]["status"] = "None"
-        # Logging
+                audit["ntp"]["sync_status"] = "unsynchronized"
+        else:
+            audit["ntp"]["sync_status"] = "unknown"
+        if not audit["ntp"].get("status") or audit["ntp"]["status"] == "None":
+            if audit["ntp"].get("sync_status") == "synchronized":
+                audit["ntp"]["status"] = "Synchronized"
+            elif audit["ntp"].get("sync_status") == "unsynchronized":
+                audit["ntp"]["status"] = "Unsynchronized"
+        # Logging (2.3.2.8.6): show logging block for Syslog enabled and console level
+        show_logging_block = _get_section(content, r"show\s+logging")
+        if not show_logging_block:
+            show_logging_block = re.search(r"show\s+logging\s*(.*?)(?=\n\s*\S+#|\n\s*\S+>|$)", content, re.IGNORECASE | re.DOTALL)
+            show_logging_block = (show_logging_block.group(1) or "").strip() if show_logging_block else ""
+        if show_logging_block:
+            if re.search(r"^\s*Syslog\s+logging:\s+enabled\b", show_logging_block, re.IGNORECASE | re.MULTILINE):
+                audit["logging"]["syslog_enabled"] = True
+            console_level_m = re.search(r"Console\s+logging:\s+level\s+(\w+)", show_logging_block, re.IGNORECASE)
+            if console_level_m:
+                audit["logging"]["console_level"] = console_level_m.group(1).strip().lower()
         for m in re.finditer(r"logging\s+host\s+(\d+\.\d+\.\d+\.\d+|\S+)", content, re.IGNORECASE):
             audit["logging"]["syslog_servers"].append(m.group(1))
         if "logging console" in cfg and "no logging console" not in cfg:
             audit["logging"]["console_logging"] = True
-        # ACLs: name, type (Standard/Extended), rule_count
-        acl_ids: List[str] = []
-        for m in re.finditer(r"ip\s+access-group\s+(\S+)\s+\w+", content, re.IGNORECASE):
-            acl_ids.append(m.group(1))
-        for m in re.finditer(r"access-list\s+(\d+)\s+(\w+)", content, re.IGNORECASE):
+        if not audit["logging"].get("syslog_enabled") and audit["logging"].get("syslog_servers"):
+            audit["logging"]["syslog_enabled"] = True
+        # ACLs (2.3.2.8.7): name, type (Standard/Extended), rules[] - full rule text per ACL
+        config_block = _get_section(content, r"show\s+running-config") or content
+        acl_by_name: Dict[str, Dict[str, Any]] = {}
+
+        # 1) Numbered ACLs: access-list <id> <permit|deny> ...
+        for m in re.finditer(r"access-list\s+(\d+)\s+(permit|deny)\s+(.+)", config_block, re.IGNORECASE):
             acl_id = m.group(1)
-            if acl_id not in acl_ids:
-                acl_ids.append(acl_id)
-        for acl_id in acl_ids:
-            try:
-                num = int(acl_id)
-                acl_type = "Standard" if 1 <= num <= 99 else "Extended"
-            except ValueError:
-                acl_type = "Extended"
-            rule_count = len(re.findall(r"access-list\s+" + re.escape(acl_id) + r"\s+\w+", content, re.IGNORECASE))
-            if rule_count == 0:
-                rule_count = len(re.findall(r"ip\s+access-list\s+(?:extended|standard)\s+" + re.escape(acl_id) + r"\s*\n.*?(?=\n(?:ip\s+access-list|\d|$)", content, re.IGNORECASE | re.DOTALL))
-            audit["acls"].append({"name": acl_id, "type": acl_type, "rule_count": rule_count})
+            action = (m.group(2) or "").strip().lower()
+            rest = (m.group(3) or "").strip()
+            rule_text = f"{action} {rest}".strip()
+            if acl_id not in acl_by_name:
+                try:
+                    num = int(acl_id)
+                    acl_type = "Standard" if 1 <= num <= 99 else "Extended"
+                except ValueError:
+                    acl_type = "Extended"
+                acl_by_name[acl_id] = {"name": acl_id, "type": acl_type, "rules": []}
+            acl_by_name[acl_id]["rules"].append(rule_text)
+
+        # 2) Named ACLs: ip access-list standard|extended <name> ... then indented permit/deny lines
+        named_blocks = re.finditer(
+            r"ip\s+access-list\s+(standard|extended)\s+(\S+)\s*\n(.*?)(?=\n(?:ip\s+access-list\s|access-list\s+\d+|interface\s+|router\s+|line\s+|!\s*$|end\s*$)|$)",
+            config_block,
+            re.IGNORECASE | re.DOTALL,
+        )
+        for nb in named_blocks:
+            kind, name, block = (nb.group(1) or "").strip(), (nb.group(2) or "").strip(), (nb.group(3) or "").strip()
+            acl_type = "Standard" if kind.lower() == "standard" else "Extended"
+            rules: List[str] = []
+            for line in block.splitlines():
+                line = line.strip()
+                if not line or line.startswith("!"):
+                    continue
+                rule_m = re.match(r"^(permit|deny)\s+(.+)$", line, re.IGNORECASE)
+                if rule_m:
+                    rules.append(f"{rule_m.group(1).lower()} {rule_m.group(2).strip()}".strip())
+            if name not in acl_by_name:
+                acl_by_name[name] = {"name": name, "type": acl_type, "rules": []}
+            acl_by_name[name]["rules"] = rules
+
+        # Referenced ACLs (ip access-group X in/out) not yet in acl_by_name: add with empty rules
+        for m in re.finditer(r"ip\s+access-group\s+(\S+)\s+\w+", config_block, re.IGNORECASE):
+            acl_id = m.group(1)
+            if acl_id not in acl_by_name:
+                try:
+                    num = int(acl_id)
+                    acl_type = "Standard" if 1 <= num <= 99 else "Extended"
+                except ValueError:
+                    acl_type = "Extended"
+                acl_by_name[acl_id] = {"name": acl_id, "type": acl_type, "rules": []}
+        audit["acls"] = list(acl_by_name.values())
         return audit
 
     def _security_audit_from_legacy(self, sec: Dict[str, Any]) -> Dict[str, Any]:
@@ -1283,109 +1967,175 @@ class CiscoIOSParser(BaseParser):
             "snmp": {"status": "Enabled" if sec.get("snmp_enabled") else "Disabled", "version": "v2c", "communities": []},
             "ntp": {"servers": sec.get("ntp_servers") or [], "status": None},
             "logging": {"syslog_servers": [sec["logging_host"]] if sec.get("logging_host") else [], "console_logging": False},
-            "acls": [{"name": a, "type": "Extended", "rule_count": 0} for a in (sec.get("acls") or [])],
+            "acls": [{"name": a, "type": "Extended", "rules": []} for a in (sec.get("acls") or [])],
         }
 
+    def _decode_etherchannel_flags(self, flags: str) -> str:
+        """Decode Cisco etherchannel summary flags. S=Layer2, R=Layer3, U=In Use, D=Down, s=Suspended."""
+        if not flags:
+            return "Unknown"
+        parts: List[str] = []
+        f = flags.upper()
+        if "S" in f:
+            parts.append("Layer2")
+        if "R" in f:
+            parts.append("Layer3")
+        if "U" in f:
+            parts.append("In Use")
+        if "D" in f:
+            parts.append("Down")
+        if "s" in flags:
+            parts.append("Suspended")
+        return ", ".join(parts) if parts else "Up"
+
+    def _decode_member_port_status(self, member_flags: str) -> str:
+        """Decode member port flags: P = Bundled in port-channel, D = Down, s = Suspended, etc."""
+        if not member_flags:
+            return "Bundled"
+        f = (member_flags or "").upper()
+        if "P" in f:
+            return "Bundled"
+        if "D" in f:
+            return "Down"
+        if "s" in (member_flags or ""):
+            return "Suspended"
+        return "Up"
+
     def extract_ha(self, content: str) -> Dict[str, Any]:
-        """2.3.2.9 - EtherChannel from show etherchannel summary (filter headers); HSRP from show standby brief (validate virtual_ip). Config fallback for both."""
-        ha: Dict[str, Any] = {"etherchannels": [], "hsrp_vrrp": []}
+        """2.3.2.9 - etherchannels (from show etherchannel summary), hsrp (show standby brief), vrrp (show vrrp brief/detail)."""
+        ha: Dict[str, Any] = {"etherchannels": [], "hsrp": [], "vrrp": []}
         config_block = _get_section(content, r"show\s+running-config") or content
         if not config_block or not config_block.strip():
             config_block = content
 
-        # --- EtherChannel: prefer show etherchannel summary; filter header lines ---
+        def _is_valid_ip(s: str) -> bool:
+            return bool(s and re.match(r"^\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3}$", str(s)))
+
+        # --- EtherChannel (2.3.2.9.1): show etherchannel summary ---
         ec_show = _get_section(content, r"show\s+etherchannel\s+summary")
         if ec_show:
             for line in ec_show.splitlines():
                 line_strip = line.strip()
-                if not line_strip:
+                if not line_strip or "Group" in line and "Port-channel" in line or "Number of" in line or "Flags:" in line or line_strip.startswith("------"):
                     continue
-                if "Group" in line and "Port-channel" in line:
-                    continue
-                if "Port-channel" in line and line_strip.startswith("------"):
-                    continue
-                if "Number of" in line or "Flags:" in line or line_strip.startswith("------"):
-                    continue
-                ec_m = re.match(r"^\s*(\d+)\s+(Po\d+)\((\w+)\)\s+(\w+)\s+(.*)$", line)
+                ec_m = re.match(r"^\s*(\d+)\s+(Po\d+)\(([^)]*)\)\s+(\S+)\s+(.*)$", line)
                 if ec_m:
                     grp_id = int(ec_m.group(1))
                     po_name = ec_m.group(2)
                     flags = ec_m.group(3)
-                    protocol = ec_m.group(4)
-                    rest = ec_m.group(5)
-                    if "SU" in flags or "RU" in flags:
-                        status = "Up"
-                    elif "D" in flags:
-                        status = "Down"
-                    else:
-                        status = "Up"
-                    members = re.findall(r"(Gi\d+/\d+|Fa\d+/\d+|Te\d+/\d+)(?:\([^)]*\))?", rest)
+                    protocol = (ec_m.group(4) or "").strip()
+                    rest = (ec_m.group(5) or "").strip()
+                    status = self._decode_etherchannel_flags(flags)
+                    member_entries = re.findall(r"(Gi\d+/\d+|Fa\d+/\d+|Te\d+/\d+|Ethernet\d+/\d+)(?:\(([^)]*)\))?", rest, re.IGNORECASE)
+                    members = []
+                    for port_part, mflags in member_entries:
+                        iface_short = port_part
+                        members.append({"interface": iface_short, "status": self._decode_member_port_status(mflags)})
                     if not members:
-                        members = [s.strip("()") for s in re.findall(r"\S+", rest) if re.match(r"^(Gi|Fa|Te)\d+/\d+", s)]
-                    ha["etherchannels"].append({"id": grp_id, "interface": po_name, "protocol": protocol, "status": status, "members": members})
-        # Config fallback for EtherChannel when no show output
+                        raw = re.findall(r"(Gi\d+/\d+|Fa\d+/\d+|Te\d+/\d+)(?:\([^)]*\))?", rest, re.IGNORECASE)
+                        members = [{"interface": p, "status": "Bundled"} for p in raw]
+                    ha["etherchannels"].append({
+                        "group": grp_id,
+                        "name": po_name,
+                        "protocol": protocol,
+                        "status": status,
+                        "members": members,
+                    })
         if not ha["etherchannels"]:
             pc_ids = set()
-            try:
-                for m in re.finditer(r"interface\s+Port-channel\s*(\d+)", config_block, re.IGNORECASE):
+            for m in re.finditer(r"interface\s+Port-channel\s*(\d+)", config_block, re.IGNORECASE):
+                try:
                     pc_ids.add(int(m.group(1)))
-            except Exception:
-                pass
+                except ValueError:
+                    pass
             for grp_id in sorted(pc_ids):
                 members = []
                 proto = "LACP"
-                try:
-                    for m2 in re.finditer(r"interface\s+(\S+)\s*\n(.*?)(?=\ninterface\s+|$)", config_block, re.IGNORECASE | re.DOTALL):
-                        block = m2.group(2)
-                        if f"channel-group {grp_id}" not in block.lower():
-                            continue
-                        members.append(m2.group(1))
-                        mode_m = re.search(r"channel-group\s+\d+\s+mode\s+(active|passive|on|desirable|auto)", block, re.IGNORECASE)
-                        if mode_m:
-                            mode = mode_m.group(1).upper()
-                            if mode in ("ACTIVE", "PASSIVE"):
-                                proto = "LACP"
-                            elif mode in ("DESIRABLE", "AUTO"):
-                                proto = "PAGP"
-                            else:
-                                proto = "Static"
-                except Exception:
-                    pass
-                ha["etherchannels"].append({"id": grp_id, "protocol": proto, "members": members})
+                for m2 in re.finditer(r"interface\s+(\S+)\s*\n(.*?)(?=\ninterface\s+|$)", config_block, re.IGNORECASE | re.DOTALL):
+                    block = m2.group(2)
+                    if f"channel-group {grp_id}" not in block.lower():
+                        continue
+                    iface_name = m2.group(1)
+                    members.append({"interface": iface_name, "status": "Bundled"})
+                    mode_m = re.search(r"channel-group\s+\d+\s+mode\s+(active|passive|on|desirable|auto)", block, re.IGNORECASE)
+                    if mode_m:
+                        mode = mode_m.group(1).upper()
+                        proto = "LACP" if mode in ("ACTIVE", "PASSIVE") else "PAGP" if mode in ("DESIRABLE", "AUTO") else "Static"
+                ha["etherchannels"].append({"group": grp_id, "name": f"Po{grp_id}", "protocol": proto, "status": "Up" if members else "Down", "members": members})
 
-        # --- HSRP: show standby brief; skip header; only add if virtual_ip is valid IP ---
-        def _is_valid_ip(s: str) -> bool:
-            return bool(s and re.match(r"^\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3}$", s))
-
+        # --- HSRP (2.3.2.9.2): show standby brief; extract priority and preempt ---
         show_standby = _get_section(content, r"show\s+standby\s+brief")
         if show_standby:
             for line in show_standby.splitlines():
                 line_strip = line.strip()
-                if not line_strip or line_strip.startswith("Interface") or line_strip.startswith("Grp") or "P indicates" in line:
+                if not line_strip or line_strip.startswith("Interface") or line_strip.startswith("Grp") or "P indicates" in line or "Virtual IP" in line and "Active" in line:
                     continue
-                # Interface Grp Pri P State Active Standby Virtual IP
-                m = re.match(r"^(\S+)\s+(\d+)\s+(\d+)\s+(?:P\s+)?(\S+)\s+(\S+)\s+(\S+)\s+(\d+\.\d+\.\d+\.\d+)$", line_strip)
+                # Interface Grp Pri P State Active Standby Virtual IP  -> P is optional (preempt)
+                m = re.match(r"^(\S+)\s+(\d+)\s+(\d+)\s+(P)?\s*(\S+)\s+(\S+)\s+(\S+)\s+(\d+\.\d+\.\d+\.\d+)\s*$", line_strip)
                 if m:
-                    iface, grp, pri, state, active, standby, vip = m.group(1), int(m.group(2)), int(m.group(3)), m.group(4), m.group(5), m.group(6), m.group(7)
+                    iface, grp, pri, preempt_char, state, active, standby, vip = m.group(1), int(m.group(2)), int(m.group(3)), m.group(4), m.group(5), m.group(6), m.group(7), m.group(8)
                     if _is_valid_ip(vip):
-                        ha["hsrp_vrrp"].append({
+                        ha["hsrp"].append({
                             "interface": iface,
                             "group": grp,
-                            "priority": pri,
-                            "state": state,
                             "virtual_ip": vip,
-                            "active": active,
-                            "standby": standby,
+                            "state": state,
+                            "priority": pri,
+                            "preempt": preempt_char == "P",
                         })
-        if not ha["hsrp_vrrp"]:
+        if not ha["hsrp"]:
             for m in re.finditer(r"standby\s+(\d+)\s+ip\s+(\d+\.\d+\.\d+\.\d+)", content, re.IGNORECASE):
-                vip = m.group(2)
-                if _is_valid_ip(vip):
-                    ha["hsrp_vrrp"].append({"interface": None, "group": int(m.group(1)), "virtual_ip": vip, "state": None})
-        for m in re.finditer(r"vrrp\s+(\d+)\s+ip\s+(\d+\.\d+\.\d+\.\d+)", content, re.IGNORECASE):
-            vip = m.group(2)
-            if _is_valid_ip(vip) and not any(e.get("group") == int(m.group(1)) and e.get("virtual_ip") == vip for e in ha["hsrp_vrrp"]):
-                ha["hsrp_vrrp"].append({"interface": None, "group": int(m.group(1)), "virtual_ip": vip, "state": "Active"})
+                if _is_valid_ip(m.group(2)):
+                    ha["hsrp"].append({"interface": None, "group": int(m.group(1)), "virtual_ip": m.group(2), "state": None, "priority": None, "preempt": None})
+
+        # --- VRRP (2.3.2.9.3): show vrrp brief / show vrrp detail (predictive) ---
+        vrrp_brief = _get_section(content, r"show\s+vrrp\s+brief")
+        if not vrrp_brief:
+            vrrp_brief = re.search(r"show\s+vrrp\s+brief\s*(.*?)(?=\n\s*\S+#|\n\s*\S+>|$)", content, re.IGNORECASE | re.DOTALL)
+            vrrp_brief = (vrrp_brief.group(1) or "").strip() if vrrp_brief else ""
+        vrrp_detail = _get_section(content, r"show\s+vrrp\s+detail")
+        if not vrrp_detail:
+            vrrp_detail = re.search(r"show\s+vrrp(?:\s+detail)?\s*(.*?)(?=\n\s*\S+#|\n\s*\S+>|$)", content, re.IGNORECASE | re.DOTALL)
+            vrrp_detail = (vrrp_detail.group(1) or "").strip() if vrrp_detail else ""
+
+        if vrrp_brief:
+            for line in vrrp_brief.splitlines():
+                line_strip = line.strip()
+                if not line_strip or "Interface" in line and "Grp" in line or "State" in line and "Master" in line:
+                    continue
+                m = re.match(r"^(\S+)\s+(\d+)\s+(\d+)\s+\S+\s+\S+\s+([YP]?)\s+(\w+)\s+(\d+\.\d+\.\d+\.\d+)\s+(\d+\.\d+\.\d+\.\d+)?", line_strip)
+                if m:
+                    iface, grp, pri, preempt_char, state, master_or_vip, group_addr = m.group(1), int(m.group(2)), int(m.group(3)), m.group(4), m.group(5), m.group(6), m.group(7)
+                    virtual_ip = group_addr if _is_valid_ip(group_addr) else master_or_vip
+                    if _is_valid_ip(virtual_ip):
+                        ha["vrrp"].append({"interface": iface, "group": grp, "virtual_ip": virtual_ip, "state": state, "priority": pri, "preempt": preempt_char in ("Y", "P")})
+        elif vrrp_detail:
+            current = {}
+            for line in vrrp_detail.splitlines():
+                line_strip = line.strip()
+                grp_m = re.match(r"Group\s+(\d+)", line_strip, re.IGNORECASE)
+                state_m = re.search(r"State\s+is\s+(\w+)", line_strip, re.IGNORECASE)
+                vip_m = re.search(r"Virtual\s+IP\s+address\s+is\s+(\d+\.\d+\.\d+\.\d+)", line_strip, re.IGNORECASE)
+                pri_m = re.search(r"Priority\s+(\d+)", line_strip, re.IGNORECASE)
+                preempt_m = re.search(r"Preemption\s+(?:is\s+)?enabled", line_strip, re.IGNORECASE)
+                if grp_m:
+                    if current and current.get("group") is not None and _is_valid_ip(current.get("virtual_ip")):
+                        ha["vrrp"].append(current)
+                    current = {"group": int(grp_m.group(1)), "interface": None, "virtual_ip": None, "state": None, "priority": None, "preempt": False}
+                if state_m:
+                    current["state"] = state_m.group(1)
+                if vip_m:
+                    current["virtual_ip"] = vip_m.group(1)
+                if pri_m:
+                    current["priority"] = int(pri_m.group(1))
+                if preempt_m:
+                    current["preempt"] = True
+            if current and current.get("group") is not None and _is_valid_ip(current.get("virtual_ip")):
+                ha["vrrp"].append(current)
+        else:
+            for m in re.finditer(r"vrrp\s+(\d+)\s+ip\s+(\d+\.\d+\.\d+\.\d+)", content, re.IGNORECASE):
+                if _is_valid_ip(m.group(2)):
+                    ha["vrrp"].append({"interface": None, "group": int(m.group(1)), "virtual_ip": m.group(2), "state": None, "priority": None, "preempt": None})
         return ha
 
     def extract_high_availability(self, content: str, sections: Optional[Dict[str, str]] = None) -> Dict[str, Any]:
@@ -1422,16 +2172,22 @@ class CiscoIOSParser(BaseParser):
         return {"ether_channels": ether_channels}
 
     def _ha_from_legacy(self, ha: Dict[str, Any]) -> Dict[str, Any]:
-        """Build high_availability from legacy ha."""
+        """Build high_availability from ha.etherchannels (group/name/protocol/status/members with interface)."""
         if not ha:
             return {"ether_channels": []}
         ec_list = []
         for e in ha.get("etherchannels") or []:
+            name = e.get("name") or f"Po{e.get('group', e.get('id', 0))}"
+            members_raw = e.get("members") or []
+            if members_raw and isinstance(members_raw[0], dict):
+                members = [m.get("interface", m.get("port", m)) if isinstance(m, dict) else m for m in members_raw]
+            else:
+                members = list(members_raw)
             ec_list.append({
-                "interface": f"Po{e.get('id', 0)}",
-                "protocol": (e.get("protocol") or "LACP").upper(),
-                "members": e.get("members") or [],
-                "status": "Up" if e.get("members") else "Down",
+                "interface": name,
+                "protocol": (e.get("protocol") or e.get("mode") or "LACP").upper(),
+                "members": members,
+                "status": e.get("status") or ("Up" if members else "Down"),
             })
         return {"ether_channels": ec_list}
 
