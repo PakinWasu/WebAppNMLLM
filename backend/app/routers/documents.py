@@ -364,7 +364,7 @@ async def upload_documents_endpoint(
                                         "upload_timestamp": datetime.now(timezone.utc),
                                         "device_overview": {"hostname": device_name},
                                         "interfaces": [],
-                                        "vlans": {"vlan_list": [], "vlan_names": {}, "vlan_status": {}, "total_vlan_count": 0},
+                                        "vlans": {"vlan_list": [], "total_vlan_count": 0, "details": [], "access_ports": [], "trunk_ports": []},
                                         "stp": {"stp_mode": None, "root_bridges": [], "mode": None},
                                         "routing": {"static": [], "ospf": {}, "eigrp": {}, "bgp": {}, "rip": {}},
                                         "neighbors": [],

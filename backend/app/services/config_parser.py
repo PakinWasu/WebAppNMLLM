@@ -53,8 +53,12 @@ def normalize_cisco_to_legacy(parsed: Dict[str, Any]) -> Dict[str, Any]:
     interfaces: List[Dict[str, Any]] = []
     for i in parsed.get("interfaces") or []:
         ip_addr = i.get("ip_address")
+        subnet_mask = i.get("subnet_mask")
         if isinstance(ip_addr, str) and "/" in ip_addr:
-            ip_addr = ip_addr.split("/")[0]
+            parts = ip_addr.split("/", 1)
+            ip_addr = parts[0]
+            if not subnet_mask and len(parts) > 1 and parts[1].strip():
+                subnet_mask = parts[1].strip()
         interfaces.append({
             "name": i.get("name"),
             "type": i.get("type"),
@@ -63,6 +67,7 @@ def normalize_cisco_to_legacy(parsed: Dict[str, Any]) -> Dict[str, Any]:
             "line_protocol": i.get("protocol") or "up",
             "description": i.get("description"),
             "ipv4_address": ip_addr,
+            "subnet_mask": subnet_mask,
             "ipv6_address": i.get("ipv6_address"),
             "mac_address": i.get("mac_address"),
             "speed": i.get("speed"),
@@ -74,25 +79,17 @@ def normalize_cisco_to_legacy(parsed: Dict[str, Any]) -> Dict[str, Any]:
             "allowed_vlans": i.get("allowed_vlans"),
         })
 
-    # vlans: dict with vlan_list (IDs as strings or list of dicts), details, access_ports, trunk_ports
+    # vlans: vlan_list, details (name/status per VLAN), access_ports, trunk_ports; no redundant vlan_names/vlan_status
     _vlans_raw = parsed.get("vlans")
     if isinstance(_vlans_raw, dict):
         vlan_list_spec = _vlans_raw.get("vlan_list") or []
         details_spec = _vlans_raw.get("details") or []
-        # Support vlan_list as ["1", "10", ...] or as [{"id": "1", "name": "...", "status": "..."}, ...]
         if vlan_list_spec and isinstance(vlan_list_spec[0], dict):
             vlan_list = [str(v.get("id")) for v in vlan_list_spec if v.get("id") is not None]
-            vlan_names = {str(v["id"]): v.get("name") or str(v["id"]) for v in vlan_list_spec if v.get("id") is not None}
-            vlan_status = {str(v["id"]): v.get("status") or "active" for v in vlan_list_spec if v.get("id") is not None}
         else:
             vlan_list = [str(v) for v in vlan_list_spec if v is not None]
-            detail_by_id = {str(d.get("id")): d for d in details_spec if d.get("id") is not None}
-            vlan_names = {vid: (detail_by_id.get(vid) or {}).get("name") or vid for vid in vlan_list}
-            vlan_status = {vid: (detail_by_id.get(vid) or {}).get("status") or "active" for vid in vlan_list}
         vlans = {
             "vlan_list": vlan_list,
-            "vlan_names": vlan_names,
-            "vlan_status": vlan_status,
             "total_vlan_count": _vlans_raw.get("total_vlan_count") or _vlans_raw.get("total_count") or len(vlan_list),
             "details": details_spec,
             "access_ports": _vlans_raw.get("access_ports", []),
@@ -104,8 +101,6 @@ def normalize_cisco_to_legacy(parsed: Dict[str, Any]) -> Dict[str, Any]:
         vlan_list = [str(v.get("id")) for v in vlan_list_spec if v.get("id") is not None]
         vlans = {
             "vlan_list": vlan_list,
-            "vlan_names": {str(v["id"]): v.get("name") or str(v["id"]) for v in vlan_list_spec if v.get("id") is not None},
-            "vlan_status": {str(v["id"]): v.get("status") or "active" for v in vlan_list_spec if v.get("id") is not None},
             "total_vlan_count": len(vlan_list),
             "details": [],
             "access_ports": [],
@@ -290,18 +285,20 @@ def normalize_huawei_to_legacy(parsed: Dict[str, Any]) -> Dict[str, Any]:
         "management_ip": device_info.get("management_ip") or overview_raw.get("management_ip"),
         "uptime": device_info.get("uptime") or overview_raw.get("uptime"),
         "cpu_utilization": device_info.get("cpu_utilization") or overview_raw.get("cpu_utilization"),
-        "memory_utilization": overview_raw.get("memory_usage"),
-        "memory_usage": overview_raw.get("memory_usage"),
+        "memory_utilization": overview_raw.get("memory_utilization") or overview_raw.get("memory_usage"),
+        "memory_usage": overview_raw.get("memory_utilization") or overview_raw.get("memory_usage"),
     }
-    if overview.get("memory_utilization") is not None and "memory_usage" not in overview:
-        overview["memory_usage"] = overview["memory_utilization"]
 
     # interfaces: same keys as legacy (Huawei already uses admin_status, oper_status, line_protocol, ipv4_address, etc.)
     interfaces: List[Dict[str, Any]] = []
     for i in parsed.get("interfaces") or []:
         ip_addr = i.get("ipv4_address") or i.get("ip_address")
+        subnet_mask = i.get("subnet_mask")
         if isinstance(ip_addr, str) and "/" in ip_addr:
-            ip_addr = ip_addr.split("/")[0]
+            parts = ip_addr.split("/", 1)
+            ip_addr = parts[0]
+            if not subnet_mask and len(parts) > 1 and parts[1].strip():
+                subnet_mask = parts[1].strip()
         interfaces.append({
             "name": i.get("name"),
             "type": i.get("type"),
@@ -310,6 +307,7 @@ def normalize_huawei_to_legacy(parsed: Dict[str, Any]) -> Dict[str, Any]:
             "line_protocol": i.get("line_protocol") or i.get("protocol") or "up",
             "description": i.get("description"),
             "ipv4_address": ip_addr,
+            "subnet_mask": subnet_mask,
             "ipv6_address": i.get("ipv6_address"),
             "mac_address": i.get("mac_address"),
             "speed": i.get("speed"),
@@ -321,72 +319,65 @@ def normalize_huawei_to_legacy(parsed: Dict[str, Any]) -> Dict[str, Any]:
             "allowed_vlans": i.get("allowed_vlans"),
         })
 
-    # vlans: dict with vlan_list (list of {id,name,status} or list of ids), details, access_ports, trunk_ports
+    # vlans: vlan_list, details (name/status per VLAN), access_ports, trunk_ports; no redundant vlan_names/vlan_status
     vlan_list_spec = parsed.get("vlans") or {}
     raw_list = vlan_list_spec.get("vlan_list") or []
     if raw_list and isinstance(raw_list[0], dict):
         vlan_list = [str(v.get("id")) for v in raw_list if v.get("id") is not None]
-        vlan_names = {str(v["id"]): v.get("name") or str(v["id"]) for v in raw_list if v.get("id") is not None}
-        vlan_status = {str(v["id"]): v.get("status") or "active" for v in raw_list if v.get("id") is not None}
     else:
         vlan_list = [str(v) for v in raw_list]
-        vlan_names = (vlan_list_spec.get("vlan_names") or {}) if isinstance(vlan_list_spec, dict) else {vid: vid for vid in vlan_list}
-        vlan_status = (vlan_list_spec.get("vlan_status") or {}) if isinstance(vlan_list_spec, dict) else {vid: "active" for vid in vlan_list}
     vlans = {
         "vlan_list": vlan_list,
-        "vlan_names": vlan_names,
-        "vlan_status": vlan_status,
         "total_vlan_count": vlan_list_spec.get("total_vlan_count", len(vlan_list)) if isinstance(vlan_list_spec, dict) else len(vlan_list),
         "details": vlan_list_spec.get("details", []) if isinstance(vlan_list_spec, dict) else [],
         "access_ports": vlan_list_spec.get("access_ports", []) if isinstance(vlan_list_spec, dict) else [],
         "trunk_ports": vlan_list_spec.get("trunk_ports", []) if isinstance(vlan_list_spec, dict) else [],
     }
 
-    # routing: static + routes[] (from display ip routing-table when present) + ospf/eigrp/bgp/rip
+    # routing: 2.3.2.5 structure (static_routes, ospf, eigrp, bgp, rip) + legacy static/routes
     routing_raw = parsed.get("routing") or {}
+    # 2.3.2.5 exact structure (pass through from parser)
+    static_routes_obj = routing_raw.get("static_routes")
+    if not isinstance(static_routes_obj, dict):
+        static_routes_obj = {"routes": []}
+    ospf_obj = routing_raw.get("ospf")
+    if not isinstance(ospf_obj, dict):
+        ospf_obj = {"router_id": None, "process_id": None, "areas": [], "interfaces": [], "neighbors": [], "dr_bdr_info": {}, "learned_prefixes": []}
+    eigrp_obj = routing_raw.get("eigrp")
+    if not isinstance(eigrp_obj, dict):
+        eigrp_obj = {"as_number": None, "router_id": None, "neighbors": [], "hold_time": None, "learned_routes": []}
+    bgp_obj = routing_raw.get("bgp")
+    if not isinstance(bgp_obj, dict):
+        bgp_obj = {"local_as": None, "peers": []}
+    rip_obj = routing_raw.get("rip")
+    if not isinstance(rip_obj, dict):
+        rip_obj = {"version": None, "networks": [], "hop_count": None, "interfaces": [], "auto_summary": False, "passive_interfaces": [], "timers": {"update": 30, "invalid": 180, "garbage": 120}, "admin_distance": 100}
+    # Legacy: static list and route table for backward compat
     static_raw = routing_raw.get("static") or []
-    static_routes = []
-    # Prefer full route table from "display ip routing-table" when present (Huawei); else build from static only
     routes_from_table = routing_raw.get("routes") or []
-    if routes_from_table:
-        route_table = [{"protocol": r.get("protocol"), "network": r.get("network"), "next_hop": r.get("next_hop") or "", "interface": r.get("interface") or ""} for r in routes_from_table]
-    else:
-        route_table = []
+    static_legacy = []
     for r in static_raw:
         net = r.get("network")
         if not net:
             continue
         nh = r.get("next_hop") or r.get("nexthop") or ""
         iface = r.get("interface") or ""
-        static_routes.append({"network": net, "next_hop": nh, "interface": iface})
-        if not routes_from_table:
-            route_table.append({"protocol": "S", "network": net, "next_hop": nh, "interface": iface})
-    ospf_raw = routing_raw.get("ospf")
-    ospf = {"router_id": None, "process_id": None, "areas": [], "interfaces": [], "neighbors": [], "dr_bdr": {}}
-    if isinstance(ospf_raw, dict):
-        ospf["router_id"] = ospf_raw.get("router_id")
-        ospf["process_id"] = ospf_raw.get("process_id")
-        ospf["areas"] = ospf_raw.get("areas") or []
-    bgp_raw = routing_raw.get("bgp")
-    bgp = {"local_as": None, "peers": []}
-    if isinstance(bgp_raw, dict):
-        bgp["local_as"] = bgp_raw.get("as_number") or bgp_raw.get("local_as")
-        bgp["peers"] = bgp_raw.get("peers") or []
-    rip_raw = routing_raw.get("rip")
-    rip = {"version": None, "networks": [], "interfaces": [], "hop_count": {}, "auto_summary": None, "passive_interfaces": [], "timers": {"update": None, "invalid": None, "holddown": None, "flush": None}, "admin_distance": None}
-    if isinstance(rip_raw, dict):
-        rip["version"] = rip_raw.get("version")
-        rip["networks"] = rip_raw.get("networks") or []
+        static_legacy.append({"network": net, "next_hop": nh, "interface": iface})
+    route_table = [{"protocol": r.get("protocol"), "network": r.get("network"), "next_hop": r.get("next_hop") or "", "interface": r.get("interface") or ""} for r in routes_from_table] if routes_from_table else []
+    if not route_table and static_legacy:
+        for s in static_legacy:
+            route_table.append({"protocol": "S", "network": s.get("network"), "next_hop": s.get("next_hop"), "interface": s.get("interface")})
     routing = {
-        "static": static_routes,
+        "static_routes": static_routes_obj,
+        "ospf": ospf_obj,
+        "eigrp": eigrp_obj,
+        "bgp": bgp_obj,
+        "rip": rip_obj,
+        "static": static_legacy,
         "routes": route_table,
-        "ospf": ospf,
-        "eigrp": {"as_number": None, "router_id": None, "neighbors": [], "hold_time": None, "learned_routes": []},
-        "bgp": bgp,
-        "rip": rip,
     }
 
-    # neighbors: same keys device_name, local_port, remote_port, platform, ip_address
+    # neighbors: 2.3.2.6 device_name, ip_address, platform, local_port, remote_port, capabilities, discovery_protocol
     neighbors = []
     for n in parsed.get("neighbors") or []:
         neighbors.append({
@@ -395,6 +386,8 @@ def normalize_huawei_to_legacy(parsed: Dict[str, Any]) -> Dict[str, Any]:
             "remote_port": n.get("remote_port"),
             "platform": n.get("platform"),
             "ip_address": n.get("ip_address"),
+            "capabilities": n.get("capabilities"),
+            "discovery_protocol": n.get("discovery_protocol"),
         })
 
     # mac_arp: ensure lists
@@ -411,6 +404,11 @@ def normalize_huawei_to_legacy(parsed: Dict[str, Any]) -> Dict[str, Any]:
     ntp_servers = []
     if sec_raw.get("ntp_server"):
         ntp_servers.append(sec_raw["ntp_server"])
+    audit_ntp = (sec_audit.get("ntp") or {}).get("servers")
+    if isinstance(audit_ntp, list):
+        for s in audit_ntp:
+            if s and s not in ntp_servers:
+                ntp_servers.append(s)
     log_host = sec_raw.get("syslog") or (sec_audit.get("logging") or {}).get("log_host") if isinstance(sec_audit.get("logging"), dict) else None
     if not log_host and isinstance(sec_audit.get("logging"), str):
         log_host = sec_audit.get("logging")
@@ -436,22 +434,59 @@ def normalize_huawei_to_legacy(parsed: Dict[str, Any]) -> Dict[str, Any]:
         "acls": acls or (sec_audit.get("acls") if isinstance(sec_audit.get("acls"), list) else []),
     }
 
-    # stp: same keys stp_mode, root_bridges, root_bridge_id, mode
+    # stp: Cisco-aligned; stp_info MUST NOT be null; root_bridges = VLAN IDs (integers) only; no stp_interfaces
     stp_raw = parsed.get("stp") or {}
     rb = stp_raw.get("root_bridge_id")
-    root_bridges = stp_raw.get("root_bridges") or ([rb] if rb else [])
+    root_bridges = [x for x in (stp_raw.get("root_bridges") or []) if isinstance(x, int)]
+    raw_interfaces = stp_raw.get("interfaces") or []
+    # Normalize each interface to exactly 6 fields (Cisco schema)
+    def _norm_stp_iface(o: Any) -> Dict[str, Any]:
+        if not isinstance(o, dict):
+            return {"port": "", "role": "Designated", "state": "Forwarding", "cost": 20000, "portfast_enabled": False, "bpduguard_enabled": False}
+        return {
+            "port": o.get("port") if o.get("port") is not None else "",
+            "role": o.get("role") if o.get("role") is not None else "Designated",
+            "state": o.get("state") if o.get("state") is not None else "Forwarding",
+            "cost": int(o["cost"]) if o.get("cost") is not None else 20000,
+            "portfast_enabled": bool(o.get("portfast_enabled")) if o.get("portfast_enabled") is not None else False,
+            "bpduguard_enabled": bool(o.get("bpduguard_enabled")) if o.get("bpduguard_enabled") is not None else False,
+        }
+    interfaces_list = [_norm_stp_iface(i) for i in raw_interfaces]
+    stp_info_raw = stp_raw.get("stp_info")
+    if stp_info_raw and isinstance(stp_info_raw, dict) and "mode" in stp_info_raw and "root_bridge" in stp_info_raw:
+        stp_info = dict(stp_info_raw)
+        stp_info["interfaces"] = [_norm_stp_iface(i) for i in (stp_info_raw.get("interfaces") or [])]
+    else:
+        root_bridge_nested = (stp_info_raw or {}).get("root_bridge") if isinstance(stp_info_raw, dict) else {}
+        stp_info = {
+            "mode": stp_raw.get("stp_mode") or stp_raw.get("mode") or "MSTP",
+            "root_bridge": {
+                "root_bridge_id": rb,
+                "priority": (root_bridge_nested.get("priority") if isinstance(root_bridge_nested, dict) else None) or 32768,
+                "is_local_device_root": root_bridge_nested.get("is_local_device_root", False) if isinstance(root_bridge_nested, dict) else False,
+            },
+            "interfaces": list(interfaces_list),
+        }
     stp = {
         "stp_mode": stp_raw.get("stp_mode") or stp_raw.get("mode"),
         "root_bridges": root_bridges,
         "root_bridge_id": rb,
         "mode": stp_raw.get("stp_mode") or stp_raw.get("mode"),
+        "priority": stp_info.get("root_bridge", {}).get("priority"),
+        "is_root": stp_info.get("root_bridge", {}).get("is_local_device_root"),
+        "bpdu_protection_global": stp_raw.get("bpduguard_enabled"),
+        "portfast_enabled": stp_raw.get("portfast_enabled"),
+        "bpduguard_enabled": stp_raw.get("bpduguard_enabled"),
+        "interfaces": interfaces_list,
+        "stp_info": stp_info,
     }
 
-    # ha: port_channels, etherchannel, hsrp, vrrp (same as legacy)
+    # ha: port_channels, etherchannel, etherchannels (Cisco-aligned), hsrp, vrrp
     ha_raw = parsed.get("ha") or {}
     high_avail = parsed.get("high_availability") or {}
-    ether_list = high_avail.get("ether_channels") or ha_raw.get("etherchannel") or []
+    ether_list = high_avail.get("ether_channels") or ha_raw.get("etherchannels") or ha_raw.get("etherchannel") or []
     port_channels = []
+    etherchannels_out = []
     for e in ether_list:
         if isinstance(e, dict):
             name = e.get("interface") or e.get("name") or ""
@@ -464,20 +499,27 @@ def normalize_huawei_to_legacy(parsed: Dict[str, Any]) -> Dict[str, Any]:
                         po_id = int(num.group(0))
                     except ValueError:
                         pass
+            members_raw = e.get("members") or []
+            members_flat = [m.get("interface", m.get("port", m)) if isinstance(m, dict) else m for m in members_raw]
             port_channels.append({
                 "id": po_id or e.get("id"),
                 "mode": e.get("protocol") or e.get("mode"),
-                "members": e.get("members") or [],
+                "members": members_flat,
                 "status": (e.get("status") or "up").lower(),
             })
-    etherchannel = [{"name": f"Po{p['id']}" if p.get("id") is not None else "Po", "mode": p.get("mode"), "members": p.get("members") or [], "status": p.get("status") or "up"} for p in port_channels]
-    hsrp = []
+            etherchannels_out.append({
+                "name": name or (f"Po{po_id}" if po_id is not None else "Po"),
+                "mode": e.get("protocol") or e.get("mode"),
+                "status": e.get("status") or "up",
+                "members": members_raw if members_raw and isinstance(members_raw[0], dict) else [{"interface": m, "status": "Bundled"} for m in members_flat],
+            })
+    etherchannel = [{"name": x["name"], "mode": x["mode"], "members": x["members"], "status": x["status"]} for x in etherchannels_out]
     vrrp_list = ha_raw.get("vrrp") or []
     vrrp = []
     for v in vrrp_list if isinstance(vrrp_list, list) else []:
         if isinstance(v, dict):
             vrrp.append({"group": v.get("vrid") or v.get("group"), "virtual_ip": v.get("virtual_ip"), "interface": v.get("interface"), "state": v.get("state")})
-    ha = {"port_channels": port_channels, "etherchannel": etherchannel, "hsrp": hsrp, "vrrp": vrrp}
+    ha = {"port_channels": port_channels, "etherchannel": etherchannel, "etherchannels": etherchannels_out, "hsrp": ha_raw.get("hsrp") or [], "vrrp": vrrp}
 
     device_name = (overview.get("hostname") or "").strip() if isinstance(overview.get("hostname"), str) else None
     return {
@@ -534,8 +576,8 @@ class ConfigParser:
                             "device_name": device_name or None,
                             "device_overview": overview,
                             "interfaces": [],
-                            "vlans": {"vlan_list": [], "vlan_names": {}, "vlan_status": {}, "total_vlan_count": 0},
-                            "stp": {"stp_mode": None, "root_bridges": [], "root_bridge_id": None, "mode": None},
+                            "vlans": {"vlan_list": [], "total_vlan_count": 0, "details": [], "access_ports": [], "trunk_ports": []},
+                            "stp": {"stp_mode": None, "root_bridges": [], "root_bridge_id": None, "mode": None, "priority": None, "is_root": None, "bpdu_protection_global": None, "portfast_enabled": None, "bpduguard_enabled": None, "interfaces": [], "stp_info": {"mode": "MSTP", "root_bridge": {"root_bridge_id": None, "priority": 32768, "is_local_device_root": False}, "interfaces": []}},
                             "routing": {"static": [], "routes": [], "ospf": {}, "eigrp": {}, "bgp": {}, "rip": {}},
                             "neighbors": [],
                             "mac_arp": {"mac_table": [], "arp_table": []},

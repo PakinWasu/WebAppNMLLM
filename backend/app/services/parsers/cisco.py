@@ -104,6 +104,11 @@ def _determine_interface_type(name: str) -> Optional[str]:
     normalized = _canonical_interface_name(name)
     lower = normalized.lower()
     
+    if "null" in lower:
+        return "Null"
+    if "meth" in lower:
+        return "ManagementEthernet"
+    
     # Physical interfaces
     if (lower.startswith("gigabitethernet") or 
         lower.startswith("fastethernet") or 
@@ -579,9 +584,11 @@ class CiscoIOSParser(BaseParser):
                 mac_m = re.search(r"address\s+is\s+([\da-fA-F.]+)", block, re.IGNORECASE)
             if mac_m:
                 out["mac_address"] = self._normalize_mac_cisco(mac_m.group(1))
-            ip_m = re.search(r"Internet\s+address\s+is\s+(\d+\.\d+\.\d+\.\d+/\d+)", block, re.IGNORECASE)
+            ip_m = re.search(r"Internet\s+address\s+is\s+(\d+\.\d+\.\d+\.\d+)(?:/(\d+))?", block, re.IGNORECASE)
             if ip_m:
                 out["ip_address"] = ip_m.group(1)
+                if ip_m.group(2):
+                    out["subnet_mask"] = ip_m.group(2)
             mtu_m = re.search(r"MTU\s+(\d+)\s+bytes", block, re.IGNORECASE)
             if mtu_m:
                 out["mtu"] = int(mtu_m.group(1))
@@ -661,6 +668,7 @@ class CiscoIOSParser(BaseParser):
             "type": _determine_interface_type(canonical_name),
             "description": None,
             "ip_address": None,
+            "subnet_mask": None,
             "status": "up",
             "protocol": "up",
             "mac_address": None,
@@ -702,9 +710,14 @@ class CiscoIOSParser(BaseParser):
             except Exception:
                 pass
             try:
-                ip_m = re.search(r"ip\s+address\s+(\d+\.\d+\.\d+\.\d+\s+\d+\.\d+\.\d+\.\d+|\d+\.\d+\.\d+\.\d+/\d+)", block, re.IGNORECASE)
+                ip_m = re.search(r"ip\s+address\s+(\d+\.\d+\.\d+\.\d+)\s+(\d+\.\d+\.\d+\.\d+|\d+)", block, re.IGNORECASE)
+                if not ip_m:
+                    ip_m = re.search(r"ip\s+address\s+(\d+\.\d+\.\d+\.\d+)/(\d+)", block, re.IGNORECASE)
                 if ip_m:
                     iface["ip_address"] = ip_m.group(1).strip()
+                    mask_val = ip_m.group(2).strip() if ip_m.lastindex >= 2 else None
+                    if mask_val:
+                        iface["subnet_mask"] = mask_val  # dotted (255.255.255.0), prefix (24), or from CIDR
             except Exception:
                 pass
             try:
@@ -786,7 +799,18 @@ class CiscoIOSParser(BaseParser):
                 if not iface.get("type"):
                     iface["type"] = _determine_interface_type(iface["name"])
                 if ip_val and ip_val != "unassigned":
-                    iface["ip_address"] = ip_val if "/" in ip_val or " " in ip_val else ip_val
+                    if "/" in ip_val:
+                        a, _, b = ip_val.partition("/")
+                        iface["ip_address"] = a.strip()
+                        if b.strip():
+                            iface["subnet_mask"] = b.strip()
+                    elif " " in ip_val:
+                        parts_ip = ip_val.split(None, 1)
+                        iface["ip_address"] = parts_ip[0]
+                        if len(parts_ip) > 1 and parts_ip[1].strip():
+                            iface["subnet_mask"] = parts_ip[1].strip()
+                    else:
+                        iface["ip_address"] = ip_val
                 if status:
                     iface["status"] = status.lower()
                 if protocol:
