@@ -67,14 +67,98 @@ function SummaryMarkdown({ text, className = "", size = "sm" }) {
   );
 }
 
-/** Dashboard widget for structured Network Overview (summaryData from backend). */
+/** Dashboard widget for structured Network Overview (summaryData from backend).
+ *  Supports new 9-section format and legacy format for backward compatibility.
+ */
 function StructuredNetworkOverview({ data, className = "" }) {
   if (!data || typeof data !== "object") return null;
-  const topology = data.topology || {};
-  const protocols = Array.isArray(data.protocols) ? data.protocols : [];
+  
   const health = (data.health_status || "Unknown").toString();
   const isHealthy = /healthy/i.test(health);
   const isWarning = /warning/i.test(health);
+
+  // Section color configs (9 sections with distinct colors like AI Recommendations)
+  const sectionColors = {
+    overview:   { bg: "rgba(59, 130, 246, 0.15)",  border: "#3b82f6", badge: "bg-blue-500" },      // Blue
+    interfaces: { bg: "rgba(6, 182, 212, 0.15)",   border: "#06b6d4", badge: "bg-cyan-500" },      // Cyan
+    vlans:      { bg: "rgba(99, 102, 241, 0.15)",  border: "#6366f1", badge: "bg-indigo-500" },    // Indigo
+    stp:        { bg: "rgba(168, 85, 247, 0.15)",  border: "#a855f7", badge: "bg-purple-500" },    // Purple
+    routing:    { bg: "rgba(34, 197, 94, 0.15)",   border: "#22c55e", badge: "bg-green-500" },     // Green
+    neighbors:  { bg: "rgba(20, 184, 166, 0.15)",  border: "#14b8a6", badge: "bg-teal-500" },      // Teal
+    mac_arp:    { bg: "rgba(249, 115, 22, 0.15)",  border: "#f97316", badge: "bg-orange-500" },    // Orange
+    security:   { bg: "rgba(244, 63, 94, 0.15)",   border: "#f43f5e", badge: "bg-rose-500" },      // Rose
+    ha:         { bg: "rgba(234, 179, 8, 0.15)",   border: "#eab308", badge: "bg-yellow-500" },    // Yellow
+  };
+  const sectionOrder = ["overview", "interfaces", "vlans", "stp", "routing", "neighbors", "mac_arp", "security", "ha"];
+
+  // New section format - vertical layout like Recommendations
+  if (data.sections && typeof data.sections === "object") {
+    const availableSections = Object.keys(data.sections);
+    const hasAnySections = availableSections.some((key) => {
+      const section = data.sections[key];
+      return section?.summary && section.summary.trim() !== "";
+    });
+    
+    if (!hasAnySections) {
+      return (
+        <div className={`text-slate-500 dark:text-slate-400 italic text-sm ${className}`}>
+          No overview data available. Click the AI button to generate.
+        </div>
+      );
+    }
+    
+    return (
+      <div className={`space-y-3 ${className}`}>
+        {/* Section Cards - Vertical layout like Recommendations */}
+        {availableSections.map((key) => {
+          const section = data.sections[key];
+          if (!section) return null;
+          const colors = sectionColors[key] || sectionColors.overview;
+          const hasContent = section.summary && section.summary.trim() !== "";
+          const hasHighlights = Array.isArray(section.highlights) && section.highlights.length > 0;
+          
+          // Skip sections with no content
+          if (!hasContent && !hasHighlights) return null;
+          
+          return (
+            <div
+              key={key}
+              className="p-3 rounded-lg border break-words"
+              style={{ backgroundColor: colors.bg, borderColor: colors.border }}
+            >
+              {/* Section Title Badge */}
+              <div className="flex items-start gap-2 mb-1.5">
+                <span className={`text-sm font-semibold px-2 py-0.5 rounded text-white ${colors.badge}`}>
+                  {section.title || key}
+                </span>
+              </div>
+              {/* Summary */}
+              {hasContent && (
+                <div className="text-slate-700 dark:text-slate-300 mb-1.5">
+                  {section.summary}
+                </div>
+              )}
+              {/* Highlights */}
+              {hasHighlights && (
+                <div className="text-slate-700 dark:text-slate-200">
+                  <span className="font-semibold">Key Points:</span>
+                  <ul className="mt-1 ml-4 space-y-0.5 list-disc">
+                    {section.highlights.map((h, i) => (
+                      <li key={i} className="text-sm">{h}</li>
+                    ))}
+                  </ul>
+                </div>
+              )}
+            </div>
+          );
+        })}
+      </div>
+    );
+  }
+
+  // Legacy format (backward compatible)
+  const topology = data.topology || {};
+  const protocols = Array.isArray(data.protocols) ? data.protocols : [];
   const insights = Array.isArray(data.key_insights) ? data.key_insights : [];
   const recommendations = Array.isArray(data.recommendations) ? data.recommendations : [];
   const mainProtocol = protocols.length > 0 ? protocols[0] : "—";
@@ -89,12 +173,7 @@ function StructuredNetworkOverview({ data, className = "" }) {
           <div className="min-w-0 flex-1">
             <div className="text-xs font-medium text-slate-500 dark:text-slate-400 uppercase tracking-wide">Health</div>
             <div className="flex items-center gap-1.5 truncate">
-              <span
-                className={`w-2 h-2 rounded-full flex-shrink-0 ${
-                  isHealthy ? "bg-green-500" : isWarning ? "bg-amber-500" : "bg-red-500"
-                }`}
-                aria-hidden
-              />
+              <span className={`w-2 h-2 rounded-full flex-shrink-0 ${isHealthy ? "bg-green-500" : isWarning ? "bg-amber-500" : "bg-red-500"}`} aria-hidden />
               <span className="text-slate-200 dark:text-slate-300 truncate">{health}</span>
             </div>
           </div>
@@ -115,7 +194,7 @@ function StructuredNetworkOverview({ data, className = "" }) {
         </div>
       </div>
 
-      {/* Middle: Insight items (vertical stack with icon) */}
+      {/* Middle: Insight items */}
       <div className="space-y-2">
         <div className="text-xs font-medium text-slate-500 dark:text-slate-400 uppercase tracking-wide mb-2">Insights</div>
         {insights.length > 0 ? (
@@ -136,15 +215,13 @@ function StructuredNetworkOverview({ data, className = "" }) {
         )}
       </div>
 
-      {/* Bottom: Recommendations (amber left border box) */}
+      {/* Bottom: Recommendations */}
       <div className="space-y-2">
         <div className="text-xs font-medium text-slate-500 dark:text-slate-400 uppercase tracking-wide mb-2">Recommendations</div>
         {recommendations.length > 0 ? (
           <div className="rounded-lg bg-slate-800/50 dark:bg-slate-800/50 border-l-4 border-amber-500 pl-3 py-2 pr-2 space-y-1.5">
             {recommendations.map((item, i) => (
-              <div key={i} className="text-slate-300 dark:text-slate-300 text-sm leading-snug">
-                {item}
-              </div>
+              <div key={i} className="text-slate-300 dark:text-slate-300 text-sm leading-snug">{item}</div>
             ))}
           </div>
         ) : (
@@ -155,9 +232,79 @@ function StructuredNetworkOverview({ data, className = "" }) {
   );
 }
 
-/** Renders structured Device Summary (role, uptime, critical_metrics, config_highlights, security_issues). */
+/** Renders structured Device Summary with colored sections (same format as StructuredNetworkOverview). */
 function StructuredDeviceSummary({ data, className = "" }) {
   if (!data || typeof data !== "object") return null;
+  
+  const sectionColors = {
+    overview:   { bg: "rgba(59, 130, 246, 0.15)",  border: "#3b82f6", badge: "bg-blue-500" },
+    interfaces: { bg: "rgba(6, 182, 212, 0.15)",   border: "#06b6d4", badge: "bg-cyan-500" },
+    vlans:      { bg: "rgba(99, 102, 241, 0.15)",  border: "#6366f1", badge: "bg-indigo-500" },
+    routing:    { bg: "rgba(34, 197, 94, 0.15)",   border: "#22c55e", badge: "bg-green-500" },
+    security:   { bg: "rgba(244, 63, 94, 0.15)",   border: "#f43f5e", badge: "bg-rose-500" },
+  };
+  
+  // New section format - vertical layout with colored cards
+  if (data.sections && typeof data.sections === "object") {
+    const availableSections = Object.keys(data.sections);
+    const hasAnySections = availableSections.some((key) => {
+      const section = data.sections[key];
+      return section?.summary && section.summary.trim() !== "";
+    });
+    
+    if (!hasAnySections) {
+      return (
+        <div className={`text-slate-500 dark:text-slate-400 italic text-sm ${className}`}>
+          No summary data available. Click the AI button to generate.
+        </div>
+      );
+    }
+    
+    return (
+      <div className={`space-y-2 ${className}`}>
+        {availableSections.map((key) => {
+          const section = data.sections[key];
+          if (!section) return null;
+          const colors = sectionColors[key] || sectionColors.overview;
+          const hasContent = section.summary && section.summary.trim() !== "";
+          const hasHighlights = Array.isArray(section.highlights) && section.highlights.length > 0;
+          
+          if (!hasContent && !hasHighlights) return null;
+          
+          return (
+            <div
+              key={key}
+              className="p-2.5 rounded-lg border break-words"
+              style={{ backgroundColor: colors.bg, borderColor: colors.border }}
+            >
+              <div className="flex items-start gap-2 mb-1">
+                <span className={`text-xs font-semibold px-1.5 py-0.5 rounded text-white ${colors.badge}`}>
+                  {section.title || key}
+                </span>
+              </div>
+              {hasContent && (
+                <div className="text-slate-700 dark:text-slate-300 text-xs mb-1">
+                  {section.summary}
+                </div>
+              )}
+              {hasHighlights && (
+                <div className="text-slate-700 dark:text-slate-200 text-xs">
+                  <span className="font-semibold">Key Points:</span>
+                  <ul className="mt-0.5 ml-3 space-y-0.5 list-disc">
+                    {section.highlights.map((h, i) => (
+                      <li key={i}>{h}</li>
+                    ))}
+                  </ul>
+                </div>
+              )}
+            </div>
+          );
+        })}
+      </div>
+    );
+  }
+  
+  // Legacy format (backward compatible)
   const role = data.role || "—";
   const uptime = data.uptime_human || "N/A";
   const metrics = data.critical_metrics || {};
@@ -1498,7 +1645,7 @@ const NetworkOverviewCard = ({ project, summaryRows, fullHeight, onRegisterGener
                     Error: {safeDisplay(error)}
                   </div>
                 )}
-                {overviewData != null && (overviewData.topology != null || overviewData.key_insights != null) ? (
+                {overviewData != null && (overviewData.sections != null || overviewData.topology != null || overviewData.key_insights != null) ? (
                   <StructuredNetworkOverview data={overviewData} className={fullHeight ? "text-base" : ""} />
                 ) : overviewText != null ? (
                   <SummaryMarkdown text={overviewText} className={fullHeight ? "text-base" : ""} />
@@ -1519,12 +1666,21 @@ const NetworkOverviewCard = ({ project, summaryRows, fullHeight, onRegisterGener
 /* Normalize recommendations-only API format to gap_analysis display format */
 function recommendationsToGapAnalysis(recommendations) {
   if (!Array.isArray(recommendations)) return [];
-  return recommendations.map((r) => ({
-    severity: r.severity || "Medium",
-    device: r.device || "all",
-    issue: r.issue ?? r.message ?? "",
-    recommendation: r.recommendation ?? r.message ?? "",
-  }));
+  return recommendations.map((r) => {
+    // Support both old "device" (string) and new "affected_devices" (array) format
+    let affectedDevices = [];
+    if (Array.isArray(r.affected_devices) && r.affected_devices.length > 0) {
+      affectedDevices = r.affected_devices;
+    } else if (r.device && r.device !== "all") {
+      affectedDevices = [r.device];
+    }
+    return {
+      severity: r.severity || "Medium",
+      affectedDevices: affectedDevices,
+      issue: r.issue ?? r.message ?? "",
+      recommendation: r.recommendation ?? r.message ?? "",
+    };
+  });
 }
 
 /* ========= Recommendations Card Component ========= */
@@ -1853,22 +2009,23 @@ const RecommendationsCard = ({ project, summaryRows, fullHeight, onRegisterGener
                 )}
                 {gapAnalysis.length > 0 ? (
                   <div className="space-y-3">
-                    {gapAnalysis.map((item, idx) => (
+                    {gapAnalysis.map((item, idx) => {
+                      const sev = (item.severity || "medium").toLowerCase();
+                      const devices = item.affectedDevices || [];
+                      const hasDevices = devices.length > 0 && !(devices.length === 1 && devices[0] === "all");
+                      return (
                       <div key={idx} className="p-3 rounded-lg border break-words" style={{
-                        borderColor: item.severity === "High" ? "#ef4444" : item.severity === "Medium" ? "#eab308" : "#64748b",
-                        backgroundColor: item.severity === "High" ? "rgba(239, 68, 68, 0.08)" : item.severity === "Medium" ? "rgba(234, 179, 8, 0.1)" : "rgba(100, 116, 139, 0.08)"
+                        borderColor: sev === "high" ? "#ef4444" : sev === "medium" ? "#eab308" : "#22c55e",
+                        backgroundColor: sev === "high" ? "rgba(239, 68, 68, 0.08)" : sev === "medium" ? "rgba(234, 179, 8, 0.1)" : "rgba(34, 197, 94, 0.08)"
                       }}>
                         <div className="flex items-start gap-2 mb-1.5">
                           <span className={`text-sm font-semibold px-2 py-0.5 rounded ${
-                            item.severity === "High" ? "bg-rose-500 text-white" :
-                            item.severity === "Medium" ? "bg-yellow-500 text-white" :
-                            "bg-slate-500 text-white"
+                            sev === "high" ? "bg-rose-500 text-white" :
+                            sev === "medium" ? "bg-yellow-500 text-white" :
+                            "bg-green-500 text-white"
                           }`}>
-                            {item.severity?.toUpperCase() || "MEDIUM"}
+                            {sev.toUpperCase()}
                           </span>
-                          {item.device && item.device !== "all" && (
-                            <span className="text-sm font-medium text-slate-600 dark:text-slate-300">[{item.device}]</span>
-                          )}
                         </div>
                         {item.issue != null && (
                           <div className="text-slate-700 dark:text-slate-300 mb-1.5">
@@ -1876,12 +2033,31 @@ const RecommendationsCard = ({ project, summaryRows, fullHeight, onRegisterGener
                           </div>
                         )}
                         {item.recommendation != null && (
-                          <div className="text-slate-700 dark:text-slate-200">
+                          <div className="text-slate-700 dark:text-slate-200 mb-1.5">
                             <span className="font-semibold">Recommendation:</span> {safeDisplay(item.recommendation)}
                           </div>
                         )}
+                        {hasDevices && (
+                          <div className="flex items-center gap-2 mt-2 pt-2 border-t border-slate-200/50 dark:border-slate-700/50">
+                            <span className="text-xs font-semibold text-slate-500 dark:text-slate-400">Affected Devices:</span>
+                            <div className="flex flex-wrap gap-1">
+                              {devices.map((d, i) => (
+                                <span key={i} className="inline-flex items-center px-2 py-0.5 text-xs font-medium rounded-full bg-slate-200 dark:bg-slate-700 text-slate-700 dark:text-slate-300">
+                                  {d}
+                                </span>
+                              ))}
+                            </div>
+                          </div>
+                        )}
+                        {!hasDevices && (
+                          <div className="flex items-center gap-2 mt-2 pt-2 border-t border-slate-200/50 dark:border-slate-700/50">
+                            <span className="text-xs font-semibold text-slate-500 dark:text-slate-400">Affected Devices:</span>
+                            <span className="text-xs text-slate-500 dark:text-slate-400 italic">All devices in network</span>
+                          </div>
+                        )}
                       </div>
-                    ))}
+                      );
+                    })}
                   </div>
                 ) : !isActuallyGenerating ? (
                   <div className="text-slate-500 dark:text-slate-400 italic">
@@ -3571,7 +3747,7 @@ const DeviceDetailsView = ({ project, deviceId, goBack, goBackHref, goIndex, goI
                             Error: {safeDisplay(deviceOverviewError)}
                           </div>
                         )}
-                        {deviceOverviewData != null && (deviceOverviewData.role != null || deviceOverviewData.config_highlights != null) ? (
+                        {deviceOverviewData != null && (deviceOverviewData.sections != null || deviceOverviewData.role != null || deviceOverviewData.config_highlights != null) ? (
                           <StructuredDeviceSummary data={deviceOverviewData} className="text-slate-700 dark:text-slate-300" />
                         ) : deviceOverviewText != null ? (
                           <SummaryMarkdown text={deviceOverviewText} size="xs" className="text-slate-700 dark:text-slate-300" />
@@ -3603,18 +3779,20 @@ const DeviceDetailsView = ({ project, deviceId, goBack, goBackHref, goIndex, goI
                         )}
                         {deviceRecsList.length ? (
                           <div className="space-y-2">
-                            {deviceRecsList.map((item, idx) => (
-                              <div key={idx} className="p-2 rounded border text-xs break-words" style={{
-                                borderColor: item.severity === "high" ? "#ef4444" : item.severity === "medium" ? "#eab308" : "#64748b",
-                                backgroundColor: item.severity === "high" ? "rgba(239, 68, 68, 0.1)" : item.severity === "medium" ? "rgba(234, 179, 8, 0.1)" : "rgba(100, 116, 139, 0.1)"
+                            {deviceRecsList.map((item, idx) => {
+                              const sev = (item.severity || "medium").toLowerCase();
+                              return (
+                              <div key={idx} className="p-2 rounded-lg border text-xs break-words" style={{
+                                borderColor: sev === "high" ? "#ef4444" : sev === "medium" ? "#eab308" : "#22c55e",
+                                backgroundColor: sev === "high" ? "rgba(239, 68, 68, 0.08)" : sev === "medium" ? "rgba(234, 179, 8, 0.1)" : "rgba(34, 197, 94, 0.08)"
                               }}>
                                 <div className="flex items-start gap-2 mb-1">
                                   <span className={`text-[10px] font-semibold px-1.5 py-0.5 rounded ${
-                                    item.severity === "high" ? "bg-rose-500 text-white" :
-                                    item.severity === "medium" ? "bg-yellow-500 text-white" :
-                                    "bg-slate-500 text-white"
+                                    sev === "high" ? "bg-rose-500 text-white" :
+                                    sev === "medium" ? "bg-yellow-500 text-white" :
+                                    "bg-green-500 text-white"
                                   }`}>
-                                    {(item.severity || "medium").toUpperCase()}
+                                    {sev.toUpperCase()}
                                   </span>
                                 </div>
                                 {item.issue && (
@@ -3628,7 +3806,8 @@ const DeviceDetailsView = ({ project, deviceId, goBack, goBackHref, goIndex, goI
                                   </div>
                                 )}
                               </div>
-                            ))}
+                              );
+                            })}
                           </div>
                         ) : (
                           <div className="text-xs text-slate-700 dark:text-slate-500">
@@ -3663,21 +3842,76 @@ const DeviceDetailsView = ({ project, deviceId, goBack, goBackHref, goIndex, goI
                           </div>
                         )}
                         {deviceDriftData ? (
-                          <div className="text-xs text-slate-700 dark:text-slate-300 space-y-2">
-                            <div className="font-semibold text-slate-800 dark:text-slate-200">Device: {safeDisplay(deviceDriftData.device_name || facts?.device)}</div>
-                            <div className="text-slate-600 dark:text-slate-400">
-                              Compare: {safeDisplay(deviceDriftData.from_filename)} → {safeDisplay(deviceDriftData.to_filename)}
+                          <div className="text-xs text-slate-700 dark:text-slate-300 space-y-3">
+                            <div className="flex items-center justify-between">
+                              <div className="font-semibold text-slate-800 dark:text-slate-200">Device: {safeDisplay(deviceDriftData.device_name || facts?.device)}</div>
+                              <div className="text-slate-500 dark:text-slate-400 text-xs">
+                                {(deviceDriftData.changes || []).length} change(s)
+                              </div>
                             </div>
-                            <ul className="list-none space-y-1">
-                              {(deviceDriftData.changes || []).map((c, i) => (
-                                <li key={i} className="flex items-start gap-2">
-                                  {c.type === "add" && <span className="text-emerald-400 font-bold flex-shrink-0">+</span>}
-                                  {c.type === "remove" && <span className="text-rose-400 font-bold flex-shrink-0">−</span>}
-                                  {c.type === "modify" && <span className="text-amber-400 font-bold flex-shrink-0">~</span>}
-                                  <span>{safeDisplay(c.description)}</span>
-                                </li>
-                              ))}
-                            </ul>
+                            <div className="text-slate-600 dark:text-slate-400 text-xs bg-slate-100 dark:bg-slate-800/50 px-2 py-1 rounded">
+                              Compare: <span className="font-medium">{safeDisplay(deviceDriftData.from_filename)}</span>
+                              <span className="mx-2">→</span>
+                              <span className="font-medium">{safeDisplay(deviceDriftData.to_filename)}</span>
+                            </div>
+                            <div className="space-y-2">
+                              {(deviceDriftData.changes || []).map((c, i) => {
+                                const typeColors = {
+                                  add: { bg: "rgba(34, 197, 94, 0.15)", border: "#22c55e", badge: "bg-emerald-500", label: "ADDED" },
+                                  remove: { bg: "rgba(244, 63, 94, 0.15)", border: "#f43f5e", badge: "bg-rose-500", label: "REMOVED" },
+                                  modify: { bg: "rgba(234, 179, 8, 0.15)", border: "#eab308", badge: "bg-amber-500", label: "MODIFIED" },
+                                };
+                                const colors = typeColors[c.type] || typeColors.modify;
+                                return (
+                                  <div
+                                    key={i}
+                                    className="p-2.5 rounded-lg border"
+                                    style={{ backgroundColor: colors.bg, borderColor: colors.border }}
+                                  >
+                                    <div className="flex items-start gap-2 mb-1.5">
+                                      <span className={`text-xs font-semibold px-1.5 py-0.5 rounded text-white ${colors.badge}`}>
+                                        {colors.label}
+                                      </span>
+                                      {c.section && (
+                                        <span className="text-xs font-medium text-slate-700 dark:text-slate-300">
+                                          {safeDisplay(c.section)}
+                                        </span>
+                                      )}
+                                    </div>
+                                    {c.description && (
+                                      <div className="text-slate-700 dark:text-slate-300 text-xs mb-1.5">
+                                        {safeDisplay(c.description)}
+                                      </div>
+                                    )}
+                                    {(c.old_value || c.new_value) && (
+                                      <div className="text-xs space-y-1 mt-2 pt-2 border-t border-slate-300/30 dark:border-slate-600/30">
+                                        {c.old_value && (
+                                          <div className="flex items-start gap-2">
+                                            <span className="text-rose-500 font-mono flex-shrink-0">−</span>
+                                            <code className="text-rose-600 dark:text-rose-400 bg-rose-100/50 dark:bg-rose-900/20 px-1 rounded break-all">
+                                              {safeDisplay(c.old_value)}
+                                            </code>
+                                          </div>
+                                        )}
+                                        {c.new_value && (
+                                          <div className="flex items-start gap-2">
+                                            <span className="text-emerald-500 font-mono flex-shrink-0">+</span>
+                                            <code className="text-emerald-600 dark:text-emerald-400 bg-emerald-100/50 dark:bg-emerald-900/20 px-1 rounded break-all">
+                                              {safeDisplay(c.new_value)}
+                                            </code>
+                                          </div>
+                                        )}
+                                      </div>
+                                    )}
+                                  </div>
+                                );
+                              })}
+                            </div>
+                            {(deviceDriftData.changes || []).length === 0 && (
+                              <div className="text-slate-500 dark:text-slate-400 italic text-center py-4">
+                                No configuration changes detected between versions.
+                              </div>
+                            )}
                           </div>
                         ) : (
                             <div className="grid gap-2">

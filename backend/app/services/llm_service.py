@@ -22,52 +22,26 @@ Output must be in JSON format with the following keys:
 Strictly avoid hallucination. If data is missing, state 'Not found'."""
 
 # Project-Level Analysis System Prompt - Network Overview (Scope 2.3.5.1)
-# Response must be a strictly valid JSON object (no markdown, no code fences).
-SYSTEM_PROMPT_PROJECT_OVERVIEW = """You are a Network Solution Architect. Review the configuration summaries of these devices collectively.
+SYSTEM_PROMPT_PROJECT_OVERVIEW = """You analyze network configs. Return ONLY JSON, nothing else.
 
-**Task:** Return a strictly valid JSON object describing the network overview. No prose, no markdown—only JSON.
-
-**Required JSON structure (use exactly these keys):**
-{
-  "topology": { "type": "Star" | "Mesh" | "Tree" | "Ring" | "Hybrid", "redundancy": "High" | "Low" | "None" },
-  "stats": { "core_devices": number, "distribution": number, "access": number },
-  "protocols": ["OSPF", "LACP", "MSTP", ...],
-  "health_status": "Healthy" | "Warning" | "Critical",
-  "key_insights": ["Short bullet 1", "Short bullet 2", "Short bullet 3 or 4"],
-  "recommendations": ["Actionable advice 1", "Actionable advice 2", ...]
-}
-
-- topology.type: overall topology style. redundancy: level of redundancy (High/Low/None).
-- stats: counts of devices by layer (use 0 if a layer is not present).
-- protocols: list of key protocols detected (routing, link aggregation, STP, etc.).
-- health_status: overall network health.
-- key_insights: 3–4 short bullet-point strings.
-- recommendations: list of actionable recommendations (can be empty).
-
-**CRITICAL:** Output ONLY valid JSON. No markdown, no code blocks, no text before or after the JSON object."""
+{"health_status":"Healthy","overview":"network summary","interfaces":"interface summary","vlans":"vlan summary","routing":"routing summary","security":"security summary","highlights":["point1","point2"]}"""
 
 # Per-Device Overview (More Detail page - Device Summary tab)
-# Response must be a strictly valid JSON object (no markdown, no code fences).
-SYSTEM_PROMPT_DEVICE_OVERVIEW = """You are a Network Solution Architect. Analyze this single device's configuration.
+SYSTEM_PROMPT_DEVICE_OVERVIEW = """You are a Network Engineer analyzing a single device configuration. Provide detailed analysis.
 
-**Task:** Return a strictly valid JSON object describing the device summary. No prose, no markdown—only JSON.
+Return JSON with these sections (write 2-4 sentences per section):
 
-**Required JSON structure (use exactly these keys):**
 {
-  "role": "Core" | "Access" | "Distribution" | "Edge" | "Other",
-  "uptime_human": "X days, Y hours" or "N/A",
-  "critical_metrics": { "cpu_load": "Low" | "Normal" | "High" | "N/A", "memory": "Low" | "Normal" | "High" | "N/A" },
-  "config_highlights": ["Key config feature 1", "Key config feature 2", "3–4 short items"],
-  "security_issues": ["Risk 1", "Risk 2", ...] or ["None"]
+  "health_status": "Healthy|Warning|Critical",
+  "overview": "Device role, model, purpose in network. What layer? Core/Distribution/Access? Primary functions.",
+  "interfaces": "List interface types and counts. Which are up/down? Any trunk ports? Speed/duplex settings. Notable interface configs.",
+  "vlans": "List all VLANs with names/IDs. Native VLAN? Voice VLAN? How VLANs are distributed across interfaces.",
+  "routing": "Which routing protocols active (OSPF/BGP/EIGRP/Static)? Router ID? Areas? Neighbors? Default route?",
+  "security": "AAA config? ACLs? Port security? DHCP snooping? 802.1X? SSH/Telnet settings? Any security concerns?",
+  "highlights": ["Important finding 1", "Important finding 2", "Important finding 3"]
 }
 
-- role: device role in the network.
-- uptime_human: human-readable uptime if available, else "N/A".
-- critical_metrics: infer from config if possible; use "N/A" if unknown.
-- config_highlights: 3–4 short strings of key configuration aspects (interfaces, VLANs, routing, etc.).
-- security_issues: list of potential risks, or ["None"] if none found.
-
-**CRITICAL:** Output ONLY valid JSON. No markdown, no code blocks, no text before or after the JSON object."""
+Be specific with actual values from config (IPs, VLAN IDs, interface names, protocol details)."""
 
 # Project-Level Analysis System Prompt - Full Project Analysis (Scope 2.3.5.1 & 2.3.5.2)
 SYSTEM_PROMPT_FULL_PROJECT_ANALYSIS = """You are a Network Solution Architect. Analyze these network devices as a whole system.
@@ -108,29 +82,30 @@ SYSTEM_PROMPT_FULL_PROJECT_ANALYSIS = """You are a Network Solution Architect. A
 - Each gap_analysis item must include severity, device, issue, and recommendation fields."""
 
 # Project-Level Analysis System Prompt - Recommendations (Scope 2.3.5.2)
-# Network-wide: gaps, missing configs, what to add; may mention devices but NOT per-device list.
+# Network-wide: gaps, missing configs, what to add; MUST specify affected devices.
 SYSTEM_PROMPT_PROJECT_RECOMMENDATIONS = """You are a Network Solution Architect. Review the configuration summaries of ALL devices in this project as ONE network.
 
 **Task: Network-wide gap and improvement analysis (Scope 2.3.5.2)**
-- Think at NETWORK level: what is missing across the project? What should be added or fixed for the whole network?
+- Think at NETWORK level: what is missing across the project? What should be added or fixed?
 - Identify: missing or inconsistent configurations (e.g. VLAN not defined on core but used on access), security gaps (e.g. no NTP, weak auth), redundancy or best-practice gaps (e.g. no HSRP, STP disabled).
-- You MAY mention specific device names when relevant (e.g. "Core-SW has no VLAN 10") but do NOT produce one recommendation per device. Output a short list of network-wide issues and what to do.
-- For each item give: (1) clear issue description, (2) concrete recommendation (what to add or change). Be concise but actionable.
+- **IMPORTANT:** For each recommendation, you MUST specify which device(s) are affected. List the actual device names from the config.
+- For each item give: (1) clear issue description, (2) concrete recommendation (what to add or change), (3) which devices are affected.
 
 **Output Format:** Return ONLY valid JSON:
 {
   "recommendations": [
     {
       "severity": "high|medium|low",
-      "issue": "Short description of the gap or problem (network-wide or which device).",
+      "issue": "Short description of the gap or problem.",
       "recommendation": "What to add or do (specific, actionable).",
-      "device": "device name if relevant, or \"all\" for network-wide"
+      "affected_devices": ["device1", "device2"] or ["all"] if truly network-wide
     }
   ]
 }
 
 **CRITICAL:**
-- You MUST fill both "issue" and "recommendation" for every item. Never leave them empty.
+- You MUST fill "issue", "recommendation", AND "affected_devices" for every item. Never leave them empty.
+- "affected_devices" MUST be an array of actual device names from the configuration. Use ["all"] only if the issue genuinely affects ALL devices.
 - Output ONLY JSON, no markdown, no code blocks. Parseable directly as JSON object."""
 
 # Per-Device Recommendations (More Detail page - AI Recommendations tab)
@@ -157,30 +132,33 @@ SYSTEM_PROMPT_DEVICE_RECOMMENDATIONS = """You are a Network Solution Architect. 
 - Output ONLY JSON, no markdown, no code blocks. Parseable directly as JSON object."""
 
 # Config Drift summary (More Detail page - Config Drift tab)
-SYSTEM_PROMPT_CONFIG_DRIFT = """You are a Network Engineer. You compare two device output files and summarize only CONFIGURATION changes.
+SYSTEM_PROMPT_CONFIG_DRIFT = """You are a Network Engineer comparing two device configurations. Analyze configuration changes in detail.
 
-**Scope: Configuration only**
-- Analyze ONLY the configuration section of each file. This is the part that corresponds to commands such as: show running-config, display current-configuration, show startup-config, display saved-configuration (and equivalent vendor commands).
-- IGNORE and do NOT report: show version output, interface status (e.g. "current state UP/DOWN"), display device, display cpu-usage, or any other non-configuration output. Report only changes to actual configuration lines (e.g. interface settings, VLANs, ACLs, NTP, SNMP, routing config).
-
-**Task: Config drift summary**
-- Output a short list of changes: additions, removals, and modifications to the configuration only.
-- For additions: what config was added (e.g. "Enabled port-security on Gi1/0/5").
-- For removals: what config was removed (e.g. "Removed VLAN 40").
-- For modifications: describe the config change with old → new (e.g. "NTP server 10.10.1.10 → 10.10.1.11").
+**Task: Detailed configuration drift analysis**
+For each change found, provide:
+1. The exact section/feature affected (e.g., "interface GigabitEthernet0/0", "OSPF", "VLAN 10")
+2. What specifically changed with actual values
+3. Potential impact of the change
 
 **Output Format:** Return ONLY valid JSON:
 {
   "changes": [
-    { "type": "add", "description": "Short description of what was added" },
-    { "type": "remove", "description": "Short description of what was removed" },
-    { "type": "modify", "description": "What changed, use 'old_value → new_value' format" }
+    { 
+      "type": "add|remove|modify",
+      "section": "Feature or config section name",
+      "description": "Detailed description with actual config values",
+      "old_value": "Previous value (for modify only, null for add)",
+      "new_value": "New value (for modify/add, null for remove)"
+    }
   ]
 }
 
-**CRITICAL:**
-- "type" must be exactly "add", "remove", or "modify".
-- Output ONLY JSON, no markdown, no code blocks. Parseable directly as JSON object."""
+**Examples:**
+- {"type":"add","section":"Interface GigabitEthernet0/1","description":"Added new interface with IP 10.0.0.1/24","old_value":null,"new_value":"ip address 10.0.0.1 255.255.255.0"}
+- {"type":"modify","section":"NTP Configuration","description":"Changed NTP server address","old_value":"ntp server 10.10.1.10","new_value":"ntp server 10.10.1.11"}
+- {"type":"remove","section":"VLAN 40","description":"Removed VLAN 40 (Marketing)","old_value":"vlan 40 name Marketing","new_value":null}
+
+**CRITICAL:** Output ONLY valid JSON, no markdown, no code blocks."""
 
 
 class LLMService:
@@ -345,9 +323,9 @@ class LLMService:
     
     # Limits to keep prompt size and inference time manageable
     MAX_DEVICES_AGGREGATED = 20
-    MAX_INTERFACES_PER_DEVICE = 12
-    MAX_NEIGHBORS_PER_DEVICE = 6
-    MAX_AGGREGATED_JSON_CHARS = 45000  # truncate if larger to avoid token overflow
+    MAX_INTERFACES_PER_DEVICE = 5
+    MAX_NEIGHBORS_PER_DEVICE = 3
+    MAX_AGGREGATED_JSON_CHARS = 8000  # very small for 7B model to avoid timeout
 
     def _prepare_aggregated_data(self, devices_data: List[Dict[str, Any]], project_id: str) -> Dict[str, Any]:
         """Prepare aggregated device data with size limits for stable LLM inference."""
@@ -423,28 +401,62 @@ class LLMService:
                 details=str(e),
             )
         
-        # Build user prompt (truncate if too large to avoid token overflow)
+        # Build compact summary for LLM (avoid sending too much data)
         try:
-            aggregated_json = json.dumps(aggregated_data, separators=(",", ":"), ensure_ascii=False, indent=2, default=str)
-            if len(aggregated_json) > self.MAX_AGGREGATED_JSON_CHARS:
-                aggregated_json = aggregated_json[: self.MAX_AGGREGATED_JSON_CHARS] + "\n\n[Truncated for length.]"
-                logger.info("project_overview aggregated JSON truncated to %d chars", self.MAX_AGGREGATED_JSON_CHARS)
+            # Create a very compact summary
+            device_names = [d.get("device_name", "unknown") for d in aggregated_data.get("devices", [])]
+            total_interfaces = 0
+            total_vlans = set()
+            routing_protocols = set()
+            stp_modes = set()
+            
+            for device in aggregated_data.get("devices", []):
+                ifaces = device.get("interfaces", [])
+                if isinstance(ifaces, list):
+                    total_interfaces += len(ifaces)
+                vlans = device.get("vlans", {})
+                if isinstance(vlans, dict):
+                    total_vlans.update(vlans.keys())
+                elif isinstance(vlans, list):
+                    total_vlans.update([str(v.get("vlan_id", v)) if isinstance(v, dict) else str(v) for v in vlans[:20]])
+                routing = device.get("routing", {})
+                if isinstance(routing, dict):
+                    if routing.get("ospf"):
+                        routing_protocols.add("OSPF")
+                    if routing.get("bgp"):
+                        routing_protocols.add("BGP")
+                    if routing.get("eigrp"):
+                        routing_protocols.add("EIGRP")
+                    if routing.get("static_routes"):
+                        routing_protocols.add("Static")
+                stp = device.get("stp", {})
+                if isinstance(stp, dict) and stp.get("mode"):
+                    stp_modes.add(stp.get("mode"))
+            
+            compact_summary = {
+                "device_count": len(device_names),
+                "device_names": device_names,
+                "total_interfaces": total_interfaces,
+                "vlan_count": len(total_vlans),
+                "vlans_sample": list(total_vlans)[:10],
+                "routing_protocols": list(routing_protocols),
+                "stp_modes": list(stp_modes) if stp_modes else ["Unknown"]
+            }
+            
+            aggregated_json = json.dumps(compact_summary, separators=(",", ":"), ensure_ascii=False)
+            print(f"[LLM_OVERVIEW] Compact summary size: {len(aggregated_json)} chars", flush=True)
         except (TypeError, ValueError) as e:
-            logger.exception("Error serializing aggregated data to JSON for project %s: %s", project_id, e)
+            logger.exception("Error creating compact summary for project %s: %s", project_id, e)
             return self._error_result(
-                f"[ERROR] Failed to serialize device data to JSON: {str(e)}",
-                "json_serialization_failed",
+                f"[ERROR] Failed to create summary: {str(e)}",
+                "summary_creation_failed",
                 0,
                 details=str(e),
             )
 
-        user_prompt = f"""Analyze the following network project with {len(devices_data)} devices.
+        user_prompt = f"""Network: {aggregated_json}
 
-=== AGGREGATED DEVICE CONFIGURATIONS ===
-{aggregated_json}
-
-=== ANALYSIS REQUEST ===
-Return a strictly valid JSON object with keys: topology, stats, protocols, health_status, key_insights, recommendations (as in the system prompt). No other text."""
+Return JSON only: {{"health_status":"Healthy","overview":"...","interfaces":"...","vlans":"...","routing":"...","security":"...","highlights":["..."]}}"""
 
         url = f"{self.base_url}/api/chat"
         payload = {
@@ -456,8 +468,8 @@ Return a strictly valid JSON object with keys: topology, stats, protocols, healt
             "stream": False,
             "options": {
                 "temperature": 0.3,
-                "top_p": 0.85,
-                "num_predict": 1024,
+                "top_p": 0.9,
+                "num_predict": 2048,
             },
         }
 
@@ -485,12 +497,21 @@ Return a strictly valid JSON object with keys: topology, stats, protocols, healt
                 "completion_tokens": data.get("eval_count", 0),
                 "total_tokens": data.get("prompt_eval_count", 0) + data.get("eval_count", 0),
             }
+            
+            # Log raw LLM response for debugging
+            print(f"[LLM_OVERVIEW_RAW] project_id={project_id} response_length={len(ai_response)}", flush=True)
+            print(f"[LLM_OVERVIEW_RAW] first_2000_chars: {ai_response[:2000]}", flush=True)
 
             # Parse JSON response
             parsed_response = self._parse_json_response(ai_response)
+            print(f"[LLM_OVERVIEW_PARSED] parsed_keys={list(parsed_response.keys()) if isinstance(parsed_response, dict) else 'not_dict'}", flush=True)
+            if isinstance(parsed_response, dict) and parsed_response.get("sections"):
+                print(f"[LLM_OVERVIEW_PARSED] sections_keys={list(parsed_response['sections'].keys())}", flush=True)
+                for k, v in parsed_response['sections'].items():
+                    print(f"[LLM_OVERVIEW_PARSED] section[{k}] summary={str(v.get('summary', ''))[:100] if isinstance(v, dict) else 'N/A'}", flush=True)
             
             if isinstance(parsed_response, dict) and parsed_response.get("format") == "text":
-                logger.warning(f"Failed to parse JSON response for project overview. Raw response: {ai_response[:500]}")
+                logger.warning(f"Failed to parse JSON response for project overview. Raw response: {ai_response[:500]}") 
                 return self._error_result(
                     f"[ERROR] LLM returned non-JSON response. Expected JSON object. Response: {ai_response[:200]}",
                     "json_parse_failed",
@@ -581,35 +602,122 @@ Return a strictly valid JSON object with keys: topology, stats, protocols, healt
                 "invalid_input",
                 0,
             )
-        try:
-            aggregated_data = self._prepare_aggregated_data(devices_data, project_id)
-        except Exception as e:
-            logger.exception("Error preparing device data for device_overview: %s", e)
+        # Find the specific device data
+        device_data = None
+        for d in devices_data:
+            if d.get("device_name") == device_name:
+                device_data = d
+                break
+        
+        if not device_data:
             return self._error_result(
-                f"[ERROR] Failed to prepare device data: {str(e)}",
-                "data_preparation_failed",
+                f"[ERROR] Device {device_name} not found in project data.",
+                "device_not_found",
                 0,
-                details=str(e),
             )
+        
         try:
-            aggregated_json = json.dumps(aggregated_data, separators=(",", ":"), ensure_ascii=False, indent=2, default=str)
-            if len(aggregated_json) > self.MAX_AGGREGATED_JSON_CHARS:
-                aggregated_json = aggregated_json[: self.MAX_AGGREGATED_JSON_CHARS] + "\n\n[Truncated.]"
+            # Build detailed device config for LLM analysis
+            ifaces = device_data.get("interfaces", [])
+            vlans = device_data.get("vlans", {})
+            routing = device_data.get("routing", {})
+            stp = device_data.get("stp", {})
+            neighbors = device_data.get("neighbors", [])
+            overview = device_data.get("device_overview", {})
+            
+            # Build device config with actual details (limit to reasonable size)
+            device_config = {
+                "device_name": device_name,
+                "hostname": overview.get("hostname", device_name),
+                "model": overview.get("model", "Unknown"),
+                "os_version": overview.get("os_version", "Unknown"),
+                "serial": overview.get("serial_number", "Unknown"),
+            }
+            
+            # Include interface details (limit to 15 interfaces)
+            if isinstance(ifaces, list):
+                device_config["interfaces"] = []
+                for iface in ifaces[:15]:
+                    if isinstance(iface, dict):
+                        device_config["interfaces"].append({
+                            "name": iface.get("name", "Unknown"),
+                            "ip": iface.get("ip_address") or iface.get("ipv4_address", ""),
+                            "status": iface.get("status", ""),
+                            "description": iface.get("description", ""),
+                            "vlan": iface.get("access_vlan") or iface.get("native_vlan", ""),
+                            "mode": iface.get("switchport_mode", ""),
+                            "speed": iface.get("speed", ""),
+                        })
+            
+            # Include VLAN details
+            if isinstance(vlans, dict):
+                device_config["vlans"] = {}
+                for vid, vinfo in list(vlans.items())[:20]:
+                    if isinstance(vinfo, dict):
+                        device_config["vlans"][vid] = {
+                            "name": vinfo.get("name", ""),
+                            "status": vinfo.get("status", "active"),
+                        }
+                    else:
+                        device_config["vlans"][vid] = {"name": str(vinfo)}
+            elif isinstance(vlans, list):
+                device_config["vlans"] = vlans[:20]
+            
+            # Include routing details
+            if isinstance(routing, dict):
+                device_config["routing"] = {}
+                if routing.get("ospf"):
+                    ospf = routing["ospf"]
+                    device_config["routing"]["ospf"] = {
+                        "router_id": ospf.get("router_id", ""),
+                        "areas": list(ospf.get("areas", {}).keys()) if isinstance(ospf.get("areas"), dict) else [],
+                        "networks": ospf.get("networks", [])[:5],
+                    }
+                if routing.get("bgp"):
+                    bgp = routing["bgp"]
+                    device_config["routing"]["bgp"] = {
+                        "as_number": bgp.get("as_number", ""),
+                        "router_id": bgp.get("router_id", ""),
+                        "neighbors": [n.get("ip", n) if isinstance(n, dict) else n for n in bgp.get("neighbors", [])[:5]],
+                    }
+                if routing.get("eigrp"):
+                    device_config["routing"]["eigrp"] = routing["eigrp"]
+                if routing.get("static_routes"):
+                    device_config["routing"]["static_routes"] = routing["static_routes"][:10]
+            
+            # Include STP details
+            if isinstance(stp, dict) and stp:
+                device_config["stp"] = {
+                    "mode": stp.get("mode", "Unknown"),
+                    "root_bridge": stp.get("root_bridge", False),
+                }
+            
+            # Include neighbors
+            if isinstance(neighbors, list) and neighbors:
+                device_config["neighbors"] = [
+                    {"name": n.get("device_id", n.get("neighbor", "")), "port": n.get("local_interface", "")}
+                    for n in neighbors[:10] if isinstance(n, dict)
+                ]
+            
+            aggregated_json = json.dumps(device_config, indent=2, ensure_ascii=False, default=str)
+            # Limit size but keep enough detail
+            if len(aggregated_json) > 12000:
+                aggregated_json = aggregated_json[:12000] + "\n...[truncated]"
+            print(f"[LLM_DEVICE_OVERVIEW] Device {device_name} config size: {len(aggregated_json)} chars", flush=True)
         except (TypeError, ValueError) as e:
-            logger.exception("Error serializing device data to JSON: %s", e)
+            logger.exception("Error creating device config: %s", e)
             return self._error_result(
-                f"[ERROR] Failed to serialize device data: {str(e)}",
-                "json_serialization_failed",
+                f"[ERROR] Failed to create device config: {str(e)}",
+                "config_creation_failed",
                 0,
                 details=str(e),
             )
-        user_prompt = f"""Analyze this single device: {device_name}.
+        
+        user_prompt = f"""Analyze this device configuration in detail:
 
-=== DEVICE CONFIGURATION ===
 {aggregated_json}
 
-=== REQUEST ===
-Return a strictly valid JSON object with keys: role, uptime_human, critical_metrics, config_highlights, security_issues (as in the system prompt). No other text."""
+Provide detailed analysis for each section. Be specific with actual values from the config."""
 
         url = f"{self.base_url}/api/chat"
         payload = {
@@ -619,7 +727,7 @@ Return a strictly valid JSON object with keys: role, uptime_human, critical_metr
                 {"role": "user", "content": user_prompt},
             ],
             "stream": False,
-            "options": {"temperature": 0.3, "top_p": 0.85, "num_predict": 1024},
+            "options": {"temperature": 0.4, "top_p": 0.9, "num_predict": 2048},
         }
         try:
             async with httpx.AsyncClient(timeout=float(self.timeout_seconds)) as client:
@@ -935,6 +1043,75 @@ List issues and actionable recommendations for this device only. Return ONLY val
             logger.exception("device_recommendations_analysis error project_id=%s device_name=%s", project_id, device_name)
             return self._error_result(f"[ERROR] Analysis failed: {str(e)}", "analysis_failed", inference_time_ms, details=str(e))
 
+    @staticmethod
+    def _extract_running_config(content: str) -> str:
+        """
+        Extract only the running-config / current-configuration section from device output.
+        Supports Cisco (show running-config) and Huawei (display current-configuration) formats.
+        """
+        if not content:
+            return ""
+        
+        lines = content.split('\n')
+        config_lines = []
+        in_config = False
+        config_start_patterns = [
+            'show running-config',
+            'show startup-config',
+            'display current-configuration',
+            'display saved-configuration',
+            'Building configuration...',
+            'Current configuration :',
+            '[V200R',  # Huawei config start
+        ]
+        config_end_patterns = [
+            '#show ',
+            '#display ',
+            '<',  # Huawei prompt like <EDGE1>
+            'end',
+        ]
+        
+        for i, line in enumerate(lines):
+            line_stripped = line.strip()
+            
+            # Check for config start
+            if not in_config:
+                for pattern in config_start_patterns:
+                    if pattern in line:
+                        in_config = True
+                        # For Huawei [V200R...], include this line
+                        if line_stripped.startswith('[V'):
+                            config_lines.append(line)
+                        break
+                continue
+            
+            # Check for config end
+            if in_config:
+                # Cisco "end" command
+                if line_stripped == 'end':
+                    config_lines.append(line)
+                    break
+                # Huawei "return" command
+                if line_stripped == 'return':
+                    config_lines.append(line)
+                    break
+                # New command prompt (end of config output)
+                if line_stripped.startswith('<') and line_stripped.endswith('>'):
+                    break
+                if line_stripped.endswith('#show ') or line_stripped.endswith('#display '):
+                    break
+                # New show/display command
+                if '#show ' in line_stripped or '#display ' in line_stripped:
+                    break
+                
+                config_lines.append(line)
+        
+        extracted = '\n'.join(config_lines).strip()
+        # If extraction failed, return original (truncated)
+        if len(extracted) < 100:
+            return content
+        return extracted
+
     async def analyze_config_drift(
         self,
         old_content: str,
@@ -945,7 +1122,7 @@ List issues and actionable recommendations for this device only. Return ONLY val
     ) -> Dict[str, Any]:
         """
         Summarize configuration drift between two configs (More Detail - Config Drift tab).
-        Returns changes list: [{ type: "add"|"remove"|"modify", description: "..." }].
+        Returns changes list: [{ type: "add"|"remove"|"modify", section, description, old_value, new_value }].
         """
         start_time = time.perf_counter()
         if not old_content or not new_content:
@@ -954,24 +1131,34 @@ List issues and actionable recommendations for this device only. Return ONLY val
                 "invalid_input",
                 0,
             )
-        # Truncate to avoid token overflow (e.g. 20k chars each)
-        max_chars = 18000
-        old_content = (old_content or "")[:max_chars]
-        new_content = (new_content or "")[:max_chars]
+        
+        # Extract only running-config section from each file
+        old_config = self._extract_running_config(old_content)
+        new_config = self._extract_running_config(new_content)
+        
+        print(f"[CONFIG_DRIFT] Original sizes: old={len(old_content)}, new={len(new_content)}", flush=True)
+        print(f"[CONFIG_DRIFT] Extracted config sizes: old={len(old_config)}, new={len(new_config)}", flush=True)
+        
+        # Truncate to avoid token overflow
+        max_chars = 15000
+        old_config = old_config[:max_chars]
+        new_config = new_config[:max_chars]
+        
         from_label = from_filename or "old"
         to_label = to_filename or "new"
-        user_prompt = f"""Device: {device_name}. Compare: {from_label} → {to_label}.
+        user_prompt = f"""Device: {device_name}
+Compare: {from_label} → {to_label}
 
-Consider ONLY the configuration section in each file (e.g. output of show running-config / display current-configuration / show startup-config / display saved-configuration). Ignore version output, interface status lines, and other non-configuration output. Report only changes to actual configuration.
+=== OLD CONFIGURATION ===
+{old_config}
 
-=== OLD FILE (previous) ===
-{old_content}
+=== NEW CONFIGURATION ===
+{new_config}
 
-=== NEW FILE (latest) ===
-{new_content}
-
-=== REQUEST ===
-Summarize configuration changes only: additions, removals, modifications. For modifications use "old_value → new_value". Return ONLY valid JSON with "changes" array; each item must have "type" ("add"|"remove"|"modify") and "description"."""
+=== TASK ===
+Compare the two configurations and list all changes (additions, removals, modifications).
+For each change, provide: section name, detailed description with actual config values, old_value, new_value.
+Return ONLY valid JSON."""
 
         url = f"{self.base_url}/api/chat"
         payload = {
@@ -981,7 +1168,7 @@ Summarize configuration changes only: additions, removals, modifications. For mo
                 {"role": "user", "content": user_prompt},
             ],
             "stream": False,
-            "options": {"temperature": 0.2, "top_p": 0.85, "num_predict": 1024},
+            "options": {"temperature": 0.3, "top_p": 0.9, "num_predict": 2048},
         }
         try:
             async with httpx.AsyncClient(timeout=float(self.timeout_seconds)) as client:
@@ -1011,10 +1198,16 @@ Summarize configuration changes only: additions, removals, modifications. For mo
                 changes = []
             validated = []
             for c in changes:
-                if isinstance(c, dict) and c.get("type") and c.get("description"):
+                if isinstance(c, dict) and c.get("type"):
                     t = str(c.get("type", "")).lower()
                     if t in ("add", "remove", "modify"):
-                        validated.append({"type": t, "description": str(c.get("description", ""))})
+                        validated.append({
+                            "type": t,
+                            "section": str(c.get("section", "Configuration")),
+                            "description": str(c.get("description", "")),
+                            "old_value": c.get("old_value"),
+                            "new_value": c.get("new_value"),
+                        })
             return {
                 "content": ai_response,
                 "parsed_response": {"changes": validated},
@@ -1210,8 +1403,9 @@ Return ONLY valid JSON with 'network_overview' and 'gap_analysis' keys as specif
             )
 
     def _parse_json_response(self, ai_response: str) -> Optional[Dict[str, Any]]:
-        """Extract and parse JSON from LLM response (handles markdown code blocks)."""
+        """Extract and parse JSON from LLM response (handles markdown code blocks and text before JSON)."""
         try:
+            # Try markdown code blocks first
             if "```json" in ai_response:
                 start = ai_response.find("```json") + 7
                 end = ai_response.find("```", start)
@@ -1220,68 +1414,156 @@ Return ONLY valid JSON with 'network_overview' and 'gap_analysis' keys as specif
                 start = ai_response.find("```") + 3
                 end = ai_response.find("```", start)
                 return json.loads(ai_response[start:end].strip())
+            
+            # Try to find JSON object in response (handles text before/after JSON)
+            # Find first { and last }
+            first_brace = ai_response.find("{")
+            last_brace = ai_response.rfind("}")
+            if first_brace != -1 and last_brace != -1 and last_brace > first_brace:
+                json_str = ai_response[first_brace:last_brace + 1]
+                return json.loads(json_str)
+            
+            # Try direct parse
             return json.loads(ai_response)
         except json.JSONDecodeError:
             return {"analysis": ai_response, "format": "text"}
 
     @staticmethod
     def _normalize_network_overview_response(data: Dict[str, Any]) -> Dict[str, Any]:
-        """Ensure parsed project overview has the required JSON structure. Fill defaults for missing keys."""
+        """Normalize LLM response to simple section format for frontend display."""
         if not isinstance(data, dict):
             data = {}
-        topology = data.get("topology")
-        if not isinstance(topology, dict):
-            topology = {"type": "Unknown", "redundancy": "Unknown"}
-        stats = data.get("stats")
-        if not isinstance(stats, dict):
-            stats = {"core_devices": 0, "distribution": 0, "access": 0}
-        protocols = data.get("protocols")
-        if not isinstance(protocols, list):
-            protocols = []
-        health_status = data.get("health_status")
+        
+        health_status = data.get("health_status", "Unknown")
         if not isinstance(health_status, str):
             health_status = "Unknown"
-        key_insights = data.get("key_insights")
-        if not isinstance(key_insights, list):
-            key_insights = []
-        recommendations = data.get("recommendations")
-        if not isinstance(recommendations, list):
-            recommendations = []
+        
+        # Simple format: convert flat fields to sections for display
+        section_keys = ["overview", "interfaces", "vlans", "routing", "security"]
+        section_titles = {
+            "overview": "Network Overview",
+            "interfaces": "Interfaces", 
+            "vlans": "VLANs",
+            "routing": "Routing",
+            "security": "Security"
+        }
+        
+        sections = {}
+        for key in section_keys:
+            value = data.get(key, "")
+            if isinstance(value, str) and value.strip():
+                sections[key] = {
+                    "title": section_titles.get(key, key.title()),
+                    "summary": value,
+                    "highlights": []
+                }
+            elif isinstance(value, dict):
+                sections[key] = {
+                    "title": value.get("title") or section_titles.get(key, key.title()),
+                    "summary": value.get("summary", ""),
+                    "highlights": value.get("highlights", []) if isinstance(value.get("highlights"), list) else []
+                }
+        
+        # Add highlights to overview if present at top level
+        highlights = data.get("highlights", [])
+        if isinstance(highlights, list) and highlights:
+            if "overview" in sections:
+                sections["overview"]["highlights"] = highlights
+            else:
+                sections["overview"] = {
+                    "title": "Network Overview",
+                    "summary": data.get("overview", "Network analysis complete"),
+                    "highlights": highlights
+                }
+        
+        # Fallback: if still no sections, try legacy format
+        if not sections:
+            topology = data.get("topology", {})
+            key_insights = data.get("key_insights", [])
+            if isinstance(topology, dict) or isinstance(key_insights, list):
+                return {
+                    "topology": topology if isinstance(topology, dict) else {"type": "Unknown"},
+                    "stats": data.get("stats", {}),
+                    "protocols": data.get("protocols", []),
+                    "health_status": health_status,
+                    "key_insights": key_insights if isinstance(key_insights, list) else [],
+                    "recommendations": data.get("recommendations", []),
+                    "format": "legacy"
+                }
+        
         return {
-            "topology": topology,
-            "stats": stats,
-            "protocols": protocols,
             "health_status": health_status,
-            "key_insights": key_insights,
-            "recommendations": recommendations,
+            "sections": sections,
+            "format": "sections"
         }
 
     @staticmethod
     def _normalize_device_overview_response(data: Dict[str, Any]) -> Dict[str, Any]:
-        """Ensure parsed device overview has the required JSON structure. Fill defaults for missing keys."""
+        """Normalize LLM response to section format for device overview display (same as project overview)."""
         if not isinstance(data, dict):
             data = {}
-        role = data.get("role")
-        if not isinstance(role, str):
-            role = "Other"
-        uptime_human = data.get("uptime_human")
-        if not isinstance(uptime_human, str):
-            uptime_human = "N/A"
-        critical_metrics = data.get("critical_metrics")
-        if not isinstance(critical_metrics, dict):
-            critical_metrics = {"cpu_load": "N/A", "memory": "N/A"}
-        config_highlights = data.get("config_highlights")
-        if not isinstance(config_highlights, list):
-            config_highlights = []
-        security_issues = data.get("security_issues")
-        if not isinstance(security_issues, list):
-            security_issues = []
+        
+        health_status = data.get("health_status", "Unknown")
+        if not isinstance(health_status, str):
+            health_status = "Unknown"
+        
+        # Convert flat fields to sections for display (same format as project overview)
+        section_keys = ["overview", "interfaces", "vlans", "routing", "security"]
+        section_titles = {
+            "overview": "Device Overview",
+            "interfaces": "Interfaces",
+            "vlans": "VLANs",
+            "routing": "Routing",
+            "security": "Security"
+        }
+        
+        sections = {}
+        for key in section_keys:
+            value = data.get(key, "")
+            if isinstance(value, str) and value.strip():
+                sections[key] = {
+                    "title": section_titles.get(key, key.title()),
+                    "summary": value,
+                    "highlights": []
+                }
+            elif isinstance(value, dict):
+                sections[key] = {
+                    "title": value.get("title") or section_titles.get(key, key.title()),
+                    "summary": value.get("summary", ""),
+                    "highlights": value.get("highlights", []) if isinstance(value.get("highlights"), list) else []
+                }
+        
+        # Add highlights to overview if present at top level
+        highlights = data.get("highlights", [])
+        if isinstance(highlights, list) and highlights:
+            if "overview" in sections:
+                sections["overview"]["highlights"] = highlights
+            else:
+                sections["overview"] = {
+                    "title": "Device Overview",
+                    "summary": data.get("overview", "Device analysis complete"),
+                    "highlights": highlights
+                }
+        
+        # Fallback: legacy format support
+        if not sections:
+            role = data.get("role", "Other")
+            config_highlights = data.get("config_highlights", [])
+            security_issues = data.get("security_issues", [])
+            if role or config_highlights or security_issues:
+                return {
+                    "role": role,
+                    "uptime_human": data.get("uptime_human", "N/A"),
+                    "critical_metrics": data.get("critical_metrics", {}),
+                    "config_highlights": config_highlights if isinstance(config_highlights, list) else [],
+                    "security_issues": security_issues if isinstance(security_issues, list) else [],
+                    "format": "legacy"
+                }
+        
         return {
-            "role": role,
-            "uptime_human": uptime_human,
-            "critical_metrics": critical_metrics,
-            "config_highlights": config_highlights,
-            "security_issues": security_issues,
+            "health_status": health_status,
+            "sections": sections,
+            "format": "sections"
         }
 
     def _error_result(

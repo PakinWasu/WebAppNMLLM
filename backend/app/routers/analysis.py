@@ -114,8 +114,8 @@ async def get_project_overview(
             )
         
         result_data = saved_result.get("result_data", {})
-        # New format: structured overview (topology, stats, protocols, etc.)
-        if result_data.get("topology") is not None or result_data.get("key_insights") is not None:
+        # Support new 9-section format (sections), legacy format (topology/key_insights), and text format
+        if result_data.get("sections") is not None or result_data.get("topology") is not None or result_data.get("key_insights") is not None:
             overview = result_data
             overview_text = None
         else:
@@ -164,7 +164,8 @@ async def get_device_overview(
                 detail="No saved overview for this device. Generate one first.",
             )
         result_data = saved_result.get("result_data", {})
-        if result_data.get("role") is not None or result_data.get("config_highlights") is not None:
+        # Support new sections format, legacy format (role/config_highlights), and text format
+        if result_data.get("sections") is not None or result_data.get("role") is not None or result_data.get("config_highlights") is not None:
             overview = {k: v for k, v in result_data.items() if k != "device_name"}
             overview_text = None
         else:
@@ -234,7 +235,12 @@ async def analyze_device_overview(
         overview_data = result.get("parsed_response") or {}
         overview_data["device_name"] = device_name
         metrics = result.get("metrics", {})
-        summary = overview_data.get("role") or (overview_data.get("config_highlights") or [None])[0] or "Device overview"
+        # Support both new sections format and legacy format for summary
+        if overview_data.get("sections"):
+            first_section = list(overview_data["sections"].values())[0] if overview_data["sections"] else {}
+            summary = first_section.get("summary", "Device overview") if isinstance(first_section, dict) else "Device overview"
+        else:
+            summary = overview_data.get("role") or (overview_data.get("config_highlights") or [None])[0] or "Device overview"
         summary_str = summary[:500] if isinstance(summary, str) else str(summary)[:500]
         from ..services.topology_service import topology_service
         await topology_service._save_llm_result(
