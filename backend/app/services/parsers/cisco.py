@@ -1757,17 +1757,37 @@ class CiscoIOSParser(BaseParser):
         """2.3.2.7 - MAC & ARP tables; filter headers (Vlan, Mac Address, Type, Interface, ----, Total)."""
         arp_entries: List[Dict[str, Any]] = []
         mac_entries: List[Dict[str, Any]] = []
-        _skip = lambda line: any(kw in line for kw in ("Vlan", "Mac Address", "Type", "Interface", "Protocol", "Address", "----", "Total")) or not line.strip()
+        
+        # ARP skip: header lines that contain "Protocol" "Address" together (header row)
+        def _skip_arp(line: str) -> bool:
+            line_lower = line.lower()
+            if not line.strip():
+                return True
+            if "protocol" in line_lower and "address" in line_lower:
+                return True
+            if line.strip().startswith("---"):
+                return True
+            return False
+        
+        # MAC skip: generic headers
+        _skip_mac = lambda line: any(kw in line for kw in ("Vlan", "Mac Address", "Type", "Interface", "----", "Total")) or not line.strip()
+        
         # show ip arp: Internet  IP  Age  Hardware Addr  Type  Interface
         arp_block = _get_section(content, r"show\s+ip\s+arp") or _get_section(content, r"show\s+arp")
         if arp_block:
             for line in arp_block.split("\n"):
-                if _skip(line):
+                if _skip_arp(line):
                     continue
-                m = re.search(r"Internet\s+(\d+\.\d+\.\d+\.\d+)\s+(-|\d+)\s+(\S+)\s+(\w+)\s+(\S+)", line, re.IGNORECASE)
+                # Pattern: Internet  IP  Age(or -)  MAC  Type  Interface
+                m = re.search(r"Internet\s+(\d+\.\d+\.\d+\.\d+)\s+(-|\d+)\s+([0-9a-fA-F\.\-:]+)\s+(\w+)\s+(\S+)", line, re.IGNORECASE)
                 if m:
                     ip_addr, age, hw, typ, iface = m.group(1), m.group(2), m.group(3), m.group(4), m.group(5)
-                    if hw.lower() == "incomplete" or not re.match(r"[\da-fA-F\.\-]{12,}", hw.replace(".", "").replace("-", "")):
+                    # Skip incomplete entries
+                    if hw.lower() == "incomplete":
+                        continue
+                    # Validate MAC has at least 12 hex chars (ignoring separators)
+                    mac_clean = re.sub(r'[.\-:]', '', hw)
+                    if not re.match(r'^[0-9a-fA-F]{12,}$', mac_clean):
                         continue
                     arp_entries.append({"ip_address": ip_addr, "age": age, "mac_address": hw, "type": typ, "interface": iface})
         # show mac address-table: VLAN MAC Type Port
@@ -1776,12 +1796,16 @@ class CiscoIOSParser(BaseParser):
             mac_block = _get_section(content, r"show\s+mac\s+address-table")
         if mac_block:
             for line in mac_block.split("\n"):
-                if _skip(line):
+                if _skip_mac(line):
                     continue
-                m = re.search(r"^\s*(\d+)\s+([0-9a-fA-F\.]+)\s+(\w+)\s+(\S+)", line)
+                m = re.search(r"^\s*(\d+)\s+([0-9a-fA-F\.\-:]+)\s+(\w+)\s+(\S+)", line)
                 if m:
                     vlan_s, mac, typ, port = m.group(1), m.group(2), m.group(3), m.group(4)
-                    if vlan_s.lower() == "vlan" or not re.match(r"[\da-fA-F\.]{12,}", mac.replace(".", "").replace("-", "")):
+                    if vlan_s.lower() == "vlan":
+                        continue
+                    # Validate MAC has at least 12 hex chars
+                    mac_clean = re.sub(r'[.\-:]', '', mac)
+                    if not re.match(r'^[0-9a-fA-F]{12,}$', mac_clean):
                         continue
                     try:
                         vlan = int(vlan_s)

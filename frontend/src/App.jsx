@@ -1008,69 +1008,76 @@ const OverviewPage = ({ project, uploadHistory }) => {
     </Card>
 
     {/* Combined Logs and Upload History */}
-    <Card title="Activity Log (Recent)">
-      <div className="mb-4 grid grid-cols-1 md:grid-cols-3 gap-2">
-        <Input 
-          placeholder="Search (filename, user, description...)" 
-          value={searchActivity} 
-          onChange={(e) => setSearchActivity(e.target.value)} 
-        />
-        <Select 
-          value={filterActivityWho} 
-          onChange={setFilterActivityWho} 
-                  options={[{value: "all", label: "All (Responsible User)"}, ...uniqueActivityWhos.map(w => ({value: w, label: w}))]} 
-                />
-                <Select 
-                  value={filterActivityWhat} 
-                  onChange={setFilterActivityWhat} 
-                  options={[{value: "all", label: "All (Activity Type)"}, ...uniqueActivityWhats.map(w => ({value: w, label: w}))]}
+    <Card 
+      title={
+        <div className="flex items-center justify-between w-full">
+          <span className="text-sm font-semibold text-gray-700 dark:text-gray-200">History</span>
+          <div className="relative">
+            <input
+              type="text"
+              placeholder="Search (filename, user, description...)"
+              value={searchActivity}
+              onChange={(e) => setSearchActivity(e.target.value)}
+              className="w-64 pl-8 pr-3 py-1.5 text-xs rounded-lg bg-slate-800/80 border border-slate-600 text-slate-200 placeholder-slate-500 focus:outline-none focus:ring-1 focus:ring-sky-500 focus:border-sky-500"
+            />
+            <svg className="absolute left-2.5 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-slate-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
+            </svg>
+          </div>
+        </div>
+      } 
+      className="overflow-hidden"
+    >
+      <div className="h-[50vh] overflow-hidden rounded-xl border border-slate-300 dark:border-slate-700">
+        <Table
+          showToolbar={false}
+          columns={[
+            { header: "Time", key: "time" },
+            { header: "Name", key: "files" },
+            { header: "Responsible User", key: "who" },
+            { header: "Activity Type", key: "what" },
+            { header: "Site", key: "where" },
+            { header: "Operational Timing", key: "when" },
+            { header: "Purpose", key: "why" },
+            { header: "Description", key: "description" },
+            {
+              header: "Action",
+              key: "act",
+              filterable: false,
+              sortable: false,
+              cell: (r) => (
+                r.type === 'upload' && r.uploadRecord?.files?.[0] ? (
+                  <div className="flex gap-2">
+                    <Button 
+                      variant="secondary" 
+                      onClick={() => {
+                        const file = r.uploadRecord.files[0];
+                        if (!file) return;
+                        const blob = new Blob(
+                          [file.content || `# ${r.uploadRecord.type === 'config' ? 'Configuration' : 'Document'} Backup\n# File: ${file.name}\n# Uploaded: ${r.time}\n# User: ${r.who}\n\nContent not available. Download from Documents if needed.`],
+                          { type: file.type || (r.uploadRecord.type === 'config' ? "text/plain;charset=utf-8" : "application/octet-stream") }
+                        );
+                        const url = URL.createObjectURL(blob);
+                        const a = document.createElement("a");
+                        a.href = url;
+                        a.download = file.name || "file";
+                        document.body.appendChild(a);
+                        a.click();
+                        a.remove();
+                        URL.revokeObjectURL(url);
+                      }}
+                    >
+                      ⬇ Download
+                    </Button>
+                  </div>
+                ) : "—"
+              ),
+            },
+          ]}
+          data={combinedHistory}
+          empty="No recent activity"
         />
       </div>
-      <Table
-        columns={[
-          { header: "Time", key: "time" },
-          { header: "Name", key: "files" },
-          { header: "Responsible User", key: "who" },
-          { header: "Activity Type", key: "what" },
-          { header: "Site", key: "where" },
-          { header: "Operational Timing", key: "when" },
-          { header: "Purpose", key: "why" },
-          { header: "Description", key: "description" },
-          {
-            header: "Action",
-            key: "act",
-            cell: (r) => (
-              r.type === 'upload' && r.uploadRecord?.files?.[0] ? (
-                <div className="flex gap-2">
-                  <Button 
-                    variant="secondary" 
-                    onClick={() => {
-                      const file = r.uploadRecord.files[0];
-                      if (!file) return;
-                      const blob = new Blob(
-                        [file.content || `# ${r.uploadRecord.type === 'config' ? 'Configuration' : 'Document'} Backup\n# File: ${file.name}\n# Uploaded: ${r.time}\n# User: ${r.who}\n\nContent not available. Download from Documents if needed.`],
-                        { type: file.type || (r.uploadRecord.type === 'config' ? "text/plain;charset=utf-8" : "application/octet-stream") }
-                      );
-                      const url = URL.createObjectURL(blob);
-                      const a = document.createElement("a");
-                      a.href = url;
-                      a.download = file.name || "file";
-                      document.body.appendChild(a);
-                      a.click();
-                      a.remove();
-                      URL.revokeObjectURL(url);
-                    }}
-                  >
-                    ⬇ Download
-                  </Button>
-                </div>
-              ) : "—"
-            ),
-          },
-        ]}
-        data={combinedHistory}
-        empty="No recent activity"
-      />
     </Card>
   </div>
   );
@@ -2717,18 +2724,6 @@ const DeviceDetailsView = ({ project, deviceId, goBack, goBackHref, goIndex, goI
   const stpData = deviceData?.stp || {};
   const routingData = deviceData?.routing || {};
   const neighborsData = deviceData?.neighbors || [];
-  
-  // Debug logging
-  React.useEffect(() => {
-    if (deviceData) {
-      console.log('🔍 DeviceDetailsView - neighborsData:', {
-        count: neighborsData.length,
-        data: neighborsData,
-        deviceData_keys: Object.keys(deviceData),
-        has_neighbors_field: 'neighbors' in deviceData
-      });
-    }
-  }, [deviceData, neighborsData]);
   const macArpData = deviceData?.mac_arp || {};
   const securityData = deviceData?.security || {};
   const haData = deviceData?.ha || {};
@@ -2764,8 +2759,8 @@ const DeviceDetailsView = ({ project, deviceId, goBack, goBackHref, goIndex, goI
     ospfNeighbors: routingData.ospf?.neighbors?.length || 0,
     bgpAsn: routingData.bgp?.as_number ?? routingData.bgp?.local_as ?? "—",
     bgpNeighbors: routingData.bgp?.peers?.length || 0,
-    cdpNeighbors: neighborsData.filter(n => n.protocol === "CDP").length || 0,
-    lldpNeighbors: neighborsData.filter(n => n.protocol === "LLDP").length || 0,
+    cdpNeighbors: neighborsData.filter(n => n.discovery_protocol === "CDP" || n.protocol === "CDP").length || 0,
+    lldpNeighbors: neighborsData.filter(n => n.discovery_protocol === "LLDP" || n.protocol === "LLDP").length || 0,
     ntpStatus: securityData.ntp?.status || securityData.ntp?.synchronized ? "Synchronized" : "—",
     snmp: securityData.snmp?.enabled ? "Enabled" : "—",
     syslog: securityData.logging?.enabled || securityData.syslog?.enabled ? "Enabled" : "—",
@@ -3158,34 +3153,74 @@ const DeviceDetailsView = ({ project, deviceId, goBack, goBackHref, goIndex, goI
     return parts.length > 0 ? parts.join(" | ") : item.recommendation || item.issue || "";
   });
 
-  // VLANs - transform from API data
+  // VLANs - transform from API data (use details array from parser if available)
   const vlans = React.useMemo(() => {
+    // Prefer details array from parser (has id, name, status, access_ports)
+    if (vlansData?.details && Array.isArray(vlansData.details) && vlansData.details.length > 0) {
+      return vlansData.details.map(vlanDetail => {
+        const vlanId = vlanDetail.id;
+        const vlanName = vlanDetail.name || "";
+        const vlanStatus = vlanDetail.status || "active";
+        
+        // Use access_ports from parser
+        const accessPorts = vlanDetail.access_ports || [];
+        
+        // Find trunk ports for this VLAN from trunk_ports array
+        const trunkPortsForVlan = (vlansData.trunk_ports || [])
+          .filter(tp => {
+            const allowed = tp.allowed_vlans || "";
+            return allowed === "ALL" || allowed.includes(vlanId) || allowed.includes("-");
+          })
+          .map(tp => tp.port);
+        
+        // Find SVI IP
+        const sviInterface = interfaces.find(i => 
+          (i.type === "SVI" || i.type === "Vlan" || i.name?.startsWith("Vlan")) && 
+          (i.name === `Vlan${vlanId}` || i.name === `Vlanif${vlanId}`)
+        );
+        const sviIp = sviInterface?.ipv4_address || null;
+        
+        // Find HSRP VIP (if any)
+        const hsrpList = Array.isArray(haData.hsrp) ? haData.hsrp : (haData.hsrp?.groups || []);
+        const hsrpGroup = hsrpList.find(g => String(g.vlan_id) === String(vlanId) || g.interface?.includes(vlanId));
+        const hsrpVip = hsrpGroup?.virtual_ip || null;
+        
+        return {
+          vlanId,
+          name: vlanName,
+          status: vlanStatus,
+          accessPorts: accessPorts.join(", ") || "—",
+          trunkPorts: trunkPortsForVlan.join(", ") || "—",
+          sviIp: sviIp || "—",
+          hsrpVip: hsrpVip || "—"
+        };
+      });
+    }
+    
+    // Fallback to old method using vlan_list
     if (!vlansData || !vlanList.length) return [];
     return vlanList.map(vlanId => {
       const vlanName = vlansData.vlan_names?.[vlanId] || "";
       const vlanStatus = vlansData.vlan_status?.[vlanId] || "active";
-      // Find ports in this VLAN
-      const accessPorts = interfaces.filter(i => i.port_mode === "access" && i.access_vlan === vlanId).map(i => i.name);
-      const trunkPorts = interfaces.filter(i => i.port_mode === "trunk" && i.allowed_vlans?.includes(vlanId)).map(i => i.name);
-      const ports = [...accessPorts, ...trunkPorts];
-      // Find SVI IP
-      const sviInterface = interfaces.find(i => (i.type === "Vlan" || i.name?.startsWith("Vlan")) && i.name?.includes(vlanId));
+      const accessPorts = interfaces.filter(i => i.port_mode === "access" && String(i.access_vlan) === String(vlanId)).map(i => i.name);
+      const trunkPorts = interfaces.filter(i => i.port_mode === "trunk").map(i => i.name);
+      const sviInterface = interfaces.find(i => (i.type === "SVI" || i.type === "Vlan" || i.name?.startsWith("Vlan")) && i.name?.includes(vlanId));
       const sviIp = sviInterface?.ipv4_address || null;
-      // Find HSRP VIP (if any)
       const hsrpList = Array.isArray(haData.hsrp) ? haData.hsrp : (haData.hsrp?.groups || []);
-      const hsrpGroup = hsrpList.find(g => g.vlan_id === vlanId);
+      const hsrpGroup = hsrpList.find(g => String(g.vlan_id) === String(vlanId));
       const hsrpVip = hsrpGroup?.virtual_ip || null;
       
       return {
         vlanId,
         name: vlanName,
         status: vlanStatus,
-        ports: ports.join(", ") || "—",
+        accessPorts: accessPorts.join(", ") || "—",
+        trunkPorts: trunkPorts.join(", ") || "—",
         sviIp: sviIp || "—",
         hsrpVip: hsrpVip || "—"
       };
     });
-  }, [vlansData, interfaces, haData]);
+  }, [vlansData, vlanList, interfaces, haData]);
 
   // Interfaces - transform from API (scope 2.3.2.2.1–2.3.2.2.16); derive type from name if missing
   const ifaces = React.useMemo(() => {
@@ -3270,12 +3305,20 @@ const DeviceDetailsView = ({ project, deviceId, goBack, goBackHref, goIndex, goI
   };
 
   const vlanColumns = [
-    { header: "VLAN ID", key: "vlanId" }, { header: "Name", key: "name" }, { header: "Status", key: "status" },
-    { header: "Ports", key: "ports" }, { header: "SVI IP", key: "sviIp", cell: (r) => r.sviIp || "—" },
+    { header: "VLAN ID", key: "vlanId", cell: (r) => <span className="font-medium text-slate-800 dark:text-slate-200">{r.vlanId}</span> },
+    { header: "Name", key: "name", cell: (r) => r.name || "—" },
+    { header: "Status", key: "status", cell: (r) => {
+      const status = r.status || "—";
+      const isActive = status.toLowerCase().includes("active") && !status.toLowerCase().includes("unsup");
+      return <span className={isActive ? "text-emerald-500" : "text-amber-500"}>{status}</span>;
+    }},
+    { header: "Access Ports", key: "accessPorts", cell: (r) => r.accessPorts || "—" },
+    { header: "Trunk Ports", key: "trunkPorts", cell: (r) => r.trunkPorts || "—" },
+    { header: "SVI IP", key: "sviIp", cell: (r) => r.sviIp || "—" },
     { header: "HSRP VIP", key: "hsrpVip", cell: (r) => r.hsrpVip || "—" },
   ];
   const exportVlans = () => {
-    const headers = ["vlanId","name","status","ports","sviIp","hsrpVip"];
+    const headers = ["vlanId","name","status","accessPorts","trunkPorts","sviIp","hsrpVip"];
     const rows = vlans.map((v) => headers.map((h) => `"${String(v[h] ?? "").replaceAll('"','""')}"`).join(","));
     downloadCSV([headers.join(","), ...rows].join("\n"), `${facts.device}_vlans.csv`);
   };
@@ -3676,109 +3719,154 @@ const DeviceDetailsView = ({ project, deviceId, goBack, goBackHref, goIndex, goI
       {/* INTERFACES */}
       {!loading && !error && tab === "interfaces" && (
         <div className="flex-1 min-h-0 overflow-auto">
-        <Card
-          title="Interfaces Explorer"
-          actions={<div className="flex items-center gap-2"><Button variant="secondary" onClick={onExportIfaces}>Export CSV</Button></div>}
-        >
-          <div className="mb-3 grid grid-cols-2 md:grid-cols-5 gap-2">
-            <Field label="Mode">
-              <Select value={qMode} onChange={setQMode} options={[
-                {value:"all",label:"All"},{value:"access",label:"Access"},{value:"trunk",label:"Trunk"}
-              ]}/>
-            </Field>
-            <Field label="State">
-              <Select value={qState} onChange={setQState} options={[
-                {value:"all",label:"All"},{value:"up",label:"Up"},{value:"down",label:"Down"}
-              ]}/>
-            </Field>
-            <Field label="Access VLAN">
-              <Input placeholder="e.g. 20" value={qVlan} onChange={(e)=>setQVlan(e.target.value)} />
-            </Field>
-            <Field label="Speed">
-              <Select value={qSpeed} onChange={setQSpeed} options={[
-                {value:"all",label:"All"},{value:"10Gbps",label:"10Gbps"},{value:"2Gbps",label:"2Gbps"},{value:"1Gbps",label:"1Gbps"},{value:"100Mbps",label:"100Mbps"},{value:"auto",label:"Auto"}
-              ]}/>
-            </Field>
-            <div className="flex items-end">
-              <Button variant="secondary" onClick={()=>{setQMode("all");setQState("all");setQVlan("");setQSpeed("all");}}>Clear Filters</Button>
-            </div>
+          <div className="h-[80vh] overflow-hidden rounded-2xl border border-slate-300 dark:border-slate-700">
+            <Table 
+              searchable
+              searchPlaceholder="Search interface name, IP, description..."
+              actions={<Button variant="secondary" onClick={onExportIfaces}>Export CSV</Button>}
+              columns={ifaceColumns} 
+              data={ifaces} 
+              empty="No interfaces" 
+              minWidthClass="min-w-[1400px]" 
+            />
           </div>
-          <div className="h-[70vh] overflow-auto rounded-2xl border border-slate-300 dark:border-[#1F2937]">
-            <Table columns={ifaceColumns} data={filteredIfaces} empty="No interfaces" minWidthClass="min-w-[1400px]" />
-          </div>
-        </Card>
         </div>
       )}
 
       {/* VLANS */}
       {!loading && !error && tab === "vlans" && (
-        <Card title={`VLANs (${vlans.length}) — All VLANs from config`} actions={<Button variant="secondary" onClick={exportVlans}>Export CSV</Button>}>
-          <div className="h-[70vh] overflow-auto rounded-2xl border border-slate-300 dark:border-[#1F2937]">
-            <Table columns={vlanColumns} data={vlans} empty="No VLANs parsed" minWidthClass="min-w-[900px]" />
-          </div>
-        </Card>
+        <div className="h-[80vh] overflow-hidden rounded-2xl border border-slate-300 dark:border-slate-700">
+          <Table 
+            searchable
+            searchPlaceholder="Search VLAN ID, name, status..."
+            actions={<Button variant="secondary" onClick={exportVlans}>Export CSV</Button>}
+            columns={vlanColumns} 
+            data={vlans} 
+            empty="No VLANs parsed" 
+            minWidthClass="min-w-[900px]" 
+          />
+        </div>
       )}
 
       {/* STP */}
       {!loading && !error && tab === "stp" && (
         <div className="grid gap-6">
           <Card title="STP Information">
-            <div className="grid gap-4 md:grid-cols-3 text-sm mb-6">
+            <div className="grid gap-4 md:grid-cols-3 lg:grid-cols-4 text-sm mb-6">
               <Metric k="STP Mode" v={stpData.stp_mode || stpData.mode || "—"} />
-              <Metric k="Bridge Priority" v={stpData.bridge_priority ?? "—"} />
-              <Metric k="Bridge ID" v={stpData.bridge_id || "—"} />
+              <Metric k="Bridge Priority" v={stpData.stp_info?.root_bridge?.priority ?? stpData.bridge_priority ?? "—"} />
+              <Metric k="Bridge ID" v={stpData.bridge_id || stpData.stp_info?.root_bridge?.root_bridge_id || "—"} />
               <Metric k="Root Bridge ID" v={stpData.root_bridge_id || "—"} />
-              <Metric k="Root Bridge Status" v={stpData.root_bridge_status !== undefined ? (stpData.root_bridge_status ? "Yes" : "No") : "—"} />
-              <Metric k="BPDU Guard" v={stpData.bpdu_guard !== undefined ? (stpData.bpdu_guard ? "Enabled" : "Disabled") : "—"} />
-              <Metric k="PortFast Enabled" v={stpData.portfast_enabled !== undefined ? (stpData.portfast_enabled ? "Yes" : "No") : "—"} />
+              <Metric k="Is Root Bridge" v={
+                stpData.stp_info?.root_bridge?.is_local_device_root !== undefined 
+                  ? (stpData.stp_info.root_bridge.is_local_device_root ? "Yes" : "No")
+                  : (stpData.root_bridges?.length > 0 ? "Yes (VLANs: " + stpData.root_bridges.join(", ") + ")" : "—")
+              } />
+              <Metric k="PortFast Global" v={stpData.portfast_enabled !== undefined ? (stpData.portfast_enabled ? "Enabled" : "Disabled") : "—"} />
+              <Metric k="BPDU Guard Global" v={stpData.bpduguard_enabled !== undefined ? (stpData.bpduguard_enabled ? "Enabled" : "Disabled") : "—"} />
             </div>
             
-            {/* STP Interfaces from parser */}
+            {/* STP Interfaces from parser - with full details */}
             {stpData.interfaces && Array.isArray(stpData.interfaces) && stpData.interfaces.length > 0 && (
-              <div className="mt-4">
-                <h3 className="text-sm font-semibold mb-3">STP Port Roles & States (from parser)</h3>
-                <div className="h-[60vh] overflow-auto rounded-2xl border border-slate-300 dark:border-[#1F2937]">
-                  <Table
-                    columns={[
-                      { header: "Port", key: "port" },
-                      { header: "Role", key: "role", cell: (r) => r.role || "—" },
-                      { header: "State", key: "state", cell: (r) => r.state || "—" }
-                    ]}
-                    data={stpData.interfaces}
-                    empty="No STP port information available"
-                    minWidthClass="min-w-[600px]"
-                  />
-                </div>
+              <div className="mt-4 h-[60vh] overflow-hidden rounded-2xl border border-slate-300 dark:border-slate-700">
+                <Table
+                  searchable
+                  searchPlaceholder="Search port name..."
+                  columns={[
+                    { header: "Port", key: "port", cell: (r) => <span className="font-medium text-slate-200">{r.port}</span> },
+                    { header: "Role", key: "role", cell: (r) => {
+                      const role = r.role || "—";
+                      const colorClass = role === "Root" ? "text-emerald-500" : role === "Designated" ? "text-blue-500" : role === "Alternate" ? "text-amber-500" : "";
+                      return <span className={colorClass}>{role}</span>;
+                    }},
+                    { header: "State", key: "state", cell: (r) => {
+                      const state = r.state || "—";
+                      const colorClass = state === "Forwarding" ? "text-emerald-500" : state === "Blocking" ? "text-rose-500" : state === "Learning" ? "text-amber-500" : "";
+                      return <span className={colorClass}>{state}</span>;
+                    }},
+                    { header: "Cost", key: "cost", cell: (r) => r.cost ?? "—" },
+                    { header: "PortFast", key: "portfast_enabled", cell: (r) => {
+                      const enabled = r.portfast_enabled;
+                      return <span className={enabled ? "text-emerald-500" : "text-slate-400"}>{enabled ? "Enabled" : "Disabled"}</span>;
+                    }},
+                    { header: "BPDU Guard", key: "bpduguard_enabled", cell: (r) => {
+                      const enabled = r.bpduguard_enabled;
+                      return <span className={enabled ? "text-emerald-500" : "text-slate-400"}>{enabled ? "Enabled" : "Disabled"}</span>;
+                    }}
+                  ]}
+                  data={stpData.interfaces}
+                  empty="No STP port information available"
+                  minWidthClass="min-w-[800px]"
+                />
+              </div>
+            )}
+            
+            {/* Fallback: use stp_info.interfaces if main interfaces not available */}
+            {(!stpData.interfaces || stpData.interfaces.length === 0) && stpData.stp_info?.interfaces && Array.isArray(stpData.stp_info.interfaces) && stpData.stp_info.interfaces.length > 0 && (
+              <div className="mt-4 h-[60vh] overflow-hidden rounded-2xl border border-slate-300 dark:border-slate-700">
+                <Table
+                  searchable
+                  searchPlaceholder="Search port name..."
+                  columns={[
+                    { header: "Port", key: "port", cell: (r) => <span className="font-medium text-slate-200">{r.port}</span> },
+                    { header: "Role", key: "role", cell: (r) => {
+                      const role = r.role || "—";
+                      const colorClass = role === "Root" ? "text-emerald-500" : role === "Designated" ? "text-blue-500" : role === "Alternate" ? "text-amber-500" : "";
+                      return <span className={colorClass}>{role}</span>;
+                    }},
+                    { header: "State", key: "state", cell: (r) => {
+                      const state = r.state || "—";
+                      const colorClass = state === "Forwarding" ? "text-emerald-500" : state === "Blocking" ? "text-rose-500" : state === "Learning" ? "text-amber-500" : "";
+                      return <span className={colorClass}>{state}</span>;
+                    }},
+                    { header: "Cost", key: "cost", cell: (r) => r.cost ?? "—" },
+                    { header: "PortFast", key: "portfast_enabled", cell: (r) => {
+                      const enabled = r.portfast_enabled;
+                      return <span className={enabled ? "text-emerald-500" : "text-slate-400"}>{enabled ? "Enabled" : "Disabled"}</span>;
+                    }},
+                    { header: "BPDU Guard", key: "bpduguard_enabled", cell: (r) => {
+                      const enabled = r.bpduguard_enabled;
+                      return <span className={enabled ? "text-emerald-500" : "text-slate-400"}>{enabled ? "Enabled" : "Disabled"}</span>;
+                    }}
+                  ]}
+                  data={stpData.stp_info.interfaces}
+                  empty="No STP port information available"
+                  minWidthClass="min-w-[800px]"
+                />
               </div>
             )}
             
             {/* Fallback: Legacy port_roles format */}
-            {(!stpData.interfaces || !Array.isArray(stpData.interfaces) || stpData.interfaces.length === 0) && stpData.port_roles && Object.keys(stpData.port_roles).length > 0 && (
-              <div className="mt-4">
-                <h3 className="text-sm font-semibold mb-3">Port Roles & States (legacy format)</h3>
-                <div className="h-[60vh] overflow-auto rounded-2xl border border-slate-300 dark:border-[#1F2937]">
-                  <Table
-                    columns={[
-                      { header: "Port", key: "port" },
-                      { header: "Role", key: "role" },
-                      { header: "State", key: "state" },
-                      { header: "Cost", key: "cost", cell: (r) => r.cost || "—" },
-                      { header: "PortFast", key: "portfast", cell: (r) => r.portfast ? "Enabled" : "Disabled" },
-                      { header: "BPDU Guard", key: "bpduguard", cell: (r) => r.bpduguard ? "Enabled" : "Disabled" }
-                    ]}
-                    data={Object.entries(stpData.port_roles || {}).map(([port, role]) => ({
-                      port,
-                      role: role || "—",
-                      state: stpData.port_states?.[port] || "—",
-                      cost: stpData.port_costs?.[port] || null,
-                      portfast: stpData.portfast_enabled?.[port] || false,
-                      bpduguard: stpData.bpdu_guard_enabled?.[port] || false
-                    }))}
-                    empty="No STP port information available"
-                    minWidthClass="min-w-[800px]"
-                  />
-                </div>
+            {(!stpData.interfaces || stpData.interfaces.length === 0) && (!stpData.stp_info?.interfaces || stpData.stp_info.interfaces.length === 0) && stpData.port_roles && Object.keys(stpData.port_roles).length > 0 && (
+              <div className="mt-4 h-[60vh] overflow-hidden rounded-2xl border border-slate-300 dark:border-slate-700">
+                <Table
+                  searchable
+                  searchPlaceholder="Search port name..."
+                  columns={[
+                    { header: "Port", key: "port" },
+                    { header: "Role", key: "role" },
+                    { header: "State", key: "state" },
+                    { header: "Cost", key: "cost", cell: (r) => r.cost || "—" },
+                    { header: "PortFast", key: "portfast", cell: (r) => r.portfast ? "Enabled" : "Disabled" },
+                    { header: "BPDU Guard", key: "bpduguard", cell: (r) => r.bpduguard ? "Enabled" : "Disabled" }
+                  ]}
+                  data={Object.entries(stpData.port_roles || {}).map(([port, role]) => ({
+                    port,
+                    role: role || "—",
+                    state: stpData.port_states?.[port] || "—",
+                    cost: stpData.port_costs?.[port] || null,
+                    portfast: stpData.portfast_enabled?.[port] || false,
+                    bpduguard: stpData.bpdu_guard_enabled?.[port] || false
+                  }))}
+                  empty="No STP port information available"
+                  minWidthClass="min-w-[800px]"
+                />
               </div>
+            )}
+            
+            {/* No STP data fallback */}
+            {(!stpData.interfaces || stpData.interfaces.length === 0) && (!stpData.stp_info?.interfaces || stpData.stp_info.interfaces.length === 0) && (!stpData.port_roles || Object.keys(stpData.port_roles).length === 0) && (
+              <div className="text-sm text-gray-500 dark:text-gray-400 mt-4">No STP port information available</div>
             )}
           </Card>
         </div>
@@ -3789,48 +3877,40 @@ const DeviceDetailsView = ({ project, deviceId, goBack, goBackHref, goIndex, goI
         <div className="grid gap-6">
           {/* Full route table (Cisco show ip route / Huawei display ip routing-table) */}
           {routingData.routes && Array.isArray(routingData.routes) && routingData.routes.length > 0 && (
-            <Card title={`Route table (${filteredRouteTable.length}${routeTableSearch.trim() ? ` / ${routingData.routes.length}` : ""} routes)`}>
-              <div className="mb-3">
-                <Input
-                  placeholder="Search protocol, network, next hop, interface..."
-                  value={routeTableSearch}
-                  onChange={(e) => setRouteTableSearch(e.target.value)}
-                  className="w-full max-w-md rounded-xl border-slate-300 dark:border-slate-600"
-                />
-              </div>
-              <div className="h-[50vh] overflow-auto rounded-2xl border border-slate-300 dark:border-[#1F2937]">
-                <Table
-                  columns={[
-                    { header: "Protocol", key: "protocol", cell: (r) => { const p = r.protocol; const labels = { O: "OSPF", C: "Connected", L: "Local", S: "Static", B: "BGP", R: "RIP", D: "EIGRP", i: "ISIS" }; return p ? (labels[p] || p) : "—"; } },
-                    { header: "Network", key: "network" },
-                    { header: "Next hop", key: "next_hop", cell: (r) => r.next_hop || "—" },
-                    { header: "Interface", key: "interface", cell: (r) => r.interface || "—" }
-                  ]}
-                  data={filteredRouteTable}
-                  empty={routeTableSearch.trim() ? "No routes match search" : "No routes"}
-                  minWidthClass="min-w-[800px]"
-                />
-              </div>
-            </Card>
+            <div className="h-[50vh] overflow-hidden rounded-2xl border border-slate-300 dark:border-slate-700">
+              <Table
+                searchable
+                searchPlaceholder="Search protocol, network, next hop, interface..."
+                columns={[
+                  { header: "Protocol", key: "protocol", cell: (r) => { const p = r.protocol; const labels = { O: "OSPF", C: "Connected", L: "Local", S: "Static", B: "BGP", R: "RIP", D: "EIGRP", i: "ISIS" }; return p ? (labels[p] || p) : "—"; } },
+                  { header: "Network", key: "network" },
+                  { header: "Next hop", key: "next_hop", cell: (r) => r.next_hop || "—" },
+                  { header: "Interface", key: "interface", cell: (r) => r.interface || "—" }
+                ]}
+                data={routingData.routes}
+                empty="No routes"
+                minWidthClass="min-w-[800px]"
+              />
+            </div>
           )}
           {/* Static Routes */}
           {routingData.static && ((Array.isArray(routingData.static) && routingData.static.length > 0) || (routingData.static.routes && routingData.static.routes.length > 0)) && (
-            <Card title="Static Routes">
-              <div className="h-[50vh] overflow-auto rounded-2xl border border-slate-300 dark:border-[#1F2937]">
-                <Table
-                  columns={[
-                    { header: "Network", key: "network" },
-                    { header: "Mask", key: "mask", cell: (r) => r.mask || "—" },
-                    { header: "Next Hop", key: "nexthop", cell: (r) => r.nexthop || r.next_hop || "—" },
-                    { header: "Interface", key: "interface", cell: (r) => r.interface || r.exit_interface || "—" },
-                    { header: "AD", key: "admin_distance", cell: (r) => r.admin_distance || "—" }
-                  ]}
-                  data={Array.isArray(routingData.static) ? routingData.static : (routingData.static.routes || [])}
-                  empty="No static routes"
-                  minWidthClass="min-w-[900px]"
-                />
-              </div>
-            </Card>
+            <div className="h-[50vh] overflow-hidden rounded-2xl border border-slate-300 dark:border-slate-700">
+              <Table
+                searchable
+                searchPlaceholder="Search network, next hop, interface..."
+                columns={[
+                  { header: "Network", key: "network" },
+                  { header: "Mask", key: "mask", cell: (r) => r.mask || "—" },
+                  { header: "Next Hop", key: "nexthop", cell: (r) => r.nexthop || r.next_hop || "—" },
+                  { header: "Interface", key: "interface", cell: (r) => r.interface || r.exit_interface || "—" },
+                  { header: "AD", key: "admin_distance", cell: (r) => r.admin_distance || "—" }
+                ]}
+                data={Array.isArray(routingData.static) ? routingData.static : (routingData.static.routes || [])}
+                empty="No static routes"
+                minWidthClass="min-w-[900px]"
+              />
+            </div>
           )}
 
           {/* OSPF */}
@@ -3847,13 +3927,14 @@ const DeviceDetailsView = ({ project, deviceId, goBack, goBackHref, goIndex, goI
                   <div className="h-[30vh] overflow-auto rounded-xl border border-slate-300 dark:border-[#1F2937]">
                     <Table
                       columns={[
-                        { header: "Interface", key: "interface" },
-                        { header: "Area", key: "area" },
-                        { header: "Cost", key: "cost", cell: (r) => r.cost || "—" }
+                        { header: "Interface", key: "interface", cell: (r) => <span className="font-medium text-slate-800 dark:text-slate-200">{r.interface || r.name || "—"}</span> },
+                        { header: "Area", key: "area", cell: (r) => r.area ?? "—" },
+                        ...(routingData.ospf.interfaces.some(i => i.cost !== undefined && i.cost !== null) ? [{ header: "Cost", key: "cost", cell: (r) => r.cost ?? "—" }] : []),
+                        ...(routingData.ospf.interfaces.some(i => i.network_type) ? [{ header: "Network Type", key: "network_type", cell: (r) => r.network_type || "—" }] : [])
                       ]}
                       data={routingData.ospf.interfaces}
                       empty="No OSPF interfaces"
-                      minWidthClass="min-w-[600px]"
+                      minWidthClass="min-w-[500px]"
                     />
                   </div>
                 </div>
@@ -3864,15 +3945,24 @@ const DeviceDetailsView = ({ project, deviceId, goBack, goBackHref, goIndex, goI
                   <div className="h-[30vh] overflow-auto rounded-xl border border-slate-300 dark:border-[#1F2937]">
                     <Table
                       columns={[
-                        { header: "Neighbor ID", key: "neighbor_id" },
-                        { header: "Interface", key: "interface" },
-                        { header: "State", key: "state" },
-                        { header: "DR", key: "dr", cell: (r) => r.dr || "—" },
-                        { header: "BDR", key: "bdr", cell: (r) => r.bdr || "—" }
+                        { header: "Neighbor ID", key: "neighbor_id", cell: (r) => <span className="font-medium text-slate-800 dark:text-slate-200">{r.neighbor_id || "—"}</span> },
+                        { header: "Interface", key: "interface", cell: (r) => <span className="text-blue-600 dark:text-blue-400">{r.interface || "—"}</span> },
+                        { header: "State", key: "state", cell: (r) => {
+                          const state = r.state || "—";
+                          const colorClass = state.toUpperCase() === "FULL" ? "text-emerald-500" : state.toUpperCase().includes("2WAY") ? "text-amber-500" : "";
+                          return <span className={colorClass}>{state}</span>;
+                        }},
+                        { header: "Role", key: "dr_bdr", cell: (r) => {
+                          const role = r.dr_bdr || r.role || "—";
+                          const colorClass = role === "DR" ? "bg-emerald-100 text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-400" : role === "BDR" ? "bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-400" : "";
+                          return <span className={`px-2 py-0.5 rounded-full text-xs font-medium ${colorClass}`}>{role}</span>;
+                        }},
+                        { header: "Address", key: "address", cell: (r) => r.address || r.ip_address || "—" },
+                        { header: "Priority", key: "priority", cell: (r) => r.priority ?? "—" }
                       ]}
                       data={routingData.ospf.neighbors}
                       empty="No OSPF neighbors"
-                      minWidthClass="min-w-[800px]"
+                      minWidthClass="min-w-[900px]"
                     />
                   </div>
                 </div>
@@ -3951,213 +4041,325 @@ const DeviceDetailsView = ({ project, deviceId, goBack, goBackHref, goIndex, goI
             </Card>
           )}
 
-          {(!routingData.routes || routingData.routes.length === 0) && (!routingData.static || ((!Array.isArray(routingData.static) || routingData.static.length === 0) && (!routingData.static.routes || routingData.static.routes.length === 0))) && !routingData.ospf && !routingData.eigrp && !routingData.bgp && !routingData.rip && (
-            <Card title="Routing">
-              <div className="text-sm text-gray-500 dark:text-gray-400">No routing protocol information available</div>
-            </Card>
-          )}
+          {/* Check if routing data is effectively empty */}
+          {(() => {
+            const hasRoutes = routingData.routes && routingData.routes.length > 0;
+            const hasStatic = routingData.static && ((Array.isArray(routingData.static) && routingData.static.length > 0) || (routingData.static.routes && routingData.static.routes.length > 0));
+            const hasOspf = routingData.ospf && (routingData.ospf.router_id || routingData.ospf.process_id || (routingData.ospf.neighbors && routingData.ospf.neighbors.length > 0));
+            const hasEigrp = routingData.eigrp && (routingData.eigrp.as_number || (routingData.eigrp.neighbors && routingData.eigrp.neighbors.length > 0));
+            const hasBgp = routingData.bgp && (routingData.bgp.local_as || (routingData.bgp.peers && routingData.bgp.peers.length > 0));
+            const hasRip = routingData.rip && routingData.rip.version;
+            const hasNoRouting = !hasRoutes && !hasStatic && !hasOspf && !hasEigrp && !hasBgp && !hasRip;
+            
+            if (hasNoRouting) {
+              return (
+                <Card title="Routing Information">
+                  <div className="p-4 rounded-xl border border-slate-300 dark:border-slate-700 bg-slate-50 dark:bg-slate-800/50">
+                    <div className="flex items-center gap-3 mb-3">
+                      <span className="text-2xl">🔀</span>
+                      <span className="text-sm font-medium text-slate-700 dark:text-slate-300">No routing protocols configured</span>
+                    </div>
+                    <div className="text-sm text-gray-500 dark:text-gray-400 space-y-1">
+                      <p>This device appears to be operating as a Layer 2 switch without routing capabilities.</p>
+                      <ul className="list-disc list-inside mt-2 ml-2 text-xs">
+                        <li>No OSPF, EIGRP, BGP, or RIP protocols detected</li>
+                        <li>No static routes configured</li>
+                        <li>For L2 switches, routing is typically handled by upstream distribution/core devices</li>
+                      </ul>
+                    </div>
+                  </div>
+                </Card>
+              );
+            }
+            return null;
+          })()}
         </div>
       )}
 
       {/* NEIGHBORS */}
       {!loading && !error && tab === "neighbors" && (
         <div className="grid gap-6">
-          <Card title={`Neighbors (${neighborsData.length})`}>
-            {neighborsData.length > 0 ? (
-              <div className="h-[70vh] overflow-auto rounded-2xl border border-slate-300 dark:border-[#1F2937]">
-                <Table
-                  columns={[
-                    { header: "Device Name", key: "device_name" },
-                    { header: "IP Address", key: "ip_address", cell: (r) => r.ip_address || "—" },
-                    { header: "Platform/Model", key: "platform", cell: (r) => r.platform || r.model || "—" },
-                    { header: "Local Port", key: "local_port" },
-                    { header: "Remote Port", key: "remote_port", cell: (r) => r.remote_port || "—" },
-                    { header: "Capabilities", key: "capabilities", cell: (r) => (Array.isArray(r.capabilities) ? r.capabilities.join(", ") : (r.capabilities || "—")) },
-                    { header: "Protocol", key: "protocol" }
-                  ]}
-                  data={neighborsData.filter(n => {
-                    // Additional client-side filtering to remove invalid entries
-                    const deviceName = (n.device_name || "").toLowerCase();
-                    const invalidNames = ['device', 'router', 'switch', 'wlan', 'other', 'id', 'port', 'local', 'remote', 'neighbor', 'intf', 'dev', 'exptime', '(r)', '(w)', '(o)'];
-                    return deviceName && deviceName.length > 1 && !invalidNames.includes(deviceName);
-                  })}
-                  empty="No neighbor information available"
-                  minWidthClass="min-w-[1200px]"
-                />
+          {/* Summary stats */}
+          <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+            <div className="p-3 rounded-xl border border-slate-300 dark:border-slate-700 bg-slate-50 dark:bg-slate-800/50">
+              <div className="text-xs text-slate-500 dark:text-slate-400">Total Neighbors</div>
+              <div className="text-xl font-semibold text-slate-800 dark:text-slate-200">{neighborsData.length}</div>
+            </div>
+            <div className="p-3 rounded-xl border border-slate-300 dark:border-slate-700 bg-slate-50 dark:bg-slate-800/50">
+              <div className="text-xs text-slate-500 dark:text-slate-400">CDP Neighbors</div>
+              <div className="text-xl font-semibold text-emerald-600 dark:text-emerald-400">{neighborsData.filter(n => n.discovery_protocol === "CDP" || n.protocol === "CDP").length}</div>
+            </div>
+            <div className="p-3 rounded-xl border border-slate-300 dark:border-slate-700 bg-slate-50 dark:bg-slate-800/50">
+              <div className="text-xs text-slate-500 dark:text-slate-400">LLDP Neighbors</div>
+              <div className="text-xl font-semibold text-blue-600 dark:text-blue-400">{neighborsData.filter(n => n.discovery_protocol === "LLDP" || n.protocol === "LLDP").length}</div>
+            </div>
+            <div className="p-3 rounded-xl border border-slate-300 dark:border-slate-700 bg-slate-50 dark:bg-slate-800/50">
+              <div className="text-xs text-slate-500 dark:text-slate-400">Unique Devices</div>
+              <div className="text-xl font-semibold text-slate-800 dark:text-slate-200">{[...new Set(neighborsData.map(n => n.device_name || n.neighbor_device_name))].length}</div>
+            </div>
+          </div>
+          
+          {neighborsData.length > 0 ? (
+            <div className="h-[65vh] overflow-hidden rounded-2xl border border-slate-300 dark:border-slate-700">
+              <Table
+                searchable
+                searchPlaceholder="Search device name, IP, port..."
+                columns={[
+                  { header: "Device Name", key: "device_name", cell: (r) => <span className="font-medium text-slate-200">{r.device_name || r.neighbor_device_name || "—"}</span> },
+                  { header: "IP Address", key: "ip_address", cell: (r) => r.ip_address || r.neighbor_ip || "—" },
+                  { header: "Platform", key: "platform", cell: (r) => r.platform || r.model || "—" },
+                  { header: "Local Port", key: "local_port", cell: (r) => <span className="text-blue-400">{r.local_port || "—"}</span> },
+                  { header: "Remote Port", key: "remote_port", cell: (r) => <span className="text-emerald-400">{r.remote_port || "—"}</span> },
+                  { header: "Capabilities", key: "capabilities", cell: (r) => (Array.isArray(r.capabilities) ? r.capabilities.join(", ") : (r.capabilities || "—")) },
+                  { header: "Protocol", key: "discovery_protocol", cell: (r) => {
+                    const proto = r.discovery_protocol || r.protocol || "—";
+                    const colorClass = proto === "CDP" ? "bg-emerald-900/30 text-emerald-400" : proto === "LLDP" ? "bg-blue-900/30 text-blue-400" : "";
+                    return <span className={`px-2 py-0.5 rounded-full text-xs font-medium ${colorClass}`}>{proto}</span>;
+                  }}
+                ]}
+                data={neighborsData}
+                empty="No neighbor information available"
+                minWidthClass="min-w-[1100px]"
+              />
+            </div>
+          ) : (
+            <Card title="Neighbor Discovery Table">
+              <div className="p-4 rounded-xl border border-slate-300 dark:border-slate-700 bg-slate-50 dark:bg-slate-800/50">
+                <div className="flex items-center gap-3 mb-3">
+                  <span className="text-2xl">🔗</span>
+                  <span className="text-sm font-medium text-slate-700 dark:text-slate-300">No neighbor information detected</span>
+                </div>
+                <div className="text-sm text-gray-500 dark:text-gray-400">
+                  <p>No CDP/LLDP neighbors were found. This could be because:</p>
+                  <ul className="list-disc list-inside mt-2 ml-2 text-xs space-y-1">
+                    <li>CDP/LLDP neighbor discovery is not enabled on this device</li>
+                    <li>The uploaded configuration does not include neighbor output</li>
+                    <li>Include "show cdp neighbors detail" or "show lldp neighbors detail" output</li>
+                  </ul>
+                </div>
               </div>
-            ) : (
-              <div className="text-sm text-gray-500 dark:text-gray-400">
-                No neighbor information available. This may be because:
-                <ul className="list-disc list-inside mt-2 ml-4">
-                  <li>The configuration file does not contain LLDP/CDP neighbor information</li>
-                  <li>The neighbor discovery protocol is not enabled on the device</li>
-                  <li>Please ensure the uploaded file includes "display lldp neighbor" or "show cdp neighbors" output</li>
-                </ul>
-                {deviceData && (
-                  <div className="mt-4 p-3 bg-gray-100 dark:bg-gray-800 rounded-lg">
-                    <div className="text-xs font-mono text-gray-600 dark:text-gray-400">
-                      Debug: neighborsData = {JSON.stringify(neighborsData, null, 2)}
-                    </div>
-                  </div>
-                )}
-              </div>
-            )}
-          </Card>
+            </Card>
+          )}
         </div>
       )}
 
       {/* MAC/ARP */}
       {!loading && !error && tab === "macarp" && (
         <div className="grid gap-6">
+          {/* Summary stats */}
+          <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+            <div className="p-3 rounded-xl border border-slate-300 dark:border-slate-700 bg-slate-50 dark:bg-slate-800/50">
+              <div className="text-xs text-slate-500 dark:text-slate-400">Total MAC Entries</div>
+              <div className="text-xl font-semibold text-slate-800 dark:text-slate-200">{macArpData.mac_table?.length || 0}</div>
+            </div>
+            <div className="p-3 rounded-xl border border-slate-300 dark:border-slate-700 bg-slate-50 dark:bg-slate-800/50">
+              <div className="text-xs text-slate-500 dark:text-slate-400">Dynamic MACs</div>
+              <div className="text-xl font-semibold text-blue-600 dark:text-blue-400">{(macArpData.mac_table || []).filter(m => m.type === "DYNAMIC" || m.type === "dynamic").length}</div>
+            </div>
+            <div className="p-3 rounded-xl border border-slate-300 dark:border-slate-700 bg-slate-50 dark:bg-slate-800/50">
+              <div className="text-xs text-slate-500 dark:text-slate-400">ARP Entries</div>
+              <div className="text-xl font-semibold text-emerald-600 dark:text-emerald-400">{macArpData.arp_table?.length || 0}</div>
+            </div>
+            <div className="p-3 rounded-xl border border-slate-300 dark:border-slate-700 bg-slate-50 dark:bg-slate-800/50">
+              <div className="text-xs text-slate-500 dark:text-slate-400">VLANs with MACs</div>
+              <div className="text-xl font-semibold text-slate-800 dark:text-slate-200">{[...new Set((macArpData.mac_table || []).map(m => m.vlan))].length}</div>
+            </div>
+          </div>
+
           {/* MAC Address Table */}
-          <Card title="MAC Address Table">
-            {macArpData.mac_table && macArpData.mac_table.length > 0 ? (
-              <div className="h-[50vh] overflow-auto rounded-2xl border border-slate-300 dark:border-[#1F2937]">
-                <Table
-                  columns={[
-                    { header: "MAC Address", key: "mac_address" },
-                    { header: "Port", key: "port" },
-                    { header: "Type", key: "type", cell: (r) => r.type || "Dynamic" },
-                    { header: "VLAN", key: "vlan", cell: (r) => r.vlan || "—" }
-                  ]}
-                  data={macArpData.mac_table}
-                  empty="No MAC address table entries"
-                  minWidthClass="min-w-[800px]"
-                />
+          {macArpData.mac_table && macArpData.mac_table.length > 0 ? (
+            <div className="h-[45vh] overflow-hidden rounded-2xl border border-slate-300 dark:border-slate-700">
+              <Table
+                searchable
+                searchPlaceholder="Search MAC address, VLAN, port..."
+                columns={[
+                  { header: "VLAN", key: "vlan", cell: (r) => <span className="font-medium text-blue-600 dark:text-blue-400">{r.vlan ?? "—"}</span> },
+                  { header: "MAC Address", key: "mac_address", cell: (r) => <span className="font-mono text-xs">{r.mac_address || "—"}</span> },
+                  { header: "Type", key: "type", cell: (r) => {
+                    const type = r.type || "Dynamic";
+                    const colorClass = type.toLowerCase() === "dynamic" ? "text-emerald-500" : type.toLowerCase() === "static" ? "text-amber-500" : "";
+                    return <span className={colorClass}>{type}</span>;
+                  }},
+                  { header: "Port", key: "port", cell: (r) => <span className="text-slate-300">{r.port || "—"}</span> }
+                ]}
+                data={macArpData.mac_table}
+                empty="No MAC address table entries"
+                minWidthClass="min-w-[700px]"
+              />
+            </div>
+          ) : (
+            <Card title="MAC Address Table">
+              <div className="p-4 rounded-xl border border-slate-300 dark:border-slate-700 bg-slate-50 dark:bg-slate-800/50">
+                <div className="text-sm text-gray-500 dark:text-gray-400">
+                  No MAC address table entries. Include "show mac address-table" output to populate this table.
+                </div>
               </div>
-            ) : (
-              <div className="text-sm text-gray-500 dark:text-gray-400">No MAC address table available</div>
-            )}
-          </Card>
+            </Card>
+          )}
 
           {/* ARP Table */}
-          <Card title="ARP Table">
-            {macArpData.arp_table && macArpData.arp_table.length > 0 ? (
-              <div className="h-[50vh] overflow-auto rounded-2xl border border-slate-300 dark:border-[#1F2937]">
-                <Table
-                  columns={[
-                    { header: "IP Address", key: "ip_address" },
-                    { header: "MAC Address", key: "mac_address" },
-                    { header: "Interface", key: "interface" },
-                    { header: "Age", key: "age", cell: (r) => r.age || "—" }
-                  ]}
-                  data={macArpData.arp_table}
-                  empty="No ARP table entries"
-                  minWidthClass="min-w-[800px]"
-                />
+          {macArpData.arp_table && macArpData.arp_table.length > 0 ? (
+            <div className="h-[45vh] overflow-hidden rounded-2xl border border-slate-300 dark:border-slate-700">
+              <Table
+                searchable
+                searchPlaceholder="Search IP, MAC, interface..."
+                columns={[
+                  { header: "IP Address", key: "ip_address", cell: (r) => <span className="font-mono text-xs text-slate-200">{r.ip_address || "—"}</span> },
+                  { header: "MAC Address", key: "mac_address", cell: (r) => <span className="font-mono text-xs">{r.mac_address || r.hardware_addr || "—"}</span> },
+                  { header: "Type", key: "type", cell: (r) => r.type || "ARPA" },
+                  { header: "Interface", key: "interface", cell: (r) => <span className="text-blue-600 dark:text-blue-400">{r.interface || "—"}</span> },
+                  { header: "Age (min)", key: "age", cell: (r) => r.age ?? "—" }
+                ]}
+                data={macArpData.arp_table}
+                empty="No ARP table entries"
+                minWidthClass="min-w-[800px]"
+              />
+            </div>
+          ) : (
+            <Card title="ARP Table">
+              <div className="p-4 rounded-xl border border-slate-300 dark:border-slate-700 bg-slate-50 dark:bg-slate-800/50">
+                <div className="text-sm text-gray-500 dark:text-gray-400">
+                  No ARP table entries. Include "show ip arp" output to populate this table.
+                </div>
               </div>
-            ) : (
-              <div className="text-sm text-gray-500 dark:text-gray-400">No ARP table available</div>
-            )}
-          </Card>
+            </Card>
+          )}
         </div>
       )}
 
       {/* SECURITY */}
       {!loading && !error && tab === "security" && (
         <div className="grid gap-6">
-          {/* User Accounts */}
-          {(securityData.user_accounts && securityData.user_accounts.length > 0) || (securityData.users && securityData.users.length > 0) && (
-            <Card title="User Accounts & Privilege Levels">
-              <div className="h-[40vh] overflow-auto rounded-xl border border-slate-300 dark:border-[#1F2937]">
-                <Table
-                  columns={[
-                    { header: "Username", key: "username" },
-                    { header: "Privilege Level", key: "privilege_level", cell: (r) => r.privilege_level ?? "—" },
-                    { header: "Role", key: "role", cell: (r) => r.role || "—" }
-                  ]}
-                  data={securityData.user_accounts || securityData.users || []}
-                  empty="No user accounts"
-                  minWidthClass="min-w-[600px]"
-                />
+          {/* Security Summary Cards */}
+          <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+            <div className="p-3 rounded-xl border border-slate-300 dark:border-slate-700 bg-slate-50 dark:bg-slate-800/50">
+              <div className="text-xs text-slate-500 dark:text-slate-400">Local Users</div>
+              <div className="text-xl font-semibold text-slate-800 dark:text-slate-200">{(securityData.users || securityData.user_accounts || []).length}</div>
+            </div>
+            <div className="p-3 rounded-xl border border-slate-300 dark:border-slate-700 bg-slate-50 dark:bg-slate-800/50">
+              <div className="text-xs text-slate-500 dark:text-slate-400">SSH</div>
+              <div className={`text-xl font-semibold ${securityData.ssh?.enabled ? "text-emerald-600 dark:text-emerald-400" : "text-slate-400"}`}>
+                {securityData.ssh?.enabled ? `v${securityData.ssh.version || "2"}` : "Disabled"}
               </div>
-            </Card>
+            </div>
+            <div className="p-3 rounded-xl border border-slate-300 dark:border-slate-700 bg-slate-50 dark:bg-slate-800/50">
+              <div className="text-xs text-slate-500 dark:text-slate-400">NTP Status</div>
+              <div className={`text-xl font-semibold ${securityData.ntp?.sync_status === "synchronized" ? "text-emerald-600 dark:text-emerald-400" : "text-amber-600 dark:text-amber-400"}`}>
+                {securityData.ntp?.sync_status || (securityData.ntp?.enabled ? "Enabled" : "—")}
+              </div>
+            </div>
+            <div className="p-3 rounded-xl border border-slate-300 dark:border-slate-700 bg-slate-50 dark:bg-slate-800/50">
+              <div className="text-xs text-slate-500 dark:text-slate-400">Logging</div>
+              <div className={`text-xl font-semibold ${securityData.logging?.enabled ? "text-emerald-600 dark:text-emerald-400" : "text-slate-400"}`}>
+                {securityData.logging?.enabled ? "Enabled" : "—"}
+              </div>
+            </div>
+          </div>
+
+          {/* User Accounts - handle both user_accounts and users structures */}
+          {((securityData.user_accounts && securityData.user_accounts.length > 0) || (securityData.users && securityData.users.length > 0)) && (
+            <div className="h-[35vh] overflow-hidden rounded-xl border border-slate-300 dark:border-slate-700">
+              <Table
+                searchable
+                searchPlaceholder="Search username, role..."
+                columns={[
+                  { header: "Username", key: "username", cell: (r) => <span className="font-medium text-slate-200">{r.username || "—"}</span> },
+                  { header: "Privilege Level", key: "privilege", cell: (r) => {
+                    const priv = r.privilege_level ?? r.privilege ?? "—";
+                    const colorClass = priv === 15 ? "text-rose-500" : priv >= 5 ? "text-amber-500" : "text-slate-500";
+                    return <span className={colorClass}>{priv}</span>;
+                  }},
+                  { header: "Role", key: "role", cell: (r) => r.role || "—" },
+                  { header: "Auth Type", key: "auth", cell: (r) => r.auth || r.secret ? "Local" : "—" }
+                ]}
+                data={securityData.user_accounts || securityData.users || []}
+                empty="No user accounts"
+                minWidthClass="min-w-[500px]"
+              />
+            </div>
           )}
 
-          {/* AAA */}
-          {securityData.aaa && (
+          {/* AAA Configuration - only show if has meaningful data */}
+          {securityData.aaa && (securityData.aaa.authentication || securityData.aaa.authorization || securityData.aaa.accounting || (securityData.aaa.protocols && securityData.aaa.protocols.length > 0)) && (
             <Card title="AAA Configuration">
-              <div className="grid gap-4 md:grid-cols-2 text-sm">
-                <Metric k="Authentication" v={securityData.aaa.authentication || "—"} />
-                <Metric k="Authorization" v={securityData.aaa.authorization || "—"} />
-                <Metric k="Accounting" v={securityData.aaa.accounting || "—"} />
+              <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3 text-sm">
+                {securityData.aaa.authentication && <Metric k="Authentication" v={securityData.aaa.authentication} />}
+                {securityData.aaa.authorization && <Metric k="Authorization" v={securityData.aaa.authorization} />}
+                {securityData.aaa.accounting && <Metric k="Accounting" v={securityData.aaa.accounting} />}
+                {securityData.aaa.protocols && securityData.aaa.protocols.length > 0 && (
+                  <Metric k="Protocols" v={Array.isArray(securityData.aaa.protocols) ? securityData.aaa.protocols.join(", ") : securityData.aaa.protocols} />
+                )}
               </div>
             </Card>
           )}
 
-          {/* SSH */}
+          {/* SSH Configuration */}
           {securityData.ssh && (
-            <Card title="SSH">
-              <div className="grid gap-4 md:grid-cols-2 text-sm">
+            <Card title="SSH Configuration">
+              <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4 text-sm">
+                <Metric k="Status" v={securityData.ssh.enabled ? <span className="text-emerald-500">Enabled</span> : <span className="text-rose-500">Disabled</span>} />
                 <Metric k="Version" v={securityData.ssh.version || "—"} />
-                <Metric k="Status" v={securityData.ssh.enabled ? "Enabled" : "Disabled"} />
                 <Metric k="Connection Timeout" v={securityData.ssh.connection_timeout ? `${securityData.ssh.connection_timeout}s` : "—"} />
                 <Metric k="Auth Retries" v={securityData.ssh.auth_retries || "—"} />
-                <Metric k="Stelnet" v={securityData.ssh.stelnet_enabled ? "Enabled" : "Disabled"} />
-                <Metric k="SFTP" v={securityData.ssh.sftp_enabled ? "Enabled" : "Disabled"} />
-                <Metric k="SCP" v={securityData.ssh.scp_enabled ? "Enabled" : "Disabled"} />
               </div>
             </Card>
           )}
 
-          {/* SNMP */}
-          {securityData.snmp && (
-            <Card title="SNMP">
-              <div className="grid gap-4 md:grid-cols-2 text-sm">
-                <Metric k="Status" v={securityData.snmp.enabled ? "Enabled" : "Disabled"} />
+          {/* SNMP Configuration - only show if enabled or has communities */}
+          {securityData.snmp && (securityData.snmp.enabled || (securityData.snmp.communities && securityData.snmp.communities.length > 0)) && (
+            <Card title="SNMP Configuration">
+              <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3 text-sm mb-4">
+                <Metric k="Status" v={securityData.snmp.enabled ? <span className="text-emerald-500">Enabled</span> : <span className="text-slate-400">Disabled</span>} />
                 <Metric k="Version" v={securityData.snmp.version || "—"} />
                 {securityData.snmp.communities && securityData.snmp.communities.length > 0 && (
-                  <div className="col-span-2">
-                    <h4 className="text-sm font-semibold mb-2">Communities</h4>
-                    <div className="h-[20vh] overflow-auto rounded-xl border border-slate-300 dark:border-[#1F2937]">
-                      <Table
-                        columns={[
-                          { header: "Name", key: "name" },
-                          { header: "Group", key: "group", cell: (r) => r.group || "—" },
-                          { header: "Access", key: "access", cell: (r) => r.access || "—" },
-                          { header: "Storage Type", key: "storage_type", cell: (r) => r.storage_type || "—" },
-                        ]}
-                        data={securityData.snmp.communities}
-                        empty="No SNMP communities"
-                        minWidthClass="min-w-[600px]"
-                      />
-                    </div>
+                  <Metric k="Communities" v={securityData.snmp.communities.length} />
+                )}
+              </div>
+              {securityData.snmp.communities && securityData.snmp.communities.length > 0 && (
+                <div>
+                  <h4 className="text-sm font-semibold mb-2 text-slate-700 dark:text-slate-300">SNMP Communities</h4>
+                  <div className="h-[20vh] overflow-auto rounded-xl border border-slate-300 dark:border-[#1F2937]">
+                    <Table
+                      columns={[
+                        { header: "Name", key: "name" },
+                        { header: "Group", key: "group", cell: (r) => r.group || "—" },
+                        { header: "Access", key: "access", cell: (r) => r.access || "—" },
+                      ]}
+                      data={securityData.snmp.communities}
+                      empty="No SNMP communities"
+                      minWidthClass="min-w-[500px]"
+                    />
                   </div>
-                )}
-              </div>
+                </div>
+              )}
             </Card>
           )}
 
-          {/* NTP */}
+          {/* NTP Configuration */}
           {securityData.ntp && (
-            <Card title="NTP">
-              <div className="grid gap-4 md:grid-cols-2 text-sm">
-                <Metric k="Status" v={securityData.ntp.status || "—"} />
-                <Metric k="Enabled" v={securityData.ntp.enabled ? "Yes" : "No"} />
-                <Metric k="Synchronized" v={securityData.ntp.synchronized ? "Yes" : "No"} />
+            <Card title="NTP Configuration">
+              <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4 text-sm">
+                <Metric k="Enabled" v={securityData.ntp.enabled ? <span className="text-emerald-500">Yes</span> : "No"} />
+                <Metric k="Sync Status" v={
+                  securityData.ntp.sync_status === "synchronized" 
+                    ? <span className="text-emerald-500">Synchronized</span> 
+                    : <span className="text-amber-500">{securityData.ntp.sync_status || "Unknown"}</span>
+                } />
                 <Metric k="Stratum" v={securityData.ntp.stratum || "—"} />
-                <Metric k="Servers" v={securityData.ntp.servers?.join(", ") || "—"} />
+                <Metric k="NTP Servers" v={securityData.ntp.servers?.join(", ") || "—"} />
               </div>
             </Card>
           )}
 
-          {/* Syslog / Info Center */}
+          {/* Logging / Syslog Configuration */}
           {(securityData.logging || securityData.syslog) && (
-            <Card title="Syslog / Info Center / Logging">
-              <div className="grid gap-4 md:grid-cols-2 text-sm">
-                <Metric k="Enabled" v={(securityData.logging?.enabled || securityData.syslog?.enabled) ? "Yes" : "No"} />
-                <Metric k="Log Hosts" v={securityData.logging?.log_hosts?.join(", ") || securityData.syslog?.servers?.join(", ") || "—"} />
+            <Card title="Logging Configuration">
+              <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4 text-sm">
+                <Metric k="Enabled" v={(securityData.logging?.enabled || securityData.syslog?.enabled) ? <span className="text-emerald-500">Yes</span> : "No"} />
+                <Metric k="Console Level" v={securityData.logging?.console_level || "—"} />
+                <Metric k="Log Hosts" v={securityData.logging?.log_hosts?.join(", ") || securityData.syslog?.servers?.join(", ") || "None"} />
                 {securityData.logging?.log_buffer && (
-                  <>
-                    <Metric k="Log Buffer Max" v={securityData.logging.log_buffer.max_size ? `${securityData.logging.log_buffer.max_size} bytes` : "—"} />
-                    <Metric k="Log Buffer Current" v={securityData.logging.log_buffer.current_size ? `${securityData.logging.log_buffer.current_size} bytes` : "—"} />
-                  </>
-                )}
-                {securityData.logging?.trap_buffer && (
-                  <>
-                    <Metric k="Trap Buffer Max" v={securityData.logging.trap_buffer.max_size ? `${securityData.logging.trap_buffer.max_size} bytes` : "—"} />
-                    <Metric k="Trap Buffer Current" v={securityData.logging.trap_buffer.current_size ? `${securityData.logging.trap_buffer.current_size} bytes` : "—"} />
-                  </>
+                  <Metric k="Buffer Size" v={securityData.logging.log_buffer.max_size ? `${securityData.logging.log_buffer.max_size} bytes` : "—"} />
                 )}
               </div>
             </Card>
@@ -4206,74 +4408,150 @@ const DeviceDetailsView = ({ project, deviceId, goBack, goBackHref, goIndex, goI
       {/* HA */}
       {!loading && !error && tab === "ha" && (
         <div className="grid gap-6">
-          {/* EtherChannel / Port-Channel: backend sends ha.etherchannel or ha.port_channels */}
-          {((haData.etherchannel && haData.etherchannel.length > 0) || (haData.port_channels && haData.port_channels.length > 0)) && (
-            <Card title="EtherChannel / Port-Channel">
-              <div className="h-[50vh] overflow-auto rounded-2xl border border-slate-300 dark:border-[#1F2937]">
+          {/* HA Summary */}
+          {(() => {
+            const etherchannelCount = (haData.etherchannel?.length || 0) + (haData.port_channels?.length || 0) + (haData.etherchannels?.length || 0);
+            const hsrpCount = (Array.isArray(haData.hsrp) ? haData.hsrp : (haData.hsrp?.groups || [])).length;
+            const vrrpCount = (Array.isArray(haData.vrrp) ? haData.vrrp : (haData.vrrp?.groups || [])).length;
+            
+            return (
+              <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+                <div className="p-3 rounded-xl border border-slate-300 dark:border-slate-700 bg-slate-50 dark:bg-slate-800/50">
+                  <div className="text-xs text-slate-500 dark:text-slate-400">EtherChannel/LAG</div>
+                  <div className={`text-xl font-semibold ${etherchannelCount > 0 ? "text-blue-600 dark:text-blue-400" : "text-slate-400"}`}>{etherchannelCount}</div>
+                </div>
+                <div className="p-3 rounded-xl border border-slate-300 dark:border-slate-700 bg-slate-50 dark:bg-slate-800/50">
+                  <div className="text-xs text-slate-500 dark:text-slate-400">HSRP Groups</div>
+                  <div className={`text-xl font-semibold ${hsrpCount > 0 ? "text-emerald-600 dark:text-emerald-400" : "text-slate-400"}`}>{hsrpCount}</div>
+                </div>
+                <div className="p-3 rounded-xl border border-slate-300 dark:border-slate-700 bg-slate-50 dark:bg-slate-800/50">
+                  <div className="text-xs text-slate-500 dark:text-slate-400">VRRP Groups</div>
+                  <div className={`text-xl font-semibold ${vrrpCount > 0 ? "text-amber-600 dark:text-amber-400" : "text-slate-400"}`}>{vrrpCount}</div>
+                </div>
+                <div className="p-3 rounded-xl border border-slate-300 dark:border-slate-700 bg-slate-50 dark:bg-slate-800/50">
+                  <div className="text-xs text-slate-500 dark:text-slate-400">Total HA Features</div>
+                  <div className="text-xl font-semibold text-slate-800 dark:text-slate-200">{etherchannelCount + hsrpCount + vrrpCount}</div>
+                </div>
+              </div>
+            );
+          })()}
+
+          {/* EtherChannel / Port-Channel: support multiple field names */}
+          {(() => {
+            const ethChannels = haData.etherchannel?.length ? haData.etherchannel : (haData.etherchannels?.length ? haData.etherchannels : (haData.port_channels || []));
+            return ethChannels.length > 0 ? (
+              <div className="h-[45vh] overflow-hidden rounded-2xl border border-slate-300 dark:border-slate-700">
                 <Table
+                  searchable
+                  searchPlaceholder="Search port-channel, protocol..."
                   columns={[
-                    { header: "Port-Channel", key: "name", cell: (r) => r.name || (r.id != null ? `Po${r.id}` : "—") },
-                    { header: "Mode", key: "mode", cell: (r) => r.mode || "—" },
+                    { header: "Port-Channel", key: "name", cell: (r) => <span className="font-medium text-slate-200">{r.name || (r.id != null ? `Po${r.id}` : "—")}</span> },
+                    { header: "Protocol", key: "protocol", cell: (r) => r.protocol || r.mode || "—" },
                     { header: "Member Interfaces", key: "members", cell: (r) => (Array.isArray(r.members) ? r.members.join(", ") : r.members) || "—" },
-                    { header: "Status", key: "status", cell: (r) => r.status || "—" }
+                    { header: "Status", key: "status", cell: (r) => {
+                      const status = r.status || "—";
+                      const colorClass = status.toLowerCase().includes("up") ? "text-emerald-500" : status.toLowerCase().includes("down") ? "text-rose-500" : "";
+                      return <span className={colorClass}>{status}</span>;
+                    }}
                   ]}
-                  data={haData.etherchannel?.length ? haData.etherchannel : (haData.port_channels || []).map(p => ({ name: p.id != null ? `Po${p.id}` : "Po", mode: p.mode, members: p.members || [], status: p.status }))}
+                  data={ethChannels.map(p => ({ 
+                    name: p.name || (p.id != null ? `Po${p.id}` : "Po"), 
+                    protocol: p.protocol || p.mode, 
+                    members: p.members || [], 
+                    status: p.status 
+                  }))}
                   empty="No Port-Channel information"
-                  minWidthClass="min-w-[900px]"
+                  minWidthClass="min-w-[800px]"
                 />
               </div>
-            </Card>
-          )}
+            ) : null;
+          })()}
 
-          {/* HSRP: backend sends ha.hsrp as array; support both array and .groups */}
-          {(() => { const hsrpList = Array.isArray(haData.hsrp) ? haData.hsrp : (haData.hsrp?.groups || []); return hsrpList.length > 0; })() && (
-            <Card title="HSRP (Hot Standby Router Protocol)">
-              <div className="h-[50vh] overflow-auto rounded-2xl border border-slate-300 dark:border-[#1F2937]">
+          {/* HSRP */}
+          {(() => { 
+            const hsrpList = Array.isArray(haData.hsrp) ? haData.hsrp : (haData.hsrp?.groups || []); 
+            return hsrpList.length > 0 ? (
+              <div className="h-[45vh] overflow-hidden rounded-2xl border border-slate-300 dark:border-slate-700">
                 <Table
+                  searchable
+                  searchPlaceholder="Search interface, virtual IP..."
                   columns={[
-                    { header: "Group", key: "group_id", cell: (r) => r.group_id ?? r.group ?? "—" },
-                    { header: "Virtual IP", key: "virtual_ip", cell: (r) => r.virtual_ip || "—" },
+                    { header: "Group", key: "group_id", cell: (r) => <span className="font-medium">{r.group_id ?? r.group ?? "—"}</span> },
                     { header: "Interface", key: "interface", cell: (r) => r.interface || "—" },
-                    { header: "Status", key: "status", cell: (r) => r.status ?? r.state ?? "—" },
+                    { header: "Virtual IP", key: "virtual_ip", cell: (r) => <span className="text-blue-400">{r.virtual_ip || "—"}</span> },
+                    { header: "Status", key: "status", cell: (r) => {
+                      const status = r.status ?? r.state ?? "—";
+                      const colorClass = status.toLowerCase().includes("active") ? "text-emerald-500" : status.toLowerCase().includes("standby") ? "text-amber-500" : "";
+                      return <span className={colorClass}>{status}</span>;
+                    }},
                     { header: "Priority", key: "priority", cell: (r) => r.priority || "—" },
-                    { header: "Preempt", key: "preempt", cell: (r) => r.preempt !== undefined ? (r.preempt ? "Yes" : "No") : "—" },
-                    { header: "VLAN", key: "vlan_id", cell: (r) => r.vlan_id || "—" }
+                    { header: "Preempt", key: "preempt", cell: (r) => r.preempt !== undefined ? (r.preempt ? "Yes" : "No") : "—" }
                   ]}
-                  data={Array.isArray(haData.hsrp) ? haData.hsrp : (haData.hsrp?.groups || [])}
+                  data={hsrpList}
                   empty="No HSRP groups"
-                  minWidthClass="min-w-[900px]"
+                  minWidthClass="min-w-[800px]"
                 />
               </div>
-            </Card>
-          )}
+            ) : null;
+          })()}
 
-          {/* VRRP: backend sends ha.vrrp as array; support both array and .groups */}
-          {(() => { const vrrpList = Array.isArray(haData.vrrp) ? haData.vrrp : (haData.vrrp?.groups || []); return vrrpList.length > 0; })() && (
-            <Card title="VRRP (Virtual Router Redundancy Protocol)">
-              <div className="h-[50vh] overflow-auto rounded-2xl border border-slate-300 dark:border-[#1F2937]">
+          {/* VRRP */}
+          {(() => { 
+            const vrrpList = Array.isArray(haData.vrrp) ? haData.vrrp : (haData.vrrp?.groups || []); 
+            return vrrpList.length > 0 ? (
+              <div className="h-[45vh] overflow-hidden rounded-2xl border border-slate-300 dark:border-slate-700">
                 <Table
+                  searchable
+                  searchPlaceholder="Search interface, virtual IP..."
                   columns={[
-                    { header: "VRID", key: "vrid", cell: (r) => r.vrid ?? r.group ?? "—" },
+                    { header: "VRID", key: "vrid", cell: (r) => <span className="font-medium">{r.vrid ?? r.group ?? "—"}</span> },
                     { header: "Interface", key: "interface", cell: (r) => r.interface || "—" },
-                    { header: "Virtual IP", key: "virtual_ip", cell: (r) => r.virtual_ip || "—" },
-                    { header: "State", key: "state", cell: (r) => r.state || r.status || "—" },
-                    { header: "Master IP", key: "master_ip", cell: (r) => r.master_ip || "—" },
+                    { header: "Virtual IP", key: "virtual_ip", cell: (r) => <span className="text-blue-400">{r.virtual_ip || "—"}</span> },
+                    { header: "State", key: "state", cell: (r) => {
+                      const state = r.state || r.status || "—";
+                      const colorClass = state.toLowerCase().includes("master") ? "text-emerald-500" : state.toLowerCase().includes("backup") ? "text-amber-500" : "";
+                      return <span className={colorClass}>{state}</span>;
+                    }},
                     { header: "Priority", key: "priority", cell: (r) => r.priority ?? r.priority_run ?? "—" },
                     { header: "Preempt", key: "preempt", cell: (r) => r.preempt !== undefined ? (r.preempt ? "Yes" : "No") : "—" }
                   ]}
-                  data={Array.isArray(haData.vrrp) ? haData.vrrp : (haData.vrrp?.groups || [])}
+                  data={vrrpList}
                   empty="No VRRP groups"
-                  minWidthClass="min-w-[1000px]"
+                  minWidthClass="min-w-[800px]"
                 />
               </div>
-            </Card>
-          )}
+            ) : null;
+          })()}
 
-          {(!haData.etherchannel || haData.etherchannel.length === 0) && (!haData.port_channels || haData.port_channels.length === 0) && (() => { const h = Array.isArray(haData.hsrp) ? haData.hsrp : (haData.hsrp?.groups || []); return h.length === 0; })() && (() => { const v = Array.isArray(haData.vrrp) ? haData.vrrp : (haData.vrrp?.groups || []); return v.length === 0; })() && (
-            <Card title="High Availability">
-              <div className="text-sm text-gray-500 dark:text-gray-400">No HA information available</div>
-            </Card>
-          )}
+          {/* No HA data message */}
+          {(() => {
+            const etherchannelCount = (haData.etherchannel?.length || 0) + (haData.port_channels?.length || 0) + (haData.etherchannels?.length || 0);
+            const hsrpCount = (Array.isArray(haData.hsrp) ? haData.hsrp : (haData.hsrp?.groups || [])).length;
+            const vrrpCount = (Array.isArray(haData.vrrp) ? haData.vrrp : (haData.vrrp?.groups || [])).length;
+            
+            if (etherchannelCount === 0 && hsrpCount === 0 && vrrpCount === 0) {
+              return (
+                <Card title="High Availability">
+                  <div className="p-4 rounded-xl border border-slate-300 dark:border-slate-700 bg-slate-50 dark:bg-slate-800/50">
+                    <div className="flex items-center gap-3 mb-3">
+                      <span className="text-2xl">🔄</span>
+                      <span className="text-sm font-medium text-slate-700 dark:text-slate-300">No High Availability features configured</span>
+                    </div>
+                    <div className="text-sm text-gray-500 dark:text-gray-400 space-y-1">
+                      <p>This device does not have HA features configured. Common HA features include:</p>
+                      <ul className="list-disc list-inside mt-2 ml-2 text-xs">
+                        <li><strong>EtherChannel/Port-Channel/LAG:</strong> Link aggregation for redundancy</li>
+                        <li><strong>HSRP:</strong> Hot Standby Router Protocol for gateway redundancy</li>
+                        <li><strong>VRRP:</strong> Virtual Router Redundancy Protocol</li>
+                      </ul>
+                      <p className="mt-2 text-xs">Include "show etherchannel summary", "show standby brief", or "show vrrp brief" output to view HA information.</p>
+                    </div>
+                  </div>
+                </Card>
+              );
+            }
+            return null;
+          })()}
         </div>
       )}
 
@@ -5885,12 +6163,24 @@ const HistoryPage = ({ project, can, authedUser }) => {
   };
 
   return (
-    <div className="h-full flex flex-col min-h-0 overflow-hidden">
-      {/* Header - large and prominent like Documents page */}
-      <div className="flex-shrink-0 flex items-center justify-between mb-4 px-1">
+    <div className="h-full flex flex-col min-h-0 overflow-hidden p-2">
+      {/* Header with search box */}
+      <div className="flex-shrink-0 flex items-center justify-between mb-3 px-1">
         <h2 className="text-xl font-semibold text-gray-900 dark:text-gray-100">History</h2>
+        <div className="relative">
+          <input
+            type="text"
+            placeholder="Search (filename, user, description...)"
+            value={searchDoc}
+            onChange={(e) => setSearchDoc(e.target.value)}
+            className="w-72 pl-8 pr-3 py-1.5 text-xs rounded-lg bg-slate-800/80 border border-slate-600 text-slate-200 placeholder-slate-500 focus:outline-none focus:ring-1 focus:ring-sky-500 focus:border-sky-500"
+          />
+          <svg className="absolute left-2.5 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-slate-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
+          </svg>
+        </div>
       </div>
-      <Card className="flex-1 min-h-0 flex flex-col overflow-hidden" title={null} actions={null}>
+      <div className="flex-1 min-h-0 flex flex-col overflow-hidden rounded-xl border border-slate-700 bg-slate-900/50">
         {loading ? (
           <div className="flex-1 flex items-center justify-center text-gray-500 dark:text-gray-400">
             <div className="text-center">
@@ -5898,150 +6188,143 @@ const HistoryPage = ({ project, can, authedUser }) => {
             </div>
           </div>
         ) : (
-          <div className="flex-1 min-h-0 flex flex-col overflow-hidden gap-3">
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-2 flex-shrink-0">
-              <Input 
-                placeholder="Search (filename, user, description...)" 
-                value={searchDoc} 
-                onChange={(e) => setSearchDoc(e.target.value)}
-                className="w-full"
-              />
-              <Select 
-                value={filterWho} 
-                onChange={setFilterWho} 
-                options={[{value: "all", label: "All (Responsible User)"}, ...uniqueWhos.map(w => ({value: w, label: w}))]} 
-              />
-              <Select 
-                value={filterWhat} 
-                onChange={setFilterWhat} 
-                options={[{value: "all", label: "All (Activity Type)"}, ...uniqueWhats.map(w => ({value: w, label: w}))]} 
-              />
-            </div>
-            <div className="flex-1 min-h-0 overflow-hidden flex flex-col">
-              <div className="rounded-lg border border-slate-300 dark:border-gray-700 bg-white dark:bg-gray-900/50 flex-1 min-h-0 overflow-hidden flex flex-col">
-                <Table
-                  columns={[
-                    { header: "Time", key: "created_at", cell: (r) => <span className="text-xs">{formatDateTime(r.created_at)}</span> },
-                    { header: "Name", key: "filename", cell: (r) => <span className="font-medium text-sm">{r.filename}</span> },
-                    { header: "Responsible User", key: "who", cell: (r) => <span className="text-sm">{r.metadata?.who || r.uploader}</span> },
-                    { header: "Activity Type", key: "what", cell: (r) => <span className="text-sm">{r.metadata?.what || "—"}</span> },
-                    { header: "Site", key: "where", cell: (r) => <span className="text-sm">{r.metadata?.where || "—"}</span> },
-                    { header: "Operational Timing", key: "when", cell: (r) => <span className="text-sm">{r.metadata?.when || "—"}</span> },
-                    { header: "Purpose", key: "why", cell: (r) => <span className="text-sm">{r.metadata?.why || "—"}</span> },
-                    { header: "Version", key: "version", cell: (r) => <span className="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-blue-100 dark:bg-blue-900/30 text-blue-800 dark:text-blue-200">{`v${r.version} ${r.is_latest ? '(Latest)' : ''}`}</span> },
-                    {
-                      header: "Description",
-                      key: "description",
-                      cell: (r) => (
-                        <Button
-                          variant="secondary"
-                          size="sm"
-                          onClick={() => openDescription(r)}
-                          title="View description"
-                        >
-                          📄 View
-                        </Button>
-                      ),
-                    },
-                    {
-                      header: "Actions",
-                      key: "actions",
-                      cell: (r) => (
-                        <div className="flex gap-2">
-                          <Button 
-                            variant="secondary" 
-                            size="sm"
-                            onClick={async () => {
-                              try {
-                                const projectId = project.project_id || project.id;
-                                await api.downloadDocument(projectId, r.document_id);
-                              } catch (error) {
-                                alert('Download failed: ' + formatError(error));
-                              }
-                            }}
+          <div className="flex-1 min-h-0 flex flex-col overflow-hidden">
+            <div className="flex-1 min-h-0 overflow-hidden">
+              <table className="w-full text-xs">
+                <thead className="bg-slate-800/80 sticky top-0">
+                  <tr>
+                    <th className="text-center px-2 py-2.5 font-medium text-slate-300 w-10">#</th>
+                    <th className="text-left px-3 py-2.5 font-medium text-slate-300 whitespace-nowrap">Time</th>
+                    <th className="text-left px-3 py-2.5 font-medium text-slate-300">Name</th>
+                    <th className="text-left px-3 py-2.5 font-medium text-slate-300 whitespace-nowrap">Responsible User</th>
+                    <th className="text-left px-3 py-2.5 font-medium text-slate-300 whitespace-nowrap">Activity Type</th>
+                    <th className="text-left px-3 py-2.5 font-medium text-slate-300">Site</th>
+                    <th className="text-left px-3 py-2.5 font-medium text-slate-300 whitespace-nowrap">Op. Timing</th>
+                    <th className="text-left px-3 py-2.5 font-medium text-slate-300">Purpose</th>
+                    <th className="text-left px-3 py-2.5 font-medium text-slate-300">Version</th>
+                    <th className="text-left px-3 py-2.5 font-medium text-slate-300">Desc.</th>
+                    <th className="text-left px-3 py-2.5 font-medium text-slate-300">Actions</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-slate-700/50">
+                  {paginatedDocs.length === 0 ? (
+                    <tr>
+                      <td colSpan={11} className="text-center py-8 text-slate-500">No document uploads yet</td>
+                    </tr>
+                  ) : (
+                    paginatedDocs.map((r, idx) => (
+                      <tr key={r.document_id || idx} className="hover:bg-slate-800/30">
+                        <td className="text-center px-2 py-2.5 text-slate-400 w-10">{(clampedPage - 1) * ROWS_PER_PAGE + idx + 1}</td>
+                        <td className="px-3 py-2.5 whitespace-nowrap text-slate-300">{formatDateTime(r.created_at)}</td>
+                        <td className="px-3 py-2.5 max-w-[180px]">
+                          <span className="block truncate font-medium text-slate-200" title={r.filename}>{r.filename}</span>
+                        </td>
+                        <td className="px-3 py-2.5 text-slate-300">{r.metadata?.who || r.uploader}</td>
+                        <td className="px-3 py-2.5 text-slate-300">{r.metadata?.what || "—"}</td>
+                        <td className="px-3 py-2.5 text-slate-300">{r.metadata?.where || "—"}</td>
+                        <td className="px-3 py-2.5 text-slate-300">{r.metadata?.when || "—"}</td>
+                        <td className="px-3 py-2.5 text-slate-300">{r.metadata?.why || "—"}</td>
+                        <td className="px-3 py-2.5">
+                          <span className="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-blue-900/30 text-blue-300">
+                            {`v${r.version}${r.is_latest ? ' (Latest)' : ''}`}
+                          </span>
+                        </td>
+                        <td className="px-3 py-2.5">
+                          <button
+                            onClick={() => openDescription(r)}
+                            title="View description"
+                            className="px-2 py-1 text-xs rounded bg-slate-700 hover:bg-slate-600 text-slate-200 transition-colors"
                           >
-                            ⬇ Download
-                          </Button>
-                          <Button 
-                            variant="secondary"
-                            size="sm"
-                            onClick={async (e) => {
-                              e.stopPropagation();
-                              await loadVersions(r.document_id, r);
-                            }}
-                          >
-                            📜 Versions
-                          </Button>
-                        </div>
-                      ),
-                    },
-                  ]}
-                  data={paginatedDocs}
-                  empty="No document uploads yet"
-                  minWidthClass="min-w-[1200px]"
-                  containerClassName="text-xs [&_th]:py-1 [&_td]:py-1 overflow-auto h-full min-h-0"
-                />
-              </div>
+                            View
+                          </button>
+                        </td>
+                        <td className="px-3 py-2.5">
+                          <div className="flex gap-1">
+                            <button 
+                              onClick={async () => {
+                                try {
+                                  const projectId = project.project_id || project.id;
+                                  await api.downloadDocument(projectId, r.document_id);
+                                } catch (error) {
+                                  alert('Download failed: ' + formatError(error));
+                                }
+                              }}
+                              className="px-2 py-1 text-xs rounded bg-slate-700 hover:bg-slate-600 text-slate-200 transition-colors"
+                            >
+                              Download
+                            </button>
+                            <button 
+                              onClick={async (e) => {
+                                e.stopPropagation();
+                                await loadVersions(r.document_id, r);
+                              }}
+                              className="px-2 py-1 text-xs rounded bg-slate-700 hover:bg-slate-600 text-slate-200 transition-colors"
+                            >
+                              Versions
+                            </button>
+                          </div>
+                        </td>
+                      </tr>
+                    ))
+                  )}
+                </tbody>
+              </table>
             </div>
-            {/* Pagination footer: buttons row, then "Page x of y" below */}
+            {/* Pagination footer */}
             {!loading && filteredDocs.length > 0 && (
-              <div className="flex-shrink-0 flex flex-col items-center justify-center gap-1.5 py-2 border-t border-slate-300 dark:border-slate-700">
-                <div className="flex items-center gap-1">
-                  <Button
-                    variant="secondary"
-                    size="sm"
-                    disabled={clampedPage <= 1}
-                    onClick={() => setCurrentPage(1)}
-                    title="First page"
+              <div className="flex-shrink-0 flex items-center justify-center gap-2 py-2 border-t border-slate-700">
+                <button
+                  disabled={clampedPage <= 1}
+                  onClick={() => setCurrentPage(1)}
+                  title="First page"
+                  className="px-2 py-1 text-xs rounded bg-slate-700 hover:bg-slate-600 text-slate-200 disabled:opacity-40 disabled:cursor-not-allowed"
+                >
+                  «
+                </button>
+                <button
+                  disabled={clampedPage <= 1}
+                  onClick={() => setCurrentPage(p => Math.max(1, p - 1))}
+                  title="Previous page"
+                  className="px-2 py-1 text-xs rounded bg-slate-700 hover:bg-slate-600 text-slate-200 disabled:opacity-40 disabled:cursor-not-allowed"
+                >
+                  ◀
+                </button>
+                {getPageNumbers().map((p) => (
+                  <button
+                    key={p}
+                    onClick={() => setCurrentPage(p)}
+                    className={`px-3 py-1 text-xs rounded transition-colors ${p === clampedPage ? 'bg-sky-600 text-white' : 'bg-slate-700 hover:bg-slate-600 text-slate-200'}`}
                   >
-                    «
-                  </Button>
-                  <Button
-                    variant="secondary"
-                    size="sm"
-                    disabled={clampedPage <= 1}
-                    onClick={() => setCurrentPage(p => Math.max(1, p - 1))}
-                    title="Previous page"
-                  >
-                    ◀
-                  </Button>
-                  {getPageNumbers().map((p) => (
-                    <Button
-                      key={p}
-                      variant={p === clampedPage ? "primary" : "secondary"}
-                      size="sm"
-                      onClick={() => setCurrentPage(p)}
-                    >
-                      {p}
-                    </Button>
-                  ))}
-                  <Button
-                    variant="secondary"
-                    size="sm"
-                    disabled={clampedPage >= totalPages}
-                    onClick={() => setCurrentPage(p => Math.min(totalPages, p + 1))}
-                    title="Next page"
-                  >
-                    ▶
-                  </Button>
-                  <Button
-                    variant="secondary"
-                    size="sm"
-                    disabled={clampedPage >= totalPages}
-                    onClick={() => setCurrentPage(totalPages)}
-                    title="Last page"
-                  >
-                    »
-                  </Button>
-                </div>
-                <span className="text-sm text-slate-600 dark:text-slate-400">
+                    {p}
+                  </button>
+                ))}
+                <button
+                  disabled={clampedPage >= totalPages}
+                  onClick={() => setCurrentPage(p => Math.min(totalPages, p + 1))}
+                  title="Next page"
+                  className="px-2 py-1 text-xs rounded bg-slate-700 hover:bg-slate-600 text-slate-200 disabled:opacity-40 disabled:cursor-not-allowed"
+                >
+                  ▶
+                </button>
+                <button
+                  disabled={clampedPage >= totalPages}
+                  onClick={() => setCurrentPage(totalPages)}
+                  title="Last page"
+                  className="px-2 py-1 text-xs rounded bg-slate-700 hover:bg-slate-600 text-slate-200 disabled:opacity-40 disabled:cursor-not-allowed"
+                >
+                  »
+                </button>
+                <span className="text-xs text-slate-400 ml-3">
                   Page {clampedPage} of {totalPages}
+                </span>
+                <span className="text-xs text-slate-500 ml-2">
+                  ({filteredDocs.length} rows)
                 </span>
               </div>
             )}
           </div>
         )}
-      </Card>
+      </div>
 
       {/* Description popup */}
       {showDescriptionModal && (

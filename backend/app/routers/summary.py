@@ -425,10 +425,54 @@ async def get_summary(
                 native_vlans = [i.get("native_vlan") for i in interfaces if i.get("native_vlan")]
                 native_vlan = native_vlans[0] if native_vlans else None
                 
-                # STP info - updated for new parser structure
-                stp_mode = stp.get("stp_mode") or "-"
-                # New parser doesn't have port_roles, so set to "-"
-                stp_role_summary = "-"
+                # STP info - extract from stp.interfaces
+                stp_mode = stp.get("stp_mode") or stp.get("mode") or "-"
+                stp_interfaces = stp.get("interfaces", [])
+                stp_roles = {}
+                for stp_iface in stp_interfaces:
+                    role = stp_iface.get("role")
+                    if role:
+                        stp_roles[role] = stp_roles.get(role, 0) + 1
+                
+                if stp_roles:
+                    root_bridges = stp.get("root_bridges", [])
+                    if root_bridges and len(root_bridges) > 0:
+                        stp_role_summary = "Root"
+                    elif "Root" in stp_roles:
+                        stp_role_summary = f"R:{stp_roles.get('Root', 0)}/D:{stp_roles.get('Designated', 0)}"
+                    elif "Designated" in stp_roles:
+                        stp_role_summary = f"D:{stp_roles.get('Designated', 0)}"
+                    else:
+                        stp_role_summary = ", ".join([f"{k}:{v}" for k, v in list(stp_roles.items())[:2]])
+                else:
+                    stp_role_summary = "-"
+                
+                # Get trunk allowed VLANs summary - collect all unique VLANs from trunk ports
+                all_trunk_vlans = set()
+                has_all_vlans = False
+                for iface in interfaces:
+                    if iface.get("port_mode") == "trunk":
+                        allowed = iface.get("allowed_vlans")
+                        if allowed:
+                            allowed_str = str(allowed).strip()
+                            if allowed_str.upper() == "ALL" or allowed_str in ["1-4094", "1-4095"]:
+                                has_all_vlans = True
+                            else:
+                                parts = allowed_str.replace(",", " ").split()
+                                for part in parts:
+                                    part = part.strip()
+                                    if part.isdigit():
+                                        all_trunk_vlans.add(int(part))
+                
+                if has_all_vlans:
+                    trunk_allowed_summary = "ALL"
+                elif all_trunk_vlans:
+                    sorted_vlans = sorted(all_trunk_vlans)
+                    trunk_allowed_summary = " ".join(str(v) for v in sorted_vlans)
+                    if len(trunk_allowed_summary) > 20:
+                        trunk_allowed_summary = trunk_allowed_summary[:17] + "..."
+                else:
+                    trunk_allowed_summary = "-"
                 
                 # OSPF neighbors - updated for new parser structure
                 ospf = routing.get("ospf")
@@ -480,7 +524,7 @@ async def get_summary(
                     "unused": unused_ports,
                     "vlans": vlan_count,
                     "native_vlan": native_vlan or "-",
-                    "trunk_allowed": "-",  # Can be calculated from interfaces if needed
+                    "trunk_allowed": trunk_allowed_summary,
                     "stp": stp_mode,
                     "stp_role": stp_role_summary,
                     "ospf_neigh": ospf_neighbors,
@@ -533,10 +577,54 @@ async def get_summary(
                 native_vlans = [i.get("native_vlan") for i in interfaces if i.get("native_vlan")]
                 native_vlan = native_vlans[0] if native_vlans else None
                 
-                # STP info - updated for new parser structure
-                stp_mode = stp.get("stp_mode") or "-"
-                # New parser doesn't have port_roles, so set to "-"
-                stp_role_summary = "-"
+                # STP info - extract from stp.interfaces
+                stp_mode = stp.get("stp_mode") or stp.get("mode") or "-"
+                stp_interfaces = stp.get("interfaces", [])
+                stp_roles = {}
+                for stp_iface in stp_interfaces:
+                    role = stp_iface.get("role")
+                    if role:
+                        stp_roles[role] = stp_roles.get(role, 0) + 1
+                
+                if stp_roles:
+                    root_bridges = stp.get("root_bridges", [])
+                    if root_bridges and len(root_bridges) > 0:
+                        stp_role_summary = "Root"
+                    elif "Root" in stp_roles:
+                        stp_role_summary = f"R:{stp_roles.get('Root', 0)}/D:{stp_roles.get('Designated', 0)}"
+                    elif "Designated" in stp_roles:
+                        stp_role_summary = f"D:{stp_roles.get('Designated', 0)}"
+                    else:
+                        stp_role_summary = ", ".join([f"{k}:{v}" for k, v in list(stp_roles.items())[:2]])
+                else:
+                    stp_role_summary = "-"
+                
+                # Get trunk allowed VLANs summary - collect all unique VLANs from trunk ports
+                all_trunk_vlans = set()
+                has_all_vlans = False
+                for iface in interfaces:
+                    if iface.get("port_mode") == "trunk":
+                        allowed = iface.get("allowed_vlans")
+                        if allowed:
+                            allowed_str = str(allowed).strip()
+                            if allowed_str.upper() == "ALL" or allowed_str in ["1-4094", "1-4095"]:
+                                has_all_vlans = True
+                            else:
+                                parts = allowed_str.replace(",", " ").split()
+                                for part in parts:
+                                    part = part.strip()
+                                    if part.isdigit():
+                                        all_trunk_vlans.add(int(part))
+                
+                if has_all_vlans:
+                    trunk_allowed_summary = "ALL"
+                elif all_trunk_vlans:
+                    sorted_vlans = sorted(all_trunk_vlans)
+                    trunk_allowed_summary = " ".join(str(v) for v in sorted_vlans)
+                    if len(trunk_allowed_summary) > 20:
+                        trunk_allowed_summary = trunk_allowed_summary[:17] + "..."
+                else:
+                    trunk_allowed_summary = "-"
                 
                 # OSPF neighbors - updated for new parser structure
                 ospf = routing.get("ospf")
@@ -588,7 +676,7 @@ async def get_summary(
                     "unused": unused_ports,
                     "vlans": vlan_count,
                     "native_vlan": native_vlan or "-",
-                    "trunk_allowed": "-",  # Can be calculated from interfaces if needed
+                    "trunk_allowed": trunk_allowed_summary,
                     "stp": stp_mode,
                     "stp_role": stp_role_summary,
                     "ospf_neigh": ospf_neighbors,
