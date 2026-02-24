@@ -363,6 +363,48 @@ export default function App() {
   // Toast notification system
   const { toasts, success, error, warning, info, removeToast } = useToast();
 
+  // Global confirmation modal state
+  const [confirmModal, setConfirmModal] = useState({
+    show: false,
+    title: "",
+    message: "",
+    confirmText: "Confirm",
+    cancelText: "Cancel",
+    variant: "default",
+    loading: false,
+    onConfirm: null,
+  });
+
+  const showConfirmModal = ({ title, message, confirmText = "Confirm", cancelText = "Cancel", variant = "default", onConfirm }) => {
+    setConfirmModal({
+      show: true,
+      title,
+      message,
+      confirmText,
+      cancelText,
+      variant,
+      loading: false,
+      onConfirm,
+    });
+  };
+
+  const closeConfirmModal = () => {
+    if (!confirmModal.loading) {
+      setConfirmModal(prev => ({ ...prev, show: false, onConfirm: null }));
+    }
+  };
+
+  const handleConfirmModalConfirm = async () => {
+    if (confirmModal.onConfirm) {
+      setConfirmModal(prev => ({ ...prev, loading: true }));
+      try {
+        await confirmModal.onConfirm();
+      } finally {
+        setConfirmModal(prev => ({ ...prev, show: false, loading: false, onConfirm: null }));
+      }
+    }
+  };
+
   // When on project page, verify access (Shared projects: everyone sees in list but only members can open)
   useEffect(() => {
     if (route.name !== "project" || !route.projectId) {
@@ -562,6 +604,17 @@ export default function App() {
     return (
       <>
         <ToastContainer toasts={toasts} onClose={removeToast} />
+        <ConfirmationModal
+          show={confirmModal.show}
+          onClose={closeConfirmModal}
+          onConfirm={handleConfirmModalConfirm}
+          title={confirmModal.title}
+          message={confirmModal.message}
+          confirmText={confirmModal.confirmText}
+          cancelText={confirmModal.cancelText}
+          variant={confirmModal.variant}
+          loading={confirmModal.loading}
+        />
         <MainLayout
           topBar={
           <div className="h-full flex items-center justify-between gap-2 px-3 sm:px-4 border-b border-slate-300 dark:border-slate-800">
@@ -1009,6 +1062,7 @@ const ProjectView = ({
               uploadHistory={uploadHistory}
               setUploadHistory={setUploadHistory}
               setProjects={setProjects}
+              showConfirmModal={showConfirmModal}
             />
           </div>
         )}
@@ -1028,6 +1082,7 @@ const ProjectView = ({
               can={can}
               authedUser={authedUser}
               toast={toast}
+              showConfirmModal={showConfirmModal}
             />
           </div>
         )}
@@ -2673,7 +2728,7 @@ const SummaryPage = ({ project, projectId: projectIdProp, routeToHash, handleNav
 
 
 /* ========= DEVICE DETAILS PAGE (with header navigation) ========= */
-const DeviceDetailsPage = ({ project, deviceId, goBack, goIndex, goBackHref, goIndexHref, can, loadProjects, uploadHistory, authedUser, setProjects, llmBusy, llmBusyMessage, requestRun, onComplete }) => {
+const DeviceDetailsPage = ({ project, deviceId, goBack, goIndex, goBackHref, goIndexHref, can, loadProjects, uploadHistory, authedUser, setProjects, llmBusy, llmBusyMessage, requestRun, onComplete, showConfirmModal }) => {
   if (!project) {
     return <div className="text-sm text-rose-400">Project not found</div>;
   }
@@ -2703,7 +2758,7 @@ const DeviceDetailsPage = ({ project, deviceId, goBack, goIndex, goBackHref, goI
 
 /* ========= DEVICE DETAILS (Overview / Interfaces / VLANs / Raw) ========= */
 /* ========= DEVICE DETAILS (Overview / Interfaces / VLANs / Raw) ========= */
-const DeviceDetailsView = ({ project, deviceId, goBack, goBackHref, goIndex, goIndexHref, can: canProp, loadProjects, uploadHistory, authedUser, setProjects, llmBusy: globalLlmBusy, llmBusyMessage, requestRun, onComplete }) => {
+const DeviceDetailsView = ({ project, deviceId, goBack, goBackHref, goIndex, goIndexHref, can: canProp, loadProjects, uploadHistory, authedUser, setProjects, llmBusy: globalLlmBusy, llmBusyMessage, requestRun, onComplete, showConfirmModal }) => {
   console.log('[DeviceDetailsView] Rendering with props:', { project, deviceId, hasGoBack: !!goBack });
   const [showDeleteDeviceModal, setShowDeleteDeviceModal] = React.useState(false);
   const [deleteConfirmText, setDeleteConfirmText] = React.useState("");
@@ -3686,6 +3741,7 @@ const DeviceDetailsView = ({ project, deviceId, goBack, goBackHref, goIndex, goI
                     authedUser={authedUser}
                     setProjects={setProjects}
                     can={can}
+                    showConfirmModal={showConfirmModal}
                   />
                 </div>
               </Card>
@@ -6269,12 +6325,83 @@ const PerformanceMetricsView = ({ metrics }) => {
 /* ========= HISTORY PAGE ========= */
 const ROWS_PER_PAGE = 10;
 
+// Filter dropdown component for History table headers
+const HistoryFilterDropdown = ({ uniqueValues, filterValue, onFilterChange, onClose, position = "left" }) => {
+  const dropdownRef = useRef(null);
+  const [searchTerm, setSearchTerm] = useState("");
+
+  const filteredValues = useMemo(() => {
+    if (!searchTerm) return uniqueValues;
+    const term = searchTerm.toLowerCase();
+    return uniqueValues.filter(v => v.toLowerCase().includes(term));
+  }, [uniqueValues, searchTerm]);
+
+  useEffect(() => {
+    const handleClickOutside = (e) => {
+      if (dropdownRef.current && !dropdownRef.current.contains(e.target)) {
+        onClose();
+      }
+    };
+    document.addEventListener("mousedown", handleClickOutside);
+    return () => document.removeEventListener("mousedown", handleClickOutside);
+  }, [onClose]);
+
+  const positionClass = position === "right" ? "right-0" : "left-0";
+
+  return (
+    <div 
+      ref={dropdownRef}
+      className={`absolute top-full ${positionClass} mt-1 z-50 bg-slate-900 border border-slate-700 rounded-lg shadow-xl min-w-[200px] max-w-[280px]`}
+      onClick={(e) => e.stopPropagation()}
+    >
+      {/* Search input */}
+      <div className="p-2 border-b border-slate-700">
+        <div className="relative">
+          <svg className="absolute left-2 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-slate-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
+          </svg>
+          <input
+            type="text"
+            placeholder="Search..."
+            value={searchTerm}
+            onChange={(e) => setSearchTerm(e.target.value)}
+            className="w-full pl-7 pr-2 py-1.5 text-xs rounded bg-slate-800 border border-slate-600 text-slate-200 placeholder-slate-500 focus:outline-none focus:ring-1 focus:ring-sky-500 focus:border-sky-500"
+            autoFocus
+          />
+        </div>
+      </div>
+      
+      {/* Options list */}
+      <div className="max-h-[200px] overflow-y-auto">
+        <button
+          onClick={() => { onFilterChange(null); onClose(); }}
+          className={`w-full px-3 py-2 text-left text-xs hover:bg-slate-800 flex items-center gap-2 transition-colors ${!filterValue ? 'text-sky-400 bg-slate-800/50' : 'text-slate-300'}`}
+        >
+          <span className="w-4 flex justify-center">{!filterValue && "✓"}</span>
+          <span>All</span>
+        </button>
+        {filteredValues.map((val, i) => (
+          <button
+            key={i}
+            onClick={() => { onFilterChange(val); onClose(); }}
+            className={`w-full px-3 py-2 text-left text-xs hover:bg-slate-800 flex items-center gap-2 truncate transition-colors ${filterValue === val ? 'text-sky-400 bg-slate-800/50' : 'text-slate-300'}`}
+          >
+            <span className="w-4 flex justify-center">{filterValue === val && "✓"}</span>
+            <span className="truncate">{val}</span>
+          </button>
+        ))}
+        {filteredValues.length === 0 && (
+          <div className="px-3 py-3 text-xs text-slate-500 text-center">No matches</div>
+        )}
+      </div>
+    </div>
+  );
+};
+
 const HistoryPage = ({ project, can, authedUser }) => {
   const [documents, setDocuments] = useState([]);
   const [loading, setLoading] = useState(true);
   const [searchDoc, setSearchDoc] = useState("");
-  const [filterWho, setFilterWho] = useState("all");
-  const [filterWhat, setFilterWhat] = useState("all");
   const [versions, setVersions] = useState([]);
   const [showVersions, setShowVersions] = useState(false);
   const [versionDocument, setVersionDocument] = useState(null);
@@ -6282,6 +6409,13 @@ const HistoryPage = ({ project, can, authedUser }) => {
   const [descriptionContent, setDescriptionContent] = useState({ text: "", filename: "" });
   const [currentPage, setCurrentPage] = useState(1);
   const isOpeningVersions = useRef(false);
+  
+  // Column filters state
+  const [columnFilters, setColumnFilters] = useState({});
+  const [openFilterColumn, setOpenFilterColumn] = useState(null);
+  
+  // Sort state
+  const [sortConfig, setSortConfig] = useState({ key: 'time', direction: 'desc' });
 
   // Load documents from API
   useEffect(() => {
@@ -6361,22 +6495,82 @@ const HistoryPage = ({ project, can, authedUser }) => {
 
   // Show ALL files (including config files) - no filtering
   const allFiles = documents;
-  const uniqueWhos = [...new Set(allFiles.map(d => d.metadata?.who || d.uploader))];
-  const uniqueWhats = [...new Set(allFiles.map(d => d.metadata?.what || "—"))];
 
-  const filteredDocs = allFiles.filter(doc => {
-    const matchSearch = !searchDoc.trim() || 
-      [doc.filename, 
-       doc.metadata?.who || doc.uploader,
-       doc.metadata?.what || "—",
-       doc.metadata?.where || "—",
-       doc.metadata?.description || "—"].some(v => 
-        v.toLowerCase().includes(searchDoc.toLowerCase())
-      );
-    const matchWho = filterWho === "all" || (doc.metadata?.who || doc.uploader) === filterWho;
-    const matchWhat = filterWhat === "all" || (doc.metadata?.what || "—") === filterWhat;
-    return matchSearch && matchWho && matchWhat;
-  });
+  // Define columns for filtering and sorting
+  const historyColumns = [
+    { key: 'time', header: 'Time', getValue: (d) => formatDateTime(d.created_at), getSortValue: (d) => new Date(d.created_at).getTime() },
+    { key: 'name', header: 'Name', getValue: (d) => d.filename, getSortValue: (d) => (d.filename || "").toLowerCase() },
+    { key: 'who', header: 'Responsible User', getValue: (d) => d.metadata?.who || d.uploader, getSortValue: (d) => (d.metadata?.who || d.uploader || "").toLowerCase() },
+    { key: 'what', header: 'Activity Type', getValue: (d) => d.metadata?.what || "—", getSortValue: (d) => (d.metadata?.what || "").toLowerCase() },
+    { key: 'where', header: 'Site', getValue: (d) => d.metadata?.where || "—", getSortValue: (d) => (d.metadata?.where || "").toLowerCase() },
+    { key: 'when', header: 'Op. Timing', getValue: (d) => d.metadata?.when || "—", getSortValue: (d) => (d.metadata?.when || "").toLowerCase() },
+    { key: 'why', header: 'Purpose', getValue: (d) => d.metadata?.why || "—", getSortValue: (d) => (d.metadata?.why || "").toLowerCase() },
+    { key: 'version', header: 'Version', getValue: (d) => `v${d.version}${d.is_latest ? ' (Latest)' : ''}`, getSortValue: (d) => d.version || 0 },
+  ];
+  
+  // Handle sort
+  const handleSort = (key) => {
+    setSortConfig(prev => ({
+      key,
+      direction: prev.key === key && prev.direction === 'asc' ? 'desc' : 'asc'
+    }));
+  };
+
+  // Get unique values for each filterable column
+  const getUniqueValues = (key) => {
+    const col = historyColumns.find(c => c.key === key);
+    if (!col) return [];
+    const values = new Set();
+    allFiles.forEach(doc => {
+      const val = col.getValue(doc);
+      if (val != null && val !== "" && val !== "—") {
+        values.add(String(val));
+      }
+    });
+    return Array.from(values).sort((a, b) => a.localeCompare(b, undefined, { numeric: true }));
+  };
+
+  const filteredDocs = useMemo(() => {
+    // First filter
+    let result = allFiles.filter(doc => {
+      // Global search filter
+      const matchSearch = !searchDoc.trim() || 
+        [doc.filename, 
+         doc.metadata?.who || doc.uploader,
+         doc.metadata?.what || "—",
+         doc.metadata?.where || "—",
+         doc.metadata?.description || "—"].some(v => 
+          v.toLowerCase().includes(searchDoc.toLowerCase())
+        );
+      
+      // Column filters
+      const matchColumnFilters = Object.entries(columnFilters).every(([key, filterValue]) => {
+        if (!filterValue) return true;
+        const col = historyColumns.find(c => c.key === key);
+        if (!col) return true;
+        return String(col.getValue(doc)) === filterValue;
+      });
+      
+      return matchSearch && matchColumnFilters;
+    });
+    
+    // Then sort
+    if (sortConfig.key) {
+      const col = historyColumns.find(c => c.key === sortConfig.key);
+      if (col && col.getSortValue) {
+        result = [...result].sort((a, b) => {
+          const aVal = col.getSortValue(a);
+          const bVal = col.getSortValue(b);
+          
+          if (aVal < bVal) return sortConfig.direction === 'asc' ? -1 : 1;
+          if (aVal > bVal) return sortConfig.direction === 'asc' ? 1 : -1;
+          return 0;
+        });
+      }
+    }
+    
+    return result;
+  }, [allFiles, searchDoc, columnFilters, sortConfig]);
 
   const totalPages = Math.max(1, Math.ceil(filteredDocs.length / ROWS_PER_PAGE));
   const clampedPage = Math.min(Math.max(1, currentPage), totalPages);
@@ -6423,6 +6617,44 @@ const HistoryPage = ({ project, can, authedUser }) => {
           </svg>
         </div>
       </div>
+      
+      {/* Active filters bar */}
+      {Object.keys(columnFilters).length > 0 && (
+        <div className="flex-shrink-0 flex items-center gap-2 px-1 py-1.5 mb-2 bg-slate-800/30 rounded-lg border border-slate-700/50">
+          <span className="text-xs text-slate-400 ml-1">Filters:</span>
+          {Object.entries(columnFilters).map(([key, value]) => {
+            const col = historyColumns.find(c => c.key === key);
+            return (
+              <span 
+                key={key} 
+                className="inline-flex items-center gap-1 px-2 py-0.5 text-xs bg-sky-800/50 text-sky-300 rounded-full"
+              >
+                <span className="font-medium">{col?.header || key}:</span>
+                <span className="max-w-[100px] truncate">{value}</span>
+                <button 
+                  onClick={() => setColumnFilters(prev => {
+                    const next = { ...prev };
+                    delete next[key];
+                    return next;
+                  })}
+                  className="ml-0.5 hover:text-sky-100"
+                >
+                  <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                  </svg>
+                </button>
+              </span>
+            );
+          })}
+          <button 
+            onClick={() => setColumnFilters({})}
+            className="ml-auto text-xs text-sky-400 hover:text-sky-200 font-medium mr-1"
+          >
+            Clear all
+          </button>
+        </div>
+      )}
+      
       <div className="flex-1 min-h-0 flex flex-col overflow-hidden rounded-xl border border-slate-700 bg-slate-900/50">
         {loading ? (
           <div className="flex-1 flex items-center justify-center text-gray-500 dark:text-gray-400">
@@ -6434,17 +6666,74 @@ const HistoryPage = ({ project, can, authedUser }) => {
           <div className="flex-1 min-h-0 flex flex-col overflow-hidden">
             <div className="flex-1 min-h-0 overflow-hidden">
               <table className="w-full text-xs">
-                <thead className="bg-slate-800/80 sticky top-0">
+                <thead className="bg-slate-800/80 sticky top-0 z-20">
                   <tr>
                     <th className="text-center px-2 py-2.5 font-medium text-slate-300 w-10">#</th>
-                    <th className="text-left px-3 py-2.5 font-medium text-slate-300 whitespace-nowrap">Time</th>
-                    <th className="text-left px-3 py-2.5 font-medium text-slate-300">Name</th>
-                    <th className="text-left px-3 py-2.5 font-medium text-slate-300 whitespace-nowrap">Responsible User</th>
-                    <th className="text-left px-3 py-2.5 font-medium text-slate-300 whitespace-nowrap">Activity Type</th>
-                    <th className="text-left px-3 py-2.5 font-medium text-slate-300">Site</th>
-                    <th className="text-left px-3 py-2.5 font-medium text-slate-300 whitespace-nowrap">Op. Timing</th>
-                    <th className="text-left px-3 py-2.5 font-medium text-slate-300">Purpose</th>
-                    <th className="text-left px-3 py-2.5 font-medium text-slate-300">Version</th>
+                    {historyColumns.map((col, colIdx) => {
+                      const hasFilter = columnFilters[col.key] != null;
+                      const isOpen = openFilterColumn === col.key;
+                      const uniqueVals = getUniqueValues(col.key);
+                      const isLastColumn = colIdx === historyColumns.length - 1;
+                      const isSorted = sortConfig.key === col.key;
+                      const sortDirection = isSorted ? sortConfig.direction : null;
+                      
+                      return (
+                        <th key={col.key} className="text-left px-3 py-2.5 font-medium text-slate-300 whitespace-nowrap relative group">
+                          <div className="flex items-center gap-1">
+                            {/* Clickable header for sorting */}
+                            <button
+                              onClick={() => handleSort(col.key)}
+                              className="flex items-center gap-0.5 hover:text-slate-100 transition-colors cursor-pointer"
+                            >
+                              <span>{col.header}</span>
+                              {/* Sort icon */}
+                              <span className="ml-0.5 inline-flex flex-col text-[8px] leading-none opacity-60">
+                                <span className={sortDirection === 'asc' ? 'text-sky-400' : ''}>▲</span>
+                                <span className={sortDirection === 'desc' ? 'text-sky-400' : ''}>▼</span>
+                              </span>
+                            </button>
+                            
+                            {/* Filter dropdown trigger */}
+                            {uniqueVals.length > 0 && (
+                              <button
+                                onClick={(e) => { e.stopPropagation(); setOpenFilterColumn(isOpen ? null : col.key); }}
+                                className={`p-0.5 rounded transition-all ${
+                                  hasFilter 
+                                    ? 'text-sky-400 bg-sky-900/30' 
+                                    : 'text-slate-500 opacity-0 group-hover:opacity-100 hover:text-slate-300 hover:bg-slate-700'
+                                }`}
+                                title="Filter"
+                              >
+                                <svg className={`w-3.5 h-3.5 transition-transform ${isOpen ? 'rotate-180' : ''}`} fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+                                </svg>
+                              </button>
+                            )}
+                          </div>
+                          
+                          {/* Filter dropdown */}
+                          {isOpen && uniqueVals.length > 0 && (
+                            <HistoryFilterDropdown
+                              uniqueValues={uniqueVals}
+                              filterValue={columnFilters[col.key]}
+                              onFilterChange={(val) => {
+                                setColumnFilters(prev => {
+                                  const next = { ...prev };
+                                  if (val === null) {
+                                    delete next[col.key];
+                                  } else {
+                                    next[col.key] = val;
+                                  }
+                                  return next;
+                                });
+                              }}
+                              onClose={() => setOpenFilterColumn(null)}
+                              position={isLastColumn ? "right" : "left"}
+                            />
+                          )}
+                        </th>
+                      );
+                    })}
                     <th className="text-left px-3 py-2.5 font-medium text-slate-300">Desc.</th>
                     <th className="text-left px-3 py-2.5 font-medium text-slate-300">Actions</th>
                   </tr>
@@ -6672,7 +6961,7 @@ const HistoryPage = ({ project, can, authedUser }) => {
 };
 
 /* ========= SCRIPT GENERATOR PAGE ========= */
-const ScriptGeneratorPage = ({ project, can, authedUser, toast }) => {
+const ScriptGeneratorPage = ({ project, can, authedUser, toast, showConfirmModal }) => {
   const projectId = project?.project_id || project?.id;
   const [deviceInventory, setDeviceInventory] = React.useState([]);
   const [ciscoCommands, setCiscoCommands] = React.useState("");
@@ -6781,11 +7070,18 @@ const ScriptGeneratorPage = ({ project, can, authedUser, toast }) => {
   };
 
   const handleDeleteDevice = (index) => {
-    if (confirm("Delete this device?")) {
-      const next = deviceInventory.filter((_, i) => i !== index);
-      setDeviceInventory(next);
-      persistDeviceInventory(next);
-    }
+    const device = deviceInventory[index];
+    showConfirmModal({
+      title: "Delete Device",
+      message: `Are you sure you want to delete device "${device?.hostname || device?.ip || 'this device'}"?`,
+      confirmText: "Delete",
+      variant: "danger",
+      onConfirm: () => {
+        const next = deviceInventory.filter((_, i) => i !== index);
+        setDeviceInventory(next);
+        persistDeviceInventory(next);
+      }
+    });
   };
 
   const handleSaveDevice = () => {
@@ -7548,7 +7844,7 @@ const ScriptGeneratorPage = ({ project, can, authedUser, toast }) => {
   );
 };
 
-const DocumentsPage = ({ project, can, authedUser, uploadHistory, setUploadHistory, setProjects }) => {
+const DocumentsPage = ({ project, can, authedUser, uploadHistory, setUploadHistory, setProjects, showConfirmModal }) => {
   const [selectedFile, setSelectedFile] = useState(null);
   const [selectedDocument, setSelectedDocument] = useState(null); // Document from API
   const [selectedFolder, setSelectedFolder] = useState(null);
@@ -8178,25 +8474,30 @@ const DocumentsPage = ({ project, can, authedUser, uploadHistory, setUploadHisto
     }
     const found = findFolder(tree, folderId);
     if (found) {
-      if (confirm(`Delete folder "${found.node.name}" and all files inside?`)) {
-        try {
-          const projectId = project.project_id || project.id;
-          await api.deleteFolder(projectId, folderId);
-          // Reload folders from API
-          const folders = await api.getFolders(projectId);
-          const transformedFolders = folders.map(f => ({
-            id: f.id,
-            name: f.name,
-            parentId: f.parent_id || null,
-            deleted: f.deleted || false
-          }));
-          setCustomFolders(transformedFolders);
-          alert("Folder deleted successfully.");
-        } catch (error) {
-          console.error('Failed to delete folder:', error);
-          alert(`Failed to delete folder: ${formatError(error)}`);
+      showConfirmModal({
+        title: "Delete Folder",
+        message: `Are you sure you want to delete folder "${found.node.name}" and all files inside?`,
+        confirmText: "Delete",
+        variant: "danger",
+        onConfirm: async () => {
+          try {
+            const projectId = project.project_id || project.id;
+            await api.deleteFolder(projectId, folderId);
+            // Reload folders from API
+            const folders = await api.getFolders(projectId);
+            const transformedFolders = folders.map(f => ({
+              id: f.id,
+              name: f.name,
+              parentId: f.parent_id || null,
+              deleted: f.deleted || false
+            }));
+            setCustomFolders(transformedFolders);
+          } catch (error) {
+            console.error('Failed to delete folder:', error);
+            alert(`Failed to delete folder: ${formatError(error)}`);
+          }
         }
-      }
+      });
     }
   };
 
@@ -8449,22 +8750,28 @@ const DocumentsPage = ({ project, can, authedUser, uploadHistory, setUploadHisto
             {doc.folder_id !== "Config" && can("project-setting", project) && (
               <Button
                 variant="danger"
-                onClick={async (e) => {
+                onClick={(e) => {
                   e.stopPropagation();
-                  if (confirm(`Are you sure you want to delete "${doc.filename || selectedFile?.name}"?`)) {
-                    try {
-                      const projectId = project.project_id || project.id;
-                      await api.deleteDocument(projectId, doc.document_id);
-                      alert("Document deleted successfully");
-                      const docs = await api.getDocuments(projectId);
-                      setDocuments(Array.isArray(docs) ? docs : []);
-                      setSelectedFile(null);
-                      setSelectedDocument(null);
-                      setPreviewContent(null);
-                    } catch (error) {
-                      alert("Failed to delete document: " + formatError(error));
+                  const filename = doc.filename || selectedFile?.name;
+                  showConfirmModal({
+                    title: "Delete Document",
+                    message: `Are you sure you want to delete "${filename}"?`,
+                    confirmText: "Delete",
+                    variant: "danger",
+                    onConfirm: async () => {
+                      try {
+                        const projectId = project.project_id || project.id;
+                        await api.deleteDocument(projectId, doc.document_id);
+                        const docs = await api.getDocuments(projectId);
+                        setDocuments(Array.isArray(docs) ? docs : []);
+                        setSelectedFile(null);
+                        setSelectedDocument(null);
+                        setPreviewContent(null);
+                      } catch (error) {
+                        alert("Failed to delete document: " + formatError(error));
+                      }
                     }
-                  }
+                  });
                 }}
               >
                 🗑️ Delete
@@ -9797,7 +10104,7 @@ const TopoGraph = ({ nodes = [], links = [], getNodeTooltip, onNodeClick }) => {
 
 
 /* ===== Device Image Upload Component ===== */
-const DeviceImageUpload = ({ project, deviceName, authedUser, setProjects, can: canProp }) => {
+const DeviceImageUpload = ({ project, deviceName, authedUser, setProjects, can: canProp, showConfirmModal }) => {
   const [imageUrl, setImageUrl] = React.useState(null);
   const [uploading, setUploading] = React.useState(false);
   const [error, setError] = React.useState(null);
@@ -9908,33 +10215,39 @@ const DeviceImageUpload = ({ project, deviceName, authedUser, setProjects, can: 
     }
   };
   
-  const handleDelete = async () => {
-    if (!confirm("Delete device image?")) return;
-    
-    try {
-      const projectId = project?.project_id || project?.id;
-      await api.deleteDeviceImage(projectId, deviceName);
-      setImageUrl(null);
-      
-      // Update project state to remove device image
-      if (setProjects) {
-        setProjects(prev => prev.map(p => {
-          const pId = p.project_id || p.id;
-          if (pId === projectId) {
-            const deviceImages = { ...(p.device_images || {}) };
-            delete deviceImages[deviceName];
-            return {
-              ...p,
-              device_images: deviceImages
-            };
+  const handleDelete = () => {
+    showConfirmModal({
+      title: "Delete Device Image",
+      message: `Are you sure you want to delete the image for "${deviceName}"?`,
+      confirmText: "Delete",
+      variant: "danger",
+      onConfirm: async () => {
+        try {
+          const projectId = project?.project_id || project?.id;
+          await api.deleteDeviceImage(projectId, deviceName);
+          setImageUrl(null);
+          
+          // Update project state to remove device image
+          if (setProjects) {
+            setProjects(prev => prev.map(p => {
+              const pId = p.project_id || p.id;
+              if (pId === projectId) {
+                const deviceImages = { ...(p.device_images || {}) };
+                delete deviceImages[deviceName];
+                return {
+                  ...p,
+                  device_images: deviceImages
+                };
+              }
+              return p;
+            }));
           }
-          return p;
-        }));
+        } catch (err) {
+          console.error("Delete failed:", err);
+          setError(formatError(err) || "Failed to delete image");
+        }
       }
-    } catch (err) {
-      console.error("Delete failed:", err);
-      setError(formatError(err) || "Failed to delete image");
-    }
+    });
   };
   
   return (

@@ -19,24 +19,39 @@ export function useHashRoute(getToken, authedUser) {
   const [route, setRoute] = useState(() => getInitialRoute(getToken));
 
   // Sync route -> URL hash; use pushState so browser back/forward works
+  // Exception: changePassword uses replaceState to prevent back/forward navigation to it
   useEffect(() => {
     const want = routeToHash(route);
     const cur = (window.location.hash || "#/").replace(/^#\/?/, "") || "";
     const wantNorm = want.replace(/^#\/?/, "") || "";
     if (wantNorm !== cur) {
-      window.history.pushState(null, "", want);
+      // Use replaceState for changePassword to prevent it from appearing in browser history
+      if (route.name === "changePassword") {
+        window.history.replaceState(null, "", want);
+      } else {
+        window.history.pushState(null, "", want);
+      }
     }
   }, [route.name, route.projectId, route.tab, route.device, route.username, route.fromIndex]);
 
   // Browser back/forward: update route from hash
+  // Block navigation to changePassword via back/forward - redirect to index instead
   useEffect(() => {
-    const onHashChange = () => setRoute(parseHash(window.location.hash));
-    const onPopState = () => setRoute(parseHash(window.location.hash));
-    window.addEventListener("hashchange", onHashChange);
-    window.addEventListener("popstate", onPopState);
+    const handleHistoryNav = () => {
+      const parsed = parseHash(window.location.hash);
+      // If user tries to navigate to changePassword via back/forward, redirect to index
+      if (parsed.name === "changePassword") {
+        window.history.replaceState(null, "", "#/");
+        setRoute({ name: "index" });
+      } else {
+        setRoute(parsed);
+      }
+    };
+    window.addEventListener("hashchange", handleHistoryNav);
+    window.addEventListener("popstate", handleHistoryNav);
     return () => {
-      window.removeEventListener("hashchange", onHashChange);
-      window.removeEventListener("popstate", onPopState);
+      window.removeEventListener("hashchange", handleHistoryNav);
+      window.removeEventListener("popstate", handleHistoryNav);
     };
   }, []);
 
