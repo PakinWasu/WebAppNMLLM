@@ -1,76 +1,7 @@
 import React, { useState, useEffect } from "react";
 import * as api from "../api";
-import { Card, Field, Input, PasswordInput, Button, Table } from "../components/ui";
+import { Card, Field, Input, PasswordInput, Button, Table, ConfirmationModal } from "../components/ui";
 import { formatError, formatDateTime, safeDisplay } from "../utils/format";
-
-function DeleteUserButton({ username, onDelete }) {
-  const [showConfirm, setShowConfirm] = useState(false);
-  const [confirmText, setConfirmText] = useState("");
-  const [deleting, setDeleting] = useState(false);
-
-  const handleDelete = async () => {
-    if (confirmText.toLowerCase() !== "delete") {
-      alert('Please type "delete" to confirm');
-      return;
-    }
-    setDeleting(true);
-    try {
-      await onDelete();
-      setShowConfirm(false);
-      setConfirmText("");
-    } catch (e) {
-      // Error handled in onDelete
-    } finally {
-      setDeleting(false);
-    }
-  };
-
-  if (!showConfirm) {
-    return (
-      <Button variant="danger" onClick={() => setShowConfirm(true)} className="text-sm">
-        Delete
-      </Button>
-    );
-  }
-  return (
-    <div className="flex items-center gap-2">
-      <Input
-        value={confirmText}
-        onChange={(e) => setConfirmText(e.target.value)}
-        placeholder='Type "delete"'
-        className="w-32 text-sm"
-        disabled={deleting}
-        onKeyDown={(e) => {
-          if (e.key === "Enter" && confirmText.toLowerCase() === "delete") {
-            handleDelete();
-          } else if (e.key === "Escape") {
-            setShowConfirm(false);
-            setConfirmText("");
-          }
-        }}
-      />
-      <Button
-        variant="danger"
-        onClick={handleDelete}
-        disabled={confirmText.toLowerCase() !== "delete" || deleting}
-        className="text-sm"
-      >
-        {deleting ? "Deleting..." : "Confirm"}
-      </Button>
-      <Button
-        variant="secondary"
-        onClick={() => {
-          setShowConfirm(false);
-          setConfirmText("");
-        }}
-        disabled={deleting}
-        className="text-sm"
-      >
-        Cancel
-      </Button>
-    </div>
-  );
-}
 
 export default function UserAdminPage({
   indexHref = "#/",
@@ -85,6 +16,10 @@ export default function UserAdminPage({
   const [tempPwd, setTempPwd] = useState("");
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
+  
+  // Delete user confirmation modal state
+  const [deleteModal, setDeleteModal] = useState({ show: false, username: null });
+  const [deleting, setDeleting] = useState(false);
 
   useEffect(() => {
     const loadUsers = async () => {
@@ -256,19 +191,13 @@ export default function UserAdminPage({
               key: "actions",
               cell: (row) =>
                 row.username !== "admin" ? (
-                  <DeleteUserButton
-                    username={row.username}
-                    onDelete={async () => {
-                      try {
-                        await api.deleteUser(row.username);
-                        const updated = await api.getUsers();
-                        setUsers(updated);
-                        alert(`User "${row.username}" deleted successfully`);
-                      } catch (e) {
-                        alert("Failed to delete user: " + formatError(e));
-                      }
-                    }}
-                  />
+                  <Button 
+                    variant="danger" 
+                    onClick={() => setDeleteModal({ show: true, username: row.username })}
+                    className="text-sm"
+                  >
+                    Delete
+                  </Button>
                 ) : (
                   <span className="text-xs text-gray-400 dark:text-gray-500 px-2 py-1 bg-gray-100 dark:bg-gray-800 rounded">
                     Protected
@@ -281,6 +210,32 @@ export default function UserAdminPage({
         />
       </Card>
       </div>
+      
+      {/* Delete User Confirmation Modal */}
+      <ConfirmationModal
+        show={deleteModal.show}
+        onClose={() => setDeleteModal({ show: false, username: null })}
+        onConfirm={async () => {
+          if (!deleteModal.username) return;
+          setDeleting(true);
+          try {
+            await api.deleteUser(deleteModal.username);
+            const updated = await api.getUsers();
+            setUsers(updated);
+            setDeleteModal({ show: false, username: null });
+          } catch (e) {
+            alert("Failed to delete user: " + formatError(e));
+          } finally {
+            setDeleting(false);
+          }
+        }}
+        title="Delete User"
+        message={`Are you sure you want to delete user "${deleteModal.username}"? This action cannot be undone.`}
+        confirmText="Delete"
+        cancelText="Cancel"
+        variant="danger"
+        loading={deleting}
+      />
     </div>
   );
 }

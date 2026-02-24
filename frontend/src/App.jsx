@@ -789,6 +789,7 @@ export default function App() {
             routeToHash={routeToHash}
             handleNavClick={handleNavClick}
             toast={{ success, error, warning, info }}
+            showConfirmModal={showConfirmModal}
           />
         )}
         {route.name === "project" && project && projectAccessDenied === null && (
@@ -816,6 +817,7 @@ export default function App() {
             llmBusyMessage={llmBusyMessage}
             requestRun={requestRun}
             onComplete={onComplete}
+            showConfirmModal={showConfirmModal}
           />
         )}
       </MainLayout>
@@ -943,6 +945,7 @@ export default function App() {
                 onComplete={onComplete}
                 routeToHash={routeToHash}
                 handleNavClick={handleNavClick}
+                showConfirmModal={showConfirmModal}
               />
             )}
             {authedUser && route.name === "device" && (
@@ -962,6 +965,7 @@ export default function App() {
                 llmBusyMessage={llmBusyMessage}
                 requestRun={requestRun}
                 onComplete={onComplete}
+                showConfirmModal={showConfirmModal}
               />
             )}
           </div>
@@ -989,6 +993,7 @@ const ProjectView = ({
   routeToHash,
   handleNavClick,
   toast,
+  showConfirmModal,
 }) => {
   if (!project)
     return <div className="text-sm text-rose-400">Project not found</div>;
@@ -1050,6 +1055,7 @@ const ProjectView = ({
               requestRun={requestRun}
               onComplete={onComplete}
               setLlmNotification={setLlmNotification}
+              showConfirmModal={showConfirmModal}
             />
           </div>
         )}
@@ -2347,7 +2353,7 @@ const CompareConfigModal = ({ project, deviceList = [], onClose }) => {
 };
 
 /* ========= SUMMARY (network-focused) + CSV ========= */
-const SummaryPage = ({ project, projectId: projectIdProp, routeToHash, handleNavClick, can, authedUser, setProjects, openDevice, llmBusy, llmBusyMessage, requestRun, onComplete, setLlmNotification }) => {
+const SummaryPage = ({ project, projectId: projectIdProp, routeToHash, handleNavClick, can, authedUser, setProjects, openDevice, llmBusy, llmBusyMessage, requestRun, onComplete, setLlmNotification, showConfirmModal }) => {
   const projectId = projectIdProp || project?.project_id || project?.id;
   const deviceDetailHref = (deviceId) => routeToHash ? routeToHash({ name: "device", projectId, device: deviceId }) : "#/";
   // LLM metrics state for topology generation (shared with TopologyGraph)
@@ -2652,7 +2658,7 @@ const SummaryPage = ({ project, projectId: projectIdProp, routeToHash, handleNav
         )}
         <div className="flex-1 min-h-0 grid grid-cols-1 lg:grid-cols-12 gap-3 overflow-hidden">
           <div className="lg:col-span-6 min-h-0 overflow-hidden rounded-xl border border-slate-300 dark:border-slate-800 bg-white dark:bg-slate-900/50 shadow-sm dark:shadow-none">
-            <TopologyGraph project={project} projectId={projectId} routeToHash={routeToHash} handleNavClick={handleNavClick} onOpenDevice={(id)=>openDevice(id)} can={can} authedUser={authedUser} setProjects={setProjects} setTopologyLLMMetrics={setTopologyLLMMetrics} topologyLLMMetrics={topologyLLMMetrics} llmBusy={llmBusy} llmBusyMessage={llmBusyMessage} requestRun={requestRun} onComplete={onComplete} setLlmNotification={setLlmNotification} />
+            <TopologyGraph project={project} projectId={projectId} routeToHash={routeToHash} handleNavClick={handleNavClick} onOpenDevice={(id)=>openDevice(id)} can={can} authedUser={authedUser} setProjects={setProjects} setTopologyLLMMetrics={setTopologyLLMMetrics} topologyLLMMetrics={topologyLLMMetrics} llmBusy={llmBusy} llmBusyMessage={llmBusyMessage} requestRun={requestRun} onComplete={onComplete} setLlmNotification={setLlmNotification} showConfirmModal={showConfirmModal} />
           </div>
           <ProjectAnalysisPanel 
             project={project}
@@ -2751,6 +2757,7 @@ const DeviceDetailsPage = ({ project, deviceId, goBack, goIndex, goBackHref, goI
         llmBusyMessage={llmBusyMessage}
         requestRun={requestRun}
         onComplete={onComplete}
+        showConfirmModal={showConfirmModal}
       />
     </div>
   );
@@ -2760,9 +2767,6 @@ const DeviceDetailsPage = ({ project, deviceId, goBack, goIndex, goBackHref, goI
 /* ========= DEVICE DETAILS (Overview / Interfaces / VLANs / Raw) ========= */
 const DeviceDetailsView = ({ project, deviceId, goBack, goBackHref, goIndex, goIndexHref, can: canProp, loadProjects, uploadHistory, authedUser, setProjects, llmBusy: globalLlmBusy, llmBusyMessage, requestRun, onComplete, showConfirmModal }) => {
   console.log('[DeviceDetailsView] Rendering with props:', { project, deviceId, hasGoBack: !!goBack });
-  const [showDeleteDeviceModal, setShowDeleteDeviceModal] = React.useState(false);
-  const [deleteConfirmText, setDeleteConfirmText] = React.useState("");
-  const [deleteDeviceLoading, setDeleteDeviceLoading] = React.useState(false);
   const can = typeof canProp === "function" ? canProp : () => false;
   const canDeleteDevice = can("upload-config", project);
   const backLink = goBack && (goBackHref != null ? (
@@ -3655,65 +3659,35 @@ const DeviceDetailsView = ({ project, deviceId, goBack, goBackHref, goIndex, goI
               <Button variant="secondary" onClick={goBack} className="text-xs py-1.5 px-3 h-8 flex-shrink-0">← Back to Summary</Button>
             ))}
             {canDeleteDevice && (
-              <Button variant="danger" onClick={() => { setShowDeleteDeviceModal(true); setDeleteConfirmText(""); }} className="text-xs py-1.5 px-3 h-8 flex-shrink-0">
+              <Button 
+                variant="danger" 
+                onClick={() => {
+                  showConfirmModal({
+                    title: "Delete Device",
+                    message: `Are you sure you want to delete device "${deviceId}"? This will remove all config versions, device image, and analysis results. This action cannot be undone.`,
+                    confirmText: "Delete Device",
+                    cancelText: "Cancel",
+                    variant: "danger",
+                    onConfirm: async () => {
+                      try {
+                        const projectId = project?.project_id || project?.id;
+                        await api.deleteDevice(projectId, deviceId);
+                        if (loadProjects) await loadProjects();
+                        if (goBack) goBack();
+                      } catch (e) {
+                        alert("Failed to delete device: " + formatError(e));
+                      }
+                    }
+                  });
+                }} 
+                className="text-xs py-1.5 px-3 h-8 flex-shrink-0"
+              >
                 Delete Device
               </Button>
             )}
           </div>
         )}
       </div>
-
-      {/* Delete device confirmation modal */}
-      {showDeleteDeviceModal && (
-        <div className="fixed inset-0 z-[100] flex items-center justify-center p-4" role="dialog" aria-modal="true">
-          <div className="absolute inset-0 bg-black/50" onClick={() => !deleteDeviceLoading && setShowDeleteDeviceModal(false)} />
-          <div className="relative z-10 w-full max-w-md rounded-xl border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-900 shadow-xl p-5">
-            <h3 className="text-lg font-semibold text-slate-800 dark:text-slate-200 mb-2">Confirm Device Deletion</h3>
-            <p className="text-sm text-slate-600 dark:text-slate-400 mb-3">
-              Deleting will remove all config versions, device image, and analysis results for device <strong>{safeDisplay(deviceId)}</strong> and remove it from topology.
-            </p>
-            <p className="text-sm text-slate-600 dark:text-slate-400 mb-2">
-              Type the device name below to confirm:
-            </p>
-            <input
-              type="text"
-              value={deleteConfirmText}
-              onChange={(e) => setDeleteConfirmText(e.target.value)}
-              placeholder={deviceId}
-              className="w-full px-3 py-2 rounded-lg border border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-800 text-slate-900 dark:text-slate-100 text-sm mb-4"
-              disabled={deleteDeviceLoading}
-              autoFocus
-            />
-            <div className="flex gap-2 justify-end">
-              <Button variant="secondary" onClick={() => !deleteDeviceLoading && setShowDeleteDeviceModal(false)} disabled={deleteDeviceLoading}>
-                Cancel
-              </Button>
-              <Button
-                variant="danger"
-                onClick={async () => {
-                  if (deleteConfirmText !== deviceId) return;
-                  setDeleteDeviceLoading(true);
-                  try {
-                    const projectId = project?.project_id || project?.id;
-                    await api.deleteDevice(projectId, deviceId);
-                    setShowDeleteDeviceModal(false);
-                    setDeleteConfirmText("");
-                    if (loadProjects) await loadProjects();
-                    if (goBack) goBack();
-                  } catch (e) {
-                    alert("Failed to delete device: " + formatError(e));
-                  } finally {
-                    setDeleteDeviceLoading(false);
-                  }
-                }}
-                disabled={deleteConfirmText !== deviceId || deleteDeviceLoading}
-              >
-                {deleteDeviceLoading ? "Deleting..." : "Delete Device"}
-              </Button>
-            </div>
-          </div>
-        </div>
-      )}
 
       {loading && (
         <div className="flex-1 flex items-center justify-center text-slate-500 dark:text-slate-400 text-xs py-8">
@@ -5692,7 +5666,7 @@ const UploadDocumentForm = ({ project, authedUser, onClose, onUpload, folderStru
 
 /* ========= DOCUMENTS (file tree + preview) ========= */
 /* ========= ANALYSIS PAGE ========= */
-const AnalysisPage = ({ project, authedUser, onChangeTab }) => {
+const AnalysisPage = ({ project, authedUser, onChangeTab, showConfirmModal }) => {
   const [analyses, setAnalyses] = useState([]);
   const [devices, setDevices] = useState([]);
   const [loading, setLoading] = useState(false);
@@ -5928,6 +5902,7 @@ const AnalysisPage = ({ project, authedUser, onChangeTab }) => {
           onVerify={handleVerifyAnalysis}
           onClose={() => setSelectedAnalysis(null)}
           loading={loading}
+          showConfirmModal={showConfirmModal}
         />
       )}
     </div>
@@ -6011,7 +5986,7 @@ const CreateAnalysisModal = ({ devices, analysisTypes, onCreate, onClose, loadin
   );
 };
 
-const AnalysisDetailModal = ({ analysis, authedUser, onVerify, onClose, loading }) => {
+const AnalysisDetailModal = ({ analysis, authedUser, onVerify, onClose, loading, showConfirmModal }) => {
   const [viewMode, setViewMode] = useState("draft"); // "draft" or "verified"
   const [isEditing, setIsEditing] = useState(false);
   const [editedContent, setEditedContent] = useState(null);
@@ -6043,14 +6018,22 @@ const AnalysisDetailModal = ({ analysis, authedUser, onVerify, onClose, loading 
     setIsEditing(false);
   };
 
-  const handleReject = async () => {
-    if (!confirm("Are you sure you want to reject this analysis?")) return;
-    await onVerify(
-      analysis.analysis_id,
-      analysis.ai_draft,
-      comments || "Rejected by reviewer",
-      "rejected"
-    );
+  const handleReject = () => {
+    showConfirmModal({
+      title: "Reject Analysis",
+      message: "Are you sure you want to reject this analysis?",
+      confirmText: "Reject",
+      cancelText: "Cancel",
+      variant: "danger",
+      onConfirm: async () => {
+        await onVerify(
+          analysis.analysis_id,
+          analysis.ai_draft,
+          comments || "Rejected by reviewer",
+          "rejected"
+        );
+      }
+    });
   };
 
   const currentContent = viewMode === "verified" && analysis.verified_version
@@ -10407,7 +10390,7 @@ function classifyRoleByName(name = "") {
 }
 
 /* ===== TopologyGraph (SVG) ===== */
-const TopologyGraph = ({ project, projectId, routeToHash, handleNavClick, onOpenDevice, can, authedUser, setProjects, setTopologyLLMMetrics, topologyLLMMetrics, llmBusy, llmBusyMessage, requestRun, onComplete, setLlmNotification }) => {
+const TopologyGraph = ({ project, projectId, routeToHash, handleNavClick, onOpenDevice, can, authedUser, setProjects, setTopologyLLMMetrics, topologyLLMMetrics, llmBusy, llmBusyMessage, requestRun, onComplete, setLlmNotification, showConfirmModal }) => {
   const deviceDetailHref = (deviceId) => routeToHash ? routeToHash({ name: "device", projectId: projectId || project?.project_id || project?.id, device: deviceId }) : "#/";
   // Helper function for default positioning - defined first to avoid hoisting issues
   const getDefaultPos = (nodeId, role, index = 0, totalByRole = {}) => {
@@ -11945,9 +11928,14 @@ const TopologyGraph = ({ project, projectId, routeToHash, handleNavClick, onOpen
                 variant="danger"
                 className="text-[10px] px-2 py-0.5 h-6"
                 onClick={() => {
-                  if (confirm(`Remove "${getNodeName(selectedNode)}" from topology? Its links will be deleted.`)) {
-                    handleRemoveNode(selectedNode);
-                  }
+                  showConfirmModal({
+                    title: "Remove Node",
+                    message: `Are you sure you want to remove "${getNodeName(selectedNode)}" from topology? Its links will be deleted.`,
+                    confirmText: "Remove",
+                    cancelText: "Cancel",
+                    variant: "danger",
+                    onConfirm: () => handleRemoveNode(selectedNode)
+                  });
                 }}
               >
                 Remove node
@@ -12244,11 +12232,18 @@ const TopologyGraph = ({ project, projectId, routeToHash, handleNavClick, onOpen
               <Button
                 variant="danger"
                 onClick={() => {
-                  if (confirm(`Remove "${getNodeName(editingNode)}" from topology? Its links will be deleted.`)) {
-                    handleRemoveNode(editingNode);
-                    setShowNodeDialog(false);
-                    setEditingNode(null);
-                  }
+                  showConfirmModal({
+                    title: "Remove Node",
+                    message: `Are you sure you want to remove "${getNodeName(editingNode)}" from topology? Its links will be deleted.`,
+                    confirmText: "Remove",
+                    cancelText: "Cancel",
+                    variant: "danger",
+                    onConfirm: () => {
+                      handleRemoveNode(editingNode);
+                      setShowNodeDialog(false);
+                      setEditingNode(null);
+                    }
+                  });
                 }}
               >
                 Remove from topology

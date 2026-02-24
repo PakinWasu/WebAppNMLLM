@@ -2,7 +2,7 @@ import React, { useState, useEffect, useMemo } from "react";
 import * as api from "../api";
 import { fileToDataURL } from "../utils/file";
 import { safeDisplay, formatError } from "../utils/format";
-import { Card, Button, Field, Input, Select, Table } from "../components/ui";
+import { Card, Button, Field, Input, Select, Table, ConfirmationModal } from "../components/ui";
 
 export default function SettingPage({ project, setProjects, authedUser, goIndex }) {
   const [name, setName] = useState(project.name);
@@ -14,7 +14,7 @@ export default function SettingPage({ project, setProjects, authedUser, goIndex 
   const [error, setError] = useState("");
   const [members, setMembers] = useState(project.members || []);
   const [showDeleteModal, setShowDeleteModal] = useState(false);
-  const [deleteConfirm, setDeleteConfirm] = useState("");
+  const [deletingProject, setDeletingProject] = useState(false);
   const [availableUsers, setAvailableUsers] = useState([]);
   const [newMemberUsername, setNewMemberUsername] = useState("");
   const [newMemberRole, setNewMemberRole] = useState("viewer");
@@ -204,17 +204,16 @@ export default function SettingPage({ project, setProjects, authedUser, goIndex 
   };
 
   const handleDeleteProject = async () => {
-    if (deleteConfirm !== "Confirm Delete") {
-      alert("Please type 'Confirm Delete' to proceed");
-      return;
-    }
+    setDeletingProject(true);
     try {
       await api.deleteProject(project.project_id || project.id);
       setProjects((prev) => prev.filter((p) => (p.project_id || p.id) !== (project.project_id || project.id)));
-      alert("✅ Project deleted successfully");
+      setShowDeleteModal(false);
       goIndex();
     } catch (e) {
       setError("Failed to delete project: " + formatError(e));
+    } finally {
+      setDeletingProject(false);
     }
   };
 
@@ -466,42 +465,18 @@ export default function SettingPage({ project, setProjects, authedUser, goIndex 
         </Card>
       </div>
 
-      {showDeleteModal && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
-          <div className="absolute inset-0 bg-black/50" onClick={() => setShowDeleteModal(false)} />
-          <div className="relative z-10 w-full max-w-md">
-            <Card
-              title="Delete Project"
-              actions={
-                <Button variant="secondary" onClick={() => setShowDeleteModal(false)}>
-                  Close
-                </Button>
-              }
-            >
-              <div className="grid gap-4">
-                <div className="text-sm text-red-600 dark:text-red-400">
-                  ⚠️ This action cannot be undone. All project data will be permanently deleted.
-                </div>
-                <Field label="Type 'Confirm Delete' to proceed">
-                  <Input
-                    value={deleteConfirm}
-                    onChange={(e) => setDeleteConfirm(e.target.value)}
-                    placeholder="Confirm Delete"
-                  />
-                </Field>
-                <div className="flex gap-2 justify-end">
-                  <Button variant="secondary" onClick={() => setShowDeleteModal(false)}>
-                    Cancel
-                  </Button>
-                  <Button variant="danger" onClick={handleDeleteProject}>
-                    Delete Project
-                  </Button>
-                </div>
-              </div>
-            </Card>
-          </div>
-        </div>
-      )}
+      {/* Delete Project Confirmation Modal */}
+      <ConfirmationModal
+        show={showDeleteModal}
+        onClose={() => setShowDeleteModal(false)}
+        onConfirm={handleDeleteProject}
+        title="Delete Project"
+        message={`Are you sure you want to delete project "${project.name}"? This action cannot be undone. All project data will be permanently deleted.`}
+        confirmText="Delete Project"
+        cancelText="Cancel"
+        variant="danger"
+        loading={deletingProject}
+      />
     </div>
   );
 }
