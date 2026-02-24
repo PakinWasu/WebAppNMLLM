@@ -47,7 +47,12 @@ async def create_user(body: UserCreate):
     if exists:
         raise HTTPException(status_code=400, detail="Username already exists")
     
-    # Email can be duplicated, so no need to check for email uniqueness
+    # Check if email exists (email must be unique)
+    email_lower = body.email.lower().strip() if body.email else None
+    if email_lower:
+        email_exists = await db()["users"].find_one({"email": {"$regex": f"^{email_lower}$", "$options": "i"}})
+        if email_exists:
+            raise HTTPException(status_code=400, detail=f"Email '{body.email}' is already used by another user")
 
     temp_pw = body.temp_password or "123456"
     doc = {

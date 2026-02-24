@@ -13,7 +13,10 @@ from pydantic import BaseModel
 from ..db.mongo import db
 from ..dependencies.auth import get_current_user, check_project_access
 from ..models.document import DocumentCreate, DocumentMetadata, DocumentPublic, DocumentVersionInfo
-from ..services.document_storage import upload_documents, get_document_file_path, read_document_file
+from ..services.document_storage import (
+    upload_documents, get_document_file_path, read_document_file,
+    extract_date_from_filename, get_filename_prefix
+)
 from ..services.preview import generate_preview
 from ..services.config_parser import ConfigParser
 
@@ -119,8 +122,19 @@ async def upload_documents_endpoint(
             parser = ConfigParser()
             for doc in uploaded:
                 try:
+                    # Get document record to check is_latest and extracted_date
+                    doc_record = await db()["documents"].find_one({
+                        "document_id": doc["document_id"],
+                        "project_id": project_id,
+                        "version": doc["version"]
+                    })
+                    
+                    # Extract date from filename for version comparison
+                    new_extracted_date = extract_date_from_filename(doc["filename"])
+                    is_latest_version = doc_record.get("is_latest", True) if doc_record else True
+                    
                     # Read file content
-                    file_path = await get_document_file_path(project_id, doc["document_id"])
+                    file_path = await get_document_file_path(project_id, doc["document_id"], doc["version"])
                     if file_path and file_path.exists():
                         with open(file_path, 'r', encoding='utf-8', errors='ignore') as f:
                             content = f.read()
@@ -192,6 +206,9 @@ async def upload_documents_endpoint(
                                 "version": next_version,
                                 "config_hash": config_hash,
                                 "upload_timestamp": datetime.now(timezone.utc),
+                                "extracted_date": new_extracted_date,  # Store extracted date from filename
+                                "is_latest_config": is_latest_version,  # Track if this is from latest document
+                                "source_filename": doc["filename"],  # Track source filename
                                 "original_content": content,  # Store original file content
                                 "device_overview": overview,
                                 "interfaces": interfaces,
@@ -206,13 +223,34 @@ async def upload_documents_endpoint(
                                 "updated_at": datetime.now(timezone.utc),
                             }
                             
-                            # Save to parsed_configs collection (check if exists, then insert or update)
+                            # Determine if we should update parsed_configs based on date logic
+                            # If uploading an older (historical) file, don't overwrite current latest
+                            should_update_parsed = is_latest_version
+                            skip_reason = None
+                            
+                            if not is_latest_version and new_extracted_date:
+                                # Check if current parsed_config has a newer date
+                                current_parsed = await db()["parsed_configs"].find_one(
+                                    {"project_id": project_id, "device_name": device_name, "is_latest_config": True},
+                                    sort=[("extracted_date", -1)]
+                                )
+                                if current_parsed:
+                                    current_date = current_parsed.get("extracted_date")
+                                    if current_date and new_extracted_date < current_date:
+                                        should_update_parsed = False
+                                        skip_reason = f"Historical file (date {new_extracted_date}) older than current ({current_date})"
+                            
                             # Log parsed data structure for debugging
                             print(f"\n=== Parsing result for {device_name} ===")
                             print(f"Device name: {device_name}")
                             print(f"Vendor: {parsed_data.get('vendor', 'unknown')}")
                             print(f"Model: {overview.get('model', 'N/A')}")
                             print(f"OS Version: {overview.get('os_version', 'N/A')}")
+                            print(f"Extracted date: {new_extracted_date}")
+                            print(f"Is latest version: {is_latest_version}")
+                            print(f"Should update parsed: {should_update_parsed}")
+                            if skip_reason:
+                                print(f"Skip reason: {skip_reason}")
                             print(f"Interfaces count: {len(interfaces) if interfaces else 0}")
                             print(f"VLANs count: {len(vlans) if vlans else 0}")
                             print(f"STP mode: {stp.get('mode', 'N/A') if stp else 'N/A'}")
@@ -227,128 +265,143 @@ async def upload_documents_endpoint(
                             collection = db()["parsed_configs"]
                             save_success = False
                             
-                            try:
-                                # First, check if collection exists and is accessible
+                            # Skip saving if this is a historical file (older date than current)
+                            if not should_update_parsed:
+                                print(f"⚠️ Skipping parsed_configs update for {device_name}: {skip_reason}")
+                                save_success = True  # Mark as success since we intentionally skipped
+                            else:
                                 try:
-                                    # Try to count documents to verify collection exists
-                                    await collection.count_documents({}, limit=1)
-                                except Exception:
-                                    # Collection might not exist, try to create it by inserting a dummy doc
+                                    # First, check if collection exists and is accessible
                                     try:
-                                        dummy_doc = {
-                                            "_temp": True,
-                                            "created_at": datetime.now(timezone.utc),
-                                            "project_id": project_id,
-                                            "device_name": "_temp"
-                                        }
-                                        await collection.insert_one(dummy_doc)
-                                        await collection.delete_one({"_temp": True})
-                                        print(f"✅ Created parsed_configs collection")
-                                    except Exception as create_err:
-                                        # Can't create collection, will fallback to documents
-                                        raise create_err
-                                
-                                # Check for duplicate config (strict check - same hash means same config)
-                                existing_doc = await collection.find_one(
-                                    {
-                                        "project_id": project_id,
-                                        "device_name": device_name,
-                                        "config_hash": config_hash
-                                    }
-                                )
-                                
-                                if existing_doc:
-                                    print(f"⚠️ Duplicate config detected for {device_name} (hash: {config_hash[:8]}...). Skipping insert (strict duplicate check).")
-                                    print(f"   Existing version: {existing_doc.get('version', 'N/A')}, timestamp: {existing_doc.get('upload_timestamp', 'N/A')}")
-                                    save_success = True  # Consider duplicate detection as success
-                                else:
-                                    # Insert new version (versioning system - keep all versions)
-                                    result = await collection.insert_one(parsed_doc)
-                                    
-                                    if result.inserted_id:
-                                        print(f"✅ Successfully inserted parsed config for {device_name} version {next_version} in parsed_configs collection (ID: {result.inserted_id})")
-                                        save_success = True
-                                        # Create indexes after successful insert
+                                        # Try to count documents to verify collection exists
+                                        await collection.count_documents({}, limit=1)
+                                    except Exception:
+                                        # Collection might not exist, try to create it by inserting a dummy doc
                                         try:
-                                            await collection.create_index("project_id", background=True)
-                                            await collection.create_index("device_name", background=True)
-                                            await collection.create_index("version", background=True)
-                                            await collection.create_index("config_hash", background=True)
-                                            await collection.create_index("upload_timestamp", background=True)
-                                            await collection.create_index([("project_id", 1), ("device_name", 1)], background=True)
-                                            await collection.create_index([("project_id", 1), ("device_name", 1), ("version", -1)], background=True)
-                                            print(f"✅ Created indexes for parsed_configs collection")
-                                        except Exception as idx_err:
-                                            print(f"⚠️ Index creation warning (may already exist): {idx_err}")
-                                    else:
-                                        print(f"⚠️ Insert operation completed but no ID returned for {device_name}")
-                            except Exception as parsed_configs_err:
-                                # If parsed_configs write fails, fallback to documents collection
-                                error_msg = str(parsed_configs_err)
-                                if "Operation not permitted" in error_msg or "not permitted" in error_msg.lower():
-                                    print(f"⚠️ parsed_configs collection unavailable (permission issue), using documents collection for {device_name}")
-                                    print(f"   Note: Data will be stored in documents.parsed_config field instead")
-                                else:
-                                    print(f"⚠️ parsed_configs collection write failed for {device_name}: {error_msg}")
-                                    print(f"⚠️ Falling back to documents collection for {device_name}")
-                                
-                                # Fallback: Store as metadata in documents collection (with versioning)
-                                try:
-                                    # Check for duplicate in documents collection
-                                    existing_doc = await db()["documents"].find_one(
+                                            dummy_doc = {
+                                                "_temp": True,
+                                                "created_at": datetime.now(timezone.utc),
+                                                "project_id": project_id,
+                                                "device_name": "_temp"
+                                            }
+                                            await collection.insert_one(dummy_doc)
+                                            await collection.delete_one({"_temp": True})
+                                            print(f"✅ Created parsed_configs collection")
+                                        except Exception as create_err:
+                                            # Can't create collection, will fallback to documents
+                                            raise create_err
+                                    
+                                    # Check for duplicate config (strict check - same hash means same config)
+                                    existing_doc = await collection.find_one(
                                         {
                                             "project_id": project_id,
-                                            "parsed_config.device_name": device_name,
-                                            "parsed_config.config_hash": config_hash
+                                            "device_name": device_name,
+                                            "config_hash": config_hash
                                         }
                                     )
                                     
                                     if existing_doc:
-                                        print(f"⚠️ Duplicate config detected for {device_name} in documents collection (hash: {config_hash[:8]}...). Skipping insert (strict duplicate check).")
-                                        save_success = True
+                                        print(f"⚠️ Duplicate config detected for {device_name} (hash: {config_hash[:8]}...). Skipping insert (strict duplicate check).")
+                                        print(f"   Existing version: {existing_doc.get('version', 'N/A')}, timestamp: {existing_doc.get('upload_timestamp', 'N/A')}")
+                                        save_success = True  # Consider duplicate detection as success
                                     else:
-                                        # Store as metadata with version info
-                                        result = await db()["documents"].update_many(
-                                            {"document_id": doc["document_id"], "project_id": project_id, "is_latest": True},
-                                            {"$set": {"parsed_config": parsed_doc}}
-                                        )
-                                        
-                                        # If no match, try without is_latest filter
-                                        if result.matched_count == 0:
-                                            result = await db()["documents"].update_many(
-                                                {"document_id": doc["document_id"], "project_id": project_id},
-                                                {"$set": {"parsed_config": parsed_doc}}
+                                        # If this is the latest config, mark previous ones as not latest
+                                        if is_latest_version:
+                                            await collection.update_many(
+                                                {"project_id": project_id, "device_name": device_name, "is_latest_config": True},
+                                                {"$set": {"is_latest_config": False}}
                                             )
                                         
-                                        if result.matched_count > 0:
-                                            print(f"✅ Successfully stored parsed config for {device_name} version {next_version} as metadata in documents collection (parsed_configs unavailable) - matched {result.matched_count}, modified {result.modified_count}")
+                                        # Insert new version (versioning system - keep all versions)
+                                        result = await collection.insert_one(parsed_doc)
+                                        
+                                        if result.inserted_id:
+                                            print(f"✅ Successfully inserted parsed config for {device_name} version {next_version} in parsed_configs collection (ID: {result.inserted_id})")
                                             save_success = True
+                                            # Create indexes after successful insert
+                                            try:
+                                                await collection.create_index("project_id", background=True)
+                                                await collection.create_index("device_name", background=True)
+                                                await collection.create_index("version", background=True)
+                                                await collection.create_index("config_hash", background=True)
+                                                await collection.create_index("upload_timestamp", background=True)
+                                                await collection.create_index("extracted_date", background=True)
+                                                await collection.create_index("is_latest_config", background=True)
+                                                await collection.create_index([("project_id", 1), ("device_name", 1)], background=True)
+                                                await collection.create_index([("project_id", 1), ("device_name", 1), ("version", -1)], background=True)
+                                                await collection.create_index([("project_id", 1), ("device_name", 1), ("is_latest_config", 1)], background=True)
+                                                print(f"✅ Created indexes for parsed_configs collection")
+                                            except Exception as idx_err:
+                                                print(f"⚠️ Index creation warning (may already exist): {idx_err}")
                                         else:
-                                            print(f"⚠️ Warning: Could not find document to update for {device_name} (document_id: {doc['document_id']})")
-                                            # Try to verify document exists
-                                            check_doc = await db()["documents"].find_one({"document_id": doc["document_id"], "project_id": project_id})
-                                            if check_doc:
-                                                print(f"Document exists but update didn't match - trying with is_latest filter")
-                                                result2 = await db()["documents"].update_many(
+                                            print(f"⚠️ Insert operation completed but no ID returned for {device_name}")
+                                except Exception as parsed_configs_err:
+                                        # If parsed_configs write fails, fallback to documents collection
+                                        error_msg = str(parsed_configs_err)
+                                        if "Operation not permitted" in error_msg or "not permitted" in error_msg.lower():
+                                            print(f"⚠️ parsed_configs collection unavailable (permission issue), using documents collection for {device_name}")
+                                            print(f"   Note: Data will be stored in documents.parsed_config field instead")
+                                        else:
+                                            print(f"⚠️ parsed_configs collection write failed for {device_name}: {error_msg}")
+                                            print(f"⚠️ Falling back to documents collection for {device_name}")
+                                        
+                                        # Fallback: Store as metadata in documents collection (with versioning)
+                                        try:
+                                            # Check for duplicate in documents collection
+                                            existing_doc = await db()["documents"].find_one(
+                                                {
+                                                    "project_id": project_id,
+                                                    "parsed_config.device_name": device_name,
+                                                    "parsed_config.config_hash": config_hash
+                                                }
+                                            )
+                                            
+                                            if existing_doc:
+                                                print(f"⚠️ Duplicate config detected for {device_name} in documents collection (hash: {config_hash[:8]}...). Skipping insert (strict duplicate check).")
+                                                save_success = True
+                                            else:
+                                                # Store as metadata with version info
+                                                result = await db()["documents"].update_many(
                                                     {"document_id": doc["document_id"], "project_id": project_id, "is_latest": True},
                                                     {"$set": {"parsed_config": parsed_doc}}
                                                 )
-                                                if result2.matched_count > 0:
-                                                    print(f"✅ Successfully stored parsed config for {device_name} version {next_version} using is_latest filter")
+                                                
+                                                # If no match, try without is_latest filter
+                                                if result.matched_count == 0:
+                                                    result = await db()["documents"].update_many(
+                                                        {"document_id": doc["document_id"], "project_id": project_id},
+                                                        {"$set": {"parsed_config": parsed_doc}}
+                                                    )
+                                                
+                                                if result.matched_count > 0:
+                                                    print(f"✅ Successfully stored parsed config for {device_name} version {next_version} as metadata in documents collection (parsed_configs unavailable) - matched {result.matched_count}, modified {result.modified_count}")
                                                     save_success = True
-                                            else:
-                                                print(f"❌ Document not found in database")
-                                except Exception as fallback_err:
-                                    print(f"❌ Error: Could not store parsed config for {device_name} in either collection: {fallback_err}")
+                                                else:
+                                                    print(f"⚠️ Warning: Could not find document to update for {device_name} (document_id: {doc['document_id']})")
+                                                    # Try to verify document exists
+                                                    check_doc = await db()["documents"].find_one({"document_id": doc["document_id"], "project_id": project_id})
+                                                    if check_doc:
+                                                        print(f"Document exists but update didn't match - trying with is_latest filter")
+                                                        result2 = await db()["documents"].update_many(
+                                                            {"document_id": doc["document_id"], "project_id": project_id, "is_latest": True},
+                                                            {"$set": {"parsed_config": parsed_doc}}
+                                                        )
+                                                        if result2.matched_count > 0:
+                                                            print(f"✅ Successfully stored parsed config for {device_name} version {next_version} using is_latest filter")
+                                                            save_success = True
+                                                    else:
+                                                        print(f"❌ Document not found in database")
+                                        except Exception as fallback_err:
+                                            print(f"❌ Error: Could not store parsed config for {device_name} in either collection: {fallback_err}")
+                                            import traceback
+                                            print(f"Traceback: {traceback.format_exc()}")
+                                            # Continue anyway - parsing succeeded even if storage failed
+                                    
+                                except Exception as db_error:
+                                    # Log error but don't fail upload
+                                    print(f"Error saving parsed config for {device_name}: {db_error}")
                                     import traceback
                                     print(f"Traceback: {traceback.format_exc()}")
-                                    # Continue anyway - parsing succeeded even if storage failed
-                                
-                            except Exception as db_error:
-                                # Log error but don't fail upload
-                                print(f"Error saving parsed config for {device_name}: {db_error}")
-                                import traceback
-                                print(f"Traceback: {traceback.format_exc()}")
                         # When parse_config returned None (no vendor matched), still save minimal parsed_config so topology can show device (Cisco/Huawei detection or parse error)
                         elif content:
                             try:

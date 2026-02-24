@@ -12,6 +12,7 @@ import { globalPollingService, notifyLLMResultReady } from "./services/llmPollin
 import { useHashRoute, useLLMQueue } from "./hooks";
 import { useToast } from "./hooks/useToast";
 import Login from "./pages/Login";
+import ForgotPassword from "./pages/ForgotPassword";
 import ChangePassword from "./pages/ChangePassword";
 import ProjectIndex from "./pages/ProjectIndex";
 import NewProjectPage from "./pages/NewProjectPage";
@@ -795,8 +796,16 @@ export default function App() {
       </div>
       <div className="mx-auto max-w-[1440px] px-4 pt-2 pb-4 sm:px-6 sm:pt-3 sm:pb-6">
           <div className="mt-2 sm:mt-3">
-            {(!authedUser && route.name !== "changePassword") && (
-              <Login onLogin={handleLogin} />
+            {(!authedUser && route.name !== "changePassword" && route.name !== "forgotPassword") && (
+              <Login 
+                onLogin={handleLogin} 
+                onForgotPassword={() => setRoute({ name: "forgotPassword" })}
+              />
+            )}
+            {route.name === "forgotPassword" && (
+              <ForgotPassword
+                goBack={() => setRoute({ name: "login" })}
+              />
             )}
             {route.name === "changePassword" && (
               <ChangePassword

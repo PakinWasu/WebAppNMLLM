@@ -1,9 +1,9 @@
 import React, { useState } from "react";
 import * as api from "../api";
 import { Card, Button, Field, Input, PasswordInput } from "../components/ui";
-import { safeDisplay } from "../utils/format";
+import { safeDisplay, formatError } from "../utils/format";
 
-export default function Login({ onLogin }) {
+export default function Login({ onLogin, onForgotPassword }) {
   const [username, setUsername] = useState("");
   const [password, setPassword] = useState("");
   const [error, setError] = useState("");
@@ -64,7 +64,14 @@ export default function Login({ onLogin }) {
               <span>{safeDisplay(error)}</span>
             </div>
           )}
-          <div className="flex justify-end">
+          <div className="flex justify-between items-center">
+            <button
+              type="button"
+              onClick={onForgotPassword}
+              className="text-sm text-blue-600 dark:text-blue-400 hover:underline"
+            >
+              Forgot password?
+            </button>
             <Button type="submit" disabled={loading}>
               {loading ? "Signing in..." : "Sign in"}
             </Button>

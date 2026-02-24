@@ -127,6 +127,27 @@ export async function updateMyProfile(email, phoneNumber) {
  });
 }
 
+export async function forgotPassword(email) {
+ return api('/auth/forgot-password', {
+  method: 'POST',
+  body: JSON.stringify({ email }),
+ });
+}
+
+export async function verifyOTP(email, otpCode) {
+ return api('/auth/verify-otp', {
+  method: 'POST',
+  body: JSON.stringify({ email, otp_code: otpCode }),
+ });
+}
+
+export async function resetPassword(email, newPassword) {
+ return api('/auth/reset-password', {
+  method: 'POST',
+  body: JSON.stringify({ email, new_password: newPassword }),
+ });
+}
+
 export async function testAI() {
  return api('/ai/test');
 }

@@ -8,8 +8,11 @@ services:
       - "8001:8000"   # 8001 บน host (ถ้า 8000 ถูกใช้แล้ว)
     env_file:
       - ./backend/.env
+    environment:
+      - TZ=Asia/Bangkok
     volumes:
       - ./storage:/app/storage
+      - /etc/localtime:/etc/localtime:ro
     depends_on:
       mongodb:
         condition: service_healthy
@@ -42,6 +45,10 @@ services:
     container_name: mnp-frontend-prod
     ports:
       - "8080:80"  # Changed to 8080 to avoid conflict with host nginx
+    environment:
+      - TZ=Asia/Bangkok
+    volumes:
+      - /etc/localtime:/etc/localtime:ro
     depends_on:
       - backend
     restart: unless-stopped
@@ -63,8 +70,10 @@ services:
     volumes:
       - ./mongo-data:/data/db
       - ./mongo-backup:/backup
+      - /etc/localtime:/etc/localtime:ro
     environment:
       MONGO_INITDB_DATABASE: manage_network_projects
+      TZ: Asia/Bangkok
     healthcheck:
       test: [ "CMD-SHELL", "mongo --eval 'db.runCommand(\"ping\").ok' || exit 1" ]
       interval: 10s
@@ -81,8 +90,11 @@ services:
     restart: unless-stopped
     ports:
       - "11434:11434"
+    environment:
+      - TZ=Asia/Bangkok
     volumes:
       - ollama-data:/root/.ollama
+      - /etc/localtime:/etc/localtime:ro
     # Resource requirements for qwen2.5-coder:32b model:
     # - RAM: ~16-20GB recommended (model size ~18GB)
     # - CPU: 4+ cores recommended for better performance (CPU-only mode)

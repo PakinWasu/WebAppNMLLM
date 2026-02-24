@@ -1,8 +1,9 @@
 import hashlib
 import uuid
+import re
 from pathlib import Path
 from datetime import datetime, timezone
-from typing import List, Optional
+from typing import List, Optional, Tuple
 from fastapi import UploadFile
 import aiofiles
 
@@ -10,6 +11,243 @@ from ..db.mongo import db
 from ..models.document import DocumentInDB, DocumentMetadata
 
 STORAGE_BASE = Path("storage")
+
+
+# ============================================================================
+# Smart Date Extraction from Filenames
+# ============================================================================
+
+# Regex patterns for date extraction (ordered by specificity)
+DATE_PATTERNS = [
+    # ISO format: YYYY-MM-DD or YYYY_MM_DD (with optional time)
+    (r'(\d{4})[-_](\d{2})[-_](\d{2})(?:[-_T](\d{2})[-_:](\d{2})(?:[-_:](\d{2}))?)?', 'YMD'),
+    # Compact ISO: YYYYMMDD (with optional time HHMMSS)
+    (r'(\d{4})(\d{2})(\d{2})(?:[-_T]?(\d{2})(\d{2})(\d{2}))?', 'YMD_COMPACT'),
+    # European/Thai: DD-MM-YYYY or DD_MM_YYYY
+    (r'(\d{2})[-_](\d{2})[-_](\d{4})', 'DMY'),
+    # Compact European: DDMMYYYY
+    (r'(\d{2})(\d{2})(\d{4})', 'DMY_COMPACT'),
+    # US format: MM-DD-YYYY or MM_DD_YYYY
+    (r'(\d{2})[-_](\d{2})[-_](\d{4})', 'MDY'),
+]
+
+
+def extract_date_from_filename(filename: str) -> Optional[datetime]:
+    """
+    Extract date/time from filename using multiple regex patterns.
+    Returns datetime object if found, None otherwise.
+    
+    Supports formats:
+    - YYYY-MM-DD, YYYY_MM_DD, YYYYMMDD
+    - YYYY-MM-DD_HH-MM-SS, YYYYMMDD_HHMMSS
+    - DD-MM-YYYY, DD_MM_YYYY, DDMMYYYY
+    - 2026-01-27_topo_realEDGE.log -> 2026-01-27
+    - CORE2_20260215.txt -> 2026-02-15
+    """
+    if not filename:
+        return None
+    
+    # Remove extension for cleaner matching
+    name_without_ext = Path(filename).stem
+    
+    # Try each pattern
+    for pattern, fmt in DATE_PATTERNS:
+        match = re.search(pattern, name_without_ext)
+        if match:
+            groups = match.groups()
+            try:
+                if fmt == 'YMD':
+                    year, month, day = int(groups[0]), int(groups[1]), int(groups[2])
+                    hour = int(groups[3]) if groups[3] else 0
+                    minute = int(groups[4]) if groups[4] else 0
+                    second = int(groups[5]) if groups[5] else 0
+                elif fmt == 'YMD_COMPACT':
+                    year, month, day = int(groups[0]), int(groups[1]), int(groups[2])
+                    hour = int(groups[3]) if groups[3] else 0
+                    minute = int(groups[4]) if groups[4] else 0
+                    second = int(groups[5]) if groups[5] else 0
+                elif fmt == 'DMY' or fmt == 'DMY_COMPACT':
+                    day, month, year = int(groups[0]), int(groups[1]), int(groups[2])
+                    hour, minute, second = 0, 0, 0
+                elif fmt == 'MDY':
+                    month, day, year = int(groups[0]), int(groups[1]), int(groups[2])
+                    hour, minute, second = 0, 0, 0
+                else:
+                    continue
+                
+                # Validate date components
+                if 1 <= month <= 12 and 1 <= day <= 31 and 1990 <= year <= 2100:
+                    if 0 <= hour <= 23 and 0 <= minute <= 59 and 0 <= second <= 59:
+                        return datetime(year, month, day, hour, minute, second, tzinfo=timezone.utc)
+            except (ValueError, TypeError):
+                continue
+    
+    return None
+
+
+def get_filename_prefix(filename: str) -> str:
+    """
+    Get the device name or prefix from filename for grouping versions.
+    Examples:
+    - "CORE2.txt" -> "CORE2"
+    - "2026-01-27_topo_realEDGE.log" -> "EDGE" or "realEDGE"
+    - "CORE2_20260215.txt" -> "CORE2"
+    """
+    if not filename:
+        return ""
+    
+    name = Path(filename).stem
+    
+    # Remove date patterns to get the device name
+    # Remove ISO dates
+    name = re.sub(r'\d{4}[-_]?\d{2}[-_]?\d{2}([-_T]?\d{2}[-_:]?\d{2}([-_:]?\d{2})?)?', '', name)
+    # Remove time patterns
+    name = re.sub(r'[-_]?\d{2}[-_:]?\d{2}[-_:]?\d{2}', '', name)
+    
+    # Clean up multiple underscores/hyphens
+    name = re.sub(r'[-_]+', '_', name)
+    name = name.strip('_-')
+    
+    # If "topo_real" prefix exists, extract device name after it
+    if 'topo_real' in name.lower():
+        match = re.search(r'topo_real(\w+)', name, re.IGNORECASE)
+        if match:
+            return match.group(1).upper()
+    
+    return name.upper() if name else Path(filename).stem.upper()
+
+
+async def determine_is_latest(
+    project_id: str,
+    document_id: str,
+    new_extracted_date: Optional[datetime],
+    new_upload_time: datetime,
+    folder_id: Optional[str] = None
+) -> Tuple[bool, Optional[str]]:
+    """
+    Determine if the new document should be marked as is_latest based on:
+    1. Extracted date from filename (Source of Truth if available)
+    2. Upload time (fallback)
+    
+    Returns: (should_be_latest, reason)
+    
+    Logic:
+    - Case A (Both have dates): Most recent extracted_date wins
+    - Case B (New has date, Old doesn't): New is latest
+    - Case C (New has no date, Old has date): Old remains latest
+    - Case D (Neither has date): Most recent upload_time wins
+    """
+    # Find current is_latest document for this document_id
+    current_latest = await db()["documents"].find_one({
+        "project_id": project_id,
+        "document_id": document_id,
+        "is_latest": True
+    })
+    
+    if not current_latest:
+        # No existing version, new one is latest
+        return True, "first_version"
+    
+    current_extracted_date = current_latest.get("extracted_date")
+    if isinstance(current_extracted_date, str):
+        try:
+            current_extracted_date = datetime.fromisoformat(current_extracted_date.replace('Z', '+00:00'))
+        except ValueError:
+            current_extracted_date = None
+    
+    current_upload_time = current_latest.get("created_at") or current_latest.get("updated_at")
+    
+    # Case A: Both have extracted dates
+    if new_extracted_date and current_extracted_date:
+        if new_extracted_date > current_extracted_date:
+            return True, "newer_extracted_date"
+        elif new_extracted_date < current_extracted_date:
+            return False, "older_extracted_date"
+        else:
+            # Same date, use upload time as tiebreaker
+            if new_upload_time > current_upload_time:
+                return True, "same_date_newer_upload"
+            return False, "same_date_older_upload"
+    
+    # Case B: New has date, Old doesn't
+    if new_extracted_date and not current_extracted_date:
+        return True, "new_has_date_old_doesnt"
+    
+    # Case C: New doesn't have date, Old has date
+    if not new_extracted_date and current_extracted_date:
+        return False, "old_has_date_new_doesnt"
+    
+    # Case D: Neither has date - use upload time
+    if new_upload_time > current_upload_time:
+        return True, "newer_upload_time"
+    return False, "older_upload_time"
+
+
+async def update_is_latest_for_document(
+    project_id: str,
+    document_id: str,
+    new_version: int,
+    new_extracted_date: Optional[datetime],
+    new_upload_time: datetime
+):
+    """
+    Update is_latest flags for all versions of a document based on smart date logic.
+    Called after inserting a new version.
+    """
+    # Get all versions of this document
+    versions = []
+    async for doc in db()["documents"].find({
+        "project_id": project_id,
+        "document_id": document_id
+    }):
+        extracted_date = doc.get("extracted_date")
+        if isinstance(extracted_date, str):
+            try:
+                extracted_date = datetime.fromisoformat(extracted_date.replace('Z', '+00:00'))
+            except ValueError:
+                extracted_date = None
+        
+        versions.append({
+            "version": doc["version"],
+            "extracted_date": extracted_date,
+            "upload_time": doc.get("created_at") or doc.get("updated_at"),
+            "_id": doc["_id"]
+        })
+    
+    if not versions:
+        return
+    
+    # Determine which version should be latest
+    def sort_key(v):
+        # Priority: extracted_date (if exists) > upload_time
+        # Higher values = more recent = should be latest
+        ed = v["extracted_date"]
+        ut = v["upload_time"]
+        
+        if ed:
+            # Has extracted date: use it as primary, upload_time as secondary
+            return (1, ed, ut or datetime.min.replace(tzinfo=timezone.utc))
+        else:
+            # No extracted date: use upload_time only
+            return (0, datetime.min.replace(tzinfo=timezone.utc), ut or datetime.min.replace(tzinfo=timezone.utc))
+    
+    # Sort versions by the key (newest first)
+    versions.sort(key=sort_key, reverse=True)
+    
+    # The first one should be is_latest=True, others is_latest=False
+    latest_id = versions[0]["_id"]
+    
+    # Update all to is_latest=False first
+    await db()["documents"].update_many(
+        {"project_id": project_id, "document_id": document_id},
+        {"$set": {"is_latest": False}}
+    )
+    
+    # Set the latest one to is_latest=True
+    await db()["documents"].update_one(
+        {"_id": latest_id},
+        {"$set": {"is_latest": True}}
+    )
 # No file size limit - removed for flexibility
 
 # Ensure storage base directory exists with proper permissions
@@ -263,6 +501,11 @@ async def upload_documents(
             if filename_lower.endswith(('.txt', '.cfg', '.conf', '.log')):
                 content_type = "text/plain"
         
+        # Smart date extraction from filename
+        extracted_date = extract_date_from_filename(filename)
+        filename_prefix = get_filename_prefix(filename)
+        
+        # Temporarily set is_latest=True (will be updated after insert)
         document_doc = {
             "document_id": document_id,
             "project_id": project_id,
@@ -286,7 +529,9 @@ async def upload_documents(
                 "description": metadata.description,
             },
             "folder_id": folder_id,
-            "is_latest": True,
+            "is_latest": True,  # Temporary, will be recalculated
+            "extracted_date": extracted_date,  # Store extracted date for future sorting
+            "filename_prefix": filename_prefix,  # Store device name/prefix for grouping
         }
         
         # Save to MongoDB - if this fails, file is already saved but we'll raise error
@@ -295,6 +540,14 @@ async def upload_documents(
         except Exception as e:
             # File was saved but database insert failed - this is a critical error
             raise Exception(f"File saved but failed to save document record to database: {str(e)}")
+        
+        # Update is_latest flags using smart date logic
+        await update_is_latest_for_document(
+            project_id, document_id, new_version, extracted_date, now
+        )
+        
+        # Log the version decision
+        print(f"[Version] {filename}: version={new_version}, extracted_date={extracted_date}, prefix={filename_prefix}")
         
         uploaded_docs.append({
             "document_id": document_id,
