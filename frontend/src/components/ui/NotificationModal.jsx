@@ -10,6 +10,26 @@ export default function NotificationModal({
   onRegenerate,
 }) {
   if (!show) return null;
+
+  let generatedAt = null;
+  if (metrics && metrics.timestamp) {
+    try {
+      const d = new Date(metrics.timestamp);
+      if (!Number.isNaN(d.getTime())) {
+        generatedAt = d.toLocaleString(undefined, {
+          year: "numeric",
+          month: "2-digit",
+          day: "2-digit",
+          hour: "2-digit",
+          minute: "2-digit",
+          second: "2-digit",
+        });
+      }
+    } catch (_e) {
+      generatedAt = null;
+    }
+  }
+
   const handleRegenerate = () => {
     if (onRegenerate) onRegenerate();
     onClose();
@@ -54,6 +74,9 @@ export default function NotificationModal({
             <div className="space-y-1 text-gray-600 dark:text-gray-400">
               {metrics.inference_time_ms !== undefined && (
                 <div>⏱️ Time: {(metrics.inference_time_ms / 1000).toFixed(1)}s</div>
+              )}
+              {generatedAt && (
+                <div>📅 Generated at: {generatedAt}</div>
               )}
               {metrics.token_usage && (
                 <div>
