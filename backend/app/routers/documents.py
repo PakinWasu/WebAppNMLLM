@@ -117,10 +117,15 @@ async def upload_documents_endpoint(
             folder_id=folder_id_clean
         )
         
-        # If uploaded to Config folder, trigger parser
-        if folder_id_clean == "Config":
+        # Trigger parser for configuration files regardless of folder
+        if True:
             parser = ConfigParser()
             for doc in uploaded:
+                # Only attempt to parse text-like configuration files
+                filename_lower = doc.get("filename", "").lower()
+                if not filename_lower.endswith(('.txt', '.cfg', '.conf', '.log')):
+                    continue
+
                 try:
                     # Get document record to check is_latest and extracted_date
                     doc_record = await db()["documents"].find_one({

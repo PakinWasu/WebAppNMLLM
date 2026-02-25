@@ -549,10 +549,10 @@ class ConfigParser:
     def __init__(self):
         # Put HuaweiParser first because it has more specific patterns
         # and Cisco might match Huawei configs incorrectly
-        self.parsers = [
-            HuaweiParser(),   # Check Huawei first (more specific)
-            CiscoIOSParser(), # Then check Cisco (returns spec; normalized to legacy below)
-        ]
+        self.parsers = []
+        if HuaweiParser is not None:
+            self.parsers.append(HuaweiParser())  # Check Huawei first (more specific)
+        self.parsers.append(CiscoIOSParser())    # Then check Cisco
 
     def parse_config(self, content: str, filename: str) -> Optional[Dict[str, Any]]:
         """

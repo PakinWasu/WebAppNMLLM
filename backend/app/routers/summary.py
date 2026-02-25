@@ -445,7 +445,7 @@ async def get_summary(
                     else:
                         stp_role_summary = ", ".join([f"{k}:{v}" for k, v in list(stp_roles.items())[:2]])
                 else:
-                stp_role_summary = "-"
+                    stp_role_summary = "-"
                 
                 # Get trunk allowed VLANs summary - collect all unique VLANs from trunk ports
                 all_trunk_vlans = set()
@@ -597,7 +597,7 @@ async def get_summary(
                     else:
                         stp_role_summary = ", ".join([f"{k}:{v}" for k, v in list(stp_roles.items())[:2]])
                 else:
-                stp_role_summary = "-"
+                    stp_role_summary = "-"
                 
                 # Get trunk allowed VLANs summary - collect all unique VLANs from trunk ports
                 all_trunk_vlans = set()

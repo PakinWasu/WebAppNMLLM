@@ -73,22 +73,22 @@ function SummaryMarkdown({ text, className = "", size = "sm" }) {
  */
 function StructuredNetworkOverview({ data, className = "" }) {
   if (!data || typeof data !== "object") return null;
-  
+
   const health = (data.health_status || "Unknown").toString();
   const isHealthy = /healthy/i.test(health);
   const isWarning = /warning/i.test(health);
 
   // Section color configs (9 sections with distinct colors like AI Recommendations)
   const sectionColors = {
-    overview:   { bg: "rgba(59, 130, 246, 0.15)",  border: "#3b82f6", badge: "bg-blue-500" },      // Blue
-    interfaces: { bg: "rgba(6, 182, 212, 0.15)",   border: "#06b6d4", badge: "bg-cyan-500" },      // Cyan
-    vlans:      { bg: "rgba(99, 102, 241, 0.15)",  border: "#6366f1", badge: "bg-indigo-500" },    // Indigo
-    stp:        { bg: "rgba(168, 85, 247, 0.15)",  border: "#a855f7", badge: "bg-purple-500" },    // Purple
-    routing:    { bg: "rgba(34, 197, 94, 0.15)",   border: "#22c55e", badge: "bg-green-500" },     // Green
-    neighbors:  { bg: "rgba(20, 184, 166, 0.15)",  border: "#14b8a6", badge: "bg-teal-500" },      // Teal
-    mac_arp:    { bg: "rgba(249, 115, 22, 0.15)",  border: "#f97316", badge: "bg-orange-500" },    // Orange
-    security:   { bg: "rgba(244, 63, 94, 0.15)",   border: "#f43f5e", badge: "bg-rose-500" },      // Rose
-    ha:         { bg: "rgba(234, 179, 8, 0.15)",   border: "#eab308", badge: "bg-yellow-500" },    // Yellow
+    overview: { bg: "rgba(59, 130, 246, 0.15)", border: "#3b82f6", badge: "bg-blue-500" },      // Blue
+    interfaces: { bg: "rgba(6, 182, 212, 0.15)", border: "#06b6d4", badge: "bg-cyan-500" },      // Cyan
+    vlans: { bg: "rgba(99, 102, 241, 0.15)", border: "#6366f1", badge: "bg-indigo-500" },    // Indigo
+    stp: { bg: "rgba(168, 85, 247, 0.15)", border: "#a855f7", badge: "bg-purple-500" },    // Purple
+    routing: { bg: "rgba(34, 197, 94, 0.15)", border: "#22c55e", badge: "bg-green-500" },     // Green
+    neighbors: { bg: "rgba(20, 184, 166, 0.15)", border: "#14b8a6", badge: "bg-teal-500" },      // Teal
+    mac_arp: { bg: "rgba(249, 115, 22, 0.15)", border: "#f97316", badge: "bg-orange-500" },    // Orange
+    security: { bg: "rgba(244, 63, 94, 0.15)", border: "#f43f5e", badge: "bg-rose-500" },      // Rose
+    ha: { bg: "rgba(234, 179, 8, 0.15)", border: "#eab308", badge: "bg-yellow-500" },    // Yellow
   };
   const sectionOrder = ["overview", "interfaces", "vlans", "stp", "routing", "neighbors", "mac_arp", "security", "ha"];
 
@@ -99,7 +99,7 @@ function StructuredNetworkOverview({ data, className = "" }) {
       const section = data.sections[key];
       return section?.summary && section.summary.trim() !== "";
     });
-    
+
     if (!hasAnySections) {
       return (
         <div className={`text-slate-500 dark:text-slate-400 italic text-sm ${className}`}>
@@ -107,7 +107,7 @@ function StructuredNetworkOverview({ data, className = "" }) {
         </div>
       );
     }
-    
+
     return (
       <div className={`space-y-3 ${className}`}>
         {/* Section Cards - Vertical layout like Recommendations */}
@@ -117,10 +117,10 @@ function StructuredNetworkOverview({ data, className = "" }) {
           const colors = sectionColors[key] || sectionColors.overview;
           const hasContent = section.summary && section.summary.trim() !== "";
           const hasHighlights = Array.isArray(section.highlights) && section.highlights.length > 0;
-          
+
           // Skip sections with no content
           if (!hasContent && !hasHighlights) return null;
-          
+
           return (
             <div
               key={key}
@@ -236,15 +236,15 @@ function StructuredNetworkOverview({ data, className = "" }) {
 /** Renders structured Device Summary with colored sections (same format as StructuredNetworkOverview). */
 function StructuredDeviceSummary({ data, className = "" }) {
   if (!data || typeof data !== "object") return null;
-  
+
   const sectionColors = {
-    overview:   { bg: "rgba(59, 130, 246, 0.15)",  border: "#3b82f6", badge: "bg-blue-500" },
-    interfaces: { bg: "rgba(6, 182, 212, 0.15)",   border: "#06b6d4", badge: "bg-cyan-500" },
-    vlans:      { bg: "rgba(99, 102, 241, 0.15)",  border: "#6366f1", badge: "bg-indigo-500" },
-    routing:    { bg: "rgba(34, 197, 94, 0.15)",   border: "#22c55e", badge: "bg-green-500" },
-    security:   { bg: "rgba(244, 63, 94, 0.15)",   border: "#f43f5e", badge: "bg-rose-500" },
+    overview: { bg: "rgba(59, 130, 246, 0.15)", border: "#3b82f6", badge: "bg-blue-500" },
+    interfaces: { bg: "rgba(6, 182, 212, 0.15)", border: "#06b6d4", badge: "bg-cyan-500" },
+    vlans: { bg: "rgba(99, 102, 241, 0.15)", border: "#6366f1", badge: "bg-indigo-500" },
+    routing: { bg: "rgba(34, 197, 94, 0.15)", border: "#22c55e", badge: "bg-green-500" },
+    security: { bg: "rgba(244, 63, 94, 0.15)", border: "#f43f5e", badge: "bg-rose-500" },
   };
-  
+
   // New section format - vertical layout with colored cards
   if (data.sections && typeof data.sections === "object") {
     const availableSections = Object.keys(data.sections);
@@ -252,7 +252,7 @@ function StructuredDeviceSummary({ data, className = "" }) {
       const section = data.sections[key];
       return section?.summary && section.summary.trim() !== "";
     });
-    
+
     if (!hasAnySections) {
       return (
         <div className={`text-slate-500 dark:text-slate-400 italic text-sm ${className}`}>
@@ -260,7 +260,7 @@ function StructuredDeviceSummary({ data, className = "" }) {
         </div>
       );
     }
-    
+
     return (
       <div className={`space-y-2 ${className}`}>
         {availableSections.map((key) => {
@@ -269,9 +269,9 @@ function StructuredDeviceSummary({ data, className = "" }) {
           const colors = sectionColors[key] || sectionColors.overview;
           const hasContent = section.summary && section.summary.trim() !== "";
           const hasHighlights = Array.isArray(section.highlights) && section.highlights.length > 0;
-          
+
           if (!hasContent && !hasHighlights) return null;
-          
+
           return (
             <div
               key={key}
@@ -304,7 +304,7 @@ function StructuredDeviceSummary({ data, className = "" }) {
       </div>
     );
   }
-  
+
   // Legacy format (backward compatible)
   const role = data.role || "—";
   const uptime = data.uptime_human || "N/A";
@@ -359,7 +359,7 @@ export default function App() {
   // Global LLM queue: one job at a time per project (Summary + More Detail + Topology share this)
   const projectIdForLLM = (route.name === "project" || route.name === "device") ? (route.projectId || "") : "";
   const { llmBusy, requestRun, onComplete, llmBusyMessage } = useLLMQueue(projectIdForLLM);
-  
+
   // Toast notification system
   const { toasts, success, error, warning, info, removeToast } = useToast();
 
@@ -479,9 +479,9 @@ export default function App() {
           api.getSummaryMetrics(p.project_id).catch(() => null),
         ]);
         // Find manager (first manager or admin, or created_by)
-        const manager = members.find(m => m.role === "manager")?.username || 
-                       members.find(m => m.role === "admin")?.username || 
-                       p.created_by;
+        const manager = members.find(m => m.role === "manager")?.username ||
+          members.find(m => m.role === "admin")?.username ||
+          p.created_by;
         const deviceCount = metrics?.total_devices ?? 0;
         return {
           id: p.project_id,
@@ -522,19 +522,19 @@ export default function App() {
   const can = (perm, project = null) => {
     const userRole = authedUser?.role; // System role (admin only)
     if (!userRole) return false;
-    
+
     // Get project role if project is provided
     let projectRole = null;
     if (project && project.members && authedUser?.username) {
       const member = project.members.find(m => m.username === authedUser.username);
       projectRole = member?.role; // manager, engineer, viewer
     }
-    
+
     // System-level permissions (admin only)
     if (perm === "see-all-projects") return userRole === "admin";
     if (perm === "create-project") return userRole === "admin";
     if (perm === "user-management") return userRole === "admin";
-    
+
     // Project-level permissions
     if (perm === "project-setting") {
       // Admin or project manager can access project settings
@@ -581,10 +581,10 @@ export default function App() {
 
   /* Single-pane layout for Index, Project, and Device (above-the-fold, no outer scroll) */
   if (authedUser && (route.name === "index" || route.name === "project" || route.name === "device")) {
-    const project = (route.name === "project" || route.name === "device") 
-      ? projects.find((p) => (p.project_id || p.id) === route.projectId) 
+    const project = (route.name === "project" || route.name === "device")
+      ? projects.find((p) => (p.project_id || p.id) === route.projectId)
       : null;
-    
+
     // Build tabs for project view - Setting moved to end
     const projectTabs = [];
     if (project && route.name === "project") {
@@ -600,7 +600,7 @@ export default function App() {
         projectTabs.push({ id: "setting", label: "Setting", icon: "⚙️" });
       }
     }
-    
+
     return (
       <>
         <ToastContainer toasts={toasts} onClose={removeToast} />
@@ -617,210 +617,209 @@ export default function App() {
         />
         <MainLayout
           topBar={
-          <div className="h-full flex items-center justify-between gap-2 px-3 sm:px-4 border-b border-slate-300 dark:border-slate-800">
-            {/* Left: Hamburger menu (mobile/tablet) + Logo + Platform Name + Breadcrumb */}
-            <div className="flex items-center gap-2 sm:gap-4 flex-1 min-w-0">
-              {/* Hamburger menu button - show on mobile/tablet (lg-), hide on desktop (lg+) */}
-              {project && projectTabs.length > 0 && (
-                <button
-                  onClick={() => {
-                    const event = new CustomEvent('toggleSideNav');
-                    window.dispatchEvent(event);
-                  }}
-                  className="lg:hidden p-2 rounded-lg text-slate-600 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-800 hover:text-slate-900 dark:hover:text-slate-200 transition-colors flex-shrink-0"
-                  aria-label="Open navigation menu"
+            <div className="h-full flex items-center justify-between gap-2 px-3 sm:px-4 border-b border-slate-300 dark:border-slate-800">
+              {/* Left: Hamburger menu (mobile/tablet) + Logo + Platform Name + Breadcrumb */}
+              <div className="flex items-center gap-2 sm:gap-4 flex-1 min-w-0">
+                {/* Hamburger menu button - show on mobile/tablet (lg-), hide on desktop (lg+) */}
+                {project && projectTabs.length > 0 && (
+                  <button
+                    onClick={() => {
+                      const event = new CustomEvent('toggleSideNav');
+                      window.dispatchEvent(event);
+                    }}
+                    className="lg:hidden p-2 rounded-lg text-slate-600 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-800 hover:text-slate-900 dark:hover:text-slate-200 transition-colors flex-shrink-0"
+                    aria-label="Open navigation menu"
+                  >
+                    <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 6h16M4 12h16M4 18h16" />
+                    </svg>
+                  </button>
+                )}
+                <a
+                  href="#/"
+                  onClick={(e) => handleNavClick(e, () => setRoute({ name: "index" }))}
+                  className="flex items-center gap-2 sm:gap-3 hover:opacity-85 transition-opacity cursor-pointer flex-shrink-0"
                 >
-                  <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 6h16M4 12h16M4 18h16" />
-                  </svg>
-                </button>
-              )}
+                  <div className="h-7 w-7 rounded-xl bg-white/90 dark:bg-white/10 backdrop-blur-sm border border-slate-300/80 dark:border-slate-600/80 flex-shrink-0 shadow-sm" />
+                  <span className="text-xs sm:text-sm font-semibold text-slate-800 dark:text-slate-200 whitespace-nowrap truncate">Network Project Platform</span>
+                </a>
+                {/* Breadcrumb and Tabs (show when in project or device) - hide tabs on mobile/tablet, show on desktop */}
+                {project && (
+                  <>
+                    <span className="text-slate-400 dark:text-slate-500 flex-shrink-0">/</span>
+                    <div className="flex items-center gap-2 sm:gap-4 flex-1 min-w-0">
+                      {route.name === "device" ? (
+                        <>
+                          <a
+                            href={`#/project/${encodeURIComponent(route.projectId)}/tab/summary`}
+                            onClick={(e) => handleNavClick(e, () => setRoute({ name: "project", projectId: route.projectId, tab: "summary" }))}
+                            className="text-xs sm:text-sm font-medium text-slate-600 dark:text-slate-300 hover:text-slate-900 dark:hover:text-slate-100 truncate"
+                          >
+                            {safeDisplay(project?.name)}
+                          </a>
+                          <span className="text-slate-400 dark:text-slate-500 flex-shrink-0">/</span>
+                          <span className="text-xs sm:text-sm font-medium text-slate-700 dark:text-slate-300 truncate">{safeDisplay(route?.device)}</span>
+                        </>
+                      ) : (
+                        <>
+                          <span className="text-xs sm:text-sm font-medium text-slate-700 dark:text-slate-300 truncate">{safeDisplay(project?.name)}</span>
+                          {/* Tabs - hidden on mobile/tablet (lg-), shown on desktop (lg+) */}
+                          {projectTabs.length > 0 && (
+                            <nav className="hidden lg:flex items-center gap-1 ml-2 sm:ml-4 flex-wrap" aria-label="Project tabs">
+                              {projectTabs.map((t) => (
+                                <a
+                                  key={t.id}
+                                  href={`#/project/${encodeURIComponent(route.projectId)}/tab/${encodeURIComponent(t.id)}`}
+                                  onClick={(e) => handleNavClick(e, () => setRoute({ ...route, tab: t.id }))}
+                                  className={`flex items-center gap-1.5 px-2.5 py-1.5 text-xs font-medium transition rounded-xl whitespace-nowrap border ${(route.tab || "summary") === t.id
+                                      ? "bg-white/90 dark:bg-white/10 backdrop-blur-sm border-slate-300/80 dark:border-slate-600/80 text-slate-800 dark:text-slate-100 shadow-sm"
+                                      : "bg-transparent dark:bg-transparent border-transparent text-slate-600 dark:text-slate-400 hover:bg-slate-100/90 dark:hover:bg-slate-800/60 hover:border-slate-300 dark:hover:border-slate-700"
+                                    }`}
+                                  title={`Go to ${t.label}`}
+                                >
+                                  <span>{safeDisplay(t.icon)}</span>
+                                  <span className="hidden xs:inline">{safeDisplay(t.label)}</span>
+                                </a>
+                              ))}
+                            </nav>
+                          )}
+                        </>
+                      )}
+                    </div>
+                  </>
+                )}
+              </div>
+              {/* Right: Dark mode + User + Sign out */}
+              <div className="flex items-center gap-2 flex-shrink-0">
+                <Button variant="ghost" className="text-slate-500 dark:text-slate-400 hover:text-slate-800 dark:hover:text-slate-200" onClick={() => setDark(!dark)} title={dark ? "Light mode" : "Dark mode"}>
+                  {dark ? "🌙" : "☀️"}
+                </Button>
+                <span className="text-xs text-slate-500 dark:text-slate-400 hidden sm:inline truncate max-w-[100px]">{safeDisplay(authedUser?.username)}</span>
+                <a
+                  href="#/login"
+                  onClick={(e) => handleNavClick(e, handleLogout)}
+                  className="inline-flex items-center justify-center rounded-lg px-3 py-1.5 text-xs font-medium shadow-sm transition focus:outline-none focus:ring-2 focus:ring-offset-2 bg-white text-gray-900 ring-1 ring-gray-300 hover:bg-gray-50 focus:ring-blue-500 dark:bg-gray-800 dark:text-gray-100 dark:ring-gray-600 dark:hover:bg-gray-700"
+                >
+                  Sign out
+                </a>
+              </div>
+            </div>
+          }
+          sideNavigation={
+            project && projectTabs.length > 0 ? (
+              <nav className="flex flex-col gap-1 px-2">
+                {projectTabs.map((t) => {
+                  const isActive = (route.tab || "summary") === t.id;
+                  return (
+                    <a
+                      key={t.id}
+                      href={`#/project/${encodeURIComponent(project.project_id || project.id)}/tab/${encodeURIComponent(t.id)}`}
+                      onClick={(e) => {
+                        e.preventDefault();
+                        handleNavClick(e, () => {
+                          setRoute({ ...route, tab: t.id });
+                          // Close side nav after navigation
+                          setTimeout(() => {
+                            window.dispatchEvent(new CustomEvent('closeSideNav'));
+                          }, 100);
+                        });
+                      }}
+                      className={`
+                      flex items-center gap-3 px-4 py-3 rounded-lg text-sm font-medium transition-all
+                      ${isActive
+                          ? "bg-indigo-50 dark:bg-indigo-900/30 text-indigo-700 dark:text-indigo-300 shadow-sm"
+                          : "text-slate-600 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-800 hover:text-slate-900 dark:hover:text-slate-200"
+                        }
+                    `}
+                    >
+                      <span className="text-lg">{safeDisplay(t.icon)}</span>
+                      <span className="flex-1">{safeDisplay(t.label)}</span>
+                      {isActive && (
+                        <span className="text-indigo-600 dark:text-indigo-400">▶</span>
+                      )}
+                    </a>
+                  );
+                })}
+              </nav>
+            ) : null
+          }
+          mainClassName="bg-slate-50 dark:bg-slate-950"
+        >
+          {route.name === "index" && (
+            <ProjectIndex
+              authedUser={authedUser}
+              can={can}
+              projects={projects}
+              setRoute={setRoute}
+              routeToHash={routeToHash}
+              isMember={isMember}
+              handleNavClick={handleNavClick}
+            />
+          )}
+          {route.name === "project" && project && projectAccessDenied === true && (
+            <div className="flex-1 flex flex-col items-center justify-center p-8 text-center">
+              <p className="text-slate-600 dark:text-slate-300 font-medium mb-2">You are not a member of this project.</p>
+              <p className="text-sm text-slate-500 dark:text-slate-400 mb-4">Only members can open and view its content.</p>
               <a
                 href="#/"
                 onClick={(e) => handleNavClick(e, () => setRoute({ name: "index" }))}
-                className="flex items-center gap-2 sm:gap-3 hover:opacity-85 transition-opacity cursor-pointer flex-shrink-0"
+                className="inline-flex items-center justify-center rounded-xl px-4 py-2 text-sm font-medium bg-slate-200 dark:bg-slate-700 text-slate-800 dark:text-slate-200 hover:bg-slate-300 dark:hover:bg-slate-600"
               >
-                <div className="h-7 w-7 rounded-xl bg-white/90 dark:bg-white/10 backdrop-blur-sm border border-slate-300/80 dark:border-slate-600/80 flex-shrink-0 shadow-sm" />
-                <span className="text-xs sm:text-sm font-semibold text-slate-800 dark:text-slate-200 whitespace-nowrap truncate">Network Project Platform</span>
-              </a>
-              {/* Breadcrumb and Tabs (show when in project or device) - hide tabs on mobile/tablet, show on desktop */}
-              {project && (
-                <>
-                  <span className="text-slate-400 dark:text-slate-500 flex-shrink-0">/</span>
-                  <div className="flex items-center gap-2 sm:gap-4 flex-1 min-w-0">
-                    {route.name === "device" ? (
-                      <>
-                        <a
-                          href={`#/project/${encodeURIComponent(route.projectId)}/tab/summary`}
-                          onClick={(e) => handleNavClick(e, () => setRoute({ name: "project", projectId: route.projectId, tab: "summary" }))}
-                          className="text-xs sm:text-sm font-medium text-slate-600 dark:text-slate-300 hover:text-slate-900 dark:hover:text-slate-100 truncate"
-                        >
-                          {safeDisplay(project?.name)}
-                        </a>
-                        <span className="text-slate-400 dark:text-slate-500 flex-shrink-0">/</span>
-                        <span className="text-xs sm:text-sm font-medium text-slate-700 dark:text-slate-300 truncate">{safeDisplay(route?.device)}</span>
-                      </>
-                    ) : (
-                      <>
-                        <span className="text-xs sm:text-sm font-medium text-slate-700 dark:text-slate-300 truncate">{safeDisplay(project?.name)}</span>
-                        {/* Tabs - hidden on mobile/tablet (lg-), shown on desktop (lg+) */}
-                        {projectTabs.length > 0 && (
-                          <nav className="hidden lg:flex items-center gap-1 ml-2 sm:ml-4 flex-wrap" aria-label="Project tabs">
-                            {projectTabs.map((t) => (
-                              <a
-                                key={t.id}
-                                href={`#/project/${encodeURIComponent(route.projectId)}/tab/${encodeURIComponent(t.id)}`}
-                                onClick={(e) => handleNavClick(e, () => setRoute({ ...route, tab: t.id }))}
-                                className={`flex items-center gap-1.5 px-2.5 py-1.5 text-xs font-medium transition rounded-xl whitespace-nowrap border ${
-                                  (route.tab || "summary") === t.id
-                                    ? "bg-white/90 dark:bg-white/10 backdrop-blur-sm border-slate-300/80 dark:border-slate-600/80 text-slate-800 dark:text-slate-100 shadow-sm"
-                                    : "bg-transparent dark:bg-transparent border-transparent text-slate-600 dark:text-slate-400 hover:bg-slate-100/90 dark:hover:bg-slate-800/60 hover:border-slate-300 dark:hover:border-slate-700"
-                                }`}
-                                title={`Go to ${t.label}`}
-                              >
-                                <span>{safeDisplay(t.icon)}</span>
-                                <span className="hidden xs:inline">{safeDisplay(t.label)}</span>
-                              </a>
-                            ))}
-                          </nav>
-                        )}
-                      </>
-                    )}
-                  </div>
-                </>
-              )}
-            </div>
-            {/* Right: Dark mode + User + Sign out */}
-            <div className="flex items-center gap-2 flex-shrink-0">
-              <Button variant="ghost" className="text-slate-500 dark:text-slate-400 hover:text-slate-800 dark:hover:text-slate-200" onClick={() => setDark(!dark)} title={dark ? "Light mode" : "Dark mode"}>
-                {dark ? "🌙" : "☀️"}
-              </Button>
-              <span className="text-xs text-slate-500 dark:text-slate-400 hidden sm:inline truncate max-w-[100px]">{safeDisplay(authedUser?.username)}</span>
-              <a
-                href="#/login"
-                onClick={(e) => handleNavClick(e, handleLogout)}
-                className="inline-flex items-center justify-center rounded-lg px-3 py-1.5 text-xs font-medium shadow-sm transition focus:outline-none focus:ring-2 focus:ring-offset-2 bg-white text-gray-900 ring-1 ring-gray-300 hover:bg-gray-50 focus:ring-blue-500 dark:bg-gray-800 dark:text-gray-100 dark:ring-gray-600 dark:hover:bg-gray-700"
-              >
-                Sign out
+                Back to My Projects
               </a>
             </div>
-          </div>
-        }
-        sideNavigation={
-          project && projectTabs.length > 0 ? (
-            <nav className="flex flex-col gap-1 px-2">
-              {projectTabs.map((t) => {
-                const isActive = (route.tab || "summary") === t.id;
-                return (
-                  <a
-                    key={t.id}
-                    href={`#/project/${encodeURIComponent(project.project_id || project.id)}/tab/${encodeURIComponent(t.id)}`}
-                    onClick={(e) => {
-                      e.preventDefault();
-                      handleNavClick(e, () => {
-                        setRoute({ ...route, tab: t.id });
-                        // Close side nav after navigation
-                        setTimeout(() => {
-                          window.dispatchEvent(new CustomEvent('closeSideNav'));
-                        }, 100);
-                      });
-                    }}
-                    className={`
-                      flex items-center gap-3 px-4 py-3 rounded-lg text-sm font-medium transition-all
-                      ${isActive
-                        ? "bg-indigo-50 dark:bg-indigo-900/30 text-indigo-700 dark:text-indigo-300 shadow-sm"
-                        : "text-slate-600 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-800 hover:text-slate-900 dark:hover:text-slate-200"
-                      }
-                    `}
-                  >
-                    <span className="text-lg">{safeDisplay(t.icon)}</span>
-                    <span className="flex-1">{safeDisplay(t.label)}</span>
-                    {isActive && (
-                      <span className="text-indigo-600 dark:text-indigo-400">▶</span>
-                    )}
-                  </a>
-                );
-              })}
-            </nav>
-          ) : null
-        }
-        mainClassName="bg-slate-50 dark:bg-slate-950"
-      >
-        {route.name === "index" && (
-          <ProjectIndex
-            authedUser={authedUser}
-            can={can}
-            projects={projects}
-            setRoute={setRoute}
-            routeToHash={routeToHash}
-            isMember={isMember}
-            handleNavClick={handleNavClick}
-          />
-        )}
-        {route.name === "project" && project && projectAccessDenied === true && (
-          <div className="flex-1 flex flex-col items-center justify-center p-8 text-center">
-            <p className="text-slate-600 dark:text-slate-300 font-medium mb-2">You are not a member of this project.</p>
-            <p className="text-sm text-slate-500 dark:text-slate-400 mb-4">Only members can open and view its content.</p>
-            <a
-              href="#/"
-              onClick={(e) => handleNavClick(e, () => setRoute({ name: "index" }))}
-              className="inline-flex items-center justify-center rounded-xl px-4 py-2 text-sm font-medium bg-slate-200 dark:bg-slate-700 text-slate-800 dark:text-slate-200 hover:bg-slate-300 dark:hover:bg-slate-600"
-            >
-              Back to My Projects
-            </a>
-          </div>
-        )}
-        {route.name === "project" && project && projectAccessDenied === false && (
-          <ProjectView
-            project={project}
-            tab={route.tab || "summary"}
-            onChangeTab={(tab) => setRoute({ ...route, tab })}
-            openDevice={(device) => setRoute({ name: "device", projectId: route.projectId, device })}
-            goIndex={() => setRoute({ name: "index" })}
-            setProjects={setProjects}
-            uploadHistory={uploadHistory}
-            setUploadHistory={setUploadHistory}
-            can={can}
-            authedUser={authedUser}
-            llmBusy={llmBusy}
-            llmBusyMessage={llmBusyMessage}
-            requestRun={requestRun}
-            onComplete={onComplete}
-            routeToHash={routeToHash}
-            handleNavClick={handleNavClick}
-            toast={{ success, error, warning, info }}
-            showConfirmModal={showConfirmModal}
-          />
-        )}
-        {route.name === "project" && project && projectAccessDenied === null && (
-          <div className="flex-1 flex items-center justify-center p-8">
-            <span className="text-sm text-slate-500 dark:text-slate-400">Checking access...</span>
-          </div>
-        )}
-        {route.name === "project" && !project && (
-          <div className="p-6 text-sm text-rose-400">Project not found.</div>
-        )}
-        {route.name === "device" && project && route.device && (
-          <DeviceDetailsPage
-            project={project}
-            deviceId={route.device}
-            goBack={() => setRoute({ name: "project", projectId: route.projectId, tab: "summary" })}
-            goIndex={() => setRoute({ name: "index" })}
-            goBackHref={routeToHash({ name: "project", projectId: route.projectId, tab: "summary" })}
-            goIndexHref="#/"
-            can={can}
-            loadProjects={loadProjects}
-            uploadHistory={uploadHistory}
-            authedUser={authedUser}
-            setProjects={setProjects}
-            llmBusy={llmBusy}
-            llmBusyMessage={llmBusyMessage}
-            requestRun={requestRun}
-            onComplete={onComplete}
-            showConfirmModal={showConfirmModal}
-          />
-        )}
-      </MainLayout>
+          )}
+          {route.name === "project" && project && projectAccessDenied === false && (
+            <ProjectView
+              project={project}
+              tab={route.tab || "summary"}
+              onChangeTab={(tab) => setRoute({ ...route, tab })}
+              openDevice={(device) => setRoute({ name: "device", projectId: route.projectId, device })}
+              goIndex={() => setRoute({ name: "index" })}
+              setProjects={setProjects}
+              uploadHistory={uploadHistory}
+              setUploadHistory={setUploadHistory}
+              can={can}
+              authedUser={authedUser}
+              llmBusy={llmBusy}
+              llmBusyMessage={llmBusyMessage}
+              requestRun={requestRun}
+              onComplete={onComplete}
+              routeToHash={routeToHash}
+              handleNavClick={handleNavClick}
+              toast={{ success, error, warning, info }}
+              showConfirmModal={showConfirmModal}
+            />
+          )}
+          {route.name === "project" && project && projectAccessDenied === null && (
+            <div className="flex-1 flex items-center justify-center p-8">
+              <span className="text-sm text-slate-500 dark:text-slate-400">Checking access...</span>
+            </div>
+          )}
+          {route.name === "project" && !project && (
+            <div className="p-6 text-sm text-rose-400">Project not found.</div>
+          )}
+          {route.name === "device" && project && route.device && (
+            <DeviceDetailsPage
+              project={project}
+              deviceId={route.device}
+              goBack={() => setRoute({ name: "project", projectId: route.projectId, tab: "summary" })}
+              goIndex={() => setRoute({ name: "index" })}
+              goBackHref={routeToHash({ name: "project", projectId: route.projectId, tab: "summary" })}
+              goIndexHref="#/"
+              can={can}
+              loadProjects={loadProjects}
+              uploadHistory={uploadHistory}
+              authedUser={authedUser}
+              setProjects={setProjects}
+              llmBusy={llmBusy}
+              llmBusyMessage={llmBusyMessage}
+              requestRun={requestRun}
+              onComplete={onComplete}
+              showConfirmModal={showConfirmModal}
+            />
+          )}
+        </MainLayout>
       </>
     );
   }
@@ -850,126 +849,126 @@ export default function App() {
         />
       </div>
       <div className="mx-auto max-w-[1440px] px-4 pt-2 pb-4 sm:px-6 sm:pt-3 sm:pb-6">
-          <div className="mt-2 sm:mt-3">
-            {(!authedUser && route.name !== "changePassword" && route.name !== "forgotPassword") && (
-              <Login 
-                onLogin={handleLogin} 
-                onForgotPassword={() => setRoute({ name: "forgotPassword" })}
-              />
-            )}
-            {route.name === "forgotPassword" && (
-              <ForgotPassword
-                goBack={() => setRoute({ name: "login" })}
-              />
-            )}
-            {route.name === "changePassword" && (
-              <ChangePassword
-                initialUsername={route.username || authedUser?.username || ""}
-                isLoggedIn={!!authedUser}
-                authedUser={authedUser}
-                goBack={() => {
-                  if (route.fromIndex && authedUser) {
-                    // Go back to index if changing password from logged in state
-                    setRoute({ name: "index" });
-                  } else {
-                    // Clear token if changing password from login page
-                    if (!authedUser) {
-                      api.clearToken();
-                    }
-                    setRoute({ name: "login" });
+        <div className="mt-2 sm:mt-3">
+          {(!authedUser && route.name !== "changePassword" && route.name !== "forgotPassword") && (
+            <Login
+              onLogin={handleLogin}
+              onForgotPassword={() => setRoute({ name: "forgotPassword" })}
+            />
+          )}
+          {route.name === "forgotPassword" && (
+            <ForgotPassword
+              goBack={() => setRoute({ name: "login" })}
+            />
+          )}
+          {route.name === "changePassword" && (
+            <ChangePassword
+              initialUsername={route.username || authedUser?.username || ""}
+              isLoggedIn={!!authedUser}
+              authedUser={authedUser}
+              goBack={() => {
+                if (route.fromIndex && authedUser) {
+                  // Go back to index if changing password from logged in state
+                  setRoute({ name: "index" });
+                } else {
+                  // Clear token if changing password from login page
+                  if (!authedUser) {
+                    api.clearToken();
                   }
-                }}
-              />
-            )}
+                  setRoute({ name: "login" });
+                }
+              }}
+            />
+          )}
 
-            {authedUser && route.name === "index" && (
-              <ProjectIndex
-                authedUser={authedUser}
-                can={can}
-                projects={projects}
-                setRoute={setRoute}
-                routeToHash={routeToHash}
-                isMember={isMember}
-                handleNavClick={handleNavClick}
-              />
+          {authedUser && route.name === "index" && (
+            <ProjectIndex
+              authedUser={authedUser}
+              can={can}
+              projects={projects}
+              setRoute={setRoute}
+              routeToHash={routeToHash}
+              isMember={isMember}
+              handleNavClick={handleNavClick}
+            />
+          )}
+          {authedUser &&
+            route.name === "newProject" &&
+            can("create-project") && (
+              <div className="-mt-2 sm:-mt-3">
+                <NewProjectPage
+                  indexHref="#/"
+                  authedUser={authedUser}
+                  onCancel={() => setRoute({ name: "index" })}
+                  onCreate={async (proj) => {
+                    await loadProjects();
+                    setRoute({ name: "index" });
+                  }}
+                  handleNavClick={handleNavClick}
+                />
+              </div>
             )}
-            {authedUser &&
-              route.name === "newProject" &&
-              can("create-project") && (
-                <div className="-mt-2 sm:-mt-3">
-                  <NewProjectPage
-                    indexHref="#/"
-                    authedUser={authedUser}
-                    onCancel={() => setRoute({ name: "index" })}
-                    onCreate={async (proj) => {
-                      await loadProjects();
-                      setRoute({ name: "index" });
-                    }}
-                    handleNavClick={handleNavClick}
-                  />
-                </div>
-              )}
-            {authedUser &&
-              route.name === "userAdmin" &&
-              can("user-management") && (
-                <div className="-mt-2 sm:-mt-3">
-                  <UserAdminPage
-                    indexHref="#/"
-                    users={users}
-                    setUsers={setUsers}
-                    onClose={async () => {
-                      await loadUsers();
-                      setRoute({ name: "index" });
-                    }}
-                    handleNavClick={handleNavClick}
-                  />
-                </div>
-              )}
-            {authedUser && route.name === "project" && (
-              <ProjectView
-                can={can}
-                authedUser={authedUser}
-                project={projects.find((p) => (p.project_id || p.id) === route.projectId)}
-                tab={route.tab || "setting"}
-                onChangeTab={(tab) => setRoute({ ...route, tab })}
-                openDevice={(device) => {
-                  setRoute({ name: "device", projectId: route.projectId, device });
-                }}
-                goIndex={() => setRoute({ name: "index" })}
-                setProjects={setProjects}
-                uploadHistory={uploadHistory}
-                setUploadHistory={setUploadHistory}
-                llmBusy={llmBusy}
-                llmBusyMessage={llmBusyMessage}
-                requestRun={requestRun}
-                onComplete={onComplete}
-                routeToHash={routeToHash}
-                handleNavClick={handleNavClick}
-                showConfirmModal={showConfirmModal}
-              />
+          {authedUser &&
+            route.name === "userAdmin" &&
+            can("user-management") && (
+              <div className="-mt-2 sm:-mt-3">
+                <UserAdminPage
+                  indexHref="#/"
+                  users={users}
+                  setUsers={setUsers}
+                  onClose={async () => {
+                    await loadUsers();
+                    setRoute({ name: "index" });
+                  }}
+                  handleNavClick={handleNavClick}
+                />
+              </div>
             )}
-            {authedUser && route.name === "device" && (
-              <DeviceDetailsPage
-                project={projects.find((p) => (p.project_id || p.id) === route.projectId)}
-                deviceId={route.device}
-                goBack={() => setRoute({ name: "project", projectId: route.projectId, tab: "summary" })}
-                goIndex={() => setRoute({ name: "index" })}
-                goBackHref={routeToHash({ name: "project", projectId: route.projectId, tab: "summary" })}
-                goIndexHref="#/"
-                can={can}
-                loadProjects={loadProjects}
-                uploadHistory={uploadHistory}
-                authedUser={authedUser}
-                setProjects={setProjects}
-                llmBusy={llmBusy}
-                llmBusyMessage={llmBusyMessage}
-                requestRun={requestRun}
-                onComplete={onComplete}
-                showConfirmModal={showConfirmModal}
-              />
-            )}
-          </div>
+          {authedUser && route.name === "project" && (
+            <ProjectView
+              can={can}
+              authedUser={authedUser}
+              project={projects.find((p) => (p.project_id || p.id) === route.projectId)}
+              tab={route.tab || "setting"}
+              onChangeTab={(tab) => setRoute({ ...route, tab })}
+              openDevice={(device) => {
+                setRoute({ name: "device", projectId: route.projectId, device });
+              }}
+              goIndex={() => setRoute({ name: "index" })}
+              setProjects={setProjects}
+              uploadHistory={uploadHistory}
+              setUploadHistory={setUploadHistory}
+              llmBusy={llmBusy}
+              llmBusyMessage={llmBusyMessage}
+              requestRun={requestRun}
+              onComplete={onComplete}
+              routeToHash={routeToHash}
+              handleNavClick={handleNavClick}
+              showConfirmModal={showConfirmModal}
+            />
+          )}
+          {authedUser && route.name === "device" && (
+            <DeviceDetailsPage
+              project={projects.find((p) => (p.project_id || p.id) === route.projectId)}
+              deviceId={route.device}
+              goBack={() => setRoute({ name: "project", projectId: route.projectId, tab: "summary" })}
+              goIndex={() => setRoute({ name: "index" })}
+              goBackHref={routeToHash({ name: "project", projectId: route.projectId, tab: "summary" })}
+              goIndexHref="#/"
+              can={can}
+              loadProjects={loadProjects}
+              uploadHistory={uploadHistory}
+              authedUser={authedUser}
+              setProjects={setProjects}
+              llmBusy={llmBusy}
+              llmBusyMessage={llmBusyMessage}
+              requestRun={requestRun}
+              onComplete={onComplete}
+              showConfirmModal={showConfirmModal}
+            />
+          )}
         </div>
+      </div>
     </div>
   );
 }
@@ -1000,7 +999,7 @@ const ProjectView = ({
 
   const projectId = project?.project_id || project?.id;
   const [llmNotification, setLlmNotification] = React.useState(null);
-  
+
   // Show tabs based on permissions - Setting moved to end
   const tabs = [];
   if (can("view-documents", project)) {
@@ -1103,7 +1102,7 @@ const OverviewPage = ({ project, uploadHistory }) => {
   const [searchActivity, setSearchActivity] = useState("");
   const [filterActivityWho, setFilterActivityWho] = useState("all");
   const [filterActivityWhat, setFilterActivityWhat] = useState("all");
-  
+
   // Combine project logs with upload history
   const allHistory = [
     ...(project.logs || []).map(log => ({
@@ -1133,14 +1132,14 @@ const OverviewPage = ({ project, uploadHistory }) => {
       uploadRecord: upload
     }))
   ].sort((a, b) => new Date(b.time) - new Date(a.time));
-  
+
   const uniqueActivityWhos = [...new Set(allHistory.map(h => h.who))];
   const uniqueActivityWhats = [...new Set(allHistory.map(h => h.what))];
-  
+
   const combinedHistory = useMemo(() => {
     return allHistory.filter(activity => {
-      const matchSearch = !searchActivity.trim() || 
-        [activity.files, activity.who, activity.what, activity.where, activity.description].some(v => 
+      const matchSearch = !searchActivity.trim() ||
+        [activity.files, activity.who, activity.what, activity.where, activity.description].some(v =>
           (v || "").toLowerCase().includes(searchActivity.toLowerCase())
         );
       const matchWho = filterActivityWho === "all" || activity.who === filterActivityWho;
@@ -1150,153 +1149,153 @@ const OverviewPage = ({ project, uploadHistory }) => {
   }, [allHistory, searchActivity, filterActivityWho, filterActivityWhat]);
 
   return (
-  <div className="grid gap-6">
-    <div className="flex items-center justify-between">
-      <div>
-        <h2 className="text-xl font-semibold">Overview</h2>
-        <div className="text-sm text-gray-500 dark:text-gray-400">
-          Last updated: {safeDisplay(project?.updated)} · Manager: {safeDisplay(project?.manager)}
+    <div className="grid gap-6">
+      <div className="flex items-center justify-between">
+        <div>
+          <h2 className="text-xl font-semibold">Overview</h2>
+          <div className="text-sm text-gray-500 dark:text-gray-400">
+            Last updated: {safeDisplay(project?.updated)} · Manager: {safeDisplay(project?.manager)}
+          </div>
         </div>
       </div>
-    </div>
 
-    {/* KPIs */}
-    <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
-      <Card title="Total Devices"><div className="text-3xl font-semibold">{safeDisplay(project?.devices)}</div></Card>
-      <Card title="Last Backup"><div className="text-3xl font-semibold">{safeDisplay(project?.lastBackup)}</div></Card>
-      <Card title="Team Members"><div className="text-3xl font-semibold">{safeDisplay(project?.members?.length)}</div></Card>
-      <Card title="Active Services"><div className="text-3xl font-semibold">{safeDisplay(project?.services)}</div></Card>
-    </div>
+      {/* KPIs */}
+      <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
+        <Card title="Total Devices"><div className="text-3xl font-semibold">{safeDisplay(project?.devices)}</div></Card>
+        <Card title="Last Backup"><div className="text-3xl font-semibold">{safeDisplay(project?.lastBackup)}</div></Card>
+        <Card title="Team Members"><div className="text-3xl font-semibold">{safeDisplay(project?.members?.length)}</div></Card>
+        <Card title="Active Services"><div className="text-3xl font-semibold">{safeDisplay(project?.services)}</div></Card>
+      </div>
 
-    {/* Topology */}
-    {(project.topoUrl || project.topo_url) && (
-      <Card title="Topology Diagram">
-        <div className="w-full rounded-xl border border-slate-300 dark:border-gray-700 overflow-hidden bg-gray-50 dark:bg-gray-900/50 flex items-center justify-center p-4">
-          <img 
-            src={project.topoUrl || project.topo_url} 
-            alt="Topology" 
-            className="max-w-full max-h-96 w-auto h-auto object-contain rounded-lg"
-            style={{ imageRendering: 'auto' }}
+      {/* Topology */}
+      {(project.topoUrl || project.topo_url) && (
+        <Card title="Topology Diagram">
+          <div className="w-full rounded-xl border border-slate-300 dark:border-gray-700 overflow-hidden bg-gray-50 dark:bg-gray-900/50 flex items-center justify-center p-4">
+            <img
+              src={project.topoUrl || project.topo_url}
+              alt="Topology"
+              className="max-w-full max-h-96 w-auto h-auto object-contain rounded-lg"
+              style={{ imageRendering: 'auto' }}
+            />
+          </div>
+        </Card>
+      )}
+
+      {/* Drift & Changes (30 days) — all devices in project */}
+      <Card title="Drift & Changes (30 days)">
+        <div className="grid gap-4">
+          {(project.summaryRows || []).map((r) => {
+            const [oldF, newF] = getComparePair(project, r.device);
+            const lines = getDriftLines(r.device);
+            return (
+              <div
+                key={r.device}
+                className="rounded-xl border border-slate-300 dark:border-[#1F2937] bg-white dark:bg-[#0F172A] p-4"
+              >
+                <div className="flex items-center justify-between gap-4">
+                  <div className="text-sm">
+                    <div className="font-semibold text-gray-800 dark:text-gray-100">Device: {safeDisplay(r.device)}</div>
+                    <div className="text-xs text-gray-500 dark:text-gray-400 mt-0.5">
+                      Compare file: <span className="font-mono">{safeDisplay(oldF)}</span> <span className="opacity-70">→</span>{" "}
+                      <span className="font-mono">{safeDisplay(newF)}</span>
+                    </div>
+                  </div>
+                </div>
+
+                <ul className="mt-3 space-y-1 text-sm leading-relaxed">
+                  {lines.map((line, i) => {
+                    const first = line.trim().charAt(0);
+                    const color =
+                      first === "+" ? "text-emerald-400" :
+                        first === "−" ? "text-rose-400" :
+                          first === "~" ? "text-amber-300" : "text-gray-300";
+                    return (
+                      <li key={i} className="font-mono">
+                        <span className={`${color} font-semibold mr-2`}>{first}</span>
+                        <span className="text-gray-200">{line.slice(1).trim()}</span>
+                      </li>
+                    );
+                  })}
+                </ul>
+              </div>
+            );
+          })}
+        </div>
+      </Card>
+
+      {/* Combined Logs and Upload History */}
+      <Card
+        title={
+          <div className="flex items-center justify-between w-full">
+            <span className="text-sm font-semibold text-gray-700 dark:text-gray-200">History</span>
+            <div className="relative">
+              <input
+                type="text"
+                placeholder="Search (filename, user, description...)"
+                value={searchActivity}
+                onChange={(e) => setSearchActivity(e.target.value)}
+                className="w-64 pl-8 pr-3 py-1.5 text-xs rounded-lg bg-slate-800/80 border border-slate-600 text-slate-200 placeholder-slate-500 focus:outline-none focus:ring-1 focus:ring-sky-500 focus:border-sky-500"
+              />
+              <svg className="absolute left-2.5 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-slate-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
+              </svg>
+            </div>
+          </div>
+        }
+        className="overflow-hidden"
+      >
+        <div className="h-[50vh] overflow-hidden rounded-xl border border-slate-300 dark:border-slate-700">
+          <Table
+            showToolbar={false}
+            columns={[
+              { header: "Time", key: "time" },
+              { header: "Name", key: "files" },
+              { header: "Responsible User", key: "who" },
+              { header: "Activity Type", key: "what" },
+              { header: "Site", key: "where" },
+              { header: "Operational Timing", key: "when" },
+              { header: "Purpose", key: "why" },
+              { header: "Description", key: "description" },
+              {
+                header: "Action",
+                key: "act",
+                filterable: false,
+                sortable: false,
+                cell: (r) => (
+                  r.type === 'upload' && r.uploadRecord?.files?.[0] ? (
+                    <div className="flex gap-2">
+                      <Button
+                        variant="secondary"
+                        onClick={() => {
+                          const file = r.uploadRecord.files[0];
+                          if (!file) return;
+                          const blob = new Blob(
+                            [file.content || `# ${r.uploadRecord.type === 'config' ? 'Configuration' : 'Document'} Backup\n# File: ${file.name}\n# Uploaded: ${r.time}\n# User: ${r.who}\n\nContent not available. Download from Documents if needed.`],
+                            { type: file.type || (r.uploadRecord.type === 'config' ? "text/plain;charset=utf-8" : "application/octet-stream") }
+                          );
+                          const url = URL.createObjectURL(blob);
+                          const a = document.createElement("a");
+                          a.href = url;
+                          a.download = file.name || "file";
+                          document.body.appendChild(a);
+                          a.click();
+                          a.remove();
+                          URL.revokeObjectURL(url);
+                        }}
+                      >
+                        ⬇ Download
+                      </Button>
+                    </div>
+                  ) : "—"
+                ),
+              },
+            ]}
+            data={combinedHistory}
+            empty="No recent activity"
           />
         </div>
       </Card>
-    )}
-
-    {/* Drift & Changes (30 days) — all devices in project */}
-    <Card title="Drift & Changes (30 days)">
-      <div className="grid gap-4">
-        {(project.summaryRows || []).map((r) => {
-          const [oldF, newF] = getComparePair(project, r.device);
-          const lines = getDriftLines(r.device);
-          return (
-            <div
-              key={r.device}
-              className="rounded-xl border border-slate-300 dark:border-[#1F2937] bg-white dark:bg-[#0F172A] p-4"
-            >
-              <div className="flex items-center justify-between gap-4">
-                <div className="text-sm">
-                  <div className="font-semibold text-gray-800 dark:text-gray-100">Device: {safeDisplay(r.device)}</div>
-                  <div className="text-xs text-gray-500 dark:text-gray-400 mt-0.5">
-                    Compare file: <span className="font-mono">{safeDisplay(oldF)}</span> <span className="opacity-70">→</span>{" "}
-                    <span className="font-mono">{safeDisplay(newF)}</span>
-                  </div>
-                </div>
-              </div>
-
-              <ul className="mt-3 space-y-1 text-sm leading-relaxed">
-                {lines.map((line, i) => {
-                  const first = line.trim().charAt(0);
-                  const color =
-                    first === "+" ? "text-emerald-400" :
-                    first === "−" ? "text-rose-400" :
-                    first === "~" ? "text-amber-300" : "text-gray-300";
-                  return (
-                    <li key={i} className="font-mono">
-                      <span className={`${color} font-semibold mr-2`}>{first}</span>
-                      <span className="text-gray-200">{line.slice(1).trim()}</span>
-                    </li>
-                  );
-                })}
-              </ul>
-            </div>
-          );
-        })}
-      </div>
-    </Card>
-
-    {/* Combined Logs and Upload History */}
-    <Card 
-      title={
-        <div className="flex items-center justify-between w-full">
-          <span className="text-sm font-semibold text-gray-700 dark:text-gray-200">History</span>
-          <div className="relative">
-            <input
-              type="text"
-              placeholder="Search (filename, user, description...)"
-              value={searchActivity}
-              onChange={(e) => setSearchActivity(e.target.value)}
-              className="w-64 pl-8 pr-3 py-1.5 text-xs rounded-lg bg-slate-800/80 border border-slate-600 text-slate-200 placeholder-slate-500 focus:outline-none focus:ring-1 focus:ring-sky-500 focus:border-sky-500"
-            />
-            <svg className="absolute left-2.5 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-slate-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
-            </svg>
-          </div>
-        </div>
-      } 
-      className="overflow-hidden"
-    >
-      <div className="h-[50vh] overflow-hidden rounded-xl border border-slate-300 dark:border-slate-700">
-        <Table
-          showToolbar={false}
-          columns={[
-            { header: "Time", key: "time" },
-            { header: "Name", key: "files" },
-            { header: "Responsible User", key: "who" },
-            { header: "Activity Type", key: "what" },
-            { header: "Site", key: "where" },
-            { header: "Operational Timing", key: "when" },
-            { header: "Purpose", key: "why" },
-            { header: "Description", key: "description" },
-            {
-              header: "Action",
-              key: "act",
-              filterable: false,
-              sortable: false,
-              cell: (r) => (
-                r.type === 'upload' && r.uploadRecord?.files?.[0] ? (
-                  <div className="flex gap-2">
-                    <Button 
-                      variant="secondary" 
-                      onClick={() => {
-                        const file = r.uploadRecord.files[0];
-                        if (!file) return;
-                        const blob = new Blob(
-                          [file.content || `# ${r.uploadRecord.type === 'config' ? 'Configuration' : 'Document'} Backup\n# File: ${file.name}\n# Uploaded: ${r.time}\n# User: ${r.who}\n\nContent not available. Download from Documents if needed.`],
-                          { type: file.type || (r.uploadRecord.type === 'config' ? "text/plain;charset=utf-8" : "application/octet-stream") }
-                        );
-                        const url = URL.createObjectURL(blob);
-                        const a = document.createElement("a");
-                        a.href = url;
-                        a.download = file.name || "file";
-                        document.body.appendChild(a);
-                        a.click();
-                        a.remove();
-                        URL.revokeObjectURL(url);
-                      }}
-                    >
-                      ⬇ Download
-                    </Button>
-                  </div>
-                ) : "—"
-              ),
-            },
-          ]}
-          data={combinedHistory}
-          empty="No recent activity"
-        />
-      </div>
-    </Card>
-  </div>
+    </div>
   );
 };
 
@@ -1342,22 +1341,20 @@ const ProjectAnalysisPanel = ({ project, summaryRows, coreCount, distCount, acce
           <button
             type="button"
             onClick={() => setActiveTab("overview")}
-            className={`px-3 py-2.5 text-xs sm:text-sm font-medium rounded-t-lg border transition-colors ${
-              activeTab === "overview"
+            className={`px-3 py-2.5 text-xs sm:text-sm font-medium rounded-t-lg border transition-colors ${activeTab === "overview"
                 ? "bg-white/85 dark:bg-white/10 border-slate-300/70 dark:border-slate-600/70 border-b-white dark:border-b-slate-900/50 text-slate-800 dark:text-slate-100 shadow-sm -mb-px"
                 : "border-transparent text-slate-700 dark:text-slate-400 hover:bg-slate-100/80 dark:hover:bg-slate-800/40 hover:text-slate-900 dark:hover:text-slate-300"
-            }`}
+              }`}
           >
             Network Overview
           </button>
           <button
             type="button"
             onClick={() => setActiveTab("recommendations")}
-            className={`px-3 py-2.5 text-xs sm:text-sm font-medium rounded-t-lg border transition-colors ${
-              activeTab === "recommendations"
+            className={`px-3 py-2.5 text-xs sm:text-sm font-medium rounded-t-lg border transition-colors ${activeTab === "recommendations"
                 ? "bg-white/85 dark:bg-white/10 border-slate-300/70 dark:border-slate-600/70 border-b-white dark:border-b-slate-900/50 text-slate-800 dark:text-slate-100 shadow-sm -mb-px"
                 : "border-transparent text-slate-700 dark:text-slate-400 hover:bg-slate-100/80 dark:hover:bg-slate-800/40 hover:text-slate-900 dark:hover:text-slate-300"
-            }`}
+              }`}
           >
             Recommendations
           </button>
@@ -1494,7 +1491,7 @@ const NetworkOverviewCard = ({ project, summaryRows, fullHeight, onRegisterGener
       }
     }
   }, [projectId]);
-  
+
   // Load saved full project analysis on mount (use network_overview from full analysis)
   // Timeout so we never block forever if API hangs
   React.useEffect(() => {
@@ -1502,10 +1499,10 @@ const NetworkOverviewCard = ({ project, summaryRows, fullHeight, onRegisterGener
       setLoading(false);
       return;
     }
-    
+
     let isMounted = true;
     const LOAD_TIMEOUT_MS = 12000;
-    
+
     const loadSavedAnalysis = async () => {
       const timeoutPromise = new Promise((_, reject) => {
         setTimeout(() => reject(new Error("Load timeout")), LOAD_TIMEOUT_MS);
@@ -1545,28 +1542,28 @@ const NetworkOverviewCard = ({ project, summaryRows, fullHeight, onRegisterGener
         if (isMounted) setLoading(false);
       }
     };
-    
+
     loadSavedAnalysis();
-    
+
     return () => {
       isMounted = false;
     };
   }, [projectId]);
-  
+
   // Poll for updates when generating (works even when user navigates away)
   React.useEffect(() => {
     if (!projectId) return;
-    
+
     const storageKey = `llm_generating_overview_${projectId}`;
     const pollingKey = `overview_${projectId}`;
     const isGenerating = generating || localStorage.getItem(storageKey) === "true";
-    
+
     if (!isGenerating) {
       localStorage.removeItem(storageKey);
       globalPollingService.stopPolling(pollingKey);
       return;
     }
-    
+
     // Use global polling service (works across page navigation)
     // Resume existing polling if it exists, otherwise start new one
     if (globalPollingService.isPolling(pollingKey)) {
@@ -1624,18 +1621,18 @@ const NetworkOverviewCard = ({ project, summaryRows, fullHeight, onRegisterGener
         }
       );
     }
-    
+
     return () => {
       // Don't stop polling on unmount - let it continue in background
       // Only stop if explicitly requested (when generating is false)
     };
   }, [projectId, generating]);
-  
+
   const handleGenerate = async () => {
     if (!projectId || generating) return;
     await doGenerate();
   };
-  
+
   const doGenerate = async () => {
     if (!projectId) return;
     const storageKeyOverview = `llm_generating_overview_${projectId}`;
@@ -1661,7 +1658,7 @@ const NetworkOverviewCard = ({ project, summaryRows, fullHeight, onRegisterGener
       });
     // Note: We don't set generating=false here - polling will handle it
   };
-  
+
   const generateRef = React.useRef(doGenerate);
   generateRef.current = doGenerate;
   React.useEffect(() => {
@@ -1678,7 +1675,7 @@ const NetworkOverviewCard = ({ project, summaryRows, fullHeight, onRegisterGener
     ));
     return () => onRegisterGetAction?.(null);
   }, [hasOverview, llmMetrics, onRegisterGetAction, requestRun]);
-  
+
   return (
     <>
       <NotificationModal
@@ -1775,11 +1772,11 @@ const RecommendationsCard = ({ project, summaryRows, fullHeight, onRegisterGener
     const storageKeyRec = `llm_generating_rec_${projectId}`;
     const pollingKey = `recommendations_${projectId}`;
     const saved = localStorage.getItem(storageKeyRec);
-    
+
     if (saved === "true") {
       // Set generating state first to show loading UI immediately
       setGeneratingRecOnly(true);
-      
+
       // If polling is not active but localStorage says generating, start polling immediately
       if (!globalPollingService.isPolling(pollingKey)) {
         // Start polling immediately (don't wait for generatingRecOnly state to trigger it)
@@ -1845,17 +1842,17 @@ const RecommendationsCard = ({ project, summaryRows, fullHeight, onRegisterGener
       setGeneratingRecOnly(false);
     }
   }, [projectId]);
-  
+
   // Load saved analysis on mount: recommendations-only (timeout so we never block forever)
   React.useEffect(() => {
     if (!projectId) {
       setLoading(false);
       return;
     }
-    
+
     let isMounted = true;
     const LOAD_TIMEOUT_MS = 12000;
-    
+
     const loadSavedAnalysis = async () => {
       const timeoutPromise = new Promise((_, reject) => {
         setTimeout(() => reject(new Error("Load timeout")), LOAD_TIMEOUT_MS);
@@ -1889,28 +1886,28 @@ const RecommendationsCard = ({ project, summaryRows, fullHeight, onRegisterGener
         if (isMounted) setLoading(false);
       }
     };
-    
+
     loadSavedAnalysis();
-    
+
     return () => {
       isMounted = false;
     };
   }, [projectId]);
-  
+
   // Poll for updates when generating (works even when user navigates away)
   React.useEffect(() => {
     if (!projectId) return;
-    
+
     const storageKeyRec = `llm_generating_rec_${projectId}`;
     const pollingKey = `recommendations_${projectId}`;
     const isGeneratingRec = generatingRecOnly || localStorage.getItem(storageKeyRec) === "true";
-    
+
     if (!isGeneratingRec) {
       localStorage.removeItem(storageKeyRec);
       globalPollingService.stopPolling(pollingKey);
       return;
     }
-    
+
     // Use global polling service (works across page navigation)
     // Resume existing polling if it exists, otherwise start new one
     if (globalPollingService.isPolling(pollingKey)) {
@@ -1930,7 +1927,7 @@ const RecommendationsCard = ({ project, summaryRows, fullHeight, onRegisterGener
             metrics: result.metrics,
             type: "success"
           });
-                    setShowNotification(true);
+          setShowNotification(true);
           setLlmNotification?.({ show: true, type: "success", title: "Recommendations Generated", message: `LLM analysis completed. Found ${recs.length} recommendations.`, metrics: result.metrics, onRegenerate: () => requestRun?.(doGenerateRecommendations) });
         },
         (errorMsg) => {
@@ -1970,13 +1967,13 @@ const RecommendationsCard = ({ project, summaryRows, fullHeight, onRegisterGener
         }
       );
     }
-    
+
     return () => {
       // Don't stop polling on unmount - let it continue in background
       // Only stop if explicitly requested (when generatingRecOnly is false)
     };
   }, [projectId, generatingRecOnly]);
-  
+
   const handleGenerateRecommendationsOnly = async () => {
     if (!projectId) return;
     const storageKey = `llm_generating_rec_${projectId}`;
@@ -1987,7 +1984,7 @@ const RecommendationsCard = ({ project, summaryRows, fullHeight, onRegisterGener
     }
     await doGenerateRecommendations();
   };
-  
+
   const doGenerateRecommendations = async () => {
     if (!projectId) return;
     const storageKeyRec = `llm_generating_rec_${projectId}`;
@@ -2018,7 +2015,7 @@ const RecommendationsCard = ({ project, summaryRows, fullHeight, onRegisterGener
       });
     // Note: We don't set generatingRecOnly=false here - polling will handle it when result is ready
   };
-  
+
   const generateRef = React.useRef(doGenerateRecommendations);
   generateRef.current = doGenerateRecommendations;
   React.useEffect(() => {
@@ -2035,7 +2032,7 @@ const RecommendationsCard = ({ project, summaryRows, fullHeight, onRegisterGener
     ));
     return () => onRegisterGetAction?.(null);
   }, [gapAnalysis, llmMetrics, onRegisterGetAction, requestRun]);
-  
+
   return (
     <>
       <NotificationModal
@@ -2084,48 +2081,47 @@ const RecommendationsCard = ({ project, summaryRows, fullHeight, onRegisterGener
                       const devices = item.affectedDevices || [];
                       const hasDevices = devices.length > 0 && !(devices.length === 1 && devices[0] === "all");
                       return (
-                      <div key={idx} className="p-3 rounded-lg border break-words" style={{
-                        borderColor: sev === "high" ? "#ef4444" : sev === "medium" ? "#eab308" : "#22c55e",
-                        backgroundColor: sev === "high" ? "rgba(239, 68, 68, 0.08)" : sev === "medium" ? "rgba(234, 179, 8, 0.1)" : "rgba(34, 197, 94, 0.08)"
-                      }}>
-                        <div className="flex items-start gap-2 mb-1.5">
-                          <span className={`text-sm font-semibold px-2 py-0.5 rounded ${
-                            sev === "high" ? "bg-rose-500 text-white" :
-                            sev === "medium" ? "bg-yellow-500 text-white" :
-                            "bg-green-500 text-white"
-                          }`}>
-                            {sev.toUpperCase()}
-                          </span>
-                        </div>
-                        {item.issue != null && (
-                          <div className="text-slate-700 dark:text-slate-300 mb-1.5">
-                            <span className="font-semibold">Issue:</span> {safeDisplay(item.issue)}
+                        <div key={idx} className="p-3 rounded-lg border break-words" style={{
+                          borderColor: sev === "high" ? "#ef4444" : sev === "medium" ? "#eab308" : "#22c55e",
+                          backgroundColor: sev === "high" ? "rgba(239, 68, 68, 0.08)" : sev === "medium" ? "rgba(234, 179, 8, 0.1)" : "rgba(34, 197, 94, 0.08)"
+                        }}>
+                          <div className="flex items-start gap-2 mb-1.5">
+                            <span className={`text-sm font-semibold px-2 py-0.5 rounded ${sev === "high" ? "bg-rose-500 text-white" :
+                                sev === "medium" ? "bg-yellow-500 text-white" :
+                                  "bg-green-500 text-white"
+                              }`}>
+                              {sev.toUpperCase()}
+                            </span>
                           </div>
-                        )}
-                        {item.recommendation != null && (
-                          <div className="text-slate-700 dark:text-slate-200 mb-1.5">
-                            <span className="font-semibold">Recommendation:</span> {safeDisplay(item.recommendation)}
-                          </div>
-                        )}
-                        {hasDevices && (
-                          <div className="flex items-center gap-2 mt-2 pt-2 border-t border-slate-200/50 dark:border-slate-700/50">
-                            <span className="text-xs font-semibold text-slate-500 dark:text-slate-400">Affected Devices:</span>
-                            <div className="flex flex-wrap gap-1">
-                              {devices.map((d, i) => (
-                                <span key={i} className="inline-flex items-center px-2 py-0.5 text-xs font-medium rounded-full bg-slate-200 dark:bg-slate-700 text-slate-700 dark:text-slate-300">
-                                  {d}
-                                </span>
-                              ))}
+                          {item.issue != null && (
+                            <div className="text-slate-700 dark:text-slate-300 mb-1.5">
+                              <span className="font-semibold">Issue:</span> {safeDisplay(item.issue)}
                             </div>
-                          </div>
-                        )}
-                        {!hasDevices && (
-                          <div className="flex items-center gap-2 mt-2 pt-2 border-t border-slate-200/50 dark:border-slate-700/50">
-                            <span className="text-xs font-semibold text-slate-500 dark:text-slate-400">Affected Devices:</span>
-                            <span className="text-xs text-slate-500 dark:text-slate-400 italic">All devices in network</span>
-                          </div>
-                        )}
-                      </div>
+                          )}
+                          {item.recommendation != null && (
+                            <div className="text-slate-700 dark:text-slate-200 mb-1.5">
+                              <span className="font-semibold">Recommendation:</span> {safeDisplay(item.recommendation)}
+                            </div>
+                          )}
+                          {hasDevices && (
+                            <div className="flex items-center gap-2 mt-2 pt-2 border-t border-slate-200/50 dark:border-slate-700/50">
+                              <span className="text-xs font-semibold text-slate-500 dark:text-slate-400">Affected Devices:</span>
+                              <div className="flex flex-wrap gap-1">
+                                {devices.map((d, i) => (
+                                  <span key={i} className="inline-flex items-center px-2 py-0.5 text-xs font-medium rounded-full bg-slate-200 dark:bg-slate-700 text-slate-700 dark:text-slate-300">
+                                    {d}
+                                  </span>
+                                ))}
+                              </div>
+                            </div>
+                          )}
+                          {!hasDevices && (
+                            <div className="flex items-center gap-2 mt-2 pt-2 border-t border-slate-200/50 dark:border-slate-700/50">
+                              <span className="text-xs font-semibold text-slate-500 dark:text-slate-400">Affected Devices:</span>
+                              <span className="text-xs text-slate-500 dark:text-slate-400 italic">All devices in network</span>
+                            </div>
+                          )}
+                        </div>
                       );
                     })}
                   </div>
@@ -2459,7 +2455,7 @@ const SummaryPage = ({ project, projectId: projectIdProp, routeToHash, handleNav
     // Reload summary + metrics after upload (wait a bit for backend to parse)
     const projectId = project?.project_id || project?.id;
     if (!projectId) return;
-    
+
     setLoading(true);
     setTimeout(async () => {
       try {
@@ -2528,7 +2524,8 @@ const SummaryPage = ({ project, projectId: projectIdProp, routeToHash, handleNav
     { header: "RT-PROTO", key: "rt_proto", width: "80px" },
     { header: "CPU%", key: "cpu", width: "60px" },
     { header: "MEM%", key: "mem", width: "60px" },
-    { header: "STATUS", key: "status", cell: (r) => {
+    {
+      header: "STATUS", key: "status", cell: (r) => {
         const raw = r.status;
         const status = (raw != null && typeof raw === "object") ? JSON.stringify(raw) : (raw || "OK");
         if (status === "OK") {
@@ -2538,17 +2535,20 @@ const SummaryPage = ({ project, projectId: projectIdProp, routeToHash, handleNav
         } else {
           return <span className="text-red-400">⚠ {String(status)}</span>;
         }
-      }},
-    { header: "MORE", key: "more", width: "40px", cell: (r) => (
-      <a
-        href={deviceDetailHref(r.device)}
-        onClick={(e) => handleNavClick(e, () => handleDeviceClick(r.device))}
-        className="w-6 h-6 flex items-center justify-center rounded-lg border border-slate-300 dark:border-slate-600 bg-slate-100/80 dark:bg-slate-800/50 hover:bg-slate-200 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-300 text-[10px] transition-colors mx-auto"
-        title="Open Details (Ctrl+click for new tab)"
-      >
-        →
-      </a>
-    )},
+      }
+    },
+    {
+      header: "MORE", key: "more", width: "40px", cell: (r) => (
+        <a
+          href={deviceDetailHref(r.device)}
+          onClick={(e) => handleNavClick(e, () => handleDeviceClick(r.device))}
+          className="w-6 h-6 flex items-center justify-center rounded-lg border border-slate-300 dark:border-slate-600 bg-slate-100/80 dark:bg-slate-800/50 hover:bg-slate-200 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-300 text-[10px] transition-colors mx-auto"
+          title="Open Details (Ctrl+click for new tab)"
+        >
+          →
+        </a>
+      )
+    },
   ];
 
   const exportCSV = () => {
@@ -2558,7 +2558,7 @@ const SummaryPage = ({ project, projectId: projectIdProp, routeToHash, handleNav
     const rows = (filtered || []).map(r =>
       exportColumns.map(c => {
         let value;
-        
+
         // For columns with cell function (like STATUS), get the raw value from row data
         if (c.key === "status") {
           // STATUS column: use the actual status value, not the React element
@@ -2571,7 +2571,7 @@ const SummaryPage = ({ project, projectId: projectIdProp, routeToHash, handleNav
           // For other columns, get the value directly
           value = r[c.key] ?? "";
         }
-        
+
         // Handle different value types
         if (value === null || value === undefined) {
           value = "";
@@ -2579,8 +2579,8 @@ const SummaryPage = ({ project, projectId: projectIdProp, routeToHash, handleNav
           // For other objects, convert to JSON string
           value = JSON.stringify(value);
         }
-        
-        return `"${String(value).replaceAll('"','""')}"`;
+
+        return `"${String(value).replaceAll('"', '""')}"`;
       }).join(","));
     downloadCSV([headers.join(","), ...rows].join("\n"), `summary_${safeDisplay(project?.name)}.csv`);
   };
@@ -2606,11 +2606,11 @@ const SummaryPage = ({ project, projectId: projectIdProp, routeToHash, handleNav
           </h2>
           <div className="flex gap-1.5 items-center">
             <div className="relative">
-              <Input 
-                placeholder="Search..." 
-                value={q} 
-                onChange={(e)=>setQ(e.target.value)} 
-                className="w-28 text-[9px] py-1 px-2.5 h-6 bg-slate-100 dark:bg-slate-900/80 border-slate-300 dark:border-slate-700 focus:border-slate-400 dark:focus:border-slate-500 focus:ring-1 focus:ring-slate-400/50 dark:focus:ring-slate-500/50 rounded-lg text-slate-800 dark:text-slate-200 placeholder:text-slate-600 dark:placeholder:text-slate-500" 
+              <Input
+                placeholder="Search..."
+                value={q}
+                onChange={(e) => setQ(e.target.value)}
+                className="w-28 text-[9px] py-1 px-2.5 h-6 bg-slate-100 dark:bg-slate-900/80 border-slate-300 dark:border-slate-700 focus:border-slate-400 dark:focus:border-slate-500 focus:ring-1 focus:ring-slate-400/50 dark:focus:ring-slate-500/50 rounded-lg text-slate-800 dark:text-slate-200 placeholder:text-slate-600 dark:placeholder:text-slate-500"
               />
               <span className="absolute right-2.5 top-1/2 -translate-y-1/2 text-[9px] text-slate-600 dark:text-slate-500 pointer-events-none">🔍</span>
             </div>
@@ -2640,14 +2640,7 @@ const SummaryPage = ({ project, projectId: projectIdProp, routeToHash, handleNav
           </div>
         </div>
 
-        {showUploadConfig && (
-          <UploadConfigForm
-            project={project}
-            authedUser={authedUser}
-            onClose={() => setShowUploadConfig(false)}
-            onUpload={handleUpload}
-          />
-        )}
+
 
         {llmBusy && (
           <div className="flex-shrink-0 px-2 py-0.5 text-[10px] text-slate-600 dark:text-slate-500 bg-slate-200 dark:bg-slate-800/30 rounded-lg" title={llmBusyMessage || undefined}>
@@ -2656,9 +2649,9 @@ const SummaryPage = ({ project, projectId: projectIdProp, routeToHash, handleNav
         )}
         <div className="flex-1 min-h-0 grid grid-cols-1 lg:grid-cols-12 gap-3 overflow-hidden">
           <div className="lg:col-span-6 min-h-0 overflow-hidden rounded-xl border border-slate-300 dark:border-slate-800 bg-white dark:bg-slate-900/50 shadow-sm dark:shadow-none">
-            <TopologyGraph project={project} projectId={projectId} routeToHash={routeToHash} handleNavClick={handleNavClick} onOpenDevice={(id)=>openDevice(id)} can={can} authedUser={authedUser} setProjects={setProjects} setTopologyLLMMetrics={setTopologyLLMMetrics} topologyLLMMetrics={topologyLLMMetrics} llmBusy={llmBusy} llmBusyMessage={llmBusyMessage} requestRun={requestRun} onComplete={onComplete} setLlmNotification={setLlmNotification} showConfirmModal={showConfirmModal} />
+            <TopologyGraph project={project} projectId={projectId} routeToHash={routeToHash} handleNavClick={handleNavClick} onOpenDevice={(id) => openDevice(id)} can={can} authedUser={authedUser} setProjects={setProjects} setTopologyLLMMetrics={setTopologyLLMMetrics} topologyLLMMetrics={topologyLLMMetrics} llmBusy={llmBusy} llmBusyMessage={llmBusyMessage} requestRun={requestRun} onComplete={onComplete} setLlmNotification={setLlmNotification} showConfirmModal={showConfirmModal} />
           </div>
-          <ProjectAnalysisPanel 
+          <ProjectAnalysisPanel
             project={project}
             summaryRows={summaryRows}
             coreCount={coreCount}
@@ -2772,7 +2765,7 @@ const DeviceDetailsView = ({ project, deviceId, goBack, goBackHref, goIndex, goI
   ) : (
     <Button variant="secondary" onClick={goBack}>← Back to Summary</Button>
   ));
-  
+
   // Early return if project or deviceId is missing
   if (!project) {
     console.error('[DeviceDetailsView] Project not found');
@@ -2804,7 +2797,7 @@ const DeviceDetailsView = ({ project, deviceId, goBack, goBackHref, goIndex, goI
     const fetchDeviceDetails = async () => {
       if (!project?.project_id && !project?.id) return;
       if (!deviceId) return;
-      
+
       setLoading(true);
       setError(null);
       try {
@@ -2848,7 +2841,7 @@ const DeviceDetailsView = ({ project, deviceId, goBack, goBackHref, goIndex, goI
     const fetchDeviceBackups = async () => {
       if (!project?.project_id && !project?.id) return;
       if (!deviceId) return;
-      
+
       setLoadingBackups(true);
       setDeviceConfigVersions(null);
       try {
@@ -2925,7 +2918,7 @@ const DeviceDetailsView = ({ project, deviceId, goBack, goBackHref, goIndex, goI
   const [compareOpen, setCompareOpen] = React.useState(false);
   const [leftFileName, setLeftFileName] = React.useState("");
   const [rightFileName, setRightFileName] = React.useState("");
-  
+
   // Update default file names when deviceBackups change
   React.useEffect(() => {
     if (deviceBackups.length >= 2) {
@@ -2936,7 +2929,7 @@ const DeviceDetailsView = ({ project, deviceId, goBack, goBackHref, goIndex, goI
       setRightFileName("");
     }
   }, [deviceBackups]);
-  
+
   const leftFile = deviceBackups.find((f) => f.filename === leftFileName);
   const rightFile = deviceBackups.find((f) => f.filename === rightFileName);
 
@@ -3045,45 +3038,45 @@ const DeviceDetailsView = ({ project, deviceId, goBack, goBackHref, goIndex, goI
       { key: "lastUpload", label: "Last Configuration Upload", value: lastUpload },
     ];
   }, [deviceData, deviceId, deviceBackups, lastConfigUpload]);
-  
+
   // Device narrative - use facts from API data only
   const deviceNarrative = React.useMemo(() => {
     if (!deviceData && loading) return "Device information is being loaded...";
     if (!deviceData) return "No device data available.";
-    
+
     const parts = [];
     parts.push(`Device summary: ${facts.device}`);
     parts.push([
       `• Model/Platform: ${facts.model} • OS/Version: ${facts.osVersion}`,
       `• Serial: ${facts.serial} • Mgmt IP: ${facts.mgmtIp}`
     ].join("  |  "));
-    
+
     if (facts.ifaces) {
       parts.push(`• Ports total ${facts.ifaces.total} (Up ${facts.ifaces.up}, Down ${facts.ifaces.down}, AdminDown ${facts.ifaces.adminDown})`);
       parts.push(`• Access ≈ ${facts.accessCount}  |  Trunk ≈ ${facts.trunkCount}`);
     }
     parts.push(`• VLANs: ${facts.vlanCount}  |  STP: ${facts.stpMode}${facts.stpRoot && facts.stpRoot !== "—" ? ` (Root: ${facts.stpRoot})` : ""}`);
-    
+
     // L3
     const l3 = [];
     if (facts.routing && facts.routing !== "—") l3.push(facts.routing);
     if (facts.ospfNeighbors > 0) l3.push(`OSPF ${facts.ospfNeighbors} neigh`);
     if (facts.bgpAsn && facts.bgpAsn !== "—") l3.push(`BGP ${facts.bgpAsn}/${facts.bgpNeighbors}`);
     if (l3.length) parts.push(`• Routing: ${l3.join(" | ")}`);
-    
+
     // Neighbors
     if (facts.cdpNeighbors > 0 || facts.lldpNeighbors > 0) {
       parts.push(`• Neighbors: CDP ${facts.cdpNeighbors} / LLDP ${facts.lldpNeighbors}`);
     }
-    
+
     // Mgmt/Health
     parts.push(`• NTP: ${facts.ntpStatus}  |  SNMP: ${facts.snmp}  |  Syslog: ${facts.syslog}  |  CPU ${facts.cpu}% / MEM ${facts.mem}%`);
-    
+
     // HA
     if (facts.hsrpGroups > 0 || facts.vrrpGroups > 0) {
       parts.push(`• HA: HSRP ${facts.hsrpGroups} groups / VRRP ${facts.vrrpGroups} groups`);
     }
-    
+
     return parts.join("\n");
   }, [deviceData, facts, loading]);
 
@@ -3230,7 +3223,7 @@ const DeviceDetailsView = ({ project, deviceId, goBack, goBackHref, goIndex, goI
             deviceDriftPollRef.current = null;
           }
         }
-      } catch (_) {}
+      } catch (_) { }
     };
     poll();
     const id = setInterval(poll, 4000);
@@ -3403,10 +3396,10 @@ const DeviceDetailsView = ({ project, deviceId, goBack, goBackHref, goIndex, goI
         const vlanId = vlanDetail.id;
         const vlanName = vlanDetail.name || "";
         const vlanStatus = vlanDetail.status || "active";
-        
+
         // Use access_ports from parser
         const accessPorts = vlanDetail.access_ports || [];
-        
+
         // Find trunk ports for this VLAN from trunk_ports array
         const trunkPortsForVlan = (vlansData.trunk_ports || [])
           .filter(tp => {
@@ -3414,19 +3407,19 @@ const DeviceDetailsView = ({ project, deviceId, goBack, goBackHref, goIndex, goI
             return allowed === "ALL" || allowed.includes(vlanId) || allowed.includes("-");
           })
           .map(tp => tp.port);
-        
+
         // Find SVI IP
-        const sviInterface = interfaces.find(i => 
-          (i.type === "SVI" || i.type === "Vlan" || i.name?.startsWith("Vlan")) && 
+        const sviInterface = interfaces.find(i =>
+          (i.type === "SVI" || i.type === "Vlan" || i.name?.startsWith("Vlan")) &&
           (i.name === `Vlan${vlanId}` || i.name === `Vlanif${vlanId}`)
         );
         const sviIp = sviInterface?.ipv4_address || null;
-        
+
         // Find HSRP VIP (if any)
         const hsrpList = Array.isArray(haData.hsrp) ? haData.hsrp : (haData.hsrp?.groups || []);
         const hsrpGroup = hsrpList.find(g => String(g.vlan_id) === String(vlanId) || g.interface?.includes(vlanId));
         const hsrpVip = hsrpGroup?.virtual_ip || null;
-        
+
         return {
           vlanId,
           name: vlanName,
@@ -3438,7 +3431,7 @@ const DeviceDetailsView = ({ project, deviceId, goBack, goBackHref, goIndex, goI
         };
       });
     }
-    
+
     // Fallback to old method using vlan_list
     if (!vlansData || !vlanList.length) return [];
     return vlanList.map(vlanId => {
@@ -3451,7 +3444,7 @@ const DeviceDetailsView = ({ project, deviceId, goBack, goBackHref, goIndex, goI
       const hsrpList = Array.isArray(haData.hsrp) ? haData.hsrp : (haData.hsrp?.groups || []);
       const hsrpGroup = hsrpList.find(g => String(g.vlan_id) === String(vlanId));
       const hsrpVip = hsrpGroup?.virtual_ip || null;
-      
+
       return {
         vlanId,
         name: vlanName,
@@ -3549,19 +3542,21 @@ const DeviceDetailsView = ({ project, deviceId, goBack, goBackHref, goIndex, goI
   const vlanColumns = [
     { header: "VLAN ID", key: "vlanId", cell: (r) => <span className="font-medium text-slate-800 dark:text-slate-200">{r.vlanId}</span> },
     { header: "Name", key: "name", cell: (r) => r.name || "—" },
-    { header: "Status", key: "status", cell: (r) => {
-      const status = r.status || "—";
-      const isActive = status.toLowerCase().includes("active") && !status.toLowerCase().includes("unsup");
-      return <span className={isActive ? "text-emerald-500" : "text-amber-500"}>{status}</span>;
-    }},
+    {
+      header: "Status", key: "status", cell: (r) => {
+        const status = r.status || "—";
+        const isActive = status.toLowerCase().includes("active") && !status.toLowerCase().includes("unsup");
+        return <span className={isActive ? "text-emerald-500" : "text-amber-500"}>{status}</span>;
+      }
+    },
     { header: "Access Ports", key: "accessPorts", cell: (r) => r.accessPorts || "—" },
     { header: "Trunk Ports", key: "trunkPorts", cell: (r) => r.trunkPorts || "—" },
     { header: "SVI IP", key: "sviIp", cell: (r) => r.sviIp || "—" },
     { header: "HSRP VIP", key: "hsrpVip", cell: (r) => r.hsrpVip || "—" },
   ];
   const exportVlans = () => {
-    const headers = ["vlanId","name","status","accessPorts","trunkPorts","sviIp","hsrpVip"];
-    const rows = vlans.map((v) => headers.map((h) => `"${String(v[h] ?? "").replaceAll('"','""')}"`).join(","));
+    const headers = ["vlanId", "name", "status", "accessPorts", "trunkPorts", "sviIp", "hsrpVip"];
+    const rows = vlans.map((v) => headers.map((h) => `"${String(v[h] ?? "").replaceAll('"', '""')}"`).join(","));
     downloadCSV([headers.join(","), ...rows].join("\n"), `${facts.device}_vlans.csv`);
   };
 
@@ -3641,11 +3636,10 @@ const DeviceDetailsView = ({ project, deviceId, goBack, goBackHref, goIndex, goI
                 <button
                   key={t.id}
                   onClick={() => setTab(t.id)}
-                  className={`px-3 py-1.5 rounded-xl text-xs font-medium transition-all border ${
-                    tab === t.id
+                  className={`px-3 py-1.5 rounded-xl text-xs font-medium transition-all border ${tab === t.id
                       ? "bg-white/90 dark:bg-white/10 backdrop-blur-sm border-slate-300/80 dark:border-slate-600/80 text-slate-800 dark:text-slate-100 shadow-sm"
                       : "bg-slate-100/80 dark:bg-slate-800/50 border-slate-300 dark:border-slate-700/60 text-slate-700 dark:text-slate-400 hover:bg-slate-200/80 dark:hover:bg-slate-700/50 hover:text-slate-900 dark:hover:text-slate-300"
-                  }`}
+                    }`}
                 >
                   {t.label}
                 </button>
@@ -3657,8 +3651,8 @@ const DeviceDetailsView = ({ project, deviceId, goBack, goBackHref, goIndex, goI
               <Button variant="secondary" onClick={goBack} className="text-xs py-1.5 px-3 h-8 flex-shrink-0">← Back to Summary</Button>
             ))}
             {canDeleteDevice && (
-              <Button 
-                variant="danger" 
+              <Button
+                variant="danger"
                 onClick={() => {
                   showConfirmModal({
                     title: "Delete Device",
@@ -3677,7 +3671,7 @@ const DeviceDetailsView = ({ project, deviceId, goBack, goBackHref, goIndex, goI
                       }
                     }
                   });
-                }} 
+                }}
                 className="text-xs py-1.5 px-3 h-8 flex-shrink-0"
               >
                 Delete Device
@@ -3707,7 +3701,7 @@ const DeviceDetailsView = ({ project, deviceId, goBack, goBackHref, goIndex, goI
             <div className="md:col-span-5 min-h-0 overflow-hidden rounded-xl border border-slate-300 dark:border-slate-800 bg-white dark:bg-slate-900/50 flex flex-col shadow-sm dark:shadow-none">
               <Card className="flex-1 min-h-0 flex flex-col overflow-hidden">
                 <div className="flex-1 min-h-0 overflow-auto">
-                  <DeviceImageUpload 
+                  <DeviceImageUpload
                     project={project}
                     deviceName={deviceId}
                     authedUser={authedUser}
@@ -3725,33 +3719,30 @@ const DeviceDetailsView = ({ project, deviceId, goBack, goBackHref, goIndex, goI
                   <button
                     type="button"
                     onClick={() => setLlmPanelTab("summary")}
-                    className={`px-4 py-2.5 text-sm font-medium rounded-t-lg border transition-colors ${
-                      llmPanelTab === "summary"
+                    className={`px-4 py-2.5 text-sm font-medium rounded-t-lg border transition-colors ${llmPanelTab === "summary"
                         ? "bg-white/90 dark:bg-white/10 border-slate-300/70 dark:border-slate-600/70 border-b-white dark:border-b-slate-900/50 text-slate-800 dark:text-slate-100 shadow-sm -mb-px"
                         : "border-transparent text-slate-700 dark:text-slate-400 hover:bg-slate-100/80 dark:hover:bg-slate-800/40 hover:text-slate-900 dark:hover:text-slate-300"
-                    }`}
+                      }`}
                   >
                     Device Summary
                   </button>
                   <button
                     type="button"
                     onClick={() => setLlmPanelTab("recommendations")}
-                    className={`px-4 py-2.5 text-sm font-medium rounded-t-lg border transition-colors ${
-                      llmPanelTab === "recommendations"
+                    className={`px-4 py-2.5 text-sm font-medium rounded-t-lg border transition-colors ${llmPanelTab === "recommendations"
                         ? "bg-white/90 dark:bg-white/10 border-slate-300/70 dark:border-slate-600/70 border-b-white dark:border-b-slate-900/50 text-slate-800 dark:text-slate-100 shadow-sm -mb-px"
                         : "border-transparent text-slate-700 dark:text-slate-400 hover:bg-slate-100/80 dark:hover:bg-slate-800/40 hover:text-slate-900 dark:hover:text-slate-300"
-                    }`}
+                      }`}
                   >
                     AI Recommendations
                   </button>
                   <button
                     type="button"
                     onClick={() => setLlmPanelTab("drift")}
-                    className={`px-4 py-2.5 text-sm font-medium rounded-t-lg border transition-colors ${
-                      llmPanelTab === "drift"
+                    className={`px-4 py-2.5 text-sm font-medium rounded-t-lg border transition-colors ${llmPanelTab === "drift"
                         ? "bg-white/90 dark:bg-white/10 border-slate-300/70 dark:border-slate-600/70 border-b-white dark:border-b-slate-900/50 text-slate-800 dark:text-slate-100 shadow-sm -mb-px"
                         : "border-transparent text-slate-700 dark:text-slate-400 hover:bg-slate-100/80 dark:hover:bg-slate-800/40 hover:text-slate-900 dark:hover:text-slate-300"
-                    }`}
+                      }`}
                   >
                     Config Drift
                   </button>
@@ -3819,30 +3810,29 @@ const DeviceDetailsView = ({ project, deviceId, goBack, goBackHref, goIndex, goI
                             {deviceRecsList.map((item, idx) => {
                               const sev = (item.severity || "medium").toLowerCase();
                               return (
-                              <div key={idx} className="p-2 rounded-lg border text-xs break-words" style={{
-                                borderColor: sev === "high" ? "#ef4444" : sev === "medium" ? "#eab308" : "#22c55e",
-                                backgroundColor: sev === "high" ? "rgba(239, 68, 68, 0.08)" : sev === "medium" ? "rgba(234, 179, 8, 0.1)" : "rgba(34, 197, 94, 0.08)"
-                              }}>
-                                <div className="flex items-start gap-2 mb-1">
-                                  <span className={`text-[10px] font-semibold px-1.5 py-0.5 rounded ${
-                                    sev === "high" ? "bg-rose-500 text-white" :
-                                    sev === "medium" ? "bg-yellow-500 text-white" :
-                                    "bg-green-500 text-white"
-                                  }`}>
-                                    {sev.toUpperCase()}
-                                  </span>
+                                <div key={idx} className="p-2 rounded-lg border text-xs break-words" style={{
+                                  borderColor: sev === "high" ? "#ef4444" : sev === "medium" ? "#eab308" : "#22c55e",
+                                  backgroundColor: sev === "high" ? "rgba(239, 68, 68, 0.08)" : sev === "medium" ? "rgba(234, 179, 8, 0.1)" : "rgba(34, 197, 94, 0.08)"
+                                }}>
+                                  <div className="flex items-start gap-2 mb-1">
+                                    <span className={`text-[10px] font-semibold px-1.5 py-0.5 rounded ${sev === "high" ? "bg-rose-500 text-white" :
+                                        sev === "medium" ? "bg-yellow-500 text-white" :
+                                          "bg-green-500 text-white"
+                                      }`}>
+                                      {sev.toUpperCase()}
+                                    </span>
+                                  </div>
+                                  {item.issue && (
+                                    <div className="text-xs text-slate-800 dark:text-slate-300 mb-1">
+                                      <span className="font-semibold">Issue:</span> {item.issue}
+                                    </div>
+                                  )}
+                                  {item.recommendation && (
+                                    <div className="text-xs text-slate-800 dark:text-slate-300">
+                                      <span className="font-semibold">Recommendation:</span> {item.recommendation}
+                                    </div>
+                                  )}
                                 </div>
-                                {item.issue && (
-                                  <div className="text-xs text-slate-800 dark:text-slate-300 mb-1">
-                                    <span className="font-semibold">Issue:</span> {item.issue}
-                                  </div>
-                                )}
-                                {item.recommendation && (
-                                  <div className="text-xs text-slate-800 dark:text-slate-300">
-                                    <span className="font-semibold">Recommendation:</span> {item.recommendation}
-                                  </div>
-                                )}
-                              </div>
                               );
                             })}
                           </div>
@@ -3962,7 +3952,7 @@ const DeviceDetailsView = ({ project, deviceId, goBack, goBackHref, goIndex, goI
                             )}
                           </div>
                         ) : (
-                            <div className="grid gap-2">
+                          <div className="grid gap-2">
                             <div className="text-xs text-slate-700 dark:text-slate-300">
                               <b>Device:</b> {safeDisplay(facts?.device)} <br />
                               <b>Version history:</b> {deviceConfigVersions.versions?.length ?? 0} version(s) (raw config) <br />
@@ -4007,12 +3997,12 @@ const DeviceDetailsView = ({ project, deviceId, goBack, goBackHref, goIndex, goI
               <Button variant="secondary" onClick={onExportIfaces}>Export CSV</Button>
             </div>
             <div className="flex-1 min-h-0">
-              <Table 
+              <Table
                 searchable
                 searchPlaceholder="Search interface name, IP, description..."
-                columns={ifaceColumns} 
-                data={ifaces} 
-                empty="No interfaces" 
+                columns={ifaceColumns}
+                data={ifaces}
+                empty="No interfaces"
                 minWidthClass="min-w-[1400px]"
                 containerClassName="h-full"
               />
@@ -4029,12 +4019,12 @@ const DeviceDetailsView = ({ project, deviceId, goBack, goBackHref, goIndex, goI
             <Button variant="secondary" onClick={exportVlans}>Export CSV</Button>
           </div>
           <div className="flex-1 min-h-0">
-            <Table 
+            <Table
               searchable
               searchPlaceholder="Search VLAN ID, name, status..."
-              columns={vlanColumns} 
-              data={vlans} 
-              empty="No VLANs parsed" 
+              columns={vlanColumns}
+              data={vlans}
+              empty="No VLANs parsed"
               minWidthClass="min-w-[900px]"
               containerClassName="h-full"
             />
@@ -4052,14 +4042,14 @@ const DeviceDetailsView = ({ project, deviceId, goBack, goBackHref, goIndex, goI
               <Metric k="Bridge ID" v={stpData.bridge_id || stpData.stp_info?.root_bridge?.root_bridge_id || "—"} />
               <Metric k="Root Bridge ID" v={stpData.root_bridge_id || "—"} />
               <Metric k="Is Root Bridge" v={
-                stpData.stp_info?.root_bridge?.is_local_device_root !== undefined 
+                stpData.stp_info?.root_bridge?.is_local_device_root !== undefined
                   ? (stpData.stp_info.root_bridge.is_local_device_root ? "Yes" : "No")
                   : (stpData.root_bridges?.length > 0 ? "Yes (VLANs: " + stpData.root_bridges.join(", ") + ")" : "—")
               } />
               <Metric k="PortFast Global" v={stpData.portfast_enabled !== undefined ? (stpData.portfast_enabled ? "Enabled" : "Disabled") : "—"} />
               <Metric k="BPDU Guard Global" v={stpData.bpduguard_enabled !== undefined ? (stpData.bpduguard_enabled ? "Enabled" : "Disabled") : "—"} />
             </div>
-            
+
             {/* STP Interfaces from parser - with full details */}
             {stpData.interfaces && Array.isArray(stpData.interfaces) && stpData.interfaces.length > 0 && (
               <div className="mt-4 max-h-[60vh] overflow-hidden rounded-2xl border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-900/30 flex flex-col">
@@ -4072,25 +4062,33 @@ const DeviceDetailsView = ({ project, deviceId, goBack, goBackHref, goIndex, goI
                     searchPlaceholder="Search port name..."
                     columns={[
                       { header: "Port", key: "port", cell: (r) => <span className="font-medium text-slate-800 dark:text-slate-200">{r.port}</span> },
-                      { header: "Role", key: "role", cell: (r) => {
-                        const role = r.role || "—";
-                        const colorClass = role === "Root" ? "text-emerald-600 dark:text-emerald-500" : role === "Designated" ? "text-blue-600 dark:text-blue-500" : role === "Alternate" ? "text-amber-600 dark:text-amber-500" : "";
-                        return <span className={colorClass}>{role}</span>;
-                      }},
-                      { header: "State", key: "state", cell: (r) => {
-                        const state = r.state || "—";
-                        const colorClass = state === "Forwarding" ? "text-emerald-600 dark:text-emerald-500" : state === "Blocking" ? "text-rose-600 dark:text-rose-500" : state === "Learning" ? "text-amber-600 dark:text-amber-500" : "";
-                        return <span className={colorClass}>{state}</span>;
-                      }},
+                      {
+                        header: "Role", key: "role", cell: (r) => {
+                          const role = r.role || "—";
+                          const colorClass = role === "Root" ? "text-emerald-600 dark:text-emerald-500" : role === "Designated" ? "text-blue-600 dark:text-blue-500" : role === "Alternate" ? "text-amber-600 dark:text-amber-500" : "";
+                          return <span className={colorClass}>{role}</span>;
+                        }
+                      },
+                      {
+                        header: "State", key: "state", cell: (r) => {
+                          const state = r.state || "—";
+                          const colorClass = state === "Forwarding" ? "text-emerald-600 dark:text-emerald-500" : state === "Blocking" ? "text-rose-600 dark:text-rose-500" : state === "Learning" ? "text-amber-600 dark:text-amber-500" : "";
+                          return <span className={colorClass}>{state}</span>;
+                        }
+                      },
                       { header: "Cost", key: "cost", cell: (r) => r.cost ?? "—" },
-                      { header: "PortFast", key: "portfast_enabled", cell: (r) => {
-                        const enabled = r.portfast_enabled;
-                        return <span className={enabled ? "text-emerald-600 dark:text-emerald-500" : "text-slate-500 dark:text-slate-400"}>{enabled ? "Enabled" : "Disabled"}</span>;
-                      }},
-                      { header: "BPDU Guard", key: "bpduguard_enabled", cell: (r) => {
-                        const enabled = r.bpduguard_enabled;
-                        return <span className={enabled ? "text-emerald-600 dark:text-emerald-500" : "text-slate-500 dark:text-slate-400"}>{enabled ? "Enabled" : "Disabled"}</span>;
-                      }}
+                      {
+                        header: "PortFast", key: "portfast_enabled", cell: (r) => {
+                          const enabled = r.portfast_enabled;
+                          return <span className={enabled ? "text-emerald-600 dark:text-emerald-500" : "text-slate-500 dark:text-slate-400"}>{enabled ? "Enabled" : "Disabled"}</span>;
+                        }
+                      },
+                      {
+                        header: "BPDU Guard", key: "bpduguard_enabled", cell: (r) => {
+                          const enabled = r.bpduguard_enabled;
+                          return <span className={enabled ? "text-emerald-600 dark:text-emerald-500" : "text-slate-500 dark:text-slate-400"}>{enabled ? "Enabled" : "Disabled"}</span>;
+                        }
+                      }
                     ]}
                     data={stpData.interfaces}
                     empty="No STP port information available"
@@ -4100,7 +4098,7 @@ const DeviceDetailsView = ({ project, deviceId, goBack, goBackHref, goIndex, goI
                 </div>
               </div>
             )}
-            
+
             {/* Fallback: use stp_info.interfaces if main interfaces not available */}
             {(!stpData.interfaces || stpData.interfaces.length === 0) && stpData.stp_info?.interfaces && Array.isArray(stpData.stp_info.interfaces) && stpData.stp_info.interfaces.length > 0 && (
               <div className="mt-4 max-h-[60vh] overflow-hidden rounded-2xl border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-900/30 flex flex-col">
@@ -4113,25 +4111,33 @@ const DeviceDetailsView = ({ project, deviceId, goBack, goBackHref, goIndex, goI
                     searchPlaceholder="Search port name..."
                     columns={[
                       { header: "Port", key: "port", cell: (r) => <span className="font-medium text-slate-800 dark:text-slate-200">{r.port}</span> },
-                      { header: "Role", key: "role", cell: (r) => {
-                        const role = r.role || "—";
-                        const colorClass = role === "Root" ? "text-emerald-600 dark:text-emerald-500" : role === "Designated" ? "text-blue-600 dark:text-blue-500" : role === "Alternate" ? "text-amber-600 dark:text-amber-500" : "";
-                        return <span className={colorClass}>{role}</span>;
-                      }},
-                      { header: "State", key: "state", cell: (r) => {
-                        const state = r.state || "—";
-                        const colorClass = state === "Forwarding" ? "text-emerald-600 dark:text-emerald-500" : state === "Blocking" ? "text-rose-600 dark:text-rose-500" : state === "Learning" ? "text-amber-600 dark:text-amber-500" : "";
-                        return <span className={colorClass}>{state}</span>;
-                      }},
+                      {
+                        header: "Role", key: "role", cell: (r) => {
+                          const role = r.role || "—";
+                          const colorClass = role === "Root" ? "text-emerald-600 dark:text-emerald-500" : role === "Designated" ? "text-blue-600 dark:text-blue-500" : role === "Alternate" ? "text-amber-600 dark:text-amber-500" : "";
+                          return <span className={colorClass}>{role}</span>;
+                        }
+                      },
+                      {
+                        header: "State", key: "state", cell: (r) => {
+                          const state = r.state || "—";
+                          const colorClass = state === "Forwarding" ? "text-emerald-600 dark:text-emerald-500" : state === "Blocking" ? "text-rose-600 dark:text-rose-500" : state === "Learning" ? "text-amber-600 dark:text-amber-500" : "";
+                          return <span className={colorClass}>{state}</span>;
+                        }
+                      },
                       { header: "Cost", key: "cost", cell: (r) => r.cost ?? "—" },
-                      { header: "PortFast", key: "portfast_enabled", cell: (r) => {
-                        const enabled = r.portfast_enabled;
-                        return <span className={enabled ? "text-emerald-600 dark:text-emerald-500" : "text-slate-500 dark:text-slate-400"}>{enabled ? "Enabled" : "Disabled"}</span>;
-                      }},
-                      { header: "BPDU Guard", key: "bpduguard_enabled", cell: (r) => {
-                        const enabled = r.bpduguard_enabled;
-                        return <span className={enabled ? "text-emerald-600 dark:text-emerald-500" : "text-slate-500 dark:text-slate-400"}>{enabled ? "Enabled" : "Disabled"}</span>;
-                      }}
+                      {
+                        header: "PortFast", key: "portfast_enabled", cell: (r) => {
+                          const enabled = r.portfast_enabled;
+                          return <span className={enabled ? "text-emerald-600 dark:text-emerald-500" : "text-slate-500 dark:text-slate-400"}>{enabled ? "Enabled" : "Disabled"}</span>;
+                        }
+                      },
+                      {
+                        header: "BPDU Guard", key: "bpduguard_enabled", cell: (r) => {
+                          const enabled = r.bpduguard_enabled;
+                          return <span className={enabled ? "text-emerald-600 dark:text-emerald-500" : "text-slate-500 dark:text-slate-400"}>{enabled ? "Enabled" : "Disabled"}</span>;
+                        }
+                      }
                     ]}
                     data={stpData.stp_info.interfaces}
                     empty="No STP port information available"
@@ -4141,7 +4147,7 @@ const DeviceDetailsView = ({ project, deviceId, goBack, goBackHref, goIndex, goI
                 </div>
               </div>
             )}
-            
+
             {/* Fallback: Legacy port_roles format */}
             {(!stpData.interfaces || stpData.interfaces.length === 0) && (!stpData.stp_info?.interfaces || stpData.stp_info.interfaces.length === 0) && stpData.port_roles && Object.keys(stpData.port_roles).length > 0 && (
               <div className="mt-4 max-h-[60vh] overflow-hidden rounded-2xl border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-900/30 flex flex-col">
@@ -4175,7 +4181,7 @@ const DeviceDetailsView = ({ project, deviceId, goBack, goBackHref, goIndex, goI
                 </div>
               </div>
             )}
-            
+
             {/* No STP data fallback */}
             {(!stpData.interfaces || stpData.interfaces.length === 0) && (!stpData.stp_info?.interfaces || stpData.stp_info.interfaces.length === 0) && (!stpData.port_roles || Object.keys(stpData.port_roles).length === 0) && (
               <div className="text-sm text-gray-500 dark:text-gray-400 mt-4">No STP port information available</div>
@@ -4276,16 +4282,20 @@ const DeviceDetailsView = ({ project, deviceId, goBack, goBackHref, goIndex, goI
                         columns={[
                           { header: "Neighbor ID", key: "neighbor_id", cell: (r) => <span className="font-medium text-slate-800 dark:text-slate-200">{r.neighbor_id || "—"}</span> },
                           { header: "Interface", key: "interface", cell: (r) => <span className="text-blue-700 dark:text-blue-400">{r.interface || "—"}</span> },
-                          { header: "State", key: "state", cell: (r) => {
-                            const state = r.state || "—";
-                            const colorClass = state.toUpperCase() === "FULL" ? "text-emerald-600 dark:text-emerald-500" : state.toUpperCase().includes("2WAY") ? "text-amber-600 dark:text-amber-500" : "";
-                            return <span className={colorClass}>{state}</span>;
-                          }},
-                          { header: "Role", key: "dr_bdr", cell: (r) => {
-                            const role = r.dr_bdr || r.role || "—";
-                            const colorClass = role === "DR" ? "bg-emerald-100 text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-400" : role === "BDR" ? "bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-400" : "";
-                            return <span className={`px-2 py-0.5 rounded-full text-xs font-medium ${colorClass}`}>{role}</span>;
-                          }},
+                          {
+                            header: "State", key: "state", cell: (r) => {
+                              const state = r.state || "—";
+                              const colorClass = state.toUpperCase() === "FULL" ? "text-emerald-600 dark:text-emerald-500" : state.toUpperCase().includes("2WAY") ? "text-amber-600 dark:text-amber-500" : "";
+                              return <span className={colorClass}>{state}</span>;
+                            }
+                          },
+                          {
+                            header: "Role", key: "dr_bdr", cell: (r) => {
+                              const role = r.dr_bdr || r.role || "—";
+                              const colorClass = role === "DR" ? "bg-emerald-100 text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-400" : role === "BDR" ? "bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-400" : "";
+                              return <span className={`px-2 py-0.5 rounded-full text-xs font-medium ${colorClass}`}>{role}</span>;
+                            }
+                          },
                           { header: "Address", key: "address", cell: (r) => r.address || r.ip_address || "—" },
                           { header: "Priority", key: "priority", cell: (r) => r.priority ?? "—" }
                         ]}
@@ -4390,7 +4400,7 @@ const DeviceDetailsView = ({ project, deviceId, goBack, goBackHref, goIndex, goI
             const hasBgp = routingData.bgp && (routingData.bgp.local_as || (routingData.bgp.peers && routingData.bgp.peers.length > 0));
             const hasRip = routingData.rip && routingData.rip.version;
             const hasNoRouting = !hasRoutes && !hasStatic && !hasOspf && !hasEigrp && !hasBgp && !hasRip;
-            
+
             if (hasNoRouting) {
               return (
                 <Card title="Routing Information">
@@ -4438,7 +4448,7 @@ const DeviceDetailsView = ({ project, deviceId, goBack, goBackHref, goIndex, goI
               <div className="text-xl font-semibold text-slate-800 dark:text-slate-200">{[...new Set(neighborsData.map(n => n.device_name || n.neighbor_device_name))].length}</div>
             </div>
           </div>
-          
+
           {neighborsData.length > 0 ? (
             <div className="max-h-[70vh] overflow-hidden rounded-2xl border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-900/30 flex flex-col">
               <div className="flex items-center justify-between gap-2 px-4 py-2.5 border-b border-slate-200 dark:border-slate-700 bg-slate-50/70 dark:bg-slate-800/30">
@@ -4455,11 +4465,13 @@ const DeviceDetailsView = ({ project, deviceId, goBack, goBackHref, goIndex, goI
                     { header: "Local Port", key: "local_port", cell: (r) => <span className="text-blue-700 dark:text-blue-400">{r.local_port || "—"}</span> },
                     { header: "Remote Port", key: "remote_port", cell: (r) => <span className="text-emerald-700 dark:text-emerald-400">{r.remote_port || "—"}</span> },
                     { header: "Capabilities", key: "capabilities", cell: (r) => (Array.isArray(r.capabilities) ? r.capabilities.join(", ") : (r.capabilities || "—")) },
-                    { header: "Protocol", key: "discovery_protocol", cell: (r) => {
-                      const proto = r.discovery_protocol || r.protocol || "—";
-                      const colorClass = proto === "CDP" ? "bg-emerald-100 text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-400" : proto === "LLDP" ? "bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-400" : "bg-slate-100 text-slate-700 dark:bg-slate-800/30 dark:text-slate-300";
-                      return <span className={`px-2 py-0.5 rounded-full text-xs font-medium ${colorClass}`}>{proto}</span>;
-                    }}
+                    {
+                      header: "Protocol", key: "discovery_protocol", cell: (r) => {
+                        const proto = r.discovery_protocol || r.protocol || "—";
+                        const colorClass = proto === "CDP" ? "bg-emerald-100 text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-400" : proto === "LLDP" ? "bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-400" : "bg-slate-100 text-slate-700 dark:bg-slate-800/30 dark:text-slate-300";
+                        return <span className={`px-2 py-0.5 rounded-full text-xs font-medium ${colorClass}`}>{proto}</span>;
+                      }
+                    }
                   ]}
                   data={neighborsData}
                   empty="No neighbor information available"
@@ -4525,11 +4537,13 @@ const DeviceDetailsView = ({ project, deviceId, goBack, goBackHref, goIndex, goI
                   columns={[
                     { header: "VLAN", key: "vlan", cell: (r) => <span className="font-medium text-blue-700 dark:text-blue-400">{r.vlan ?? "—"}</span> },
                     { header: "MAC Address", key: "mac_address", cell: (r) => <span className="font-mono text-xs">{r.mac_address || "—"}</span> },
-                    { header: "Type", key: "type", cell: (r) => {
-                      const type = r.type || "Dynamic";
-                      const colorClass = type.toLowerCase() === "dynamic" ? "text-emerald-600 dark:text-emerald-500" : type.toLowerCase() === "static" ? "text-amber-600 dark:text-amber-500" : "";
-                      return <span className={colorClass}>{type}</span>;
-                    }},
+                    {
+                      header: "Type", key: "type", cell: (r) => {
+                        const type = r.type || "Dynamic";
+                        const colorClass = type.toLowerCase() === "dynamic" ? "text-emerald-600 dark:text-emerald-500" : type.toLowerCase() === "static" ? "text-amber-600 dark:text-amber-500" : "";
+                        return <span className={colorClass}>{type}</span>;
+                      }
+                    },
                     { header: "Port", key: "port", cell: (r) => <span className="text-slate-700 dark:text-slate-300">{r.port || "—"}</span> }
                   ]}
                   data={macArpData.mac_table}
@@ -4643,8 +4657,8 @@ const DeviceDetailsView = ({ project, deviceId, goBack, goBackHref, goIndex, goI
                           priv === 15
                             ? "text-rose-600 dark:text-rose-500"
                             : priv >= 5
-                            ? "text-amber-600 dark:text-amber-500"
-                            : "text-slate-600 dark:text-slate-500";
+                              ? "text-amber-600 dark:text-amber-500"
+                              : "text-slate-600 dark:text-slate-500";
                         return <span className={colorClass}>{priv}</span>;
                       },
                     },
@@ -4724,8 +4738,8 @@ const DeviceDetailsView = ({ project, deviceId, goBack, goBackHref, goIndex, goI
               <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4 text-sm">
                 <Metric k="Enabled" v={securityData.ntp.enabled ? <span className="text-emerald-500">Yes</span> : "No"} />
                 <Metric k="Sync Status" v={
-                  securityData.ntp.sync_status === "synchronized" 
-                    ? <span className="text-emerald-500">Synchronized</span> 
+                  securityData.ntp.sync_status === "synchronized"
+                    ? <span className="text-emerald-500">Synchronized</span>
                     : <span className="text-amber-500">{securityData.ntp.sync_status || "Unknown"}</span>
                 } />
                 <Metric k="Stratum" v={securityData.ntp.stratum || "—"} />
@@ -4803,7 +4817,7 @@ const DeviceDetailsView = ({ project, deviceId, goBack, goBackHref, goIndex, goI
             const etherchannelCount = (haData.etherchannel?.length || 0) + (haData.port_channels?.length || 0) + (haData.etherchannels?.length || 0);
             const hsrpCount = (Array.isArray(haData.hsrp) ? haData.hsrp : (haData.hsrp?.groups || [])).length;
             const vrrpCount = (Array.isArray(haData.vrrp) ? haData.vrrp : (haData.vrrp?.groups || [])).length;
-            
+
             return (
               <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
                 <div className="p-3 rounded-xl border border-slate-300 dark:border-slate-700 bg-slate-50 dark:bg-slate-800/50">
@@ -4841,25 +4855,28 @@ const DeviceDetailsView = ({ project, deviceId, goBack, goBackHref, goIndex, goI
                     columns={[
                       { header: "Port-Channel", key: "name", cell: (r) => <span className="font-medium text-slate-800 dark:text-slate-200">{r.name || (r.id != null ? `Po${r.id}` : "—")}</span> },
                       { header: "Protocol", key: "protocol", cell: (r) => r.protocol || r.mode || "—" },
-                      { header: "Member Interfaces", key: "members", cell: (r) => {
+                      {
+                        header: "Member Interfaces", key: "members", cell: (r) => {
                           if (!r.members || !Array.isArray(r.members) || r.members.length === 0) return "—";
-                          const names = r.members.map(m => 
+                          const names = r.members.map(m =>
                             typeof m === "string" ? m : (m.name || m.interface || m.ifname || m.port || "")
                           ).filter(Boolean);
                           return names.length ? names.join(", ") : "—";
-                        } 
+                        }
                       },
-                      { header: "Status", key: "status", cell: (r) => {
-                        const status = r.status || "—";
-                        const colorClass = status.toLowerCase().includes("up") ? "text-emerald-600 dark:text-emerald-500" : status.toLowerCase().includes("down") ? "text-rose-600 dark:text-rose-500" : "";
-                        return <span className={colorClass}>{status}</span>;
-                      }}
+                      {
+                        header: "Status", key: "status", cell: (r) => {
+                          const status = r.status || "—";
+                          const colorClass = status.toLowerCase().includes("up") ? "text-emerald-600 dark:text-emerald-500" : status.toLowerCase().includes("down") ? "text-rose-600 dark:text-rose-500" : "";
+                          return <span className={colorClass}>{status}</span>;
+                        }
+                      }
                     ]}
-                    data={ethChannels.map(p => ({ 
-                      name: p.name || (p.id != null ? `Po${p.id}` : "Po"), 
-                      protocol: p.protocol || p.mode, 
-                      members: p.members || p.member_interfaces || p.interfaces || [], 
-                      status: p.status || p.state 
+                    data={ethChannels.map(p => ({
+                      name: p.name || (p.id != null ? `Po${p.id}` : "Po"),
+                      protocol: p.protocol || p.mode,
+                      members: p.members || p.member_interfaces || p.interfaces || [],
+                      status: p.status || p.state
                     }))}
                     empty="No Port-Channel information"
                     minWidthClass="min-w-[800px]"
@@ -4871,8 +4888,8 @@ const DeviceDetailsView = ({ project, deviceId, goBack, goBackHref, goIndex, goI
           })()}
 
           {/* HSRP */}
-          {(() => { 
-            const hsrpList = Array.isArray(haData.hsrp) ? haData.hsrp : (haData.hsrp?.groups || []); 
+          {(() => {
+            const hsrpList = Array.isArray(haData.hsrp) ? haData.hsrp : (haData.hsrp?.groups || []);
             return hsrpList.length > 0 ? (
               <div className="max-h-[55vh] overflow-hidden rounded-2xl border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-900/30 flex flex-col">
                 <div className="px-4 pt-3 pb-1 flex items-center justify-between">
@@ -4886,11 +4903,13 @@ const DeviceDetailsView = ({ project, deviceId, goBack, goBackHref, goIndex, goI
                       { header: "Group", key: "group_id", cell: (r) => <span className="font-medium">{r.group_id ?? r.group ?? "—"}</span> },
                       { header: "Interface", key: "interface", cell: (r) => r.interface || "—" },
                       { header: "Virtual IP", key: "virtual_ip", cell: (r) => <span className="text-blue-700 dark:text-blue-400">{r.virtual_ip || "—"}</span> },
-                      { header: "Status", key: "status", cell: (r) => {
-                        const status = r.status ?? r.state ?? "—";
-                        const colorClass = status.toLowerCase().includes("active") ? "text-emerald-600 dark:text-emerald-500" : status.toLowerCase().includes("standby") ? "text-amber-600 dark:text-amber-500" : "";
-                        return <span className={colorClass}>{status}</span>;
-                      }},
+                      {
+                        header: "Status", key: "status", cell: (r) => {
+                          const status = r.status ?? r.state ?? "—";
+                          const colorClass = status.toLowerCase().includes("active") ? "text-emerald-600 dark:text-emerald-500" : status.toLowerCase().includes("standby") ? "text-amber-600 dark:text-amber-500" : "";
+                          return <span className={colorClass}>{status}</span>;
+                        }
+                      },
                       { header: "Priority", key: "priority", cell: (r) => r.priority || "—" },
                       { header: "Preempt", key: "preempt", cell: (r) => r.preempt !== undefined ? (r.preempt ? "Yes" : "No") : "—" }
                     ]}
@@ -4905,8 +4924,8 @@ const DeviceDetailsView = ({ project, deviceId, goBack, goBackHref, goIndex, goI
           })()}
 
           {/* VRRP */}
-          {(() => { 
-            const vrrpList = Array.isArray(haData.vrrp) ? haData.vrrp : (haData.vrrp?.groups || []); 
+          {(() => {
+            const vrrpList = Array.isArray(haData.vrrp) ? haData.vrrp : (haData.vrrp?.groups || []);
             return vrrpList.length > 0 ? (
               <div className="max-h-[55vh] overflow-hidden rounded-2xl border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-900/30 flex flex-col">
                 <div className="px-4 pt-3 pb-1 flex items-center justify-between">
@@ -4920,11 +4939,13 @@ const DeviceDetailsView = ({ project, deviceId, goBack, goBackHref, goIndex, goI
                       { header: "VRID", key: "vrid", cell: (r) => <span className="font-medium">{r.vrid ?? r.group ?? "—"}</span> },
                       { header: "Interface", key: "interface", cell: (r) => r.interface || "—" },
                       { header: "Virtual IP", key: "virtual_ip", cell: (r) => <span className="text-blue-700 dark:text-blue-400">{r.virtual_ip || "—"}</span> },
-                      { header: "State", key: "state", cell: (r) => {
-                        const state = r.state || r.status || "—";
-                        const colorClass = state.toLowerCase().includes("master") ? "text-emerald-600 dark:text-emerald-500" : state.toLowerCase().includes("backup") ? "text-amber-600 dark:text-amber-500" : "";
-                        return <span className={colorClass}>{state}</span>;
-                      }},
+                      {
+                        header: "State", key: "state", cell: (r) => {
+                          const state = r.state || r.status || "—";
+                          const colorClass = state.toLowerCase().includes("master") ? "text-emerald-600 dark:text-emerald-500" : state.toLowerCase().includes("backup") ? "text-amber-600 dark:text-amber-500" : "";
+                          return <span className={colorClass}>{state}</span>;
+                        }
+                      },
                       { header: "Priority", key: "priority", cell: (r) => r.priority ?? r.priority_run ?? "—" },
                       { header: "Preempt", key: "preempt", cell: (r) => r.preempt !== undefined ? (r.preempt ? "Yes" : "No") : "—" }
                     ]}
@@ -4943,7 +4964,7 @@ const DeviceDetailsView = ({ project, deviceId, goBack, goBackHref, goIndex, goI
             const etherchannelCount = (haData.etherchannel?.length || 0) + (haData.port_channels?.length || 0) + (haData.etherchannels?.length || 0);
             const hsrpCount = (Array.isArray(haData.hsrp) ? haData.hsrp : (haData.hsrp?.groups || [])).length;
             const vrrpCount = (Array.isArray(haData.vrrp) ? haData.vrrp : (haData.vrrp?.groups || [])).length;
-            
+
             if (etherchannelCount === 0 && hsrpCount === 0 && vrrpCount === 0) {
               return (
                 <Card title="High Availability">
@@ -4982,11 +5003,10 @@ const DeviceDetailsView = ({ project, deviceId, goBack, goBackHref, goIndex, goI
               <button
                 key={t.id}
                 onClick={() => setRawSubTab(t.id)}
-                className={`px-4 py-2 rounded-xl text-sm font-semibold border transition-all ${
-                  rawSubTab === t.id
+                className={`px-4 py-2 rounded-xl text-sm font-semibold border transition-all ${rawSubTab === t.id
                     ? "bg-white/90 dark:bg-white/10 backdrop-blur-sm border-slate-300/80 dark:border-slate-600/80 text-slate-800 dark:text-slate-100 shadow-sm"
                     : "bg-slate-100/80 dark:bg-slate-800/50 border-slate-300 dark:border-slate-700/60 text-slate-600 dark:text-slate-400 hover:bg-slate-200/80 dark:hover:bg-slate-700/50"
-                }`}
+                  }`}
               >
                 {t.label}
               </button>
@@ -4995,7 +5015,7 @@ const DeviceDetailsView = ({ project, deviceId, goBack, goBackHref, goIndex, goI
 
           {/* Parsed Data (JSON) */}
           {rawSubTab === "parsed" && (
-            <Card 
+            <Card
               title="Parsed Data from Database (JSON Structure)"
               actions={
                 <button
@@ -5038,7 +5058,7 @@ const DeviceDetailsView = ({ project, deviceId, goBack, goBackHref, goIndex, goI
 
           {/* Original File Content */}
           {rawSubTab === "original" && (
-            <Card 
+            <Card
               title="Original File Content"
               actions={
                 <button
@@ -5091,11 +5111,11 @@ const DeviceDetailsView = ({ project, deviceId, goBack, goBackHref, goIndex, goI
       {/* Modal: Compare Backups */}
       {compareOpen && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
-          <div className="absolute inset-0 bg-black/50" onClick={()=>setCompareOpen(false)} />
+          <div className="absolute inset-0 bg-black/50" onClick={() => setCompareOpen(false)} />
           <div className="relative z-10 w-full max-w-5xl">
             <Card
               title={`Compare Backups — ${facts.device}`}
-              actions={<Button variant="secondary" onClick={()=>setCompareOpen(false)}>Close</Button>}
+              actions={<Button variant="secondary" onClick={() => setCompareOpen(false)}>Close</Button>}
             >
               <div className="grid gap-3">
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
@@ -5103,14 +5123,14 @@ const DeviceDetailsView = ({ project, deviceId, goBack, goBackHref, goIndex, goI
                     <Select
                       value={leftFileName}
                       onChange={setLeftFileName}
-                      options={deviceBackups.map(f=>({value:f.name,label:f.name}))}
+                      options={deviceBackups.map(f => ({ value: f.name, label: f.name }))}
                     />
                   </Field>
                   <Field label="Right (newer)">
                     <Select
                       value={rightFileName}
                       onChange={setRightFileName}
-                      options={deviceBackups.map(f=>({value:f.name,label:f.name}))}
+                      options={deviceBackups.map(f => ({ value: f.name, label: f.name }))}
                     />
                   </Field>
                 </div>
@@ -5126,10 +5146,10 @@ const DeviceDetailsView = ({ project, deviceId, goBack, goBackHref, goIndex, goI
                       <div className="text-xs text-gray-400 mb-2">Diff (line by line)</div>
                       <div className="bg-[#0D1422] rounded-lg p-3 h-[60vh] overflow-auto text-sm">
                         {leftFile && rightFile ? (
-                          simpleDiff(leftFile.content || "", rightFile.content || "").map((d,i)=>(
+                          simpleDiff(leftFile.content || "", rightFile.content || "").map((d, i) => (
                             <div key={i} className={
                               d.t === "+" ? "text-emerald-400" :
-                              d.t === "-" ? "text-rose-400" : "text-gray-300"
+                                d.t === "-" ? "text-rose-400" : "text-gray-300"
                             }>
                               {d.t} {d.l}
                             </div>
@@ -5184,7 +5204,7 @@ const UploadConfigForm = ({ project, authedUser, onClose, onUpload }) => {
   const [error, setError] = useState(null);
   const [dragActive, setDragActive] = useState(false);
   const [projectOptions, setProjectOptions] = useState({ what: [], where: [], when: [], why: [] });
-  
+
   // Load project-specific options
   useEffect(() => {
     const loadProjectOptions = async () => {
@@ -5220,7 +5240,7 @@ const UploadConfigForm = ({ project, authedUser, onClose, onUpload }) => {
     e.preventDefault();
     e.stopPropagation();
     setDragActive(false);
-    
+
     if (e.dataTransfer.files && e.dataTransfer.files.length > 0) {
       const droppedFiles = Array.from(e.dataTransfer.files);
       setFiles(prev => [...prev, ...droppedFiles]);
@@ -5235,10 +5255,10 @@ const UploadConfigForm = ({ project, authedUser, onClose, onUpload }) => {
   const handleSubmit = async (e) => {
     e.preventDefault();
     if (files.length === 0) return;
-    
+
     setIsUploading(true);
     setError(null);
-    
+
     try {
       // Upload config files - always to Config folder
       const metadata = {
@@ -5249,17 +5269,17 @@ const UploadConfigForm = ({ project, authedUser, onClose, onUpload }) => {
         why: details.why || null,
         description: details.description || null
       };
-      
+
       const projectId = project.project_id || project.id;
       const result = await api.uploadDocuments(projectId, files, metadata, "Config"); // Force Config folder
-      
+
       // Upload successful - close modal and refresh
       // Create upload record for UI consistency
       const uploadRecord = createUploadRecord('config', files, authedUser.username, projectId, {
         ...details,
         folderId: "Config"
       });
-      
+
       onUpload(uploadRecord, "Config");
       onClose(); // Close modal after successful upload
     } catch (error) {
@@ -5277,181 +5297,180 @@ const UploadConfigForm = ({ project, authedUser, onClose, onUpload }) => {
         <Card title="Upload Configuration Files" actions={<Button variant="secondary" onClick={onClose}>Close</Button>}>
           <div className="max-h-[calc(90vh-120px)] overflow-y-auto pr-2">
             <form onSubmit={handleSubmit} className="grid gap-3">
-            {error && (
-              <div className="rounded-xl border border-rose-300 dark:border-rose-700 bg-rose-50 dark:bg-rose-900/20 p-3 text-sm text-rose-700 dark:text-rose-400">
-                {safeDisplay(error)}
+              {error && (
+                <div className="rounded-xl border border-rose-300 dark:border-rose-700 bg-rose-50 dark:bg-rose-900/20 p-3 text-sm text-rose-700 dark:text-rose-400">
+                  {safeDisplay(error)}
                 </div>
               )}
 
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
-              <Field label="Responsible User">
-                <Input
-                  value={details.who}
-                  disabled
-                  className="bg-gray-100 dark:bg-gray-700"
-                />
-              </Field>
-              <Field label="Activity Type">
-                <SelectWithOther
-                  value={details.what}
-                  onChange={async (value) => {
-                    setDetails({...details, what: value});
-                    // Save custom option to project
-                    if (value && !projectOptions.what.includes(value)) {
-                      try {
-                        const projectId = project.project_id || project.id;
-                        await api.saveProjectOption(projectId, 'what', value);
-                        setProjectOptions(prev => ({ ...prev, what: [...prev.what, value] }));
-                      } catch (error) {
-                        console.error('Failed to save option:', error);
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
+                <Field label="Responsible User">
+                  <Input
+                    value={details.who}
+                    disabled
+                    className="bg-gray-100 dark:bg-gray-700"
+                  />
+                </Field>
+                <Field label="Activity Type">
+                  <SelectWithOther
+                    value={details.what}
+                    onChange={async (value) => {
+                      setDetails({ ...details, what: value });
+                      // Save custom option to project
+                      if (value && !projectOptions.what.includes(value)) {
+                        try {
+                          const projectId = project.project_id || project.id;
+                          await api.saveProjectOption(projectId, 'what', value);
+                          setProjectOptions(prev => ({ ...prev, what: [...prev.what, value] }));
+                        } catch (error) {
+                          console.error('Failed to save option:', error);
+                        }
                       }
-                    }
-                  }}
-                  options={projectOptions.what.map(v => ({ value: v, label: v }))}
-                  placeholder="Type custom value..."
-                />
-              </Field>
-              <Field label="Site">
-                <SelectWithOther
-                  value={details.where}
-                  onChange={async (value) => {
-                    setDetails({...details, where: value});
-                    // Save custom option to project
-                    if (value && !projectOptions.where.includes(value)) {
-                      try {
-                        const projectId = project.project_id || project.id;
-                        await api.saveProjectOption(projectId, 'where', value);
-                        setProjectOptions(prev => ({ ...prev, where: [...prev.where, value] }));
-                      } catch (error) {
-                        console.error('Failed to save option:', error);
+                    }}
+                    options={projectOptions.what.map(v => ({ value: v, label: v }))}
+                    placeholder="Type custom value..."
+                  />
+                </Field>
+                <Field label="Site">
+                  <SelectWithOther
+                    value={details.where}
+                    onChange={async (value) => {
+                      setDetails({ ...details, where: value });
+                      // Save custom option to project
+                      if (value && !projectOptions.where.includes(value)) {
+                        try {
+                          const projectId = project.project_id || project.id;
+                          await api.saveProjectOption(projectId, 'where', value);
+                          setProjectOptions(prev => ({ ...prev, where: [...prev.where, value] }));
+                        } catch (error) {
+                          console.error('Failed to save option:', error);
+                        }
                       }
-                    }
-                  }}
-                  options={projectOptions.where.map(v => ({ value: v, label: v }))}
-                  placeholder="Type custom value..."
-                />
-              </Field>
-              <Field label="Operational Timing">
-                <SelectWithOther
-                  value={details.when}
-                  onChange={async (value) => {
-                    setDetails({...details, when: value});
-                    // Save custom option to project
-                    if (value && !projectOptions.when.includes(value)) {
-                      try {
-                        const projectId = project.project_id || project.id;
-                        await api.saveProjectOption(projectId, 'when', value);
-                        setProjectOptions(prev => ({ ...prev, when: [...prev.when, value] }));
-                      } catch (error) {
-                        console.error('Failed to save option:', error);
+                    }}
+                    options={projectOptions.where.map(v => ({ value: v, label: v }))}
+                    placeholder="Type custom value..."
+                  />
+                </Field>
+                <Field label="Operational Timing">
+                  <SelectWithOther
+                    value={details.when}
+                    onChange={async (value) => {
+                      setDetails({ ...details, when: value });
+                      // Save custom option to project
+                      if (value && !projectOptions.when.includes(value)) {
+                        try {
+                          const projectId = project.project_id || project.id;
+                          await api.saveProjectOption(projectId, 'when', value);
+                          setProjectOptions(prev => ({ ...prev, when: [...prev.when, value] }));
+                        } catch (error) {
+                          console.error('Failed to save option:', error);
+                        }
                       }
-                    }
-                  }}
-                  options={projectOptions.when.map(v => ({ value: v, label: v }))}
-                  placeholder="Type custom value..."
-                />
-              </Field>
-            <Field label="Purpose">
-              <SelectWithOther
-                value={details.why}
-                  onChange={async (value) => {
-                    setDetails({...details, why: value});
-                    // Save custom option to project
-                    if (value && !projectOptions.why.includes(value)) {
-                      try {
-                        const projectId = project.project_id || project.id;
-                        await api.saveProjectOption(projectId, 'why', value);
-                        setProjectOptions(prev => ({ ...prev, why: [...prev.why, value] }));
-                      } catch (error) {
-                        console.error('Failed to save option:', error);
+                    }}
+                    options={projectOptions.when.map(v => ({ value: v, label: v }))}
+                    placeholder="Type custom value..."
+                  />
+                </Field>
+                <Field label="Purpose">
+                  <SelectWithOther
+                    value={details.why}
+                    onChange={async (value) => {
+                      setDetails({ ...details, why: value });
+                      // Save custom option to project
+                      if (value && !projectOptions.why.includes(value)) {
+                        try {
+                          const projectId = project.project_id || project.id;
+                          await api.saveProjectOption(projectId, 'why', value);
+                          setProjectOptions(prev => ({ ...prev, why: [...prev.why, value] }));
+                        } catch (error) {
+                          console.error('Failed to save option:', error);
+                        }
                       }
-                    }
-                  }}
-                  options={projectOptions.why.map(v => ({ value: v, label: v }))}
-                  placeholder="Type custom value..."
-              />
-            </Field>
-            </div>
-
-            <Field label="Description">
-              <textarea
-                value={details.description}
-                onChange={(e) => setDetails({...details, description: e.target.value})}
-                placeholder="Describe the purpose of this upload..."
-                className="w-full rounded-xl border border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-800 px-3 py-2 text-sm min-h-[60px]"
-              />
-            </Field>
-
-            {/* File Upload Section - Moved to bottom */}
-            <Field label="Select Configuration Files">
-              <div
-                onDragEnter={handleDrag}
-                onDragLeave={handleDrag}
-                onDragOver={handleDrag}
-                onDrop={handleDrop}
-                className={`border-2 border-dashed rounded-xl p-6 text-center transition-colors ${
-                  dragActive
-                    ? 'border-slate-400/80 dark:border-slate-500/80 bg-slate-100/80 dark:bg-white/10'
-                    : 'border-gray-300 dark:border-gray-700 hover:border-gray-400 dark:hover:border-gray-600'
-                }`}
-              >
-                <input
-                  type="file"
-                  multiple
-                  accept=".txt,.cfg,.conf,.log"
-                  onChange={handleFileChange}
-                  className="hidden"
-                  id="file-upload-input-config"
-                />
-                <label
-                  htmlFor="file-upload-input-config"
-                  className="cursor-pointer block"
-                >
-                  <div className="text-4xl mb-2">📁</div>
-                  <div className="text-sm font-medium mb-1">
-                    Drag & drop files here, or click to select
-                  </div>
-                  <div className="text-xs text-gray-500">
-                    You can select multiple files (.txt, .cfg, .conf)
-                  </div>
-                </label>
+                    }}
+                    options={projectOptions.why.map(v => ({ value: v, label: v }))}
+                    placeholder="Type custom value..."
+                  />
+                </Field>
               </div>
-              
-              {files.length > 0 && (
-                <div className="mt-4">
-                  <div className="text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
-                    Selected {files.length} file(s):
-                  </div>
-                  <div className="border border-slate-300 dark:border-gray-700 rounded-lg p-2 max-h-48 overflow-y-auto">
-                    <div className="space-y-2">
-                      {files.map((file, idx) => (
-                        <div key={idx} className="flex items-center justify-between rounded-lg border border-slate-300 dark:border-gray-700 p-2 text-sm bg-gray-50 dark:bg-gray-800/50">
-                          <div className="flex-1 min-w-0">
-                            <div className="font-medium truncate">{file.name}</div>
-                            <div className="text-xs text-gray-500">{(file.size / 1024).toFixed(1)} KB</div>
+
+              <Field label="Description">
+                <textarea
+                  value={details.description}
+                  onChange={(e) => setDetails({ ...details, description: e.target.value })}
+                  placeholder="Describe the purpose of this upload..."
+                  className="w-full rounded-xl border border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-800 px-3 py-2 text-sm min-h-[60px]"
+                />
+              </Field>
+
+              {/* File Upload Section - Moved to bottom */}
+              <Field label="Select Configuration Files">
+                <div
+                  onDragEnter={handleDrag}
+                  onDragLeave={handleDrag}
+                  onDragOver={handleDrag}
+                  onDrop={handleDrop}
+                  className={`border-2 border-dashed rounded-xl p-6 text-center transition-colors ${dragActive
+                      ? 'border-slate-400/80 dark:border-slate-500/80 bg-slate-100/80 dark:bg-white/10'
+                      : 'border-gray-300 dark:border-gray-700 hover:border-gray-400 dark:hover:border-gray-600'
+                    }`}
+                >
+                  <input
+                    type="file"
+                    multiple
+                    accept=".txt,.cfg,.conf,.log"
+                    onChange={handleFileChange}
+                    className="hidden"
+                    id="file-upload-input-config"
+                  />
+                  <label
+                    htmlFor="file-upload-input-config"
+                    className="cursor-pointer block"
+                  >
+                    <div className="text-4xl mb-2">📁</div>
+                    <div className="text-sm font-medium mb-1">
+                      Drag & drop files here, or click to select
+                    </div>
+                    <div className="text-xs text-gray-500">
+                      You can select multiple files (.txt, .cfg, .conf)
+                    </div>
+                  </label>
+                </div>
+
+                {files.length > 0 && (
+                  <div className="mt-4">
+                    <div className="text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                      Selected {files.length} file(s):
+                    </div>
+                    <div className="border border-slate-300 dark:border-gray-700 rounded-lg p-2 max-h-48 overflow-y-auto">
+                      <div className="space-y-2">
+                        {files.map((file, idx) => (
+                          <div key={idx} className="flex items-center justify-between rounded-lg border border-slate-300 dark:border-gray-700 p-2 text-sm bg-gray-50 dark:bg-gray-800/50">
+                            <div className="flex-1 min-w-0">
+                              <div className="font-medium truncate">{file.name}</div>
+                              <div className="text-xs text-gray-500">{(file.size / 1024).toFixed(1)} KB</div>
+                            </div>
+                            <button
+                              type="button"
+                              onClick={() => removeFile(idx)}
+                              className="ml-2 text-rose-500 hover:text-rose-700 text-sm flex-shrink-0"
+                            >
+                              ✕
+                            </button>
                           </div>
-                          <button
-                            type="button"
-                            onClick={() => removeFile(idx)}
-                            className="ml-2 text-rose-500 hover:text-rose-700 text-sm flex-shrink-0"
-                          >
-                            ✕
-                          </button>
-                        </div>
-                      ))}
+                        ))}
+                      </div>
                     </div>
                   </div>
-                </div>
-              )}
-            </Field>
+                )}
+              </Field>
 
-            <div className="flex gap-2 justify-end sticky bottom-0 bg-white dark:bg-gray-900 pt-3 pb-1 border-t border-slate-300 dark:border-gray-700 mt-2">
-              <Button variant="secondary" onClick={onClose}>Cancel</Button>
-              <Button type="submit" disabled={files.length === 0 || isUploading}>
-                {isUploading ? 'Uploading...' : 'Upload Files'}
-              </Button>
-            </div>
-          </form>
+              <div className="flex gap-2 justify-end sticky bottom-0 bg-white dark:bg-gray-900 pt-3 pb-1 border-t border-slate-300 dark:border-gray-700 mt-2">
+                <Button variant="secondary" onClick={onClose}>Cancel</Button>
+                <Button type="submit" disabled={files.length === 0 || isUploading}>
+                  {isUploading ? 'Uploading...' : 'Upload Files'}
+                </Button>
+              </div>
+            </form>
           </div>
         </Card>
       </div>
@@ -5474,7 +5493,7 @@ const UploadDocumentForm = ({ project, authedUser, onClose, onUpload, folderStru
   const [error, setError] = useState(null);
   const [dragActive, setDragActive] = useState(false);
   const [projectOptions, setProjectOptions] = useState({ what: [], where: [], when: [], why: [] });
-  
+
   // Load project-specific options
   useEffect(() => {
     const loadProjectOptions = async () => {
@@ -5489,11 +5508,11 @@ const UploadDocumentForm = ({ project, authedUser, onClose, onUpload, folderStru
     };
     loadProjectOptions();
   }, [project]);
-  
+
   // Get all folders for selection (exclude Config folder and root, but include Other)
   const getAllFolders = (node, path = []) => {
     let folders = [];
-    
+
     // Skip root and Config folders
     if (node.id === "root" || node.id === "Config") {
       // Process children with empty path for root, or skip Config entirely
@@ -5507,13 +5526,13 @@ const UploadDocumentForm = ({ project, authedUser, onClose, onUpload, folderStru
       }
       return folders;
     }
-    
+
     // Build path for current folder
     const currentPath = path.length > 0 ? [...path, node.name] : [node.name];
-    
+
     // Add current folder (including Other folder)
     folders.push({ id: node.id, name: node.name, path: currentPath });
-    
+
     // Process child folders (exclude Config, but include Other and custom folders)
     if (node.folders) {
       node.folders.forEach(folder => {
@@ -5522,10 +5541,10 @@ const UploadDocumentForm = ({ project, authedUser, onClose, onUpload, folderStru
         }
       });
     }
-    
+
     return folders;
   };
-  
+
   const folderOptions = folderStructure ? [
     ...getAllFolders(folderStructure).map(f => ({
       value: f.id,
@@ -5553,7 +5572,7 @@ const UploadDocumentForm = ({ project, authedUser, onClose, onUpload, folderStru
     e.preventDefault();
     e.stopPropagation();
     setDragActive(false);
-    
+
     if (e.dataTransfer.files && e.dataTransfer.files.length > 0) {
       const droppedFiles = Array.from(e.dataTransfer.files);
       setFiles(prev => [...prev, ...droppedFiles]);
@@ -5568,10 +5587,10 @@ const UploadDocumentForm = ({ project, authedUser, onClose, onUpload, folderStru
   const handleSubmit = async (e) => {
     e.preventDefault();
     if (files.length === 0) return;
-    
+
     setIsUploading(true);
     setError(null);
-    
+
     try {
       const projectId = project.project_id || project.id;
       const folderIdToUse = selectedFolderId || null;
@@ -5611,194 +5630,193 @@ const UploadDocumentForm = ({ project, authedUser, onClose, onUpload, folderStru
         <Card title="Upload Documents" actions={<Button variant="secondary" onClick={onClose}>Close</Button>}>
           <div className="max-h-[calc(90vh-120px)] overflow-y-auto pr-2">
             <form onSubmit={handleSubmit} className="grid gap-3">
-            {error && (
-              <div className="rounded-xl border border-rose-300 dark:border-rose-700 bg-rose-50 dark:bg-rose-900/20 p-3 text-sm text-rose-700 dark:text-rose-400">
-                {safeDisplay(error)}
+              {error && (
+                <div className="rounded-xl border border-rose-300 dark:border-rose-700 bg-rose-50 dark:bg-rose-900/20 p-3 text-sm text-rose-700 dark:text-rose-400">
+                  {safeDisplay(error)}
                 </div>
               )}
 
-            <Field label="Upload to folder">
-              <Select
-                value={selectedFolderId}
-                onChange={setSelectedFolderId}
-                options={[
-                  { value: "", label: "Root (no folder)" },
-                  ...folderOptions
-                ]}
-                placeholder="Select folder..."
-              />
-            </Field>
-
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              <Field label="Responsible User">
-                <Input
-                  value={details.who}
-                  disabled
-                  className="bg-gray-100 dark:bg-gray-700"
+              <Field label="Upload to folder">
+                <Select
+                  value={selectedFolderId}
+                  onChange={setSelectedFolderId}
+                  options={[
+                    { value: "", label: "Root (no folder)" },
+                    ...folderOptions
+                  ]}
+                  placeholder="Select folder..."
                 />
               </Field>
-              <Field label="Activity Type">
-                <SelectWithOther
-                  value={details.what}
-                  onChange={async (value) => {
-                    setDetails({...details, what: value});
-                    // Save custom option to project
-                    if (value && !projectOptions.what.includes(value)) {
-                      try {
-                        const projectId = project.project_id || project.id;
-                        await api.saveProjectOption(projectId, 'what', value);
-                        setProjectOptions(prev => ({ ...prev, what: [...prev.what, value] }));
-                      } catch (error) {
-                        console.error('Failed to save option:', error);
+
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <Field label="Responsible User">
+                  <Input
+                    value={details.who}
+                    disabled
+                    className="bg-gray-100 dark:bg-gray-700"
+                  />
+                </Field>
+                <Field label="Activity Type">
+                  <SelectWithOther
+                    value={details.what}
+                    onChange={async (value) => {
+                      setDetails({ ...details, what: value });
+                      // Save custom option to project
+                      if (value && !projectOptions.what.includes(value)) {
+                        try {
+                          const projectId = project.project_id || project.id;
+                          await api.saveProjectOption(projectId, 'what', value);
+                          setProjectOptions(prev => ({ ...prev, what: [...prev.what, value] }));
+                        } catch (error) {
+                          console.error('Failed to save option:', error);
+                        }
                       }
-                    }
-                  }}
-                  options={projectOptions.what.map(v => ({ value: v, label: v }))}
-                  placeholder="Type custom value..."
-                />
-              </Field>
-              <Field label="Site">
-                <SelectWithOther
-                  value={details.where}
-                  onChange={async (value) => {
-                    setDetails({...details, where: value});
-                    // Save custom option to project
-                    if (value && !projectOptions.where.includes(value)) {
-                      try {
-                        const projectId = project.project_id || project.id;
-                        await api.saveProjectOption(projectId, 'where', value);
-                        setProjectOptions(prev => ({ ...prev, where: [...prev.where, value] }));
-                      } catch (error) {
-                        console.error('Failed to save option:', error);
+                    }}
+                    options={projectOptions.what.map(v => ({ value: v, label: v }))}
+                    placeholder="Type custom value..."
+                  />
+                </Field>
+                <Field label="Site">
+                  <SelectWithOther
+                    value={details.where}
+                    onChange={async (value) => {
+                      setDetails({ ...details, where: value });
+                      // Save custom option to project
+                      if (value && !projectOptions.where.includes(value)) {
+                        try {
+                          const projectId = project.project_id || project.id;
+                          await api.saveProjectOption(projectId, 'where', value);
+                          setProjectOptions(prev => ({ ...prev, where: [...prev.where, value] }));
+                        } catch (error) {
+                          console.error('Failed to save option:', error);
+                        }
                       }
-                    }
-                  }}
-                  options={projectOptions.where.map(v => ({ value: v, label: v }))}
-                  placeholder="Type custom value..."
-                />
-              </Field>
-              <Field label="Operational Timing">
-                <SelectWithOther
-                  value={details.when}
-                  onChange={async (value) => {
-                    setDetails({...details, when: value});
-                    // Save custom option to project
-                    if (value && !projectOptions.when.includes(value)) {
-                      try {
-                        const projectId = project.project_id || project.id;
-                        await api.saveProjectOption(projectId, 'when', value);
-                        setProjectOptions(prev => ({ ...prev, when: [...prev.when, value] }));
-                      } catch (error) {
-                        console.error('Failed to save option:', error);
+                    }}
+                    options={projectOptions.where.map(v => ({ value: v, label: v }))}
+                    placeholder="Type custom value..."
+                  />
+                </Field>
+                <Field label="Operational Timing">
+                  <SelectWithOther
+                    value={details.when}
+                    onChange={async (value) => {
+                      setDetails({ ...details, when: value });
+                      // Save custom option to project
+                      if (value && !projectOptions.when.includes(value)) {
+                        try {
+                          const projectId = project.project_id || project.id;
+                          await api.saveProjectOption(projectId, 'when', value);
+                          setProjectOptions(prev => ({ ...prev, when: [...prev.when, value] }));
+                        } catch (error) {
+                          console.error('Failed to save option:', error);
+                        }
                       }
-                    }
-                  }}
-                  options={projectOptions.when.map(v => ({ value: v, label: v }))}
-                  placeholder="Type custom value..."
-                />
-              </Field>
-            </div>
-
-            <Field label="Purpose">
-              <SelectWithOther
-                value={details.why}
-                onChange={async (value) => {
-                  setDetails({...details, why: value});
-                  // Save custom option to project
-                  if (value && !projectOptions.why.includes(value)) {
-                    try {
-                      const projectId = project.project_id || project.id;
-                      await api.saveProjectOption(projectId, 'why', value);
-                      setProjectOptions(prev => ({ ...prev, why: [...prev.why, value] }));
-                    } catch (error) {
-                      console.error('Failed to save option:', error);
-                    }
-                  }
-                }}
-                options={projectOptions.why.map(v => ({ value: v, label: v }))}
-                placeholder="Type custom value..."
-              />
-            </Field>
-
-            <Field label="Description">
-              <textarea
-                value={details.description}
-                onChange={(e) => setDetails({...details, description: e.target.value})}
-                placeholder="Describe the purpose of this upload..."
-                className="w-full rounded-xl border border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-800 px-3 py-2 text-sm min-h-[80px]"
-              />
-            </Field>
-
-            {/* File Upload Section - Moved to bottom */}
-            <Field label="Select Document Files">
-              <div
-                onDragEnter={handleDrag}
-                onDragLeave={handleDrag}
-                onDragOver={handleDrag}
-                onDrop={handleDrop}
-                className={`border-2 border-dashed rounded-xl p-6 text-center transition-colors ${
-                  dragActive
-                    ? 'border-slate-400/80 dark:border-slate-500/80 bg-slate-100/80 dark:bg-white/10'
-                    : 'border-gray-300 dark:border-gray-700 hover:border-gray-400 dark:hover:border-gray-600'
-                }`}
-              >
-                <input
-                  type="file"
-                  multiple
-                  accept="*/*"
-                  onChange={handleFileChange}
-                  className="hidden"
-                  id="file-upload-input-doc"
-                />
-                <label
-                  htmlFor="file-upload-input-doc"
-                  className="cursor-pointer block"
-                >
-                  <div className="text-4xl mb-2">📁</div>
-                  <div className="text-sm font-medium mb-1">
-                    Drag & drop files here, or click to select
-                  </div>
-                  <div className="text-xs text-gray-500">
-                    You can select multiple files
-                  </div>
-                </label>
+                    }}
+                    options={projectOptions.when.map(v => ({ value: v, label: v }))}
+                    placeholder="Type custom value..."
+                  />
+                </Field>
               </div>
-              
-              {files.length > 0 && (
-                <div className="mt-4">
-                  <div className="text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
-                    Selected {files.length} file(s):
-                  </div>
-                  <div className="border border-slate-300 dark:border-gray-700 rounded-lg p-2 max-h-48 overflow-y-auto">
-                    <div className="space-y-2">
-                      {files.map((file, idx) => (
-                        <div key={idx} className="flex items-center justify-between rounded-lg border border-slate-300 dark:border-gray-700 p-2 text-sm bg-gray-50 dark:bg-gray-800/50">
-                          <div className="flex-1 min-w-0">
-                            <div className="font-medium truncate">{file.name}</div>
-                            <div className="text-xs text-gray-500">{(file.size / 1024).toFixed(1)} KB</div>
+
+              <Field label="Purpose">
+                <SelectWithOther
+                  value={details.why}
+                  onChange={async (value) => {
+                    setDetails({ ...details, why: value });
+                    // Save custom option to project
+                    if (value && !projectOptions.why.includes(value)) {
+                      try {
+                        const projectId = project.project_id || project.id;
+                        await api.saveProjectOption(projectId, 'why', value);
+                        setProjectOptions(prev => ({ ...prev, why: [...prev.why, value] }));
+                      } catch (error) {
+                        console.error('Failed to save option:', error);
+                      }
+                    }
+                  }}
+                  options={projectOptions.why.map(v => ({ value: v, label: v }))}
+                  placeholder="Type custom value..."
+                />
+              </Field>
+
+              <Field label="Description">
+                <textarea
+                  value={details.description}
+                  onChange={(e) => setDetails({ ...details, description: e.target.value })}
+                  placeholder="Describe the purpose of this upload..."
+                  className="w-full rounded-xl border border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-800 px-3 py-2 text-sm min-h-[80px]"
+                />
+              </Field>
+
+              {/* File Upload Section - Moved to bottom */}
+              <Field label="Select Document Files">
+                <div
+                  onDragEnter={handleDrag}
+                  onDragLeave={handleDrag}
+                  onDragOver={handleDrag}
+                  onDrop={handleDrop}
+                  className={`border-2 border-dashed rounded-xl p-6 text-center transition-colors ${dragActive
+                      ? 'border-slate-400/80 dark:border-slate-500/80 bg-slate-100/80 dark:bg-white/10'
+                      : 'border-gray-300 dark:border-gray-700 hover:border-gray-400 dark:hover:border-gray-600'
+                    }`}
+                >
+                  <input
+                    type="file"
+                    multiple
+                    accept="*/*"
+                    onChange={handleFileChange}
+                    className="hidden"
+                    id="file-upload-input-doc"
+                  />
+                  <label
+                    htmlFor="file-upload-input-doc"
+                    className="cursor-pointer block"
+                  >
+                    <div className="text-4xl mb-2">📁</div>
+                    <div className="text-sm font-medium mb-1">
+                      Drag & drop files here, or click to select
+                    </div>
+                    <div className="text-xs text-gray-500">
+                      You can select multiple files
+                    </div>
+                  </label>
+                </div>
+
+                {files.length > 0 && (
+                  <div className="mt-4">
+                    <div className="text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                      Selected {files.length} file(s):
+                    </div>
+                    <div className="border border-slate-300 dark:border-gray-700 rounded-lg p-2 max-h-48 overflow-y-auto">
+                      <div className="space-y-2">
+                        {files.map((file, idx) => (
+                          <div key={idx} className="flex items-center justify-between rounded-lg border border-slate-300 dark:border-gray-700 p-2 text-sm bg-gray-50 dark:bg-gray-800/50">
+                            <div className="flex-1 min-w-0">
+                              <div className="font-medium truncate">{file.name}</div>
+                              <div className="text-xs text-gray-500">{(file.size / 1024).toFixed(1)} KB</div>
+                            </div>
+                            <button
+                              type="button"
+                              onClick={() => removeFile(idx)}
+                              className="ml-2 text-rose-500 hover:text-rose-700 text-sm flex-shrink-0"
+                            >
+                              ✕
+                            </button>
                           </div>
-                          <button
-                            type="button"
-                            onClick={() => removeFile(idx)}
-                            className="ml-2 text-rose-500 hover:text-rose-700 text-sm flex-shrink-0"
-                          >
-                            ✕
-                          </button>
-                        </div>
-                      ))}
+                        ))}
+                      </div>
                     </div>
                   </div>
-                </div>
-              )}
-            </Field>
+                )}
+              </Field>
 
-            <div className="flex gap-2 justify-end sticky bottom-0 bg-white dark:bg-gray-900 pt-3 pb-1 border-t border-slate-300 dark:border-gray-700 mt-2">
-              <Button variant="secondary" onClick={onClose}>Cancel</Button>
-              <Button type="submit" disabled={files.length === 0 || isUploading}>
-                {isUploading ? 'Uploading...' : 'Upload Files'}
-              </Button>
-            </div>
-          </form>
+              <div className="flex gap-2 justify-end sticky bottom-0 bg-white dark:bg-gray-900 pt-3 pb-1 border-t border-slate-300 dark:border-gray-700 mt-2">
+                <Button variant="secondary" onClick={onClose}>Cancel</Button>
+                <Button type="submit" disabled={files.length === 0 || isUploading}>
+                  {isUploading ? 'Uploading...' : 'Upload Files'}
+                </Button>
+              </div>
+            </form>
           </div>
         </Card>
       </div>
@@ -6134,7 +6152,7 @@ const AnalysisDetailModal = ({ analysis, authedUser, onVerify, onClose, loading,
   const [editedContent, setEditedContent] = useState(null);
   const [comments, setComments] = useState("");
   const [showDiff, setShowDiff] = useState(false);
-  
+
   const statusColors = {
     pending_review: "bg-yellow-100 text-yellow-800 dark:bg-yellow-900 dark:text-yellow-100",
     verified: "bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-100",
@@ -6474,7 +6492,7 @@ const HistoryFilterDropdown = ({ uniqueValues, filterValue, onFilterChange, onCl
   const positionClass = position === "right" ? "right-0" : "left-0";
 
   return (
-    <div 
+    <div
       ref={dropdownRef}
       className={`absolute top-full ${positionClass} mt-1 z-50 bg-slate-900 border border-slate-700 rounded-lg shadow-xl min-w-[200px] max-w-[280px]`}
       onClick={(e) => e.stopPropagation()}
@@ -6495,7 +6513,7 @@ const HistoryFilterDropdown = ({ uniqueValues, filterValue, onFilterChange, onCl
           />
         </div>
       </div>
-      
+
       {/* Options list */}
       <div className="max-h-[200px] overflow-y-auto">
         <button
@@ -6534,11 +6552,11 @@ const HistoryPage = ({ project, can, authedUser }) => {
   const [descriptionContent, setDescriptionContent] = useState({ text: "", filename: "" });
   const [currentPage, setCurrentPage] = useState(1);
   const isOpeningVersions = useRef(false);
-  
+
   // Column filters state
   const [columnFilters, setColumnFilters] = useState({});
   const [openFilterColumn, setOpenFilterColumn] = useState(null);
-  
+
   // Sort state
   const [sortConfig, setSortConfig] = useState({ key: 'time', direction: 'desc' });
 
@@ -6577,12 +6595,12 @@ const HistoryPage = ({ project, can, authedUser }) => {
       }
       setVersionDocument(docInfo);
       setShowVersions(true);
-      
+
       await new Promise(resolve => setTimeout(resolve, 50));
-      
+
       const projectId = project.project_id || project.id;
       const versionData = await api.getDocumentVersions(projectId, documentId);
-      
+
       if (versionData && versionData.versions && Array.isArray(versionData.versions)) {
         setVersions(versionData.versions);
         if (versionData.filename) {
@@ -6594,7 +6612,7 @@ const HistoryPage = ({ project, can, authedUser }) => {
       } else {
         setVersions([]);
       }
-      
+
       setTimeout(() => {
         isOpeningVersions.current = false;
       }, 200);
@@ -6632,7 +6650,7 @@ const HistoryPage = ({ project, can, authedUser }) => {
     { key: 'why', header: 'Purpose', getValue: (d) => d.metadata?.why || "—", getSortValue: (d) => (d.metadata?.why || "").toLowerCase() },
     { key: 'version', header: 'Version', getValue: (d) => `v${d.version}${d.is_latest ? ' (Latest)' : ''}`, getSortValue: (d) => d.version || 0 },
   ];
-  
+
   // Handle sort
   const handleSort = (key) => {
     setSortConfig(prev => ({
@@ -6659,15 +6677,15 @@ const HistoryPage = ({ project, can, authedUser }) => {
     // First filter
     let result = allFiles.filter(doc => {
       // Global search filter
-      const matchSearch = !searchDoc.trim() || 
-        [doc.filename, 
-         doc.metadata?.who || doc.uploader,
-         doc.metadata?.what || "—",
-         doc.metadata?.where || "—",
-         doc.metadata?.description || "—"].some(v => 
+      const matchSearch = !searchDoc.trim() ||
+        [doc.filename,
+        doc.metadata?.who || doc.uploader,
+        doc.metadata?.what || "—",
+        doc.metadata?.where || "—",
+        doc.metadata?.description || "—"].some(v =>
           v.toLowerCase().includes(searchDoc.toLowerCase())
         );
-      
+
       // Column filters
       const matchColumnFilters = Object.entries(columnFilters).every(([key, filterValue]) => {
         if (!filterValue) return true;
@@ -6675,10 +6693,10 @@ const HistoryPage = ({ project, can, authedUser }) => {
         if (!col) return true;
         return String(col.getValue(doc)) === filterValue;
       });
-      
+
       return matchSearch && matchColumnFilters;
     });
-    
+
     // Then sort
     if (sortConfig.key) {
       const col = historyColumns.find(c => c.key === sortConfig.key);
@@ -6686,14 +6704,14 @@ const HistoryPage = ({ project, can, authedUser }) => {
         result = [...result].sort((a, b) => {
           const aVal = col.getSortValue(a);
           const bVal = col.getSortValue(b);
-          
+
           if (aVal < bVal) return sortConfig.direction === 'asc' ? -1 : 1;
           if (aVal > bVal) return sortConfig.direction === 'asc' ? 1 : -1;
           return 0;
         });
       }
     }
-    
+
     return result;
   }, [allFiles, searchDoc, columnFilters, sortConfig]);
 
@@ -6742,7 +6760,7 @@ const HistoryPage = ({ project, can, authedUser }) => {
           </svg>
         </div>
       </div>
-      
+
       {/* Active filters bar */}
       {Object.keys(columnFilters).length > 0 && (
         <div className="flex-shrink-0 flex items-center gap-2 px-1 py-1.5 mb-2 bg-sky-50 border border-sky-200 rounded-lg dark:bg-slate-800/30 dark:border-slate-700/50">
@@ -6750,13 +6768,13 @@ const HistoryPage = ({ project, can, authedUser }) => {
           {Object.entries(columnFilters).map(([key, value]) => {
             const col = historyColumns.find(c => c.key === key);
             return (
-              <span 
-                key={key} 
+              <span
+                key={key}
                 className="inline-flex items-center gap-1 px-2 py-0.5 text-xs bg-sky-100 text-sky-700 dark:bg-sky-800/50 dark:text-sky-300 rounded-full"
               >
                 <span className="font-medium">{col?.header || key}:</span>
                 <span className="max-w-[100px] truncate">{value}</span>
-                <button 
+                <button
                   onClick={() => setColumnFilters(prev => {
                     const next = { ...prev };
                     delete next[key];
@@ -6771,7 +6789,7 @@ const HistoryPage = ({ project, can, authedUser }) => {
               </span>
             );
           })}
-          <button 
+          <button
             onClick={() => setColumnFilters({})}
             className="ml-auto text-xs text-sky-700 hover:text-sky-900 dark:text-sky-400 dark:hover:text-sky-200 font-medium mr-1"
           >
@@ -6779,7 +6797,7 @@ const HistoryPage = ({ project, can, authedUser }) => {
           </button>
         </div>
       )}
-      
+
       <div className="flex-1 min-h-0 flex flex-col overflow-hidden rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900/50">
         {loading ? (
           <div className="flex-1 flex items-center justify-center text-gray-500 dark:text-gray-400">
@@ -6801,7 +6819,7 @@ const HistoryPage = ({ project, can, authedUser }) => {
                       const isLastColumn = colIdx === historyColumns.length - 1;
                       const isSorted = sortConfig.key === col.key;
                       const sortDirection = isSorted ? sortConfig.direction : null;
-                      
+
                       return (
                         <th key={col.key} className="text-left px-3 py-2.5 font-medium text-slate-800 dark:text-slate-300 whitespace-nowrap relative group">
                           <div className="flex items-center gap-1">
@@ -6817,16 +6835,15 @@ const HistoryPage = ({ project, can, authedUser }) => {
                                 <span className={sortDirection === 'desc' ? 'text-sky-400' : ''}>▼</span>
                               </span>
                             </button>
-                            
+
                             {/* Filter dropdown trigger */}
                             {uniqueVals.length > 0 && (
                               <button
                                 onClick={(e) => { e.stopPropagation(); setOpenFilterColumn(isOpen ? null : col.key); }}
-                                className={`p-0.5 rounded transition-all ${
-                                  hasFilter 
-                                    ? 'text-sky-700 bg-sky-100 dark:text-sky-400 dark:bg-sky-900/30' 
+                                className={`p-0.5 rounded transition-all ${hasFilter
+                                    ? 'text-sky-700 bg-sky-100 dark:text-sky-400 dark:bg-sky-900/30'
                                     : 'text-slate-400 opacity-0 group-hover:opacity-100 hover:text-slate-700 hover:bg-slate-100 dark:text-slate-500 dark:hover:text-slate-300 dark:hover:bg-slate-700'
-                                }`}
+                                  }`}
                                 title="Filter"
                               >
                                 <svg className={`w-3.5 h-3.5 transition-transform ${isOpen ? 'rotate-180' : ''}`} fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -6835,7 +6852,7 @@ const HistoryPage = ({ project, can, authedUser }) => {
                               </button>
                             )}
                           </div>
-                          
+
                           {/* Filter dropdown */}
                           {isOpen && uniqueVals.length > 0 && (
                             <HistoryFilterDropdown
@@ -6897,7 +6914,7 @@ const HistoryPage = ({ project, can, authedUser }) => {
                         </td>
                         <td className="px-3 py-2.5">
                           <div className="flex gap-1">
-                            <button 
+                            <button
                               onClick={async () => {
                                 try {
                                   const projectId = project.project_id || project.id;
@@ -6910,7 +6927,7 @@ const HistoryPage = ({ project, can, authedUser }) => {
                             >
                               Download
                             </button>
-                            <button 
+                            <button
                               onClick={async (e) => {
                                 e.stopPropagation();
                                 await loadVersions(r.document_id, r);
@@ -7014,8 +7031,8 @@ const HistoryPage = ({ project, can, authedUser }) => {
       {/* Version History Modal */}
       {showVersions && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
-          <div 
-            className="absolute inset-0 bg-black/50" 
+          <div
+            className="absolute inset-0 bg-black/50"
             onClick={(e) => {
               e.stopPropagation();
               if (isOpeningVersions.current) {
@@ -7023,9 +7040,9 @@ const HistoryPage = ({ project, can, authedUser }) => {
               }
               setShowVersions(false);
               setVersionDocument(null);
-            }} 
+            }}
           />
-          <div 
+          <div
             className="relative z-10 w-full max-w-4xl"
             onClick={(e) => e.stopPropagation()}
           >
@@ -7049,9 +7066,9 @@ const HistoryPage = ({ project, can, authedUser }) => {
                       { header: "Uploaded By", key: "uploader", cell: (v) => v.uploader },
                       { header: "Uploaded At", key: "created_at", cell: (v) => formatDateTime(v.created_at) },
                       { header: "Size", key: "size", cell: (v) => `${(v.size / 1024).toFixed(1)} KB` },
-                      { 
-                        header: "Actions", 
-                        key: "actions", 
+                      {
+                        header: "Actions",
+                        key: "actions",
                         cell: (v) => (
                           <div className="flex gap-2">
                             <Button
@@ -7245,7 +7262,7 @@ const ScriptGeneratorPage = ({ project, can, authedUser, toast, showConfirmModal
   const handleCsvImport = async (e) => {
     const file = e.target.files?.[0];
     if (!file) return;
-    
+
     const text = await file.text();
     const rawLines = text.split(/\r?\n/).map(line => line.trim()).filter(line => line.length > 0);
     // Skip comment lines (starting with #) and find header row
@@ -7299,18 +7316,18 @@ const ScriptGeneratorPage = ({ project, can, authedUser, toast, showConfirmModal
   const generateLinuxScript = () => {
     const commands = activeVendorTab === "cisco" ? ciscoCommands : huaweiCommands;
     const vendor = activeVendorTab === "cisco" ? "cisco_ios" : "huawei_vrp";
-    
+
     const filteredDevices = deviceInventory.filter(d => d.device_type === vendor);
     if (filteredDevices.length === 0) {
       if (toast) toast.warning("No devices found for selected vendor type");
       return;
     }
-    
+
     // Helper function to sanitize hostname for filename
     const sanitizeFilename = (str) => {
       return (str || "").replace(/[\/\\:*?"<>| ]/g, "_").replace(/_+/g, "_").replace(/^_|_$/g, "");
     };
-    
+
     let script = "#!/bin/bash\n\n";
     script += "# Auto-generated backup script\n";
     script += "# Generated: " + new Date().toISOString() + "\n\n";
@@ -7325,10 +7342,10 @@ const ScriptGeneratorPage = ({ project, can, authedUser, toast, showConfirmModal
     script += "mkdir -p \"$OUTPUT_DIR\"\n";
     script += "SUCCESS_COUNT=0\n";
     script += "TOTAL_DEVICES=" + filteredDevices.length + "\n\n";
-    
+
     // Build command list
     const commandLines = commands.split("\n").map(c => c.trim()).filter(c => c && !c.startsWith("!"));
-    
+
     filteredDevices.forEach(device => {
       const hostname = device.hostname || device.ip;
       const safeHostname = sanitizeFilename(hostname);
@@ -7338,11 +7355,11 @@ const ScriptGeneratorPage = ({ project, can, authedUser, toast, showConfirmModal
       const secret = device.secret || "";
       const port = device.port || 22;
       const isHuawei = device.device_type === "huawei_vrp";
-      
+
       script += `# Backup device: ${hostname} (${ip})\n`;
       script += `echo "Connecting to ${hostname} (${ip})..."\n`;
       script += `OUTPUT_FILE="$OUTPUT_DIR/${safeHostname}_$(date +%Y%m%d_%H%M%S).txt"\n\n`;
-      
+
       // Escape password for bash
       const escapedPassword = password.replace(/\\/g, "\\\\").replace(/"/g, '\\"').replace(/\$/g, "\\$").replace(/`/g, "\\`");
       const escapedSecret = secret.replace(/\\/g, "\\\\").replace(/"/g, '\\"').replace(/\$/g, "\\$").replace(/`/g, "\\`");
@@ -7356,7 +7373,7 @@ const ScriptGeneratorPage = ({ project, can, authedUser, toast, showConfirmModal
         sshOptions += " -o Ciphers=+aes128-cbc,3des-cbc,aes128-ctr,aes256-ctr";
         sshOptions += " -o MACs=+hmac-sha1,hmac-md5,hmac-sha1-96,hmac-md5-96";
       }
-      
+
       if (secret) {
         script += `sshpass -p "${escapedPassword}" ssh -v ${sshOptions} -p ${port} ${username}@${ip} <<'EOF' | tee "$OUTPUT_FILE"\n`;
         script += "enable\n";
@@ -7384,9 +7401,9 @@ const ScriptGeneratorPage = ({ project, can, authedUser, toast, showConfirmModal
       script += `fi\n`;
       script += `echo ""\n\n`;
     });
-    
+
     script += "echo \"Backup process completed. $SUCCESS_COUNT/$TOTAL_DEVICES device(s) backed up successfully.\"\n";
-    
+
     // Determine vendor label for filename (Cisco / Huawei / Mixed_Network)
     const deviceTypes = new Set(filteredDevices.map(d => d.device_type));
     let vendorLabel;
@@ -7411,7 +7428,7 @@ const ScriptGeneratorPage = ({ project, can, authedUser, toast, showConfirmModal
     setGeneratedScript(script);
     setScriptLanguage("bash");
     setScriptFilename(safeFilename);
-    
+
     // Also download automatically
     downloadScript(script, safeFilename);
     if (toast) toast.success(`Linux script generated and downloaded: ${safeFilename}`);
@@ -7420,17 +7437,17 @@ const ScriptGeneratorPage = ({ project, can, authedUser, toast, showConfirmModal
   const generatePythonScript = () => {
     const commands = activeVendorTab === "cisco" ? ciscoCommands : huaweiCommands;
     const vendor = activeVendorTab === "cisco" ? "cisco_ios" : "huawei_vrp";
-    
+
     const filteredDevices = deviceInventory.filter(d => d.device_type === vendor);
-    
+
     // Helper function to sanitize hostname for filename
     const sanitizeFilename = (str) => {
       return (str || "").replace(/[\/\\:*?"<>| ]/g, "_").replace(/_+/g, "_").replace(/^_|_$/g, "");
     };
-    
+
     // Helper function to escape strings for Python
     const escapeStr = (s) => (s || "").replace(/\\/g, "\\\\").replace(/"/g, '\\"').replace(/\n/g, "\\n");
-    
+
     let script = "#!/usr/bin/env python3\n";
     script += "# -*- coding: utf-8 -*-\n";
     script += "\"\"\"\n";
@@ -7557,7 +7574,7 @@ const ScriptGeneratorPage = ({ project, can, authedUser, toast, showConfirmModal
     setGeneratedScript(script);
     setScriptLanguage("python");
     setScriptFilename(safeFilename);
-    
+
     // Also download automatically
     downloadScript(script, safeFilename);
     if (toast) toast.success(`Python script generated and downloaded: ${safeFilename}`);
@@ -7574,7 +7591,7 @@ const ScriptGeneratorPage = ({ project, can, authedUser, toast, showConfirmModal
     document.body.removeChild(a);
     URL.revokeObjectURL(url);
   };
-  
+
   const handleDownloadScript = () => {
     if (generatedScript && scriptFilename) {
       downloadScript(generatedScript, scriptFilename);
@@ -8001,7 +8018,7 @@ const DocumentsPage = ({ project, can, authedUser, uploadHistory, setUploadHisto
   const [moveFolderId, setMoveFolderId] = useState('');
   // Load custom folders from API
   const [customFolders, setCustomFolders] = useState([]);
-  
+
   // Load folders from API on mount and when project changes
   useEffect(() => {
     const loadFolders = async () => {
@@ -8054,27 +8071,27 @@ const DocumentsPage = ({ project, can, authedUser, uploadHistory, setUploadHisto
   const handleUpload = async (uploadRecord, folderId) => {
     // Add to upload history
     setUploadHistory(prev => [uploadRecord, ...prev]);
-    
+
     // Always reload documents from API after upload
     // Add a small delay to ensure backend has finished processing
     try {
       const projectId = project.project_id || project.id;
-      
+
       // Wait a bit for backend to finish processing (especially for config parsing)
       await new Promise(resolve => setTimeout(resolve, 500));
-      
+
       // Reload all documents (frontend will filter by folder in UI)
       const docs = await api.getDocuments(projectId);
       // Ensure docs is an array
       setDocuments(Array.isArray(docs) ? docs : []);
-      
+
       console.log('Documents reloaded after upload:', docs.length, 'documents');
     } catch (error) {
       console.error('Failed to reload documents:', error);
       // Still update documents to empty array on error to clear stale data
       setDocuments([]);
     }
-    
+
     console.log('Upload completed:', uploadRecord);
   };
 
@@ -8090,11 +8107,11 @@ const DocumentsPage = ({ project, can, authedUser, uploadHistory, setUploadHisto
         }
         return;
       }
-      
+
       setPreviewLoading(true);
       try {
         const projectId = project.project_id || project.id;
-        
+
         // For PDF files, load the file directly as blob for iframe viewing
         if (selectedDocument.content_type === "application/pdf") {
           const token = api.getToken();
@@ -8103,11 +8120,11 @@ const DocumentsPage = ({ project, can, authedUser, uploadHistory, setUploadHisto
               'Authorization': token ? `Bearer ${token}` : '',
             },
           });
-          
+
           if (!response.ok) {
             throw new Error('Failed to load PDF');
           }
-          
+
           const blob = await response.blob();
           // Clean up previous blob URL
           if (pdfBlobUrl) {
@@ -8128,9 +8145,9 @@ const DocumentsPage = ({ project, can, authedUser, uploadHistory, setUploadHisto
         setPreviewLoading(false);
       }
     };
-    
+
     loadPreview();
-    
+
     // Cleanup function to revoke blob URL when component unmounts or document changes
     return () => {
       if (pdfBlobUrl) {
@@ -8145,7 +8162,7 @@ const DocumentsPage = ({ project, can, authedUser, uploadHistory, setUploadHisto
     try {
       // Set flag to prevent accidental close during opening
       isOpeningVersions.current = true;
-      
+
       setVersions([]); // Clear previous versions
       // Store document info for the modal (use provided info or selectedDocument)
       const docInfo = documentInfo || selectedDocument;
@@ -8157,14 +8174,14 @@ const DocumentsPage = ({ project, can, authedUser, uploadHistory, setUploadHisto
       // Set document info and show modal first (with loading state)
       setVersionDocument(docInfo);
       setShowVersions(true);
-      
+
       // Small delay to ensure modal is rendered before API call
       await new Promise(resolve => setTimeout(resolve, 50));
-      
+
       const projectId = project.project_id || project.id;
       const versionData = await api.getDocumentVersions(projectId, documentId);
       console.log('Version data received:', versionData);
-      
+
       if (versionData && versionData.versions && Array.isArray(versionData.versions)) {
         // Sort versions so that the newest logical version (by extracted_date or created_at)
         // appears first, and assign displayVersion numbers so that the latest is highest v.
@@ -8179,7 +8196,7 @@ const DocumentsPage = ({ project, can, authedUser, uploadHistory, setUploadHisto
           if (ca && cb) return cb - ca;
           return 0;
         });
-        
+
         const total = sorted.length;
         const processed = sorted.map((v, idx) => ({
           ...v,
@@ -8187,7 +8204,7 @@ const DocumentsPage = ({ project, can, authedUser, uploadHistory, setUploadHisto
           displayVersion: `v${total - idx}`,
           is_latest_display: idx === 0 || v.is_latest,
         }));
-        
+
         setVersions(processed);
         // Update versionDocument with filename from API if available
         if (versionData.filename) {
@@ -8203,7 +8220,7 @@ const DocumentsPage = ({ project, can, authedUser, uploadHistory, setUploadHisto
         setVersions([]);
         console.warn('No versions found or invalid response:', versionData);
       }
-      
+
       // Clear flag after modal is fully loaded
       setTimeout(() => {
         isOpeningVersions.current = false;
@@ -8238,7 +8255,7 @@ const DocumentsPage = ({ project, can, authedUser, uploadHistory, setUploadHisto
     const findFolderInLocation = (folders, id) => {
       return folders.find(f => f.id === id) || null;
     };
-    
+
     // Find folder recursively in entire structure (for file placement)
     const findFolderInStructure = (folders, id) => {
       for (const folder of folders) {
@@ -8250,7 +8267,7 @@ const DocumentsPage = ({ project, can, authedUser, uploadHistory, setUploadHisto
       }
       return null;
     };
-    
+
     // Check if folder already exists anywhere in the structure
     const folderExists = (targetFolders, folderId) => {
       return findFolderInStructure(targetFolders, folderId) !== null;
@@ -8272,13 +8289,13 @@ const DocumentsPage = ({ project, can, authedUser, uploadHistory, setUploadHisto
           if (!parentFolder.folders) {
             parentFolder.folders = [];
           }
-          
+
           // Check if folder already exists in this parent
           const existingInParent = findFolderInLocation(parentFolder.folders, folderId);
           if (existingInParent) {
             return true; // Already exists in correct location
           }
-          
+
           // If folder exists elsewhere, remove it first (it's in wrong location)
           if (existingFolder && existingFolder !== existingInParent) {
             // Remove from wrong location - search in entire structure
@@ -8297,7 +8314,7 @@ const DocumentsPage = ({ project, can, authedUser, uploadHistory, setUploadHisto
             };
             removeFromStructure(rootFolders, folderId);
           }
-          
+
           // Create folder in correct location
           parentFolder.folders.push({
             id: folderId,
@@ -8323,7 +8340,7 @@ const DocumentsPage = ({ project, can, authedUser, uploadHistory, setUploadHisto
                 return false;
               }
             }
-            
+
             // Recursively ensure parent exists in the correct location
             if (ensureFolderExists(parentTargetFolders, effectiveParentId, parentCustomFolder.name, parentCustomFolder.parentId, customFolders, visited, rootFolders)) {
               const parentFolderAfter = findFolderInStructure(targetFolders, effectiveParentId);
@@ -8350,7 +8367,7 @@ const DocumentsPage = ({ project, can, authedUser, uploadHistory, setUploadHisto
                     };
                     removeFromStructure(rootFolders, folderId);
                   }
-                  
+
                   parentFolderAfter.folders.push({
                     id: folderId,
                     name: folderName,
@@ -8377,7 +8394,7 @@ const DocumentsPage = ({ project, can, authedUser, uploadHistory, setUploadHisto
           }
           return true; // Already exists in root
         }
-        
+
         // If folder exists elsewhere, remove it first (it's in wrong location)
         // But be careful: only remove if it's NOT in rootFolders (baseStructure.folders)
         // to prevent accidentally removing root folders
@@ -8407,7 +8424,7 @@ const DocumentsPage = ({ project, can, authedUser, uploadHistory, setUploadHisto
             }
           }
         }
-        
+
         // Create folder in root (only if it doesn't exist)
         if (!findFolderInLocation(targetFolders, folderId)) {
           targetFolders.push({
@@ -8434,7 +8451,7 @@ const DocumentsPage = ({ project, can, authedUser, uploadHistory, setUploadHisto
         if (isRootLevel) return folderParent == null || folderParent === "root";
         return folderParent === parentId;
       });
-      
+
       // First pass: create all folders at this level
       foldersForThisLevel.forEach(customFolder => {
         if (!processed.has(customFolder.id)) {
@@ -8444,7 +8461,7 @@ const DocumentsPage = ({ project, can, authedUser, uploadHistory, setUploadHisto
           }
         }
       });
-      
+
       // Second pass: recursively merge nested folders for each folder at this level
       foldersForThisLevel.forEach(customFolder => {
         const targetFolder = findFolderInStructure(targetFolders, customFolder.id);
@@ -8468,20 +8485,20 @@ const DocumentsPage = ({ project, can, authedUser, uploadHistory, setUploadHisto
         if (!folder || pid == null || pid === "root") return 0;
         return 1 + calculateDepth(pid, visited);
       };
-      
+
       // Sort by depth: folders with no parent first, then nested ones by depth
       const sortedFolders = [...activeCustomFolders].sort((a, b) => {
         const depthA = calculateDepth(a.id);
         const depthB = calculateDepth(b.id);
         return depthA - depthB;
       });
-      
+
       // Single pass merge with proper processing tracking
       // IMPORTANT: Always merge into baseStructure.folders to preserve Config folder
       // and ensure all root folders (parentId === null) are added correctly
       const processed = new Set();
       mergeCustomFolders(baseStructure.folders, sortedFolders, null, processed);
-      
+
       // Ensure all root folders are present (parentId null/"root"/undefined; not Config)
       const rootFolders = activeCustomFolders.filter(f => (f.parentId == null || f.parentId === "root") && f.id !== "Config");
       rootFolders.forEach(rootFolder => {
@@ -8513,7 +8530,7 @@ const DocumentsPage = ({ project, can, authedUser, uploadHistory, setUploadHisto
     // Group documents by folder_id or type
     latestDocs.forEach(doc => {
       if (!doc || !doc.filename) return;
-      
+
       const fileInfo = {
         name: doc.filename,
         size: doc.size,
@@ -8665,17 +8682,17 @@ const DocumentsPage = ({ project, can, authedUser, uploadHistory, setUploadHisto
     try {
       const projectId = project.project_id || project.id;
       const renamedFolderId = selectedFolder; // Store folder ID before rename
-      
+
       if (folderAction === "add") {
         // Prevent adding to Config folder
         if (folderParent === "Config" || folderParent === "Other") {
           alert("Cannot create a folder inside this folder.");
           return;
         }
-        
+
         await api.createFolder(projectId, folderName.trim(), folderParent || null);
         alert("Folder created successfully.");
-        
+
         // Reload folders from API
         const folders = await api.getFolders(projectId);
         const transformedFolders = (folders || []).map(f => ({
@@ -8685,7 +8702,7 @@ const DocumentsPage = ({ project, can, authedUser, uploadHistory, setUploadHisto
           deleted: !!f.deleted
         }));
         setCustomFolders(transformedFolders);
-        
+
         // Find the newly created folder and expand it and its parent
         const newFolder = transformedFolders.find(f => f.name === folderName.trim() && f.parentId === (folderParent || null));
         const newExpanded = new Set(expanded);
@@ -8701,7 +8718,7 @@ const DocumentsPage = ({ project, can, authedUser, uploadHistory, setUploadHisto
         const parentIdForApi = (folderParent === "root" || folderParent === "") ? null : (folderParent || null);
         await api.updateFolder(projectId, selectedFolder, folderName.trim(), parentIdForApi);
         alert("Folder updated successfully.");
-        
+
         // Reload folders from API (normalize parentId so root folders use null, not "root")
         const folders = await api.getFolders(projectId);
         const transformedFolders = (folders || []).map(f => ({
@@ -8711,12 +8728,12 @@ const DocumentsPage = ({ project, can, authedUser, uploadHistory, setUploadHisto
           deleted: !!f.deleted
         }));
         setCustomFolders(transformedFolders);
-        
+
         // Reload documents to ensure they're properly associated with renamed folder
         const docsResponse = await api.getDocuments(projectId);
         const docs = Array.isArray(docsResponse) ? docsResponse : (docsResponse?.documents || []);
         setDocuments(docs);
-        
+
         // Keep the renamed folder expanded and ensure parent is expanded too
         const newExpanded = new Set(expanded);
         newExpanded.add(renamedFolderId); // Keep folder expanded after rename
@@ -8734,7 +8751,7 @@ const DocumentsPage = ({ project, can, authedUser, uploadHistory, setUploadHisto
         findParentFolders(renamedFolderId);
         setExpanded(newExpanded);
       }
-      
+
       setShowFolderDialog(false);
       setFolderName("");
       setSelectedFolder(null);
@@ -8752,14 +8769,14 @@ const DocumentsPage = ({ project, can, authedUser, uploadHistory, setUploadHisto
       alert("Cannot rename: File information is incomplete");
       return;
     }
-    
+
     // Prevent renaming files in Config folder
     const doc = documents.find(d => d.document_id === file.document_id);
     if (doc && doc.folder_id === "Config") {
       alert("Cannot rename files in Config folder");
       return;
     }
-    
+
     setFileToRename(file);
     setFileRenameName(file.name);
     setShowFileRenameDialog(true);
@@ -8779,12 +8796,12 @@ const DocumentsPage = ({ project, can, authedUser, uploadHistory, setUploadHisto
       const projectId = project.project_id || project.id;
       await api.renameDocument(projectId, fileToRename.document_id, fileRenameName.trim());
       alert("File renamed successfully");
-      
+
       // Reload documents
       const docsResponse = await api.getDocuments(projectId);
       const docs = Array.isArray(docsResponse) ? docsResponse : (docsResponse?.documents || []);
       setDocuments(docs);
-      
+
       // Update selected file if it was the renamed one
       if (selectedFile && selectedFile.document_id === fileToRename.document_id) {
         const updatedDoc = docs.find(d => d.document_id === fileToRename.document_id);
@@ -8793,7 +8810,7 @@ const DocumentsPage = ({ project, can, authedUser, uploadHistory, setUploadHisto
           setSelectedDocument(updatedDoc);
         }
       }
-      
+
       setShowFileRenameDialog(false);
       setFileRenameName("");
       setFileToRename(null);
@@ -8806,7 +8823,7 @@ const DocumentsPage = ({ project, can, authedUser, uploadHistory, setUploadHisto
   // Get all folders for parent selection
   const getAllFolders = (node, excludeId = null, path = []) => {
     let folders = [];
-    
+
     // Skip root node - just process its children
     if (node.id === "root") {
       if (node.folders) {
@@ -8816,22 +8833,22 @@ const DocumentsPage = ({ project, can, authedUser, uploadHistory, setUploadHisto
       }
       return folders;
     }
-    
+
     // Build current path - only add node.name if it's not already in path
     const currentPath = path.length > 0 ? [...path, node.name] : [node.name];
-    
+
     // Add current folder if not excluded
     if (node.id !== excludeId) {
       folders.push({ id: node.id, name: node.name, path: currentPath });
     }
-    
+
     // Recursively process child folders with updated path
     if (node.folders) {
       node.folders.forEach(folder => {
         folders = folders.concat(getAllFolders(folder, excludeId, currentPath));
       });
     }
-    
+
     return folders;
   };
 
@@ -8847,84 +8864,84 @@ const DocumentsPage = ({ project, can, authedUser, uploadHistory, setUploadHisto
           const doc = selectedDocument || (selectedFile?.document_id && documents?.find(d => d.document_id === selectedFile.document_id));
           if (!selectedFile || !doc) return null;
           return (
-          <div className="flex gap-2 flex-wrap">
-          <Button
-            variant="secondary"
-              onClick={async () => {
-                try {
-                  const projectId = project.project_id || project.id;
-                  await api.downloadDocument(projectId, doc.document_id);
-                } catch (error) {
-                  alert('Download failed: ' + formatError(error));
-                }
-            }}
-          >
-            ⬇ Download
-          </Button>
-            <Button
-              variant="secondary"
-              onClick={(e) => {
-                e.stopPropagation();
-                loadVersions(doc.document_id, doc);
-              }}
-            >
-              📜 Versions
-            </Button>
-            {doc.folder_id !== "Config" && (
+            <div className="flex gap-2 flex-wrap">
+              <Button
+                variant="secondary"
+                onClick={async () => {
+                  try {
+                    const projectId = project.project_id || project.id;
+                    await api.downloadDocument(projectId, doc.document_id);
+                  } catch (error) {
+                    alert('Download failed: ' + formatError(error));
+                  }
+                }}
+              >
+                ⬇ Download
+              </Button>
               <Button
                 variant="secondary"
                 onClick={(e) => {
                   e.stopPropagation();
-                  handleEditFile(selectedFile);
+                  loadVersions(doc.document_id, doc);
                 }}
               >
-                ✏️ Rename
+                📜 Versions
               </Button>
-            )}
-            {doc.folder_id !== "Config" && (
-              <Button
-                variant="secondary"
-                onClick={(e) => {
-                  e.stopPropagation();
-                  setMoveFolderTarget(doc);
-                  setMoveFolderId(doc.folder_id ?? '');
-                  setShowMoveFolder(true);
-                }}
-              >
-                📁 Move
-              </Button>
-            )}
-            {doc.folder_id !== "Config" && can("project-setting", project) && (
-              <Button
-                variant="danger"
-                onClick={(e) => {
-                  e.stopPropagation();
-                  const filename = doc.filename || selectedFile?.name;
-                  showConfirmModal({
-                    title: "Delete Document",
-                    message: `Are you sure you want to delete "${filename}"?`,
-                    confirmText: "Delete",
-                    variant: "danger",
-                    onConfirm: async () => {
-                      try {
-                        const projectId = project.project_id || project.id;
-                        await api.deleteDocument(projectId, doc.document_id);
-                        const docs = await api.getDocuments(projectId);
-                        setDocuments(Array.isArray(docs) ? docs : []);
-                        setSelectedFile(null);
-                        setSelectedDocument(null);
-                        setPreviewContent(null);
-                      } catch (error) {
-                        alert("Failed to delete document: " + formatError(error));
+              {doc.folder_id !== "Config" && (
+                <Button
+                  variant="secondary"
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    handleEditFile(selectedFile);
+                  }}
+                >
+                  ✏️ Rename
+                </Button>
+              )}
+              {doc.folder_id !== "Config" && (
+                <Button
+                  variant="secondary"
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    setMoveFolderTarget(doc);
+                    setMoveFolderId(doc.folder_id ?? '');
+                    setShowMoveFolder(true);
+                  }}
+                >
+                  📁 Move
+                </Button>
+              )}
+              {doc.folder_id !== "Config" && can("project-setting", project) && (
+                <Button
+                  variant="danger"
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    const filename = doc.filename || selectedFile?.name;
+                    showConfirmModal({
+                      title: "Delete Document",
+                      message: `Are you sure you want to delete "${filename}"?`,
+                      confirmText: "Delete",
+                      variant: "danger",
+                      onConfirm: async () => {
+                        try {
+                          const projectId = project.project_id || project.id;
+                          await api.deleteDocument(projectId, doc.document_id);
+                          const docs = await api.getDocuments(projectId);
+                          setDocuments(Array.isArray(docs) ? docs : []);
+                          setSelectedFile(null);
+                          setSelectedDocument(null);
+                          setPreviewContent(null);
+                        } catch (error) {
+                          alert("Failed to delete document: " + formatError(error));
+                        }
                       }
-                    }
-                  });
-                }}
-              >
-                🗑️ Delete
-              </Button>
-            )}
-          </div>
+                    });
+                  }}
+                >
+                  🗑️ Delete
+                </Button>
+              )}
+            </div>
           );
         })()
       }
@@ -8973,8 +8990,8 @@ const DocumentsPage = ({ project, can, authedUser, uploadHistory, setUploadHisto
                   src={previewContent.preview_data}
                   alt={selectedFile?.name || "Preview"}
                   className="max-h-full max-w-full w-auto h-auto object-contain rounded-lg shadow-lg"
-                  style={{ 
-                    maxWidth: '100%', 
+                  style={{
+                    maxWidth: '100%',
                     maxHeight: '100%',
                     imageRendering: 'auto'
                   }}
@@ -9071,8 +9088,8 @@ const DocumentsPage = ({ project, can, authedUser, uploadHistory, setUploadHisto
         {/* File Tree + Preview Section */}
         {layout === "side" ? (
           <div className="flex-1 min-h-0 flex gap-4 overflow-hidden" style={{ height: '100%' }}>
-            <Card 
-              className={filesPanelCollapsed ? "w-12 flex-shrink-0 flex flex-col min-h-0 overflow-hidden" : "w-1/3 flex-shrink-0 flex flex-col min-h-0 overflow-hidden"} 
+            <Card
+              className={filesPanelCollapsed ? "w-12 flex-shrink-0 flex flex-col min-h-0 overflow-hidden" : "w-1/3 flex-shrink-0 flex flex-col min-h-0 overflow-hidden"}
               title={
                 <div className={`flex ${filesPanelCollapsed ? 'items-center justify-center h-full' : 'items-center justify-between'} w-full`}>
                   {!filesPanelCollapsed && <span className="text-sm font-semibold">Files</span>}
@@ -9132,7 +9149,7 @@ const DocumentsPage = ({ project, can, authedUser, uploadHistory, setUploadHisto
         ) : (
           <div className="flex-1 min-h-0 flex flex-col gap-4 overflow-hidden">
             {/* File Tree on top when layout is bottom */}
-            <Card 
+            <Card
               className={`${filesPanelCollapsed ? "h-12" : "h-1/2"} flex-shrink-0 flex flex-col overflow-hidden transition-all duration-300`}
               title={
                 <div className={`flex ${filesPanelCollapsed ? 'items-center justify-center' : 'items-center justify-between'} w-full`}>
@@ -9197,8 +9214,8 @@ const DocumentsPage = ({ project, can, authedUser, uploadHistory, setUploadHisto
       {/* Version History Modal */}
       {showVersions && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
-          <div 
-            className="absolute inset-0 bg-black/50" 
+          <div
+            className="absolute inset-0 bg-black/50"
             onClick={(e) => {
               e.stopPropagation();
               // Prevent closing during opening
@@ -9207,9 +9224,9 @@ const DocumentsPage = ({ project, can, authedUser, uploadHistory, setUploadHisto
               }
               setShowVersions(false);
               setVersionDocument(null);
-            }} 
+            }}
           />
-          <div 
+          <div
             className="relative z-10 w-full max-w-4xl"
             onClick={(e) => e.stopPropagation()}
           >
@@ -9233,9 +9250,9 @@ const DocumentsPage = ({ project, can, authedUser, uploadHistory, setUploadHisto
                       { header: "Uploaded By", key: "uploader", cell: (v) => v.uploader },
                       { header: "Uploaded At", key: "created_at", cell: (v) => formatDateTime(v.created_at) },
                       { header: "Size", key: "size", cell: (v) => `${(v.size / 1024).toFixed(1)} KB` },
-                      { 
-                        header: "Actions", 
-                        key: "actions", 
+                      {
+                        header: "Actions",
+                        key: "actions",
                         cell: (v) => (
                           <div className="flex gap-2">
                             <Button
@@ -9335,11 +9352,11 @@ const DocumentsPage = ({ project, can, authedUser, uploadHistory, setUploadHisto
                           alert('Cannot move files into the Other folder. Other is a virtual folder for files with invalid folder_id.');
                           return;
                         }
-                        
+
                         const projectId = project.project_id || project.id;
                         await api.moveDocumentFolder(projectId, moveFolderTarget.document_id, moveFolderId || null);
                         setShowMoveFolder(false);
-                        
+
                         // Reload documents to reflect the change
                         // Add a small delay to ensure backend has finished processing
                         setTimeout(async () => {
@@ -9359,7 +9376,7 @@ const DocumentsPage = ({ project, can, authedUser, uploadHistory, setUploadHisto
                             setDocuments(Array.isArray(docs) ? docs : []);
                           }
                         }, 300);
-                        
+
                         alert('Document moved successfully');
                       } catch (error) {
                         alert('Failed to move document: ' + formatError(error));
@@ -9492,16 +9509,15 @@ const FileTree2 = ({
   indentSize = 20,
 }) => {
   const isRootNode = node.id === "root";
-  
+
   const FolderRow = ({ folder, open, onSelectFolder }) => {
     const isSelected = selectedFolder === folder.id;
     const paddingLeft = isRootNode ? 8 : 8 + depth * indentSize;
-    
+
     return (
       <div
-        className={`flex items-center gap-2 py-1.5 cursor-pointer hover:bg-gray-100 dark:hover:bg-[#1A2231] ${
-          isSelected ? "bg-slate-100/90 dark:bg-white/10 border-slate-300/80 dark:border-slate-600/80" : ""
-        }`}
+        className={`flex items-center gap-2 py-1.5 cursor-pointer hover:bg-gray-100 dark:hover:bg-[#1A2231] ${isSelected ? "bg-slate-100/90 dark:bg-white/10 border-slate-300/80 dark:border-slate-600/80" : ""
+          }`}
         style={{ paddingLeft: `${paddingLeft}px` }}
         onClick={(e) => {
           e.stopPropagation();
@@ -9529,13 +9545,13 @@ const FileTree2 = ({
       </div>
     );
   };
-  
+
   const FileRow = ({ f, onEditFile, onSelectFile }) => {
     const selected =
       selectedFile?.name === f.name &&
       JSON.stringify(selectedFile?.path) === JSON.stringify(f.path);
     const paddingLeft = isRootNode ? 8 : 8 + (depth + 1) * indentSize;
-    
+
     // Build tooltip content
     const tooltipContent = [
       `Uploaded by: ${f.uploader || "Unknown"}`,
@@ -9543,12 +9559,11 @@ const FileTree2 = ({
       `Size: ${f.sizeFormatted || (f.size ? `${(f.size / 1024).toFixed(1)} KB` : "Unknown")}`,
       `Type: ${f.extension ? `.${f.extension}` : "Unknown"}`
     ].join('\n');
-    
+
     return (
       <div
-        className={`flex items-center py-1.5 cursor-pointer hover:bg-gray-100 dark:hover:bg-[#1A2231] relative group ${
-          selected ? "bg-slate-100/90 dark:bg-white/10" : ""
-        }`}
+        className={`flex items-center py-1.5 cursor-pointer hover:bg-gray-100 dark:hover:bg-[#1A2231] relative group ${selected ? "bg-slate-100/90 dark:bg-white/10" : ""
+          }`}
         style={{ paddingLeft: `${paddingLeft}px` }}
         onClick={() => {
           onSelectFile(f);
@@ -9578,7 +9593,7 @@ const FileTree2 = ({
       </div>
     );
   };
-  
+
   return (
     <div>
       {isRootNode && node.files?.length > 0 && (
@@ -9596,12 +9611,12 @@ const FileTree2 = ({
       {node.folders?.map((folder) => {
         const open = expanded.has(folder.id);
         const current = [...parentPath, folder.name];
-        
+
         return (
           <div key={folder.id}>
-            <FolderRow 
-              folder={folder} 
-              open={open} 
+            <FolderRow
+              folder={folder}
+              open={open}
               onSelectFolder={onSelectFolder}
             />
             {open && (
@@ -9645,285 +9660,365 @@ const CommandTemplatesPage = () => {
     "cisco-ios": {
       name: "Cisco IOS / IOS-XE / IOS-XR / NX-OS",
       commands: [
-        { category: "System Information", commands: [
-          "show version",
-          "show inventory",
-          "show running-config",
-          "show startup-config",
-          "show clock",
-          "show uptime"
-        ]},
-        { category: "Interfaces", commands: [
-          "show interfaces",
-          "show interfaces status",
-          "show interfaces description",
-          "show ip interface brief",
-          "show interfaces counters",
-          "show interfaces transceiver",
-          "show interfaces switchport"
-        ]},
-        { category: "VLAN", commands: [
-          "show vlan",
-          "show vlan brief",
-          "show vlan id <vlan-id>",
-          "show interfaces trunk"
-        ]},
-        { category: "Spanning Tree", commands: [
-          "show spanning-tree",
-          "show spanning-tree summary",
-          "show spanning-tree detail",
-          "show spanning-tree root"
-        ]},
-        { category: "Routing", commands: [
-          "show ip route",
-          "show ip route summary",
-          "show ip ospf neighbor",
-          "show ip ospf database",
-          "show ip bgp summary",
-          "show ip bgp neighbors",
-          "show ip protocols"
-        ]},
-        { category: "HSRP/VRRP", commands: [
-          "show standby",
-          "show standby brief",
-          "show vrrp",
-          "show vrrp brief"
-        ]},
-        { category: "Security", commands: [
-          "show port-security",
-          "show ip arp inspection",
-          "show dhcp snooping",
-          "show access-lists"
-        ]},
-        { category: "Management", commands: [
-          "show snmp",
-          "show ntp status",
-          "show logging",
-          "show users"
-        ]}
+        {
+          category: "System Information", commands: [
+            "show version",
+            "show inventory",
+            "show running-config",
+            "show startup-config",
+            "show clock",
+            "show uptime"
+          ]
+        },
+        {
+          category: "Interfaces", commands: [
+            "show interfaces",
+            "show interfaces status",
+            "show interfaces description",
+            "show ip interface brief",
+            "show interfaces counters",
+            "show interfaces transceiver",
+            "show interfaces switchport"
+          ]
+        },
+        {
+          category: "VLAN", commands: [
+            "show vlan",
+            "show vlan brief",
+            "show vlan id <vlan-id>",
+            "show interfaces trunk"
+          ]
+        },
+        {
+          category: "Spanning Tree", commands: [
+            "show spanning-tree",
+            "show spanning-tree summary",
+            "show spanning-tree detail",
+            "show spanning-tree root"
+          ]
+        },
+        {
+          category: "Routing", commands: [
+            "show ip route",
+            "show ip route summary",
+            "show ip ospf neighbor",
+            "show ip ospf database",
+            "show ip bgp summary",
+            "show ip bgp neighbors",
+            "show ip protocols"
+          ]
+        },
+        {
+          category: "HSRP/VRRP", commands: [
+            "show standby",
+            "show standby brief",
+            "show vrrp",
+            "show vrrp brief"
+          ]
+        },
+        {
+          category: "Security", commands: [
+            "show port-security",
+            "show ip arp inspection",
+            "show dhcp snooping",
+            "show access-lists"
+          ]
+        },
+        {
+          category: "Management", commands: [
+            "show snmp",
+            "show ntp status",
+            "show logging",
+            "show users"
+          ]
+        }
       ]
     },
     "huawei-vrp": {
       name: "Huawei VRP",
       commands: [
-        { category: "System Information", commands: [
-          "display version",
-          "display device",
-          "display current-configuration",
-          "display saved-configuration",
-          "display clock",
-          "display cpu-usage"
-        ]},
-        { category: "Interfaces", commands: [
-          "display interface",
-          "display interface brief",
-          "display ip interface",
-          "display interface description",
-          "display interface counters"
-        ]},
-        { category: "VLAN", commands: [
-          "display vlan",
-          "display vlan all",
-          "display port vlan",
-          "display port trunk"
-        ]},
-        { category: "Spanning Tree", commands: [
-          "display stp",
-          "display stp brief",
-          "display stp root",
-          "display stp region-configuration"
-        ]},
-        { category: "Routing", commands: [
-          "display ip routing-table",
-          "display ospf peer",
-          "display ospf lsdb",
-          "display bgp peer",
-          "display ip routing-table protocol ospf"
-        ]},
-        { category: "VRRP", commands: [
-          "display vrrp",
-          "display vrrp brief",
-          "display vrrp statistics"
-        ]},
-        { category: "Security", commands: [
-          "display port-security",
-          "display dhcp snooping",
-          "display acl all"
-        ]},
-        { category: "Management", commands: [
-          "display snmp-agent sys-info",
-          "display ntp-service status",
-          "display logbuffer",
-          "display users"
-        ]}
+        {
+          category: "System Information", commands: [
+            "display version",
+            "display device",
+            "display current-configuration",
+            "display saved-configuration",
+            "display clock",
+            "display cpu-usage"
+          ]
+        },
+        {
+          category: "Interfaces", commands: [
+            "display interface",
+            "display interface brief",
+            "display ip interface",
+            "display interface description",
+            "display interface counters"
+          ]
+        },
+        {
+          category: "VLAN", commands: [
+            "display vlan",
+            "display vlan all",
+            "display port vlan",
+            "display port trunk"
+          ]
+        },
+        {
+          category: "Spanning Tree", commands: [
+            "display stp",
+            "display stp brief",
+            "display stp root",
+            "display stp region-configuration"
+          ]
+        },
+        {
+          category: "Routing", commands: [
+            "display ip routing-table",
+            "display ospf peer",
+            "display ospf lsdb",
+            "display bgp peer",
+            "display ip routing-table protocol ospf"
+          ]
+        },
+        {
+          category: "VRRP", commands: [
+            "display vrrp",
+            "display vrrp brief",
+            "display vrrp statistics"
+          ]
+        },
+        {
+          category: "Security", commands: [
+            "display port-security",
+            "display dhcp snooping",
+            "display acl all"
+          ]
+        },
+        {
+          category: "Management", commands: [
+            "display snmp-agent sys-info",
+            "display ntp-service status",
+            "display logbuffer",
+            "display users"
+          ]
+        }
       ]
     },
     "h3c-comware": {
       name: "H3C Comware",
       commands: [
-        { category: "System Information", commands: [
-          "display version",
-          "display device",
-          "display current-configuration",
-          "display saved-configuration",
-          "display clock",
-          "display cpu-usage"
-        ]},
-        { category: "Interfaces", commands: [
-          "display interface",
-          "display interface brief",
-          "display ip interface",
-          "display interface description",
-          "display interface counters"
-        ]},
-        { category: "VLAN", commands: [
-          "display vlan",
-          "display vlan all",
-          "display port vlan",
-          "display port trunk"
-        ]},
-        { category: "Spanning Tree", commands: [
-          "display stp",
-          "display stp brief",
-          "display stp root",
-          "display stp region-configuration"
-        ]},
-        { category: "Routing", commands: [
-          "display ip routing-table",
-          "display ospf peer",
-          "display ospf lsdb",
-          "display bgp peer",
-          "display ip routing-table protocol ospf"
-        ]},
-        { category: "VRRP", commands: [
-          "display vrrp",
-          "display vrrp brief",
-          "display vrrp statistics"
-        ]},
-        { category: "Security", commands: [
-          "display port-security",
-          "display dhcp snooping",
-          "display acl all"
-        ]},
-        { category: "Management", commands: [
-          "display snmp-agent sys-info",
-          "display ntp-service status",
-          "display logbuffer",
-          "display users"
-        ]}
+        {
+          category: "System Information", commands: [
+            "display version",
+            "display device",
+            "display current-configuration",
+            "display saved-configuration",
+            "display clock",
+            "display cpu-usage"
+          ]
+        },
+        {
+          category: "Interfaces", commands: [
+            "display interface",
+            "display interface brief",
+            "display ip interface",
+            "display interface description",
+            "display interface counters"
+          ]
+        },
+        {
+          category: "VLAN", commands: [
+            "display vlan",
+            "display vlan all",
+            "display port vlan",
+            "display port trunk"
+          ]
+        },
+        {
+          category: "Spanning Tree", commands: [
+            "display stp",
+            "display stp brief",
+            "display stp root",
+            "display stp region-configuration"
+          ]
+        },
+        {
+          category: "Routing", commands: [
+            "display ip routing-table",
+            "display ospf peer",
+            "display ospf lsdb",
+            "display bgp peer",
+            "display ip routing-table protocol ospf"
+          ]
+        },
+        {
+          category: "VRRP", commands: [
+            "display vrrp",
+            "display vrrp brief",
+            "display vrrp statistics"
+          ]
+        },
+        {
+          category: "Security", commands: [
+            "display port-security",
+            "display dhcp snooping",
+            "display acl all"
+          ]
+        },
+        {
+          category: "Management", commands: [
+            "display snmp-agent sys-info",
+            "display ntp-service status",
+            "display logbuffer",
+            "display users"
+          ]
+        }
       ]
     },
     "juniper-junos": {
       name: "Juniper JunOS",
       commands: [
-        { category: "System Information", commands: [
-          "show version",
-          "show chassis hardware",
-          "show configuration",
-          "show system uptime",
-          "show system information"
-        ]},
-        { category: "Interfaces", commands: [
-          "show interfaces",
-          "show interfaces terse",
-          "show interfaces detail",
-          "show interfaces descriptions",
-          "show interfaces statistics"
-        ]},
-        { category: "VLAN", commands: [
-          "show vlans",
-          "show vlans extensive",
-          "show ethernet-switching table"
-        ]},
-        { category: "Spanning Tree", commands: [
-          "show spanning-tree bridge",
-          "show spanning-tree interface",
-          "show spanning-tree statistics"
-        ]},
-        { category: "Routing", commands: [
-          "show route",
-          "show route summary",
-          "show ospf neighbor",
-          "show ospf database",
-          "show bgp summary",
-          "show bgp neighbor",
-          "show route protocol ospf"
-        ]},
-        { category: "VRRP", commands: [
-          "show vrrp",
-          "show vrrp extensive",
-          "show vrrp statistics"
-        ]},
-        { category: "Security", commands: [
-          "show security",
-          "show firewall",
-          "show access-lists"
-        ]},
-        { category: "Management", commands: [
-          "show snmp",
-          "show ntp",
-          "show log",
-          "show system users"
-        ]}
+        {
+          category: "System Information", commands: [
+            "show version",
+            "show chassis hardware",
+            "show configuration",
+            "show system uptime",
+            "show system information"
+          ]
+        },
+        {
+          category: "Interfaces", commands: [
+            "show interfaces",
+            "show interfaces terse",
+            "show interfaces detail",
+            "show interfaces descriptions",
+            "show interfaces statistics"
+          ]
+        },
+        {
+          category: "VLAN", commands: [
+            "show vlans",
+            "show vlans extensive",
+            "show ethernet-switching table"
+          ]
+        },
+        {
+          category: "Spanning Tree", commands: [
+            "show spanning-tree bridge",
+            "show spanning-tree interface",
+            "show spanning-tree statistics"
+          ]
+        },
+        {
+          category: "Routing", commands: [
+            "show route",
+            "show route summary",
+            "show ospf neighbor",
+            "show ospf database",
+            "show bgp summary",
+            "show bgp neighbor",
+            "show route protocol ospf"
+          ]
+        },
+        {
+          category: "VRRP", commands: [
+            "show vrrp",
+            "show vrrp extensive",
+            "show vrrp statistics"
+          ]
+        },
+        {
+          category: "Security", commands: [
+            "show security",
+            "show firewall",
+            "show access-lists"
+          ]
+        },
+        {
+          category: "Management", commands: [
+            "show snmp",
+            "show ntp",
+            "show log",
+            "show system users"
+          ]
+        }
       ]
     },
     "arista-eos": {
       name: "Arista EOS",
       commands: [
-        { category: "System Information", commands: [
-          "show version",
-          "show inventory",
-          "show running-config",
-          "show startup-config",
-          "show clock",
-          "show uptime"
-        ]},
-        { category: "Interfaces", commands: [
-          "show interfaces",
-          "show interfaces status",
-          "show interfaces description",
-          "show ip interface brief",
-          "show interfaces counters",
-          "show interfaces transceiver"
-        ]},
-        { category: "VLAN", commands: [
-          "show vlan",
-          "show vlan brief",
-          "show vlan id <vlan-id>",
-          "show interfaces trunk"
-        ]},
-        { category: "Spanning Tree", commands: [
-          "show spanning-tree",
-          "show spanning-tree summary",
-          "show spanning-tree detail",
-          "show spanning-tree root"
-        ]},
-        { category: "Routing", commands: [
-          "show ip route",
-          "show ip route summary",
-          "show ip ospf neighbor",
-          "show ip ospf database",
-          "show ip bgp summary",
-          "show ip bgp neighbors",
-          "show ip protocols"
-        ]},
-        { category: "VRRP", commands: [
-          "show vrrp",
-          "show vrrp brief",
-          "show vrrp statistics"
-        ]},
-        { category: "Security", commands: [
-          "show port-security",
-          "show ip arp inspection",
-          "show dhcp snooping",
-          "show access-lists"
-        ]},
-        { category: "Management", commands: [
-          "show snmp",
-          "show ntp status",
-          "show logging",
-          "show users"
-        ]}
+        {
+          category: "System Information", commands: [
+            "show version",
+            "show inventory",
+            "show running-config",
+            "show startup-config",
+            "show clock",
+            "show uptime"
+          ]
+        },
+        {
+          category: "Interfaces", commands: [
+            "show interfaces",
+            "show interfaces status",
+            "show interfaces description",
+            "show ip interface brief",
+            "show interfaces counters",
+            "show interfaces transceiver"
+          ]
+        },
+        {
+          category: "VLAN", commands: [
+            "show vlan",
+            "show vlan brief",
+            "show vlan id <vlan-id>",
+            "show interfaces trunk"
+          ]
+        },
+        {
+          category: "Spanning Tree", commands: [
+            "show spanning-tree",
+            "show spanning-tree summary",
+            "show spanning-tree detail",
+            "show spanning-tree root"
+          ]
+        },
+        {
+          category: "Routing", commands: [
+            "show ip route",
+            "show ip route summary",
+            "show ip ospf neighbor",
+            "show ip ospf database",
+            "show ip bgp summary",
+            "show ip bgp neighbors",
+            "show ip protocols"
+          ]
+        },
+        {
+          category: "VRRP", commands: [
+            "show vrrp",
+            "show vrrp brief",
+            "show vrrp statistics"
+          ]
+        },
+        {
+          category: "Security", commands: [
+            "show port-security",
+            "show ip arp inspection",
+            "show dhcp snooping",
+            "show access-lists"
+          ]
+        },
+        {
+          category: "Management", commands: [
+            "show snmp",
+            "show ntp status",
+            "show logging",
+            "show users"
+          ]
+        }
       ]
     }
   };
@@ -10001,7 +10096,7 @@ const LogsPage = ({ project, uploadHistory }) => {
   const [searchLog, setSearchLog] = useState("");
   const [filterLogWho, setFilterLogWho] = useState("all");
   const [filterLogWhat, setFilterLogWhat] = useState("all");
-  
+
   // Combine project logs with upload history
   const allHistory = [
     ...(project.logs || []).map(log => ({
@@ -10031,14 +10126,14 @@ const LogsPage = ({ project, uploadHistory }) => {
       uploadRecord: upload
     }))
   ].sort((a, b) => new Date(b.time) - new Date(a.time));
-  
+
   const uniqueLogWhos = [...new Set(allHistory.map(h => h.who))];
   const uniqueLogWhats = [...new Set(allHistory.map(h => h.what))];
-  
+
   const combinedHistory = useMemo(() => {
     return allHistory.filter(log => {
-      const matchSearch = !searchLog.trim() || 
-        [log.files, log.who, log.what, log.where, log.description].some(v => 
+      const matchSearch = !searchLog.trim() ||
+        [log.files, log.who, log.what, log.where, log.description].some(v =>
           (v || "").toLowerCase().includes(searchLog.toLowerCase())
         );
       const matchWho = filterLogWho === "all" || log.who === filterLogWho;
@@ -10051,82 +10146,82 @@ const LogsPage = ({ project, uploadHistory }) => {
     const headers = ["Time", "Name", "Who", "What", "Where", "When", "Why", "Description"];
     const rows = combinedHistory.map(r =>
       [r.time, r.files, r.who, r.what, r.where, r.when, r.why, r.description]
-        .map(v => `"${(v || "").toString().replaceAll('"','""')}"`).join(",")
+        .map(v => `"${(v || "").toString().replaceAll('"', '""')}"`).join(",")
     );
     downloadCSV([headers.join(","), ...rows].join("\n"), `logs_${safeDisplay(project?.name)}.csv`);
   };
 
   return (
-  <div className="grid gap-4">
-    <div className="flex items-center justify-between">
-      <h2 className="text-xl font-semibold">Log Updates</h2>
-      <div className="flex gap-2">
-        <Button variant="secondary" onClick={exportCSV}>Export CSV</Button>
+    <div className="grid gap-4">
+      <div className="flex items-center justify-between">
+        <h2 className="text-xl font-semibold">Log Updates</h2>
+        <div className="flex gap-2">
+          <Button variant="secondary" onClick={exportCSV}>Export CSV</Button>
+        </div>
       </div>
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-2">
+        <Input
+          placeholder="Search (filename, user, description...)"
+          value={searchLog}
+          onChange={(e) => setSearchLog(e.target.value)}
+        />
+        <Select
+          value={filterLogWho}
+          onChange={setFilterLogWho}
+          options={[{ value: "all", label: "All (Responsible User)" }, ...uniqueLogWhos.map(w => ({ value: w, label: w }))]}
+        />
+        <Select
+          value={filterLogWhat}
+          onChange={setFilterLogWhat}
+          options={[{ value: "all", label: "All (Activity Type)" }, ...uniqueLogWhats.map(w => ({ value: w, label: w }))]}
+        />
+      </div>
+      <Table
+        columns={[
+          { header: "Time", key: "time" },
+          { header: "Name", key: "files" },
+          { header: "Responsible User", key: "who" },
+          { header: "Activity Type", key: "what" },
+          { header: "Site", key: "where" },
+          { header: "Operational Timing", key: "when" },
+          { header: "Purpose", key: "why" },
+          { header: "Description", key: "description" },
+          {
+            header: "Action",
+            key: "act",
+            cell: (r) => (
+              r.type === 'upload' && r.uploadRecord?.files?.[0] ? (
+                <div className="flex gap-2">
+                  <Button
+                    variant="secondary"
+                    onClick={() => {
+                      const file = r.uploadRecord.files[0];
+                      if (!file) return;
+                      const blob = new Blob(
+                        [file.content || `# ${r.uploadRecord.type === 'config' ? 'Configuration' : 'Document'} Backup\n# File: ${file.name}\n# Uploaded: ${r.time}\n# User: ${r.who}\n\nContent not available. Download from Documents if needed.`],
+                        { type: file.type || (r.uploadRecord.type === 'config' ? "text/plain;charset=utf-8" : "application/octet-stream") }
+                      );
+                      const url = URL.createObjectURL(blob);
+                      const a = document.createElement("a");
+                      a.href = url;
+                      a.download = file.name || "file";
+                      document.body.appendChild(a);
+                      a.click();
+                      a.remove();
+                      URL.revokeObjectURL(url);
+                    }}
+                  >
+                    ⬇ Download
+                  </Button>
+                </div>
+              ) : "—"
+            ),
+          },
+        ]}
+        data={combinedHistory}
+        empty="No logs yet"
+      />
     </div>
-    <div className="grid grid-cols-1 md:grid-cols-3 gap-2">
-      <Input 
-        placeholder="Search (filename, user, description...)" 
-        value={searchLog} 
-        onChange={(e) => setSearchLog(e.target.value)} 
-      />
-      <Select 
-        value={filterLogWho} 
-        onChange={setFilterLogWho} 
-        options={[{value: "all", label: "All (Responsible User)"}, ...uniqueLogWhos.map(w => ({value: w, label: w}))]} 
-      />
-      <Select 
-        value={filterLogWhat} 
-        onChange={setFilterLogWhat} 
-        options={[{value: "all", label: "All (Activity Type)"}, ...uniqueLogWhats.map(w => ({value: w, label: w}))]} 
-      />
-    </div>
-    <Table
-      columns={[
-        { header: "Time", key: "time" },
-        { header: "Name", key: "files" },
-        { header: "Responsible User", key: "who" },
-        { header: "Activity Type", key: "what" },
-        { header: "Site", key: "where" },
-        { header: "Operational Timing", key: "when" },
-        { header: "Purpose", key: "why" },
-        { header: "Description", key: "description" },
-        {
-          header: "Action",
-          key: "act",
-          cell: (r) => (
-            r.type === 'upload' && r.uploadRecord?.files?.[0] ? (
-              <div className="flex gap-2">
-                <Button 
-                  variant="secondary" 
-                  onClick={() => {
-                    const file = r.uploadRecord.files[0];
-                    if (!file) return;
-                    const blob = new Blob(
-                      [file.content || `# ${r.uploadRecord.type === 'config' ? 'Configuration' : 'Document'} Backup\n# File: ${file.name}\n# Uploaded: ${r.time}\n# User: ${r.who}\n\nContent not available. Download from Documents if needed.`],
-                      { type: file.type || (r.uploadRecord.type === 'config' ? "text/plain;charset=utf-8" : "application/octet-stream") }
-                    );
-                    const url = URL.createObjectURL(blob);
-                    const a = document.createElement("a");
-                    a.href = url;
-                    a.download = file.name || "file";
-                    document.body.appendChild(a);
-                    a.click();
-                    a.remove();
-                    URL.revokeObjectURL(url);
-                  }}
-                >
-                  ⬇ Download
-                </Button>
-              </div>
-            ) : "—"
-          ),
-        },
-      ]}
-      data={combinedHistory}
-      empty="No logs yet"
-    />
-  </div>
   );
 };
 
@@ -10146,7 +10241,7 @@ function downloadCSV(csv, filename) {
 function getComparePair(project, device) {
   const hits = (project.documents?.config || [])
     .filter(f => f.name.toLowerCase().includes(device.replace(/-/g, "_")))
-    .sort((a,b)=> (b.modified||"").localeCompare(a.modified||""));
+    .sort((a, b) => (b.modified || "").localeCompare(a.modified || ""));
 
   if (hits.length >= 2) return [hits[1].name, hits[0].name]; // older -> newer
   return ["—", "—"];
@@ -10167,7 +10262,7 @@ const TopoGraph = ({ nodes = [], links = [], getNodeTooltip, onNodeClick }) => {
 
   // Layout: first node (if role=Core) at center, rest around circle
   const coreIdx = nodes.findIndex(n => n.role === "Core");
-  const ordered = coreIdx >= 0 ? [nodes[coreIdx], ...nodes.filter((_,i)=>i!==coreIdx)] : nodes;
+  const ordered = coreIdx >= 0 ? [nodes[coreIdx], ...nodes.filter((_, i) => i !== coreIdx)] : nodes;
   const positions = {};
   ordered.forEach((n, i) => {
     if (i === 0 && n.role === "Core") {
@@ -10196,9 +10291,9 @@ const TopoGraph = ({ nodes = [], links = [], getNodeTooltip, onNodeClick }) => {
           return (
             <g key={i}>
               <line x1={a.x} y1={a.y} x2={b.x} y2={b.y}
-                    stroke={l.type === "uplink" ? "#94a3b8" : "#cbd5e1"}
-                    strokeWidth={l.type === "uplink" ? 2.5 : 1.5}
-                    strokeDasharray={l.type === "uplink" ? "0" : "4 3"}
+                stroke={l.type === "uplink" ? "#94a3b8" : "#cbd5e1"}
+                strokeWidth={l.type === "uplink" ? 2.5 : 1.5}
+                strokeDasharray={l.type === "uplink" ? "0" : "4 3"}
               />
             </g>
           );
@@ -10209,17 +10304,17 @@ const TopoGraph = ({ nodes = [], links = [], getNodeTooltip, onNodeClick }) => {
           const p = positions[n.id];
           return (
             <g key={n.id} transform={`translate(${p.x},${p.y})`}
-               onMouseEnter={(e)=>{
-                 const rect = e.currentTarget.ownerSVGElement.getBoundingClientRect();
-                 setTip({
-                   x: (p.x / size.w) * rect.width,
-                   y: (p.y / size.h) * rect.height,
-                   text: getNodeTooltip ? getNodeTooltip(n.id) : n.id
-                 });
-               }}
-               onMouseLeave={()=>setTip(null)}
-               onClick={()=> onNodeClick && onNodeClick(n.id)}
-               style={{cursor:"pointer"}}
+              onMouseEnter={(e) => {
+                const rect = e.currentTarget.ownerSVGElement.getBoundingClientRect();
+                setTip({
+                  x: (p.x / size.w) * rect.width,
+                  y: (p.y / size.h) * rect.height,
+                  text: getNodeTooltip ? getNodeTooltip(n.id) : n.id
+                });
+              }}
+              onMouseLeave={() => setTip(null)}
+              onClick={() => onNodeClick && onNodeClick(n.id)}
+              style={{ cursor: "pointer" }}
             >
               <circle r={18} fill={colorByRole(n.role)} stroke="#0b1220" strokeWidth="2"></circle>
               <text y={34} textAnchor="middle" fontSize="11" fill="#cbd5e1">{n.id}</text>
@@ -10256,11 +10351,11 @@ const DeviceImageUpload = ({ project, deviceName, authedUser, setProjects, can: 
   const [uploading, setUploading] = React.useState(false);
   const [error, setError] = React.useState(null);
   const fileInputRef = React.useRef(null);
-  
+
   // Check if user can edit (admin, manager, or engineer — viewer is read-only)
   const can = typeof canProp === "function" ? canProp : () => false;
   const canEdit = can("upload-config", project);
-  
+
   // Load existing image from project state or API
   React.useEffect(() => {
     const loadImage = async () => {
@@ -10275,7 +10370,7 @@ const DeviceImageUpload = ({ project, deviceName, authedUser, setProjects, can: 
           setImageUrl(`data:image/${imageFormat};base64,${imageData}`);
           return;
         }
-        
+
         // If not in project state, try to fetch from API
         try {
           const result = await api.getDeviceImage(projectId, deviceName);
@@ -10308,23 +10403,23 @@ const DeviceImageUpload = ({ project, deviceName, authedUser, setProjects, can: 
     };
     loadImage();
   }, [project, deviceName, setProjects]);
-  
+
   const handleFileSelect = async (e) => {
     const file = e.target.files?.[0];
     if (!file) return;
-    
+
     if (!file.type.startsWith("image/")) {
       setError("Please select an image file");
       return;
     }
-    
+
     setUploading(true);
     setError(null);
-    
+
     try {
       const projectId = project?.project_id || project?.id;
       await api.uploadDeviceImage(projectId, deviceName, file);
-      
+
       // Reload image from API
       const result = await api.getDeviceImage(projectId, deviceName);
       // Check if it's PNG or JPEG based on data format
@@ -10332,7 +10427,7 @@ const DeviceImageUpload = ({ project, deviceName, authedUser, setProjects, can: 
       const imageFormat = imageData.startsWith('/9j/') ? 'jpeg' : 'png';
       const newImageUrl = `data:image/${imageFormat};base64,${imageData}`;
       setImageUrl(newImageUrl);
-      
+
       // Update project state with new device_images
       if (setProjects) {
         setProjects(prev => prev.map(p => {
@@ -10361,7 +10456,7 @@ const DeviceImageUpload = ({ project, deviceName, authedUser, setProjects, can: 
       }
     }
   };
-  
+
   const handleDelete = () => {
     showConfirmModal({
       title: "Delete Device Image",
@@ -10373,7 +10468,7 @@ const DeviceImageUpload = ({ project, deviceName, authedUser, setProjects, can: 
           const projectId = project?.project_id || project?.id;
           await api.deleteDeviceImage(projectId, deviceName);
           setImageUrl(null);
-          
+
           // Update project state to remove device image
           if (setProjects) {
             setProjects(prev => prev.map(p => {
@@ -10396,7 +10491,7 @@ const DeviceImageUpload = ({ project, deviceName, authedUser, setProjects, can: 
       }
     });
   };
-  
+
   return (
     <div className="flex flex-col h-full min-h-0">
       {/* Single header: "Device Image" (left) + Upload/Delete (right) */}
@@ -10474,8 +10569,8 @@ const NetworkDeviceIcon = ({ role, isSelected, isLinkStart, size = 8, imageUrl =
         {/* Display image directly - no background, no clipPath, preserves transparency */}
         <image
           href={imageUrl}
-          x={-imageSize/2}
-          y={-imageSize/2}
+          x={-imageSize / 2}
+          y={-imageSize / 2}
           width={imageSize}
           height={imageSize}
           preserveAspectRatio="xMidYMid meet"
@@ -10485,8 +10580,8 @@ const NetworkDeviceIcon = ({ role, isSelected, isLinkStart, size = 8, imageUrl =
         {/* Border highlight when selected - only border, no background fill */}
         {(isSelected || isLinkStart) && (
           <rect
-            x={-imageSize/2 - 1}
-            y={-imageSize/2 - 1}
+            x={-imageSize / 2 - 1}
+            y={-imageSize / 2 - 1}
             width={imageSize + 2}
             height={imageSize + 2}
             fill="none"
@@ -10498,47 +10593,47 @@ const NetworkDeviceIcon = ({ role, isSelected, isLinkStart, size = 8, imageUrl =
       </g>
     );
   }
-  
+
   // Fallback to SVG icon if no image
   const baseColor = isLinkStart ? "#10b981" : isSelected ? "#3b82f6" : "#F59E0B";
   const strokeColor = isSelected || isLinkStart ? "#ffffff" : "#0B1220";
   const strokeWidth = isSelected || isLinkStart ? "1.5" : "0.5";
-  
+
   // Router shape (for core)
   if (role === "core") {
     return (
       <g>
         {/* Router body */}
-        <rect x={-size} y={-size*0.6} width={size*2} height={size*1.2} rx={size*0.2} 
-              fill={baseColor} stroke={strokeColor} strokeWidth={strokeWidth} />
+        <rect x={-size} y={-size * 0.6} width={size * 2} height={size * 1.2} rx={size * 0.2}
+          fill={baseColor} stroke={strokeColor} strokeWidth={strokeWidth} />
         {/* Antenna lines */}
-        <line x1={-size*0.8} y1={-size*0.6} x2={-size*0.8} y2={-size*0.9} 
-              stroke={strokeColor} strokeWidth={strokeWidth*0.7} />
-        <line x1={size*0.8} y1={-size*0.6} x2={size*0.8} y2={-size*0.9} 
-              stroke={strokeColor} strokeWidth={strokeWidth*0.7} />
+        <line x1={-size * 0.8} y1={-size * 0.6} x2={-size * 0.8} y2={-size * 0.9}
+          stroke={strokeColor} strokeWidth={strokeWidth * 0.7} />
+        <line x1={size * 0.8} y1={-size * 0.6} x2={size * 0.8} y2={-size * 0.9}
+          stroke={strokeColor} strokeWidth={strokeWidth * 0.7} />
         {/* Port indicators */}
-        <circle cx={-size*0.5} cy={size*0.3} r={size*0.15} fill={strokeColor} />
-        <circle cx={0} cy={size*0.3} r={size*0.15} fill={strokeColor} />
-        <circle cx={size*0.5} cy={size*0.3} r={size*0.15} fill={strokeColor} />
+        <circle cx={-size * 0.5} cy={size * 0.3} r={size * 0.15} fill={strokeColor} />
+        <circle cx={0} cy={size * 0.3} r={size * 0.15} fill={strokeColor} />
+        <circle cx={size * 0.5} cy={size * 0.3} r={size * 0.15} fill={strokeColor} />
       </g>
     );
   }
-  
+
   // Switch shape (for distribution/access)
   return (
     <g>
       {/* Switch body */}
-      <rect x={-size} y={-size*0.5} width={size*2} height={size} rx={size*0.15} 
-            fill={baseColor} stroke={strokeColor} strokeWidth={strokeWidth} />
+      <rect x={-size} y={-size * 0.5} width={size * 2} height={size} rx={size * 0.15}
+        fill={baseColor} stroke={strokeColor} strokeWidth={strokeWidth} />
       {/* Port rows */}
-      <line x1={-size*0.7} y1={-size*0.2} x2={size*0.7} y2={-size*0.2} 
-            stroke={strokeColor} strokeWidth={strokeWidth*0.5} />
-      <line x1={-size*0.7} y1={0} x2={size*0.7} y2={0} 
-            stroke={strokeColor} strokeWidth={strokeWidth*0.5} />
-      <line x1={-size*0.7} y1={size*0.2} x2={size*0.7} y2={size*0.2} 
-            stroke={strokeColor} strokeWidth={strokeWidth*0.5} />
+      <line x1={-size * 0.7} y1={-size * 0.2} x2={size * 0.7} y2={-size * 0.2}
+        stroke={strokeColor} strokeWidth={strokeWidth * 0.5} />
+      <line x1={-size * 0.7} y1={0} x2={size * 0.7} y2={0}
+        stroke={strokeColor} strokeWidth={strokeWidth * 0.5} />
+      <line x1={-size * 0.7} y1={size * 0.2} x2={size * 0.7} y2={size * 0.2}
+        stroke={strokeColor} strokeWidth={strokeWidth * 0.5} />
       {/* Status indicator */}
-      <circle cx={size*0.6} cy={-size*0.3} r={size*0.2} fill={strokeColor} />
+      <circle cx={size * 0.6} cy={-size * 0.3} r={size * 0.2} fill={strokeColor} />
     </g>
   );
 };
@@ -10560,16 +10655,16 @@ const TopologyGraph = ({ project, projectId, routeToHash, handleNavClick, onOpen
   const getDefaultPos = (nodeId, role, index = 0, totalByRole = {}) => {
     const centerX = 50;
     const centerY = 50;
-    
+
     // Normalize role to lowercase for consistent matching
     const normalizedRole = (role || "default").toLowerCase();
-    
+
     // Count nodes by role for better distribution
     const coreCount = totalByRole.core || 0;
     const distCount = totalByRole.distribution || 0;
     const accessCount = totalByRole.access || 0;
     const routerCount = totalByRole.router || 0;
-    
+
     switch (normalizedRole) {
       case "core": {
         // Core nodes: arrange in horizontal line at top-center
@@ -10580,7 +10675,7 @@ const TopologyGraph = ({ project, projectId, routeToHash, handleNavClick, onOpen
         const coreStartX = centerX - ((coreCount - 1) * coreSpacing) / 2;
         return { x: coreStartX + (index * coreSpacing), y: 20 };
       }
-        
+
       case "distribution": {
         // Distribution nodes: arrange in horizontal line below core
         if (distCount <= 1) {
@@ -10590,7 +10685,7 @@ const TopologyGraph = ({ project, projectId, routeToHash, handleNavClick, onOpen
         const distStartX = centerX - ((distCount - 1) * distSpacing) / 2;
         return { x: distStartX + (index * distSpacing), y: 45 };
       }
-        
+
       case "access": {
         // Access nodes: arrange in two rows below distribution
         if (accessCount <= 1) {
@@ -10603,7 +10698,7 @@ const TopologyGraph = ({ project, projectId, routeToHash, handleNavClick, onOpen
         const accessStartX = centerX - ((accessPerRow - 1) * accessSpacing) / 2;
         return { x: accessStartX + (col * accessSpacing), y: 70 + (row * 20) };
       }
-        
+
       case "router": {
         // Router nodes: arrange at bottom
         if (routerCount <= 1) {
@@ -10613,7 +10708,7 @@ const TopologyGraph = ({ project, projectId, routeToHash, handleNavClick, onOpen
         const routerStartX = centerX - ((routerCount - 1) * routerSpacing) / 2;
         return { x: routerStartX + (index * routerSpacing), y: 85 };
       }
-        
+
       default: {
         // Default: arrange in grid
         const defaultSpacing = 15;
@@ -10660,7 +10755,7 @@ const TopologyGraph = ({ project, projectId, routeToHash, handleNavClick, onOpen
   const [isGraphLoading, setIsGraphLoading] = React.useState(true);
   /** True while LLM is analyzing (slow). Graph stays interactive; only AI panel shows loading. */
   const isAiLoading = generatingTopology;
-  
+
   const rows = project.summaryRows || [];
   // Base nodes from project summary rows - compute first
   const baseNodes = rows.map(r => ({
@@ -10671,7 +10766,7 @@ const TopologyGraph = ({ project, projectId, routeToHash, handleNavClick, onOpen
     model: r.model, mgmtIp: r.mgmtIp,
     routing: r.routing, stpMode: r.stpMode
   }));
-  
+
   // Topology nodes state - will be updated when topology is generated
   const [topologyNodes, setTopologyNodes] = useState(() => {
     // Initialize from project.topoNodes if available, otherwise compute baseNodes inline
@@ -10698,7 +10793,7 @@ const TopologyGraph = ({ project, projectId, routeToHash, handleNavClick, onOpen
       routing: r.routing, stpMode: r.stpMode
     }));
   });
-  
+
   // Use topology nodes if available, otherwise use base nodes
   const nodes = topologyNodes.length > 0 ? topologyNodes : baseNodes;
 
@@ -10707,13 +10802,13 @@ const TopologyGraph = ({ project, projectId, routeToHash, handleNavClick, onOpen
   const canEdit = can("upload-config", project);
 
   const [editMode, setEditMode] = useState(false);
-  
+
   // Zoom and Pan state
   const [zoom, setZoom] = useState(1.0);
   const [pan, setPan] = useState({ x: 0, y: 0 });
   const [isPanning, setIsPanning] = useState(false);
   const [panStart, setPanStart] = useState({ x: 0, y: 0 });
-  
+
   const [positions, setPositions] = useState(() => {
     if (project.topoPositions) {
       return project.topoPositions;
@@ -10751,7 +10846,7 @@ const TopologyGraph = ({ project, projectId, routeToHash, handleNavClick, onOpen
     }
     return deriveLinksFromProject(project);
   });
-  
+
   // Load generating state from localStorage on mount and start polling if needed
   React.useEffect(() => {
     const projectId = project.project_id || project.id;
@@ -10759,11 +10854,11 @@ const TopologyGraph = ({ project, projectId, routeToHash, handleNavClick, onOpen
     const storageKey = `llm_generating_topology_${projectId}`;
     const pollingKey = `topology_${projectId}`;
     const saved = localStorage.getItem(storageKey);
-    
+
     if (saved === "true") {
       // Set generating state first to show loading UI immediately
       setGeneratingTopology(true);
-      
+
       // If polling is not active but localStorage says generating, start polling immediately
       if (!globalPollingService.isPolling(pollingKey)) {
         // Start polling immediately (don't wait for generatingTopology state to trigger it)
@@ -10776,7 +10871,7 @@ const TopologyGraph = ({ project, projectId, routeToHash, handleNavClick, onOpen
             // Process topology result
             const aiNodes = topologyData.topology?.nodes || [];
             const aiEdges = topologyData.topology?.edges || [];
-            
+
             if (aiNodes.length > 0 || aiEdges.length > 0) {
               // Convert AI nodes to internal format
               const nodeMap = new Map();
@@ -10784,7 +10879,7 @@ const TopologyGraph = ({ project, projectId, routeToHash, handleNavClick, onOpen
               currentNodes.forEach(n => {
                 nodeMap.set(n.id, { ...n });
               });
-              
+
               aiNodes.forEach(aiNode => {
                 const nodeId = aiNode.id;
                 const existingNode = nodeMap.get(nodeId);
@@ -10806,7 +10901,7 @@ const TopologyGraph = ({ project, projectId, routeToHash, handleNavClick, onOpen
                   });
                 }
               });
-              
+
               const updatedNodes = Array.from(nodeMap.values());
               const convertedEdges = aiEdges.map(edge => ({
                 a: edge.from,
@@ -10815,7 +10910,7 @@ const TopologyGraph = ({ project, projectId, routeToHash, handleNavClick, onOpen
                 evidence: edge.evidence || "",
                 type: "trunk"
               }));
-              
+
               // Update positions for new nodes
               const updatedPositions = { ...positions };
               const roleCounts = {};
@@ -10824,7 +10919,7 @@ const TopologyGraph = ({ project, projectId, routeToHash, handleNavClick, onOpen
                 const role = (node.role || "default").toLowerCase();
                 roleCounts[role] = (roleCounts[role] || 0) + 1;
               });
-              
+
               updatedNodes.forEach((node) => {
                 if (!updatedPositions[node.id]) {
                   const role = (node.role || "access").toLowerCase();
@@ -10835,12 +10930,12 @@ const TopologyGraph = ({ project, projectId, routeToHash, handleNavClick, onOpen
               });
               const nodeIds = updatedNodes.map(n => n.id);
               const nudgedPositions = nudgePositionsNoOverlap(updatedPositions, nodeIds);
-              
+
               // Update states
               setTopologyNodes(updatedNodes);
               setLinks(convertedEdges);
               setPositions(nudgedPositions);
-              
+
               // Update project state
               setProjects(prev => prev.map(p => {
                 if ((p.project_id || p.id) === projectId) {
@@ -10853,7 +10948,7 @@ const TopologyGraph = ({ project, projectId, routeToHash, handleNavClick, onOpen
                 }
                 return p;
               }));
-              
+
               // Load LLM metrics
               if (topologyData.llm_metrics) {
                 setTopologyLLMMetrics(topologyData.llm_metrics);
@@ -10865,11 +10960,11 @@ const TopologyGraph = ({ project, projectId, routeToHash, handleNavClick, onOpen
                 setProjects(prev => prev.map(p => (p.project_id || p.id) === projectId ? { ...p, topoPositions: nudgedPositions, topoLinks: convertedEdges, topoNodeLabels: labels, topoNodeRoles: roles, topoUpdatedAt: new Date().toISOString() } : p));
               }).catch(err => console.warn("Failed to auto-save topology layout:", err));
             }
-            
+
             setGeneratingTopology(false);
             localStorage.removeItem(storageKey);
             onComplete?.();
-            
+
             // Show notification popup (same as Recommendations); global popup so it shows even on Documents/History tab
             setTopologyNotificationData({
               title: "Topology Generated",
@@ -10896,14 +10991,14 @@ const TopologyGraph = ({ project, projectId, routeToHash, handleNavClick, onOpen
             // Process topology result (same as above)
             const aiNodes = topologyData.topology?.nodes || [];
             const aiEdges = topologyData.topology?.edges || [];
-            
+
             if (aiNodes.length > 0 || aiEdges.length > 0) {
               const nodeMap = new Map();
               const currentNodes = topologyNodes.length > 0 ? topologyNodes : baseNodes;
               currentNodes.forEach(n => {
                 nodeMap.set(n.id, { ...n });
               });
-              
+
               aiNodes.forEach(aiNode => {
                 const nodeId = aiNode.id;
                 const existingNode = nodeMap.get(nodeId);
@@ -10925,7 +11020,7 @@ const TopologyGraph = ({ project, projectId, routeToHash, handleNavClick, onOpen
                   });
                 }
               });
-              
+
               const updatedNodes = Array.from(nodeMap.values());
               const convertedEdges = aiEdges.map(edge => ({
                 a: edge.from,
@@ -10934,7 +11029,7 @@ const TopologyGraph = ({ project, projectId, routeToHash, handleNavClick, onOpen
                 evidence: edge.evidence || "",
                 type: "trunk"
               }));
-              
+
               const updatedPositions = { ...positions };
               const roleCounts = {};
               const roleIndices = {};
@@ -10942,7 +11037,7 @@ const TopologyGraph = ({ project, projectId, routeToHash, handleNavClick, onOpen
                 const role = (node.role || "default").toLowerCase();
                 roleCounts[role] = (roleCounts[role] || 0) + 1;
               });
-              
+
               updatedNodes.forEach((node) => {
                 if (!updatedPositions[node.id]) {
                   const role = (node.role || "access").toLowerCase();
@@ -10953,11 +11048,11 @@ const TopologyGraph = ({ project, projectId, routeToHash, handleNavClick, onOpen
               });
               const nodeIds = updatedNodes.map(n => n.id);
               const nudgedPositions = nudgePositionsNoOverlap(updatedPositions, nodeIds);
-              
+
               setTopologyNodes(updatedNodes);
               setLinks(convertedEdges);
               setPositions(nudgedPositions);
-              
+
               setProjects(prev => prev.map(p => {
                 if ((p.project_id || p.id) === projectId) {
                   return {
@@ -10969,7 +11064,7 @@ const TopologyGraph = ({ project, projectId, routeToHash, handleNavClick, onOpen
                 }
                 return p;
               }));
-              
+
               if (topologyData.llm_metrics) {
                 setTopologyLLMMetrics(topologyData.llm_metrics);
               }
@@ -10979,11 +11074,11 @@ const TopologyGraph = ({ project, projectId, routeToHash, handleNavClick, onOpen
                 setProjects(prev => prev.map(p => (p.project_id || p.id) === projectId ? { ...p, topoPositions: nudgedPositions, topoLinks: convertedEdges, topoNodeLabels: labels, topoNodeRoles: roles, topoUpdatedAt: new Date().toISOString() } : p));
               }).catch(err => console.warn("Failed to auto-save topology layout:", err));
             }
-            
+
             setGeneratingTopology(false);
             localStorage.removeItem(storageKey);
             onComplete?.();
-            
+
             setTopologyNotificationData({
               title: "Topology Generated",
               message: `LLM topology generation completed. Found ${aiNodes.length} nodes and ${aiEdges.length} links.`,
@@ -11006,13 +11101,13 @@ const TopologyGraph = ({ project, projectId, routeToHash, handleNavClick, onOpen
       setGeneratingTopology(false);
     }
   }, [project.project_id || project.id]);
-  
+
   // Load topology layout from backend on mount
   React.useEffect(() => {
     const loadTopologyLayout = async () => {
       const projectId = project.project_id || project.id;
       if (!projectId) return;
-      
+
       try {
         const topologyData = await api.getTopology(projectId);
         if (topologyData.layout) {
@@ -11053,25 +11148,25 @@ const TopologyGraph = ({ project, projectId, routeToHash, handleNavClick, onOpen
         // Fallback to project data (already set in useState)
       }
     };
-    
+
     loadTopologyLayout();
   }, [project.project_id || project.id]);
-  
+
   // Poll for topology updates when generating (works even when user navigates away)
   React.useEffect(() => {
     const projectId = project.project_id || project.id;
     if (!projectId) return;
-    
+
     const storageKey = `llm_generating_topology_${projectId}`;
     const pollingKey = `topology_${projectId}`;
     const isGenerating = generatingTopology || localStorage.getItem(storageKey) === "true";
-    
+
     if (!isGenerating) {
       localStorage.removeItem(storageKey);
       globalPollingService.stopPolling(pollingKey);
       return;
     }
-    
+
     // Use global polling service (works across page navigation)
     // Resume existing polling if it exists, otherwise start new one
     if (globalPollingService.isPolling(pollingKey)) {
@@ -11081,7 +11176,7 @@ const TopologyGraph = ({ project, projectId, routeToHash, handleNavClick, onOpen
           // Process topology result
           const aiNodes = topologyData.topology?.nodes || [];
           const aiEdges = topologyData.topology?.edges || [];
-          
+
           if (aiNodes.length > 0 || aiEdges.length > 0) {
             // Convert AI nodes to internal format
             const nodeMap = new Map();
@@ -11089,7 +11184,7 @@ const TopologyGraph = ({ project, projectId, routeToHash, handleNavClick, onOpen
             currentNodes.forEach(n => {
               nodeMap.set(n.id, { ...n });
             });
-            
+
             aiNodes.forEach(aiNode => {
               const nodeId = aiNode.id;
               const existingNode = nodeMap.get(nodeId);
@@ -11111,7 +11206,7 @@ const TopologyGraph = ({ project, projectId, routeToHash, handleNavClick, onOpen
                 });
               }
             });
-            
+
             const updatedNodes = Array.from(nodeMap.values());
             const convertedEdges = aiEdges.map(edge => ({
               a: edge.from,
@@ -11120,7 +11215,7 @@ const TopologyGraph = ({ project, projectId, routeToHash, handleNavClick, onOpen
               evidence: edge.evidence || "",
               type: "trunk"
             }));
-            
+
             // Update positions for new nodes
             const updatedPositions = { ...positions };
             const roleCounts = {};
@@ -11129,7 +11224,7 @@ const TopologyGraph = ({ project, projectId, routeToHash, handleNavClick, onOpen
               const role = (node.role || "default").toLowerCase();
               roleCounts[role] = (roleCounts[role] || 0) + 1;
             });
-            
+
             updatedNodes.forEach((node) => {
               if (!updatedPositions[node.id]) {
                 const role = (node.role || "access").toLowerCase();
@@ -11140,12 +11235,12 @@ const TopologyGraph = ({ project, projectId, routeToHash, handleNavClick, onOpen
             });
             const nodeIds = updatedNodes.map(n => n.id);
             const nudgedPositions = nudgePositionsNoOverlap(updatedPositions, nodeIds);
-            
+
             // Update states
             setTopologyNodes(updatedNodes);
             setLinks(convertedEdges);
             setPositions(nudgedPositions);
-            
+
             // Update project state
             setProjects(prev => prev.map(p => {
               if ((p.project_id || p.id) === projectId) {
@@ -11158,7 +11253,7 @@ const TopologyGraph = ({ project, projectId, routeToHash, handleNavClick, onOpen
               }
               return p;
             }));
-            
+
             // Load LLM metrics
             if (topologyData.llm_metrics) {
               setTopologyLLMMetrics(topologyData.llm_metrics);
@@ -11169,11 +11264,11 @@ const TopologyGraph = ({ project, projectId, routeToHash, handleNavClick, onOpen
               setProjects(prev => prev.map(p => (p.project_id || p.id) === projectId ? { ...p, topoPositions: nudgedPositions, topoLinks: convertedEdges, topoNodeLabels: labels, topoNodeRoles: roles, topoUpdatedAt: new Date().toISOString() } : p));
             }).catch(err => console.warn("Failed to auto-save topology layout:", err));
           }
-          
+
           setGeneratingTopology(false);
           localStorage.removeItem(storageKey);
           onComplete?.();
-          
+
           setTopologyNotificationData({
             title: "Topology Generated",
             message: `LLM topology generation completed. Found ${aiNodes.length} nodes and ${aiEdges.length} links.`,
@@ -11196,112 +11291,112 @@ const TopologyGraph = ({ project, projectId, routeToHash, handleNavClick, onOpen
         projectId,
         api.getTopology,
         (topologyData) => {
-        notifyLLMResultReady("Topology", "LLM topology completed. Open Summary to view.");
-        // Process topology result
-        const aiNodes = topologyData.topology?.nodes || [];
-        const aiEdges = topologyData.topology?.edges || [];
-        
-        if (aiNodes.length > 0 || aiEdges.length > 0) {
-          // Convert AI nodes to internal format
-          const nodeMap = new Map();
-          const currentNodes = topologyNodes.length > 0 ? topologyNodes : baseNodes;
-          currentNodes.forEach(n => {
-            nodeMap.set(n.id, { ...n });
-          });
-          
-          aiNodes.forEach(aiNode => {
-            const nodeId = aiNode.id;
-            const existingNode = nodeMap.get(nodeId);
-            if (existingNode) {
-              nodeMap.set(nodeId, {
-                ...existingNode,
-                label: aiNode.label || existingNode.label,
-                role: (aiNode.type || existingNode.role)?.toLowerCase() || existingNode.role,
-                type: aiNode.type || existingNode.type
-              });
-            } else {
-              nodeMap.set(nodeId, {
-                id: nodeId,
-                label: aiNode.label || nodeId,
-                role: (aiNode.type || "access")?.toLowerCase(),
-                type: aiNode.type || "Switch",
-                model: aiNode.model,
-                mgmtIp: aiNode.ip || aiNode.management_ip
-              });
+          notifyLLMResultReady("Topology", "LLM topology completed. Open Summary to view.");
+          // Process topology result
+          const aiNodes = topologyData.topology?.nodes || [];
+          const aiEdges = topologyData.topology?.edges || [];
+
+          if (aiNodes.length > 0 || aiEdges.length > 0) {
+            // Convert AI nodes to internal format
+            const nodeMap = new Map();
+            const currentNodes = topologyNodes.length > 0 ? topologyNodes : baseNodes;
+            currentNodes.forEach(n => {
+              nodeMap.set(n.id, { ...n });
+            });
+
+            aiNodes.forEach(aiNode => {
+              const nodeId = aiNode.id;
+              const existingNode = nodeMap.get(nodeId);
+              if (existingNode) {
+                nodeMap.set(nodeId, {
+                  ...existingNode,
+                  label: aiNode.label || existingNode.label,
+                  role: (aiNode.type || existingNode.role)?.toLowerCase() || existingNode.role,
+                  type: aiNode.type || existingNode.type
+                });
+              } else {
+                nodeMap.set(nodeId, {
+                  id: nodeId,
+                  label: aiNode.label || nodeId,
+                  role: (aiNode.type || "access")?.toLowerCase(),
+                  type: aiNode.type || "Switch",
+                  model: aiNode.model,
+                  mgmtIp: aiNode.ip || aiNode.management_ip
+                });
+              }
+            });
+
+            const updatedNodes = Array.from(nodeMap.values());
+            const convertedEdges = aiEdges.map(edge => ({
+              a: edge.from,
+              b: edge.to,
+              label: edge.label || "",
+              evidence: edge.evidence || "",
+              type: "trunk"
+            }));
+
+            // Update positions for new nodes
+            const updatedPositions = { ...positions };
+            const roleCounts = {};
+            const roleIndices = {};
+            updatedNodes.forEach(node => {
+              const role = (node.role || "default").toLowerCase();
+              roleCounts[role] = (roleCounts[role] || 0) + 1;
+            });
+
+            updatedNodes.forEach((node) => {
+              if (!updatedPositions[node.id]) {
+                const role = (node.role || "access").toLowerCase();
+                roleIndices[role] = (roleIndices[role] || 0);
+                updatedPositions[node.id] = getDefaultPos(node.id, role, roleIndices[role], roleCounts);
+                roleIndices[role]++;
+              }
+            });
+            const nodeIds = updatedNodes.map(n => n.id);
+            const nudgedPositions = nudgePositionsNoOverlap(updatedPositions, nodeIds);
+
+            // Update states
+            setTopologyNodes(updatedNodes);
+            setLinks(convertedEdges);
+            setPositions(nudgedPositions);
+
+            // Update project state
+            setProjects(prev => prev.map(p => {
+              if ((p.project_id || p.id) === projectId) {
+                return {
+                  ...p,
+                  topoLinks: convertedEdges,
+                  topoNodes: aiNodes,
+                  topoPositions: nudgedPositions
+                };
+              }
+              return p;
+            }));
+
+            // Load LLM metrics
+            if (topologyData.llm_metrics) {
+              setTopologyLLMMetrics(topologyData.llm_metrics);
             }
-          });
-          
-          const updatedNodes = Array.from(nodeMap.values());
-          const convertedEdges = aiEdges.map(edge => ({
-            a: edge.from,
-            b: edge.to,
-            label: edge.label || "",
-            evidence: edge.evidence || "",
-            type: "trunk"
-          }));
-          
-          // Update positions for new nodes
-          const updatedPositions = { ...positions };
-          const roleCounts = {};
-          const roleIndices = {};
-          updatedNodes.forEach(node => {
-            const role = (node.role || "default").toLowerCase();
-            roleCounts[role] = (roleCounts[role] || 0) + 1;
-          });
-          
-          updatedNodes.forEach((node) => {
-            if (!updatedPositions[node.id]) {
-              const role = (node.role || "access").toLowerCase();
-              roleIndices[role] = (roleIndices[role] || 0);
-              updatedPositions[node.id] = getDefaultPos(node.id, role, roleIndices[role], roleCounts);
-              roleIndices[role]++;
-            }
-          });
-          const nodeIds = updatedNodes.map(n => n.id);
-          const nudgedPositions = nudgePositionsNoOverlap(updatedPositions, nodeIds);
-          
-          // Update states
-          setTopologyNodes(updatedNodes);
-          setLinks(convertedEdges);
-          setPositions(nudgedPositions);
-          
-          // Update project state
-          setProjects(prev => prev.map(p => {
-            if ((p.project_id || p.id) === projectId) {
-              return {
-                ...p,
-                topoLinks: convertedEdges,
-                topoNodes: aiNodes,
-                topoPositions: nudgedPositions
-              };
-            }
-            return p;
-          }));
-          
-          // Load LLM metrics
-          if (topologyData.llm_metrics) {
-            setTopologyLLMMetrics(topologyData.llm_metrics);
+            const labels = Object.fromEntries(updatedNodes.map(n => [n.id, n.label || n.id]));
+            const roles = Object.fromEntries(updatedNodes.map(n => [n.id, n.role || "access"]));
+            api.saveTopologyLayout(projectId, nudgedPositions, convertedEdges, labels, roles).then(() => {
+              setProjects(prev => prev.map(p => (p.project_id || p.id) === projectId ? { ...p, topoPositions: nudgedPositions, topoLinks: convertedEdges, topoNodeLabels: labels, topoNodeRoles: roles, topoUpdatedAt: new Date().toISOString() } : p));
+            }).catch(err => console.warn("Failed to auto-save topology layout:", err));
           }
-          const labels = Object.fromEntries(updatedNodes.map(n => [n.id, n.label || n.id]));
-          const roles = Object.fromEntries(updatedNodes.map(n => [n.id, n.role || "access"]));
-          api.saveTopologyLayout(projectId, nudgedPositions, convertedEdges, labels, roles).then(() => {
-            setProjects(prev => prev.map(p => (p.project_id || p.id) === projectId ? { ...p, topoPositions: nudgedPositions, topoLinks: convertedEdges, topoNodeLabels: labels, topoNodeRoles: roles, topoUpdatedAt: new Date().toISOString() } : p));
-          }).catch(err => console.warn("Failed to auto-save topology layout:", err));
-        }
-        
-        setGeneratingTopology(false);
-        localStorage.removeItem(storageKey);
-        onComplete?.();
-        
-        setTopologyNotificationData({
-          title: "Topology Generated",
-          message: "LLM analysis completed successfully.",
-          metrics: topologyData.llm_metrics,
-          type: "success"
-        });
-        setShowTopologyNotification(true);
-        setLlmNotification?.({ show: true, type: "success", title: "Topology Generated", message: "LLM analysis completed successfully.", metrics: topologyData.llm_metrics, onRegenerate: () => requestRun?.(doGenerateTopologyRef.current) });
-      },
+
+          setGeneratingTopology(false);
+          localStorage.removeItem(storageKey);
+          onComplete?.();
+
+          setTopologyNotificationData({
+            title: "Topology Generated",
+            message: "LLM analysis completed successfully.",
+            metrics: topologyData.llm_metrics,
+            type: "success"
+          });
+          setShowTopologyNotification(true);
+          setLlmNotification?.({ show: true, type: "success", title: "Topology Generated", message: "LLM analysis completed successfully.", metrics: topologyData.llm_metrics, onRegenerate: () => requestRun?.(doGenerateTopologyRef.current) });
+        },
         (errorMsg) => {
           setGeneratingTopology(false);
           setTopologyError(errorMsg);
@@ -11310,13 +11405,13 @@ const TopologyGraph = ({ project, projectId, routeToHash, handleNavClick, onOpen
         }
       );
     }
-    
+
     return () => {
       // Don't stop polling on unmount - let it continue in background
       // Only stop if explicitly requested (when generatingTopology is false)
     };
   }, [project.project_id || project.id, generatingTopology]);
-  
+
   const doGenerateTopologyRef = React.useRef(null);
 
   const handleGenerateTopology = () => {
@@ -11515,33 +11610,33 @@ const TopologyGraph = ({ project, projectId, routeToHash, handleNavClick, onOpen
     })();
     return () => { cancelled = true; };
   }, [project.project_id || project.id]);
-  
+
   // Handle zoom
   const handleZoomIn = () => {
     setZoom(prev => Math.min(prev + 0.2, 3.0));
   };
-  
+
   const handleZoomOut = () => {
     setZoom(prev => Math.max(prev - 0.2, 0.5));
   };
-  
+
   const handleZoomReset = () => {
     setZoom(1.0);
     setPan({ x: 0, y: 0 });
   };
-  
+
   // Handle pan (drag background) - works in both edit and view mode
   const handlePanStart = (e) => {
     // Don't pan if already dragging a node or starting a link
     if (dragging || linkStart || e.button !== 0) return;
-    
+
     // Check if clicking on empty space (SVG background, pan area rect, or line, not on nodes)
     const target = e.target;
-    const isClickingEmptySpace = target.tagName === 'svg' || 
-                                  target.tagName === 'line' ||
-                                  (target.classList && target.classList.contains('pan-area')) ||
-                                  (target.tagName === 'rect' && target.getAttribute('fill') === 'transparent');
-    
+    const isClickingEmptySpace = target.tagName === 'svg' ||
+      target.tagName === 'line' ||
+      (target.classList && target.classList.contains('pan-area')) ||
+      (target.tagName === 'rect' && target.getAttribute('fill') === 'transparent');
+
     if (editMode) {
       // In edit mode: Ctrl/Shift/Cmd+drag or drag empty space (but not on nodes)
       if (e.ctrlKey || e.metaKey || e.shiftKey || isClickingEmptySpace) {
@@ -11560,7 +11655,7 @@ const TopologyGraph = ({ project, projectId, routeToHash, handleNavClick, onOpen
       }
     }
   };
-  
+
   const handlePanMove = (e) => {
     if (isPanning) {
       // Reduce panning speed by dividing by 1.5
@@ -11570,26 +11665,26 @@ const TopologyGraph = ({ project, projectId, routeToHash, handleNavClick, onOpen
       });
     }
   };
-  
+
   const handlePanEnd = () => {
     setIsPanning(false);
   };
-  
+
   // Handle node drag
   const handleMouseDown = (nodeId, e) => {
     if (!editMode) return; // view mode: navigation is handled by the <a> wrapper (click); ctrl/cmd/middle-click opens in new tab
-    
+
     // In edit mode: Check if panning with modifier keys
     if (editMode && (e.ctrlKey || e.metaKey || e.shiftKey)) {
       handlePanStart(e);
       return;
     }
-    
+
     // Don't start dragging if we're panning
     if (isPanning) {
       return;
     }
-    
+
     e.stopPropagation();
     setDragging(nodeId);
     setSelectedNode(nodeId);
@@ -11601,17 +11696,17 @@ const TopologyGraph = ({ project, projectId, routeToHash, handleNavClick, onOpen
       handlePanMove(e);
       return;
     }
-    
+
     // Handle node dragging
     if (!dragging || !editMode) return;
     const svg = e.currentTarget;
     const rect = svg.getBoundingClientRect();
     const viewBox = svg.viewBox.baseVal;
-    
+
     // Calculate position accounting for zoom and pan
     const x = ((e.clientX - rect.left) / rect.width) * viewBox.width / zoom - pan.x / zoom;
     const y = ((e.clientY - rect.top) / rect.height) * viewBox.height / zoom - pan.y / zoom;
-    
+
     setPositions(prev => ({
       ...prev,
       [dragging]: { x, y } // No position limits - allow free dragging
@@ -11622,7 +11717,7 @@ const TopologyGraph = ({ project, projectId, routeToHash, handleNavClick, onOpen
     setDragging(null);
     handlePanEnd();
   };
-  
+
   // Handle wheel zoom - works in both edit and view mode
   const handleWheel = (e) => {
     e.preventDefault();
@@ -11634,20 +11729,20 @@ const TopologyGraph = ({ project, projectId, routeToHash, handleNavClick, onOpen
   const handleNodeClick = (nodeId, e) => {
     if (!editMode) return;
     e.stopPropagation();
-    
+
     // Re-route link connector mode
     if (reroutingLink !== null) {
       const linkIndex = reroutingLink;
       const link = links[linkIndex];
-      
+
       // Determine which end to re-route (closest to clicked node)
       const posA = getPos(link.a);
       const posB = getPos(link.b);
       const posNode = getPos(nodeId);
-      
+
       const distToA = Math.sqrt(Math.pow(posNode.x - posA.x, 2) + Math.pow(posNode.y - posA.y, 2));
       const distToB = Math.sqrt(Math.pow(posNode.x - posB.x, 2) + Math.pow(posNode.y - posB.y, 2));
-      
+
       // Re-route the closer end
       setLinks(prev => prev.map((l, i) => {
         if (i === linkIndex) {
@@ -11659,19 +11754,19 @@ const TopologyGraph = ({ project, projectId, routeToHash, handleNavClick, onOpen
         }
         return l;
       }));
-      
+
       setReroutingLink(null);
       setSelectedLink(null);
       return;
     }
-    
+
     if (linkMode === "add") {
       if (linkStart === null) {
         setLinkStart(nodeId);
         setSelectedNode(nodeId);
       } else if (linkStart !== nodeId) {
         // Create link if it doesn't exist
-        const linkExists = links.some(l => 
+        const linkExists = links.some(l =>
           (l.a === linkStart && l.b === nodeId) || (l.a === nodeId && l.b === linkStart)
         );
         if (!linkExists) {
@@ -11713,7 +11808,7 @@ const TopologyGraph = ({ project, projectId, routeToHash, handleNavClick, onOpen
   const handleLinkClick = (linkIndex, e) => {
     if (!editMode) return;
     e.stopPropagation();
-    
+
     if (linkMode === "edit") {
       setSelectedLink(linkIndex);
       setShowLinkDialog(true);
@@ -11723,7 +11818,7 @@ const TopologyGraph = ({ project, projectId, routeToHash, handleNavClick, onOpen
       setSelectedLink(null);
     }
   };
-  
+
   // Start re-routing link connector
   const startRerouteLink = (linkIndex) => {
     setReroutingLink(linkIndex);
@@ -11786,11 +11881,11 @@ const TopologyGraph = ({ project, projectId, routeToHash, handleNavClick, onOpen
       alert("❌ Project ID not found");
       return;
     }
-    
+
     try {
       // Save to backend
       await api.saveTopologyLayout(projectId, positions, links, nodeLabels, nodeRoles, hiddenNodeIds);
-      
+
       // Update "last saved" snapshot so Cancel restores to this state
       lastSavedLayoutRef.current = {
         positions: { ...positions },
@@ -11799,21 +11894,21 @@ const TopologyGraph = ({ project, projectId, routeToHash, handleNavClick, onOpen
         node_roles: { ...nodeRoles },
         hidden_node_ids: [...hiddenNodeIds],
       };
-      
+
       // Update local state with current timestamp
       const now = new Date().toISOString();
-      setProjects(prev => prev.map(p => 
-        p.id === project.id 
+      setProjects(prev => prev.map(p =>
+        p.id === project.id
           ? { ...p, topoPositions: positions, topoLinks: links, topoNodeLabels: nodeLabels, topoNodeRoles: nodeRoles, topoHiddenNodes: hiddenNodeIds, topoUpdatedAt: now }
           : p
       ));
-      
+
       setEditMode(false);
       setLinkStart(null);
       setSelectedNode(null);
       setLinkMode("none");
       setSelectedLink(null);
-      
+
       alert("Topology layout saved successfully.");
     } catch (error) {
       console.error("Failed to save topology layout:", error);
@@ -11865,7 +11960,7 @@ const TopologyGraph = ({ project, projectId, routeToHash, handleNavClick, onOpen
       setNodeRoles(project.topoNodeRoles || Object.fromEntries(nodes.map(n => [n.id, n.role])));
       setHiddenNodeIds(project.topoHiddenNodes || []);
     }
-    
+
     setEditMode(false);
     setLinkStart(null);
     setSelectedNode(null);
@@ -11909,7 +12004,7 @@ const TopologyGraph = ({ project, projectId, routeToHash, handleNavClick, onOpen
   };
 
   return (
-    <Card 
+    <Card
       headerClassName="py-2.5"
       title={
         <div className="flex items-center justify-between w-full gap-2">
@@ -11947,8 +12042,8 @@ const TopologyGraph = ({ project, projectId, routeToHash, handleNavClick, onOpen
                 <>
                   {!editMode ? (
                     <button
-                    className="w-6 h-6 flex items-center justify-center rounded-lg border border-slate-300 dark:border-slate-600 bg-slate-100/80 dark:bg-slate-800/50 hover:bg-slate-200 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-300 text-xs transition-colors"
-                    onClick={() => setEditMode(true)}
+                      className="w-6 h-6 flex items-center justify-center rounded-lg border border-slate-300 dark:border-slate-600 bg-slate-100/80 dark:bg-slate-800/50 hover:bg-slate-200 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-300 text-xs transition-colors"
+                      onClick={() => setEditMode(true)}
                       title="Edit Graph"
                     >
                       ✏️
@@ -11956,8 +12051,8 @@ const TopologyGraph = ({ project, projectId, routeToHash, handleNavClick, onOpen
                   ) : (
                     <>
                       <button
-                      className="w-6 h-6 flex items-center justify-center rounded-lg border border-slate-300 dark:border-slate-600 bg-slate-100/80 dark:bg-slate-800/50 hover:bg-slate-200 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-300 text-xs transition-colors"
-                      onClick={handleCancel}
+                        className="w-6 h-6 flex items-center justify-center rounded-lg border border-slate-300 dark:border-slate-600 bg-slate-100/80 dark:bg-slate-800/50 hover:bg-slate-200 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-300 text-xs transition-colors"
+                        onClick={handleCancel}
                         title="Cancel"
                       >
                         ✕
@@ -12013,7 +12108,7 @@ const TopologyGraph = ({ project, projectId, routeToHash, handleNavClick, onOpen
             )}
           </div>
         </div>
-      } 
+      }
       className="w-full"
       compact={true}
     >
@@ -12023,7 +12118,7 @@ const TopologyGraph = ({ project, projectId, routeToHash, handleNavClick, onOpen
         const storageKey = `llm_generating_topology_${projectId}`;
         const isGeneratingFromStorage = localStorage.getItem(storageKey) === "true";
         const isActuallyGenerating = generatingTopology || isGeneratingFromStorage;
-        
+
         return (
           <>
             {isActuallyGenerating && (
@@ -12042,15 +12137,15 @@ const TopologyGraph = ({ project, projectId, routeToHash, handleNavClick, onOpen
       {editMode && (
         <div className="mb-2 px-2 py-1.5 bg-gray-50 dark:bg-gray-800 rounded">
           <div className="flex items-center gap-1.5 flex-wrap">
-            <Button 
-              variant={linkMode === "add" ? "primary" : "secondary"} 
+            <Button
+              variant={linkMode === "add" ? "primary" : "secondary"}
               className="text-[10px] px-2 py-0.5 h-6"
               onClick={linkMode === "add" ? cancelLinkMode : startAddLink}
             >
               {linkMode === "add" ? "Cancel" : "Add Link"}
             </Button>
-            <Button 
-              variant={linkMode === "edit" ? "primary" : "secondary"} 
+            <Button
+              variant={linkMode === "edit" ? "primary" : "secondary"}
               className="text-[10px] px-2 py-0.5 h-6"
               onClick={() => {
                 setLinkMode(linkMode === "edit" ? "none" : "edit");
@@ -12061,19 +12156,19 @@ const TopologyGraph = ({ project, projectId, routeToHash, handleNavClick, onOpen
             </Button>
             {selectedLink !== null && linkMode === "edit" && (
               <>
-                <Button 
+                <Button
                   variant="danger"
                   className="text-[10px] px-2 py-0.5 h-6"
                   onClick={() => {
-                    handleLinkDelete(selectedLink, { preventDefault: () => {}, stopPropagation: () => {} });
+                    handleLinkDelete(selectedLink, { preventDefault: () => { }, stopPropagation: () => { } });
                     setShowLinkDialog(false);
                     setSelectedLink(null);
                   }}
                 >
                   Delete link
                 </Button>
-                <Button 
-                  variant={reroutingLink === selectedLink ? "primary" : "secondary"} 
+                <Button
+                  variant={reroutingLink === selectedLink ? "primary" : "secondary"}
                   className="text-[10px] px-2 py-0.5 h-6"
                   onClick={() => {
                     if (reroutingLink === selectedLink) {
@@ -12142,8 +12237,8 @@ const TopologyGraph = ({ project, projectId, routeToHash, handleNavClick, onOpen
             Loading topology graph...
           </div>
         ) : null}
-        <svg 
-          viewBox="0 0 100 100" 
+        <svg
+          viewBox="0 0 100 100"
           className="w-full h-full"
           onMouseMove={handleMouseMove}
           onMouseUp={handleMouseUp}
@@ -12157,135 +12252,135 @@ const TopologyGraph = ({ project, projectId, routeToHash, handleNavClick, onOpen
           }}
         >
           <g transform={`translate(${pan.x}, ${pan.y}) scale(${zoom})`}>
-          {/* Background pan area - unlimited size for dragging */}
-          <rect 
-            x="-10000" y="-10000" 
-            width="20000" height="20000" 
-            fill="transparent" 
-            className="pan-area"
-            onMouseDown={handlePanStart}
-            style={{ cursor: isPanning ? 'grabbing' : (!dragging ? 'grab' : 'default'), pointerEvents: 'all' }}
-          />
-          {/* edges */}
-          {links.map((e, i) => {
-            if (hiddenNodeIds.includes(e.a) || hiddenNodeIds.includes(e.b)) return null;
-            const A = getPos(e.a), B = getPos(e.b);
-            const isSelected = selectedLink === i;
-            const isRerouting = reroutingLink === i;
-            const midX = (A.x + B.x) / 2;
-            const midY = (A.y + B.y) / 2;
-            const linkLabel = e.label || e.evidence || "";
-            return (
-              <g key={i}>
-                <line 
-                  x1={A.x} y1={A.y} x2={B.x} y2={B.y}
-                  stroke={isRerouting ? "#f59e0b" : (isSelected ? "#10b981" : "#5DA0FF")} 
-                  strokeWidth={editMode ? (isSelected || isRerouting ? "1.5" : "1.2") : "1.0"} 
-                  strokeDasharray={isRerouting ? "3,3" : "none"}
-                  opacity={isRerouting ? "1" : "0.85"}
-                  onClick={(evt) => handleLinkClick(i, evt)}
-                  onContextMenu={(evt) => handleLinkDelete(i, evt)}
-                  onMouseEnter={(evt) => {
-                    if (linkLabel) {
-                      const svg = evt.currentTarget.ownerSVGElement;
-                      const rect = svg.getBoundingClientRect();
-                      const viewBox = svg.viewBox.baseVal;
-                      const xPercent = (midX / viewBox.width) * 100;
-                      const yPercent = (midY / viewBox.height) * 100;
-                      setLinkTooltip({
-                        x: (xPercent / 100) * rect.width,
-                        y: (yPercent / 100) * rect.height,
-                        text: linkLabel
-                      });
-                    }
-                  }}
-                  onMouseLeave={() => setLinkTooltip(null)}
-                  className={editMode ? "cursor-pointer" : (linkLabel ? "cursor-help" : "")}
-                />
-                {editMode && (
-                  <line 
+            {/* Background pan area - unlimited size for dragging */}
+            <rect
+              x="-10000" y="-10000"
+              width="20000" height="20000"
+              fill="transparent"
+              className="pan-area"
+              onMouseDown={handlePanStart}
+              style={{ cursor: isPanning ? 'grabbing' : (!dragging ? 'grab' : 'default'), pointerEvents: 'all' }}
+            />
+            {/* edges */}
+            {links.map((e, i) => {
+              if (hiddenNodeIds.includes(e.a) || hiddenNodeIds.includes(e.b)) return null;
+              const A = getPos(e.a), B = getPos(e.b);
+              const isSelected = selectedLink === i;
+              const isRerouting = reroutingLink === i;
+              const midX = (A.x + B.x) / 2;
+              const midY = (A.y + B.y) / 2;
+              const linkLabel = e.label || e.evidence || "";
+              return (
+                <g key={i}>
+                  <line
                     x1={A.x} y1={A.y} x2={B.x} y2={B.y}
-                    stroke="transparent" 
-                    strokeWidth="8"
+                    stroke={isRerouting ? "#f59e0b" : (isSelected ? "#10b981" : "#5DA0FF")}
+                    strokeWidth={editMode ? (isSelected || isRerouting ? "1.5" : "1.2") : "1.0"}
+                    strokeDasharray={isRerouting ? "3,3" : "none"}
+                    opacity={isRerouting ? "1" : "0.85"}
                     onClick={(evt) => handleLinkClick(i, evt)}
                     onContextMenu={(evt) => handleLinkDelete(i, evt)}
-                    className="cursor-pointer"
+                    onMouseEnter={(evt) => {
+                      if (linkLabel) {
+                        const svg = evt.currentTarget.ownerSVGElement;
+                        const rect = svg.getBoundingClientRect();
+                        const viewBox = svg.viewBox.baseVal;
+                        const xPercent = (midX / viewBox.width) * 100;
+                        const yPercent = (midY / viewBox.height) * 100;
+                        setLinkTooltip({
+                          x: (xPercent / 100) * rect.width,
+                          y: (yPercent / 100) * rect.height,
+                          text: linkLabel
+                        });
+                      }
+                    }}
+                    onMouseLeave={() => setLinkTooltip(null)}
+                    className={editMode ? "cursor-pointer" : (linkLabel ? "cursor-help" : "")}
                   />
-                )}
-              </g>
-            );
-          })}
-          {/* nodes */}
-          {nodes.map((n) => {
-            if (hiddenNodeIds.includes(n.id)) return null;
-            const p = getPos(n.id);
-            const isSelected = selectedNode === n.id;
-            const isLinkStart = linkStart === n.id;
-            const deviceSize = editMode ? (isSelected || isLinkStart ? 5 : 4) : 3.5;
-            
-            // Get device image if available
-            const deviceImages = project?.device_images || {};
-            const deviceImageBase64 = deviceImages[n.id];
-            // Detect format: PNG starts with iVBOR, JPEG starts with /9j/
-            let deviceImageUrl = null;
-            if (deviceImageBase64) {
-              const imageFormat = deviceImageBase64.startsWith('iVBOR') ? 'png' : 'jpeg';
-              deviceImageUrl = `data:image/${imageFormat};base64,${deviceImageBase64}`;
-            }
-            // Label always below icon: image height is size*8 (centered), so bottom at +size*4; SVG icon bottom ~+size*0.6
-            const labelY = deviceImageUrl ? (deviceSize * 4 + 3.2) : (deviceSize + 3);
-            
-            const nodeContent = (
-              <g 
-                transform={`translate(${p.x}, ${p.y})`}
-                onMouseDown={(e) => handleMouseDown(n.id, e)}
-                onClick={(e) => handleNodeClick(n.id, e)}
-                onDoubleClick={(e) => handleNodeDoubleClick(n.id, e)}
-                className={editMode && linkMode !== "add" ? "cursor-move" : "cursor-pointer"}
-              >
-                <NetworkDeviceIcon 
-                  role={getNodeRole(n.id)} 
-                  isSelected={isSelected}
-                  isLinkStart={isLinkStart}
-                  size={deviceSize}
-                  imageUrl={deviceImageUrl}
-                />
-                <text 
-                  x={0} 
-                  y={labelY} 
-                  fontSize="2.4" 
-                  fontWeight="600"
-                  fill="var(--topo-label-fill, #1e293b)"
-                  textAnchor="middle"
-                  pointerEvents="none"
-                  className="select-none topology-node-label"
-                >
-                  {getNodeName(n.id)}
-                </text>
-                {/* hover tooltip */}
-                <title>{`Role: ${n.role || "-"} • Model: ${n.model || "-"} • Mgmt: ${n.mgmtIp || "-"} • Routing: ${n.routing || "-"} • STP: ${n.stpMode || "-"} • Ctrl+click to open in new tab`}</title>
-              </g>
-            );
-            if (!editMode) {
-              return (
-                <a key={n.id} href={deviceDetailHref(n.id)} onClick={(e) => handleNavClick?.(e, () => onOpenDevice?.(n.id))} style={{ cursor: "pointer" }}>
-                  {nodeContent}
-                </a>
+                  {editMode && (
+                    <line
+                      x1={A.x} y1={A.y} x2={B.x} y2={B.y}
+                      stroke="transparent"
+                      strokeWidth="8"
+                      onClick={(evt) => handleLinkClick(i, evt)}
+                      onContextMenu={(evt) => handleLinkDelete(i, evt)}
+                      className="cursor-pointer"
+                    />
+                  )}
+                </g>
               );
-            }
-            return React.cloneElement(nodeContent, { key: n.id });
-          })}
+            })}
+            {/* nodes */}
+            {nodes.map((n) => {
+              if (hiddenNodeIds.includes(n.id)) return null;
+              const p = getPos(n.id);
+              const isSelected = selectedNode === n.id;
+              const isLinkStart = linkStart === n.id;
+              const deviceSize = editMode ? (isSelected || isLinkStart ? 5 : 4) : 3.5;
+
+              // Get device image if available
+              const deviceImages = project?.device_images || {};
+              const deviceImageBase64 = deviceImages[n.id];
+              // Detect format: PNG starts with iVBOR, JPEG starts with /9j/
+              let deviceImageUrl = null;
+              if (deviceImageBase64) {
+                const imageFormat = deviceImageBase64.startsWith('iVBOR') ? 'png' : 'jpeg';
+                deviceImageUrl = `data:image/${imageFormat};base64,${deviceImageBase64}`;
+              }
+              // Label always below icon: image height is size*8 (centered), so bottom at +size*4; SVG icon bottom ~+size*0.6
+              const labelY = deviceImageUrl ? (deviceSize * 4 + 3.2) : (deviceSize + 3);
+
+              const nodeContent = (
+                <g
+                  transform={`translate(${p.x}, ${p.y})`}
+                  onMouseDown={(e) => handleMouseDown(n.id, e)}
+                  onClick={(e) => handleNodeClick(n.id, e)}
+                  onDoubleClick={(e) => handleNodeDoubleClick(n.id, e)}
+                  className={editMode && linkMode !== "add" ? "cursor-move" : "cursor-pointer"}
+                >
+                  <NetworkDeviceIcon
+                    role={getNodeRole(n.id)}
+                    isSelected={isSelected}
+                    isLinkStart={isLinkStart}
+                    size={deviceSize}
+                    imageUrl={deviceImageUrl}
+                  />
+                  <text
+                    x={0}
+                    y={labelY}
+                    fontSize="2.4"
+                    fontWeight="600"
+                    fill="var(--topo-label-fill, #1e293b)"
+                    textAnchor="middle"
+                    pointerEvents="none"
+                    className="select-none topology-node-label"
+                  >
+                    {getNodeName(n.id)}
+                  </text>
+                  {/* hover tooltip */}
+                  <title>{`Role: ${n.role || "-"} • Model: ${n.model || "-"} • Mgmt: ${n.mgmtIp || "-"} • Routing: ${n.routing || "-"} • STP: ${n.stpMode || "-"} • Ctrl+click to open in new tab`}</title>
+                </g>
+              );
+              if (!editMode) {
+                return (
+                  <a key={n.id} href={deviceDetailHref(n.id)} onClick={(e) => handleNavClick?.(e, () => onOpenDevice?.(n.id))} style={{ cursor: "pointer" }}>
+                    {nodeContent}
+                  </a>
+                );
+              }
+              return React.cloneElement(nodeContent, { key: n.id });
+            })}
           </g>
         </svg>
         {/* Link tooltip */}
         {linkTooltip && (
           <div
             className="absolute z-10 text-xs bg-white dark:bg-[#0F172A] text-slate-800 dark:text-gray-100 border border-slate-300 dark:border-[#1F2937] rounded-lg p-2 whitespace-pre shadow-md"
-            style={{ 
-              left: linkTooltip.x + 8, 
-              top: linkTooltip.y + 8, 
-              pointerEvents: "none", 
-              maxWidth: 360 
+            style={{
+              left: linkTooltip.x + 8,
+              top: linkTooltip.y + 8,
+              pointerEvents: "none",
+              maxWidth: 360
             }}
           >
             {linkTooltip.text}
@@ -12320,7 +12415,7 @@ const TopologyGraph = ({ project, projectId, routeToHash, handleNavClick, onOpen
                 <Select
                   value={links[selectedLink].type || "trunk"}
                   onChange={(value) => {
-                    setLinks(prev => prev.map((l, i) => 
+                    setLinks(prev => prev.map((l, i) =>
                       i === selectedLink ? { ...l, type: value } : l
                     ));
                   }}
@@ -12335,7 +12430,7 @@ const TopologyGraph = ({ project, projectId, routeToHash, handleNavClick, onOpen
                 <Input
                   value={links[selectedLink].label || ""}
                   onChange={(e) => {
-                    setLinks(prev => prev.map((l, i) => 
+                    setLinks(prev => prev.map((l, i) =>
                       i === selectedLink ? { ...l, label: e.target.value } : l
                     ));
                   }}

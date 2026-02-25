@@ -1273,11 +1273,11 @@ class HuaweiParser(BaseParser):
                     phy = parts[2].lower() if len(parts) > 2 else None
                     proto = parts[3].lower() if len(parts) > 3 else None
                     iface = _get_or_create(name)
-                        if phy in ('up', 'down'):
+                    if phy in ('up', 'down'):
                         iface["oper_status"] = iface.get("oper_status") or phy
-                        if proto in ('up', 'down'):
+                    if proto in ('up', 'down'):
                         iface["line_protocol"] = iface.get("line_protocol") or proto
-                        if ip_val and ip_val != 'unassigned' and re.match(r'\d+\.\d+\.\d+\.\d+', ip_val):
+                    if ip_val and ip_val != 'unassigned' and re.match(r'\d+\.\d+\.\d+\.\d+', ip_val):
                         parts_ip = ip_val.split('/')
                         iface["ipv4_address"] = iface.get("ipv4_address") or parts_ip[0]
                         if len(parts_ip) > 1 and parts_ip[1].strip():
@@ -1465,7 +1465,7 @@ class HuaweiParser(BaseParser):
                 if mask_candidate:
                     iface["subnet_mask"] = mask_candidate.strip()
                 if iface.get("port_mode") is None:
-                iface["port_mode"] = "routed"
+                    iface["port_mode"] = "routed"
                 break
         
         # Extract IPv6 address
@@ -1751,7 +1751,7 @@ class HuaweiParser(BaseParser):
 
         # 1. Extract Global Info (Mode, Root, etc.)
         mode_match = re.search(r"Mode\s+(MSTP|RSTP|STP)", content, re.IGNORECASE)
-            if mode_match:
+        if mode_match:
             stp_data["stp_mode"] = mode_match.group(1).upper()
             stp_data["mode"] = mode_match.group(1).upper()
 
@@ -1931,7 +1931,7 @@ class HuaweiParser(BaseParser):
             for line in lines:
                 line_clean = _strip_prompt(line).strip()
                 if not line_clean:
-                continue
+                    continue
                 if line_clean.startswith("interface "):
                     parts = line_clean.split()
                     if len(parts) >= 2:
@@ -2000,7 +2000,7 @@ class HuaweiParser(BaseParser):
                 if not is_valid_ipv4(mask_str):
                     continue
                 cidr = _mask_to_cidr(mask_str)
-                else:
+            else:
                 try:
                     cidr = int(mask_str)
                     if cidr < 0 or cidr > 32:
@@ -2047,7 +2047,7 @@ class HuaweiParser(BaseParser):
                     try:
                         cidr = int(mask_str)
                         if cidr < 0 or cidr > 32:
-                    continue
+                            continue
                     except ValueError:
                         continue
                 network_cidr = f"{network_str}/{cidr}"
@@ -2058,16 +2058,16 @@ class HuaweiParser(BaseParser):
                     next_hop = next_hop_or_if
                 elif is_valid_interface_name(next_hop_or_if):
                     interface = next_hop_or_if
-            else:
+                else:
                     continue
                 key = (network_cidr, next_hop, interface)
                 if key in seen_static:
-                continue
+                    continue
                 seen_static.add(key)
                 routing_data["static_routes"]["routes"].append({
                     "network": network_cidr,
                     "next_hop": next_hop,
-                "interface": interface,
+                    "interface": interface,
                     "admin_distance": pref,
                     "is_default_route": is_default,
                 })
@@ -2163,8 +2163,8 @@ class HuaweiParser(BaseParser):
                                 "invalid": int(parts[3]),
                                 "garbage": int(parts[4]),
                             }
-                    except ValueError:
-                        pass
+                        except ValueError:
+                            pass
                 if "undo summary" in line_stripped or line_stripped.strip() == "undo summary":
                     rip_data["auto_summary"] = False
                 if line_stripped.startswith("silent-interface "):
@@ -2323,8 +2323,8 @@ class HuaweiParser(BaseParser):
             if pref_m:
                 try:
                     routing_data["rip"]["admin_distance"] = int(pref_m.group(1))
-                        except ValueError:
-                            pass
+                except ValueError:
+                    pass
             for upd in re.finditer(r"Update\s+time\s*:\s*(\d+)", block, re.IGNORECASE):
                 routing_data["rip"].setdefault("timers", {})["update"] = int(upd.group(1))
                 break
@@ -2597,11 +2597,11 @@ class HuaweiParser(BaseParser):
                     parts = line.split()
                     if len(parts) >= 3 and is_valid_mac_address(parts[0]):
                         vlan = int(parts[1]) if parts[1].isdigit() else None
-                    port = None
+                        port = None
                         for i in range(2, min(len(parts), 6)):
                             if is_valid_interface_name(parts[i]):
                                 port = parts[i]
-                            break
+                                break
                         if not port and len(parts) > 2 and is_valid_interface_name(parts[-1]):
                             port = parts[-1]
                         mac_table.append({"mac_address": parts[0], "vlan": vlan, "port": port})
@@ -2687,7 +2687,7 @@ class HuaweiParser(BaseParser):
             
             # Validate username - filter out separators and garbage
             if not is_valid_username(username):
-                    continue
+                continue
             
             # Extract privilege level from user config block (2.3.2.8)
             privilege_level = None
@@ -2713,7 +2713,7 @@ class HuaweiParser(BaseParser):
                 })
             else:
                 if privilege_level is not None and existing_user.get("privilege_level") is None:
-                existing_user["privilege_level"] = privilege_level
+                    existing_user["privilege_level"] = privilege_level
                 if service_type_str and existing_user.get("service_type") is None:
                     existing_user["service_type"] = service_type_str
         

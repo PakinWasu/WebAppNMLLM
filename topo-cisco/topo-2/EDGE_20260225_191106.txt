@@ -1,0 +1,1249 @@
+=== term len 0 ===
+
+
+=== show version ===
+Cisco IOS Software, IOSv Software (VIOS-ADVENTERPRISEK9-M), Version 15.6(2)T, RELEASE SOFTWARE (fc2)
+Technical Support: http://www.cisco.com/techsupport
+Copyright (c) 1986-2016 by Cisco Systems, Inc.
+Compiled Tue 22-Mar-16 16:19 by prod_rel_team
+
+
+ROM: Bootstrap program is IOSv
+
+EDGE uptime is 3 hours, 34 minutes
+System returned to ROM by reload
+System image file is "flash0:/vios-adventerprisek9-m"
+Last reload reason: Unknown reason
+
+
+
+This product contains cryptographic features and is subject to United
+States and local country laws governing import, export, transfer and
+use. Delivery of Cisco cryptographic products does not imply
+third-party authority to import, export, distribute or use encryption.
+Importers, exporters, distributors and users are responsible for
+compliance with U.S. and local country laws. By using this product you
+agree to comply with applicable laws and regulations. If you are unable
+to comply with U.S. and local laws, return this product immediately.
+
+A summary of U.S. laws governing Cisco cryptographic products may be found at:
+http://www.cisco.com/wwl/export/crypto/tool/stqrg.html
+
+If you require further assistance please contact us by sending email to
+export@cisco.com.
+
+Cisco IOSv (revision 1.0) with  with 984321K/62464K bytes of memory.
+Processor board ID 9OUF3JBGJSF597ZL3YHNT
+4 Gigabit Ethernet interfaces
+DRAM configuration is 72 bits wide with parity disabled.
+256K bytes of non-volatile configuration memory.
+2097152K bytes of ATA System CompactFlash 0 (Read/Write)
+0K bytes of ATA CompactFlash 1 (Read/Write)
+0K bytes of ATA CompactFlash 2 (Read/Write)
+0K bytes of ATA CompactFlash 3 (Read/Write)
+
+
+
+Configuration register is 0x0
+
+
+=== show running-config ===
+Building configuration...
+
+  
+Current configuration : 4406 bytes
+!
+version 15.6
+service timestamps debug datetime msec
+service timestamps log datetime msec
+no service password-encryption
+!
+hostname EDGE
+!
+boot-start-marker
+boot-end-marker
+!
+!
+logging buffered 51200
+!
+no aaa new-model
+ethernet lmi ce
+!
+!
+!
+mmi polling-interval 60
+no mmi auto-configure
+no mmi pvc
+mmi snmp-timeout 180
+!
+!
+!
+!
+!
+!
+!
+!
+!
+!
+!
+ip domain name lab.local
+ip cef
+no ipv6 cef
+!
+multilink bundle-name authenticated
+!
+!
+!
+!
+username admin privilege 15 secret 5 $1$t4oO$xT8wVKFpXGkDHodW0Yww3/
+!
+redundancy
+!
+lldp run
+!
+! 
+!
+!
+!
+!
+!
+!
+!
+!
+!
+!
+!
+!
+interface Loopback0
+ description MGMT_ID
+ ip address 1.1.1.1 255.255.255.255
+!
+interface GigabitEthernet0/0
+ description UPLINK_TO_ISP
+ ip address 10.4.15.248 255.255.255.0
+ ip nat outside
+ ip virtual-reassembly in
+ duplex auto
+ speed auto
+ media-type rj45
+!
+interface GigabitEthernet0/1
+ no ip address
+ duplex auto
+ speed auto
+ media-type rj45
+!
+interface GigabitEthernet0/2
+ description LINK_TO_CORE1
+ ip address 10.10.1.1 255.255.255.252
+ ip nat inside
+ ip virtual-reassembly in
+ ip ospf 1 area 0
+ duplex auto
+ speed auto
+ media-type rj45
+!
+interface GigabitEthernet0/3
+ description LINK_TO_CORE2
+ ip address 10.10.2.1 255.255.255.252
+ ip nat inside
+ ip virtual-reassembly in
+ ip ospf 1 area 0
+ duplex auto
+ speed auto
+ media-type rj45
+!
+router ospf 1
+ router-id 1.1.1.1
+ network 1.1.1.1 0.0.0.0 area 0
+ network 10.10.0.0 0.0.255.255 area 0
+ default-information originate always
+!
+ip forward-protocol nd
+!
+!
+no ip http server
+no ip http secure-server
+ip nat inside source list 100 interface GigabitEthernet0/0 overload
+ip nat inside source static tcp 10.10.1.2 22 10.4.15.248 2001 extendable
+ip nat inside source static tcp 10.10.2.2 22 10.4.15.248 2002 extendable
+ip nat inside source static tcp 192.168.99.2 22 10.4.15.248 3001 extendable
+ip nat inside source static tcp 192.168.99.3 22 10.4.15.248 3002 extendable
+ip nat inside source static tcp 192.168.99.11 22 10.4.15.248 4001 extendable
+ip nat inside source static tcp 192.168.99.12 22 10.4.15.248 4002 extendable
+ip nat inside source static tcp 192.168.99.13 22 10.4.15.248 4003 extendable
+ip nat inside source static tcp 192.168.99.14 22 10.4.15.248 4004 extendable
+ip route 0.0.0.0 0.0.0.0 10.4.15.1
+ip ssh version 2
+!
+!
+!
+access-list 10 permit 10.0.0.0 0.255.255.255
+access-list 10 permit any
+access-list 100 permit ip 10.0.0.0 0.255.255.255 any
+access-list 100 permit ip 192.168.0.0 0.0.255.255 any
+!
+control-plane
+!
+banner exec ^C
+**************************************************************************
+* IOSv is strictly limited to use for evaluation, demonstration and IOS  *
+* education. IOSv is provided as-is and is not supported by Cisco's      *
+* Technical Advisory Center. Any use or disclosure, in whole or in part, *
+* of the IOSv Software or Documentation to any third party for any       *
+* purposes is expressly prohibited except as otherwise authorized by     *
+* Cisco in writing.                                                      *
+**************************************************************************^C
+banner incoming ^C
+**************************************************************************
+* IOSv is strictly limited to use for evaluation, demonstration and IOS  *
+* education. IOSv is provided as-is and is not supported by Cisco's      *
+* Technical Advisory Center. Any use or disclosure, in whole or in part, *
+* of the IOSv Software or Documentation to any third party for any       *
+* purposes is expressly prohibited except as otherwise authorized by     *
+* Cisco in writing.                                                      *
+**************************************************************************^C
+banner login ^C
+**************************************************************************
+* IOSv is strictly limited to use for evaluation, demonstration and IOS  *
+* education. IOSv is provided as-is and is not supported by Cisco's      *
+* Technical Advisory Center. Any use or disclosure, in whole or in part, *
+* of the IOSv Software or Documentation to any third party for any       *
+* purposes is expressly prohibited except as otherwise authorized by     *
+* Cisco in writing.                                                      *
+**************************************************************************^C
+!
+line con 0
+line aux 0
+line vty 0 4
+ login local
+ transport input ssh
+!
+no scheduler allocate
+ntp server 1.1.1.1
+!
+end
+
+
+=== show processes cpu sorted ===
+CPU utilization for five seconds: 6%/0%; one minute: 2%; five minutes: 2%
+ PID Runtime(ms)     Invoked      uSecs   5Sec   1Min   5Min TTY Process 
+  48        1031         201       5129  2.87%  0.23%  0.04% 578 SSH Process      
+ 137        2905        7134        407  0.79%  0.12%  0.02%   0 IP Input         
+  82       22425       12865       1743  0.39%  0.39%  0.39%   0 Per-Second Jobs  
+ 269       21848      200576        108  0.39%  0.30%  0.22%   0 MMA DB TIMER     
+ 365       27469     1593808         17  0.31%  0.35%  0.32%   0 NBAR timer tick  
+ 104       21435      200577        106  0.23%  0.14%  0.17%   0 VRRS Main thread 
+ 205         101        1113         90  0.15%  0.01%  0.00%   0 TCP Timer        
+ 234         481       12848         37  0.15%  0.01%  0.00%   0 PfR BR Learn     
+  96        8527      128192         66  0.15%  0.06%  0.07%   0 IOSv in console  
+ 133        6533      400350         16  0.07%  0.03%  0.05%   0 IPAM Manager     
+  26       19548       70947        275  0.07%  0.09%  0.13%   0 ARP Input        
+  84       22360      128192        174  0.07%  0.16%  0.20%   0 IOSv e1000       
+ 197         470       12854         36  0.07%  0.00%  0.00%   0 bsm_xmt_proc     
+ 225        2117       25099         84  0.07%  0.01%  0.00%   0 IP NAT Ager      
+ 265           8         393         20  0.07%  0.01%  0.00%   0 LOCAL AAA        
+ 206          13           8       1625  0.07%  0.00%  0.00%   0 TCP Protocols    
+  16         520       12556         41  0.00%  0.00%  0.00%   0 IPC Periodic Tim 
+  15           0           1          0  0.00%  0.00%  0.00%   0 IPC Zone Manager 
+  17         364       12556         28  0.00%  0.00%  0.00%   0 IPC Deferred Por 
+  18           1           1       1000  0.00%  0.00%  0.00%   0 IPC Process leve 
+  21           0           1          0  0.00%  0.00%  0.00%   0 IPC Seat RX Cont 
+  14           0           1          0  0.00%  0.00%  0.00%   0 IPC Session Serv 
+  23          56        1287         43  0.00%  0.00%  0.00%   0 IPC Keep Alive M 
+  13           2         215          9  0.00%  0.00%  0.00%   0 IPC Dynamic Cach 
+  19           0           1          0  0.00%  0.00%  0.00%   0 IPC Seat Manager 
+  20          13         736         17  0.00%  0.00%  0.00%   0 IPC Check Queue  
+  27        1817       13420        135  0.00%  0.00%  0.00%   0 ARP Background   
+  28           1           2        500  0.00%  0.00%  0.00%   0 ATM Idle Timer   
+  22           0           1          0  0.00%  0.00%  0.00%   0 IPC Seat TX Cont 
+  30           0           1          0  0.00%  0.00%  0.00%   0 CEF MIB API      
+  31           0           1          0  0.00%  0.00%  0.00%   0 AAA_SERVER_DEADT 
+  32           0           1          0  0.00%  0.00%  0.00%   0 Policy Manager   
+  12          57        2573         22  0.00%  0.00%  0.00%   0 IPC Event Notifi 
+  34           0           2          0  0.00%  0.00%  0.00%   0 Entity MIB API   
+  35           1           3        333  0.00%  0.00%  0.00%   0 PrstVbl          
+  24         126        2573         48  0.00%  0.00%  0.00%   0 IPC Loadometer   
+  25           1           1       1000  0.00%  0.00%  0.00%   0 IPC Session Deta 
+  38           9           1       9000  0.00%  0.00%  0.00%   0 RF SCTPthread    
+  11           0           1          0  0.00%  0.00%  0.00%   0 Exception contro 
+  40         207       12860         16  0.00%  0.00%  0.00%   0 GraphIt          
+  29           0           1          0  0.00%  0.00%  0.00%   0 ATM ASYNC PROC   
+  42           0           1          0  0.00%  0.00%  0.00%   0 SERIAL A'detect  
+  43           1           2        500  0.00%  0.00%  0.00%   0 XML Proxy Client 
+  44         172          28       6142  0.00%  0.00%  0.00%   0 crypto sw pk pro 
+  45           1           1       1000  0.00%  0.00%  0.00%   0 Inode Table Dest 
+  46           0           1          0  0.00%  0.00%  0.00%   0 dev_device_inser 
+  33           0           2          0  0.00%  0.00%  0.00%   0 DDR Timers       
+  10           0           1          0  0.00%  0.00%  0.00%   0 Crash writer     
+  49           0           1          0  0.00%  0.00%  0.00%   0 Async write proc 
+  50           0           1          0  0.00%  0.00%  0.00%   0 Async write proc 
+  51           0           1          0  0.00%  0.00%  0.00%   0 Async write proc 
+  52          42         216        194  0.00%  0.00%  0.00%   0 DFS flush period 
+  53           0           1          0  0.00%  0.00%  0.00%   0 Critical Bkgnd   
+  54        3776        9182        411  0.00%  0.00%  0.00%   0 Net Background   
+  55           1           2        500  0.00%  0.00%  0.00%   0 IDB Work         
+  36           1           2        500  0.00%  0.00%  0.00%   0 Serial Backgroun 
+  57        4739       12849        368  0.00%  0.01%  0.00%   0 TTY Background   
+  58           1           2        500  0.00%  0.00%  0.00%   0 CTS CORE         
+  59           1           7        142  0.00%  0.00%  0.00%   0 SXP CORE         
+  60           4          12        333  0.00%  0.00%  0.00%   0 RF Slave Main Th 
+  37           0           1          0  0.00%  0.00%  0.00%   0 RMI RM Notify Wa 
+  62           0           7          0  0.00%  0.00%  0.00%   0 IF-MGR event pro 
+  39           1           1       1000  0.00%  0.00%  0.00%   0 CHKPT RG SCTPthr 
+  64           0           1          0  0.00%  0.00%  0.00%   0 cpf_msg_rcvq_pro 
+  65           0           1          0  0.00%  0.00%  0.00%   0 cpf_process_tpQ  
+   9           6         255         23  0.00%  0.00%  0.00%   0 WATCH_AFS        
+  67           0           1          0  0.00%  0.00%  0.00%   0 CHKPT Test clien 
+  41           1           2        500  0.00%  0.00%  0.00%   0 Dialer event     
+  69           0           1          0  0.00%  0.00%  0.00%   0 CHKPT Test clien 
+  70           0           1          0  0.00%  0.00%  0.00%   0 CHKPT Test clien 
+  47           0           1          0  0.00%  0.00%  0.00%   0 dev_device_remov 
+  72           0           1          0  0.00%  0.00%  0.00%   0 CHKPT Test clien 
+  73           0           1          0  0.00%  0.00%  0.00%   0 CHKPT Test clien 
+  74           0           1          0  0.00%  0.00%  0.00%   0 CHKPT Test clien 
+  75           0           1          0  0.00%  0.00%  0.00%   0 CHKPT Test clien 
+  76           0           1          0  0.00%  0.00%  0.00%   0 CHKPT Test clien 
+  77           3          12        250  0.00%  0.00%  0.00%   0 RF Master Main T 
+  78           0           7          0  0.00%  0.00%  0.00%   0 RF Master Status 
+  79          70         431        162  0.00%  0.00%  0.00%   0 Net Input        
+  80         473        2574        183  0.00%  0.00%  0.00%   0 Compute load avg 
+  81        1507         527       2859  0.00%  0.00%  0.00%   0 Per-minute Jobs  
+   8           0           2          0  0.00%  0.00%  0.00%   0 Timers           
+  83           1           2        500  0.00%  0.00%  0.00%   0 Transport Port A 
+  56         129         445        289  0.00%  0.00%  0.00%   0 Logger           
+  85           0           1          0  0.00%  0.00%  0.00%   0 RF_INTERDEV_DELA 
+  86           0           1          0  0.00%  0.00%  0.00%   0 RF_INTERDEV_SCTP 
+  87           0           2          0  0.00%  0.00%  0.00%   0 BMA Background   
+  88           0           2          0  0.00%  0.00%  0.00%   0 VMI Background   
+  89           1           4        250  0.00%  0.00%  0.00%   0 EEM ED Identity  
+   7           1           1       1000  0.00%  0.00%  0.00%   0 DiscardQ Backgro 
+   6         248         313        792  0.00%  0.00%  0.00%   0 Pool Manager     
+  92           0           1          0  0.00%  0.00%  0.00%   0 ETH_PLAT_SW_THRE 
+  93           0           1          0  0.00%  0.00%  0.00%   0 CF_INTERDEV_SCTP 
+  94          46        2574         17  0.00%  0.00%  0.00%   0 Rate limit load  
+  95           0           2          0  0.00%  0.00%  0.00%   0 IOSv out console 
+   5       10927        1902       5745  0.00%  0.10%  0.06%   0 Check heaps      
+   4           0           1          0  0.00%  0.00%  0.00%   0 RO Notify Timers 
+  98           0           2          0  0.00%  0.00%  0.00%   0 Ethernet CFM IOU 
+  99        2215       12854        172  0.00%  0.02%  0.00%   0 mDNS             
+ 101           4         429          9  0.00%  0.00%  0.00%   0 Bridge-domain MA 
+  61           1           3        333  0.00%  0.00%  0.00%   0 IF-MGR control p 
+   3        3701       13139        281  0.00%  0.00%  0.00%   0 OSPF-1 Router    
+   2         712        2573        276  0.00%  0.00%  0.00%   0 Load Meter       
+ 105           1           2        500  0.00%  0.00%  0.00%   0 RG Faults Timer  
+ 106           1           2        500  0.00%  0.00%  0.00%   0 RG Protocol Time 
+ 107           1           2        500  0.00%  0.00%  0.00%   0 RG Transport Tim 
+ 108           0           1          0  0.00%  0.00%  0.00%   0 RG VP            
+ 109           0           2          0  0.00%  0.00%  0.00%   0 RG AR            
+ 110           0           2          0  0.00%  0.00%  0.00%   0 IP NAT HA BGND P 
+ 111           0           1          0  0.00%  0.00%  0.00%   0 EAP Framework    
+  63           0           2          0  0.00%  0.00%  0.00%   0 cpf_msg_holdq_pr 
+ 113           0           2          0  0.00%  0.00%  0.00%   0 Auth Manager     
+ 114           0           1          0  0.00%  0.00%  0.00%   0 AUTH POLICY Fram 
+ 115           0           2          0  0.00%  0.00%  0.00%   0 IP Host Track Pr 
+ 116           2          14        142  0.00%  0.00%  0.00%   0 AAA Server       
+  71           0           1          0  0.00%  0.00%  0.00%   0 CHKPT Test clien 
+ 118           1           1       1000  0.00%  0.00%  0.00%   0 ACCT Periodic Pr 
+ 119           0           1          0  0.00%  0.00%  0.00%   0 AAA System Acct  
+ 120        1650        2512        656  0.00%  0.00%  0.00%   0 CDP Protocol     
+ 122           1           6        166  0.00%  0.00%  0.00%   0 SSH Event handle 
+ 123           0           2          0  0.00%  0.00%  0.00%   0 AAA Dictionary R 
+ 124           0           2          0  0.00%  0.00%  0.00%   0 Ethernet OAM Pro 
+ 125           0           2          0  0.00%  0.00%  0.00%   0 Ethernet LMI     
+ 126           1           2        500  0.00%  0.00%  0.00%   0 CEF switching ba 
+ 127           0           1          0  0.00%  0.00%  0.00%   0 ADJ NSF process  
+ 128           1           1       1000  0.00%  0.00%  0.00%   0 TRACK Main threa 
+ 129           0           1          0  0.00%  0.00%  0.00%   0 TRACK Client thr 
+ 130           0           2          0  0.00%  0.00%  0.00%   0 ATM OAM Input    
+ 131           0           2          0  0.00%  0.00%  0.00%   0 ATM OAM TIMER    
+   1           3          17        176  0.00%  0.00%  0.00%   0 Chunk Manager    
+  66           1           1       1000  0.00%  0.00%  0.00%   0 CHKPT Test clien 
+  68           0           1          0  0.00%  0.00%  0.00%   0 CHKPT Test clien 
+ 135           7           3       2333  0.00%  0.00%  0.00%   0 IP ARP Adjacency 
+ 136           0           1          0  0.00%  0.00%  0.00%   0 IP ARP Retry Age 
+  90         486        1531        317  0.00%  0.00%  0.00%   0 EEM ED ND        
+ 138           0           1          0  0.00%  0.00%  0.00%   0 ICMP event handl 
+ 139         561       25097         22  0.00%  0.00%  0.00%   0 NAT64 Bgnd Proce 
+ 140           0           4          0  0.00%  0.00%  0.00%   0 TurboACL         
+ 141           1           2        500  0.00%  0.00%  0.00%   0 TurboACL chunk   
+ 142           0           3          0  0.00%  0.00%  0.00%   0 PIM register asy 
+ 143           0           1          0  0.00%  0.00%  0.00%   0 IPv6 ping proces 
+ 144          55          24       2291  0.00%  0.00%  0.00%   0 MOP Protocols    
+ 145           1           2        500  0.00%  0.00%  0.00%   0 OCE punted Pkts  
+ 146           0           1          0  0.00%  0.00%  0.00%   0 LSP Tunnel FRR   
+ 147           0           1          0  0.00%  0.00%  0.00%   0 MPLS Auto-Tunnel 
+ 148           0           2          0  0.00%  0.00%  0.00%   0 PPP SIP          
+ 149           0           2          0  0.00%  0.00%  0.00%   0 PPP Bind         
+ 150           1           2        500  0.00%  0.00%  0.00%   0 PPP IP Route     
+ 151           0           1          0  0.00%  0.00%  0.00%   0 HQF TARGET DYNAM 
+ 153           0           2          0  0.00%  0.00%  0.00%   0 RIB LM VALIDATE  
+ 154           0           2          0  0.00%  0.00%  0.00%   0 Spanning Tree    
+ 155           0           1          0  0.00%  0.00%  0.00%   0 X.25 Encaps Mana 
+ 156           2           4        500  0.00%  0.00%  0.00%   0 SSM connection m 
+ 157           0           1          0  0.00%  0.00%  0.00%   0 AC Switch        
+ 158           0           1          0  0.00%  0.00%  0.00%   0 SSS Manager      
+ 159           0           1          0  0.00%  0.00%  0.00%   0 SSS Policy Manag 
+ 160           0           1          0  0.00%  0.00%  0.00%   0 SSS Feature Mana 
+ 161         794       50230         15  0.00%  0.00%  0.00%   0 SSS Feature Time 
+ 162           0           1          0  0.00%  0.00%  0.00%   0 WAAS Process     
+ 163           0           1          0  0.00%  0.00%  0.00%   0 Auth-proxy AAA B 
+ 164          59        4287         13  0.00%  0.00%  0.00%   0 Auth-proxy HTTP  
+ 165           0           1          0  0.00%  0.00%  0.00%   0 IP Admin SM Proc 
+ 166           0           2          0  0.00%  0.00%  0.00%   0 EAPoUDP Process  
+ 167           2           2       1000  0.00%  0.00%  0.00%   0 KRB5 AAA         
+ 168           1           4        250  0.00%  0.00%  0.00%   0 Flow Exporter Ti 
+ 169           1           2        500  0.00%  0.00%  0.00%   0 Flow Exporter Pa 
+ 170           0           3          0  0.00%  0.00%  0.00%   0 Service Routing  
+ 171           3         215         13  0.00%  0.00%  0.00%   0 FRR Background P 
+ 172         255        1058        241  0.00%  0.00%  0.00%   0 CEF background p 
+ 173           0           1          0  0.00%  0.00%  0.00%   0 fib_fib_bfd_sb e 
+ 174           0           1          0  0.00%  0.00%  0.00%   0 Tunnel FIB       
+ 175           0           2          0  0.00%  0.00%  0.00%   0 VPWS Thread      
+ 176          69         430        160  0.00%  0.00%  0.00%   0 NGCP SCHEDULER P 
+ 177        1388       12852        107  0.00%  0.00%  0.00%   0 STILE PERIODIC T 
+ 178           8         216         37  0.00%  0.00%  0.00%   0 UV AUTO CUSTOM P 
+ 179           0           2          0  0.00%  0.00%  0.00%   0 EFP Errd         
+ 180           1           2        500  0.00%  0.00%  0.00%   0 Ether EFP Proces 
+ 181           0           2          0  0.00%  0.00%  0.00%   0 L2X Switching Ev 
+  91           1           1       1000  0.00%  0.00%  0.00%   0 Src Fltr backgro 
+ 183           0           1          0  0.00%  0.00%  0.00%   0 Ethernet PM Proc 
+  97           1           2        500  0.00%  0.00%  0.00%   0 Ethernet CFM     
+ 185         477        3859        123  0.00%  0.00%  0.00%   0 Ethernet PM Moni 
+ 186           0           1          0  0.00%  0.00%  0.00%   0 SNMP Timers      
+ 187           3           2       1500  0.00%  0.00%  0.00%   0 SCTP Main Proces 
+ 188           0           2          0  0.00%  0.00%  0.00%   0 RG Media Timer   
+ 189           0           1          0  0.00%  0.00%  0.00%   0 RG If-Mgr Timer  
+ 190           0           1          0  0.00%  0.00%  0.00%   0 IP Traceroute    
+ 191           0           2          0  0.00%  0.00%  0.00%   0 IPMUXv4          
+ 192           1           2        500  0.00%  0.00%  0.00%   0 IPMUXv6          
+ 193           0           1          0  0.00%  0.00%  0.00%   0 Critical Auth    
+ 194           0           1          0  0.00%  0.00%  0.00%   0 MAB Framework    
+ 195        1796       12852        139  0.00%  0.01%  0.00%   0 RUDPV1 Main Proc 
+ 196           0           1          0  0.00%  0.00%  0.00%   0 bsm_timers       
+ 102        2048       12854        159  0.00%  0.02%  0.00%   0 FHRP Main thread 
+ 198           0           2          0  0.00%  0.00%  0.00%   0 Routing Topology 
+ 199          39          37       1054  0.00%  0.00%  0.00%   0 IP RIB Update    
+ 200          17         218         77  0.00%  0.00%  0.00%   0 IP Background    
+ 201           4           5        800  0.00%  0.00%  0.00%   0 IP Connected Rou 
+ 202           1           2        500  0.00%  0.00%  0.00%   0 PPP Compress Inp 
+ 203           0           2          0  0.00%  0.00%  0.00%   0 PPP Compress Res 
+ 204           0           1          0  0.00%  0.00%  0.00%   0 Socket Timers    
+ 103           1           1       1000  0.00%  0.00%  0.00%   0 VRRP Main thread 
+ 112           0           2          0  0.00%  0.00%  0.00%   0 Dot1x Mgr Proces 
+ 207           1           1       1000  0.00%  0.00%  0.00%   0 COPS             
+ 208           0           2          0  0.00%  0.00%  0.00%   0 Dialer Forwarder 
+ 209           0           4          0  0.00%  0.00%  0.00%   0 SR CapMan Proces 
+ 210         781        6427        121  0.00%  0.00%  0.00%   0 CEF: IPv4 proces 
+ 211        2150       12850        167  0.00%  0.00%  0.00%   0 ADJ background   
+ 212           1           6        166  0.00%  0.00%  0.00%   0 Collection proce 
+ 213           0           3          0  0.00%  0.00%  0.00%   0 ADJ resolve proc 
+ 214           6          43        139  0.00%  0.00%  0.00%   0 HTTP CORE        
+ 215           1           2        500  0.00%  0.00%  0.00%   0 MVPN Mgr Process 
+ 216           1           2        500  0.00%  0.00%  0.00%   0 Multicast Offloa 
+ 217           0           1          0  0.00%  0.00%  0.00%   0 RARP Input       
+ 218           1           4        250  0.00%  0.00%  0.00%   0 static           
+ 219           0           2          0  0.00%  0.00%  0.00%   0 App Route Proces 
+ 220           0           1          0  0.00%  0.00%  0.00%   0 IPv6 RIB Cleanup 
+ 221           0           1          0  0.00%  0.00%  0.00%   0 IPv6 RIB Event H 
+ 222           1           2        500  0.00%  0.00%  0.00%   0 Tunnel           
+ 223           1           3        333  0.00%  0.00%  0.00%   0 MFIB Master back 
+ 224        2109        2544        829  0.00%  0.00%  0.00%   0 LLDP Protocol    
+ 117           0           1          0  0.00%  0.00%  0.00%   0 AAA ACCT Proc    
+ 226           0           1          0  0.00%  0.00%  0.00%   0 IPv6 Static Hand 
+ 227           0           1          0  0.00%  0.00%  0.00%   0 IPv6 Inspect Tim 
+ 228           0           1          0  0.00%  0.00%  0.00%   0 IP NAT WLAN      
+ 229           0           1          0  0.00%  0.00%  0.00%   0 IP IRDP          
+ 230           0           1          0  0.00%  0.00%  0.00%   0 LAPB Process     
+ 231           2           2       1000  0.00%  0.00%  0.00%   0 LFDp Input Proc  
+ 232           0           1          0  0.00%  0.00%  0.00%   0 PAD InCall       
+ 233           0           2          0  0.00%  0.00%  0.00%   0 X.25 Background  
+ 132           1           2        500  0.00%  0.00%  0.00%   0 IPAM/ODAP Events 
+ 235          81        1282         63  0.00%  0.00%  0.00%   0 QoS stats proces 
+ 236           0           2          0  0.00%  0.00%  0.00%   0 HQF Output Shape 
+ 237           0           2          0  0.00%  0.00%  0.00%   0 HQF Input Shaper 
+ 238           0           3          0  0.00%  0.00%  0.00%   0 RBSCP Background 
+ 239           1           3        333  0.00%  0.00%  0.00%   0 Media Services P 
+ 240           1           1       1000  0.00%  0.00%  0.00%   0 VPDN call manage 
+ 241           0           1          0  0.00%  0.00%  0.00%   0 IPS Process      
+ 242           0           2          0  0.00%  0.00%  0.00%   0 IPS Auto Update  
+ 243           1           2        500  0.00%  0.00%  0.00%   0 SDEE Management  
+ 244        1035       25097         41  0.00%  0.00%  0.00%   0 Inspect process  
+ 246         180         828        217  0.00%  0.00%  0.00%   0 FW DP Inspect pr 
+ 247        1015       25097         40  0.00%  0.00%  0.00%   0 CCE DP URLF cach 
+ 248           0           2          0  0.00%  0.00%  0.00%   0 URL filter proc  
+ 249           0           1          0  0.00%  0.00%  0.00%   0 Select Timers    
+ 250           4           2       2000  0.00%  0.00%  0.00%   0 HTTP Process     
+ 251           0           2          0  0.00%  0.00%  0.00%   0 CIFS API Process 
+ 252           0           2          0  0.00%  0.00%  0.00%   0 CIFS Proxy Proce 
+ 253           0           2          0  0.00%  0.00%  0.00%   0 Diameter Base pr 
+ 254          50         516         96  0.00%  0.00%  0.00%   0 CRM_CALL_UPDATE_ 
+ 255           0           1          0  0.00%  0.00%  0.00%   0 EAP Process      
+ 257           1           2        500  0.00%  0.00%  0.00%   0 AAA Cached Serve 
+ 258           0           2          0  0.00%  0.00%  0.00%   0 ENABLE AAA       
+ 259           1           1       1000  0.00%  0.00%  0.00%   0 EM Background Pr 
+ 260           0           1          0  0.00%  0.00%  0.00%   0 IDMGR CORE       
+ 261           0           3          0  0.00%  0.00%  0.00%   0 LDAP process     
+ 262           0           1          0  0.00%  0.00%  0.00%   0 Opaque Database  
+ 263           0           1          0  0.00%  0.00%  0.00%   0 Key chain liveke 
+ 264           0           2          0  0.00%  0.00%  0.00%   0 LINE AAA         
+ 134           0           2          0  0.00%  0.00%  0.00%   0 IPAM Events      
+ 266           0           3          0  0.00%  0.00%  0.00%   0 MPLS Auto Mesh P 
+ 267           0           2          0  0.00%  0.00%  0.00%   0 TPLUS            
+ 268           0           2          0  0.00%  0.00%  0.00%   0 VSP_MGR          
+ 182           0           1          0  0.00%  0.00%  0.00%   0 Ethernet Datapla 
+ 270           0           1          0  0.00%  0.00%  0.00%   0 FW_TEST_TRP      
+ 271           0           1          0  0.00%  0.00%  0.00%   0 EPM MAIN PROCESS 
+ 272           3           3       1000  0.00%  0.00%  0.00%   0 Crypto WUI       
+ 273           0           3          0  0.00%  0.00%  0.00%   0 EST Client       
+ 274           3           4        750  0.00%  0.00%  0.00%   0 NIST rng proc    
+ 275         698       25097         27  0.00%  0.00%  0.00%   0 Timer Library    
+ 276           1           2        500  0.00%  0.00%  0.00%   0 Crypto Support   
+ 277           0           1          0  0.00%  0.00%  0.00%   0 IPSECv6 PS Proc  
+ 278        3377       12855        262  0.00%  0.01%  0.01%   0 Crypto IKEv2     
+ 279           0           1          0  0.00%  0.00%  0.00%   0 IKEv2 AAA handle 
+ 280           0           1          0  0.00%  0.00%  0.00%   0 http client proc 
+ 281       21632      200576        107  0.00%  0.09%  0.14%   0 MMA DP TIMER     
+ 282           0           2          0  0.00%  0.00%  0.00%   0 CSDB Timer proce 
+ 283           0           1          0  0.00%  0.00%  0.00%   0 RPMS_PROC_MAIN   
+ 284           8          11        727  0.00%  0.00%  0.00%   0 crypto engine pr 
+ 285           0           1          0  0.00%  0.00%  0.00%   0 RSA background p 
+ 286         864          19      45473  0.00%  0.00%  0.00%   0 Crypto CA        
+ 287           0           3          0  0.00%  0.00%  0.00%   0 Crypto PKI-CRL   
+ 288           0           1          0  0.00%  0.00%  0.00%   0 Crypto PKI-Rev-P 
+ 289           0           1          0  0.00%  0.00%  0.00%   0 PKI OCSP         
+ 290           1           1       1000  0.00%  0.00%  0.00%   0 PKI Revocation   
+ 291           0           1          0  0.00%  0.00%  0.00%   0 encrypt proc     
+ 292           0           3          0  0.00%  0.00%  0.00%   0 CRYPTO MAP FREE  
+ 293           0           1          0  0.00%  0.00%  0.00%   0 Crypto INT       
+ 294           1           3        333  0.00%  0.00%  0.00%   0 Crypto IKE Dispa 
+ 295           2           3        666  0.00%  0.00%  0.00%   0 Crypto IKMP      
+ 296           0           1          0  0.00%  0.00%  0.00%   0 IPSEC manual key 
+ 297          99         645        153  0.00%  0.00%  0.00%   0 IPSEC key engine 
+ 298           0           1          0  0.00%  0.00%  0.00%   0 CRYPTO QoS proce 
+ 299           0           1          0  0.00%  0.00%  0.00%   0 Crypto ACL       
+ 300           1           1       1000  0.00%  0.00%  0.00%   0 Crypto PAS Proc  
+ 301           0           1          0  0.00%  0.00%  0.00%   0 IPSec background 
+ 302           0           2          0  0.00%  0.00%  0.00%   0 GKM GM Process   
+ 303           0           1          0  0.00%  0.00%  0.00%   0 GKM KS PROCESS   
+ 304           0           2          0  0.00%  0.00%  0.00%   0 Control-plane ho 
+ 305           0           1          0  0.00%  0.00%  0.00%   0 IKEv2 FlexVPN Pr 
+ 306           1           1       1000  0.00%  0.00%  0.00%   0 IKEv2 Cluster Lo 
+ 308           0           8          0  0.00%  0.00%  0.00%   0 AAA SEND STOP EV 
+ 309           0           1          0  0.00%  0.00%  0.00%   0 Test AAA Client  
+ 311           1           1       1000  0.00%  0.00%  0.00%   0 dcm_cli_engine   
+ 312           0           3          0  0.00%  0.00%  0.00%   0 dcm_cli_provider 
+ 313           1           5        200  0.00%  0.00%  0.00%   0 DCM Core Thread  
+ 314          39        1287         30  0.00%  0.00%  0.00%   0 RMON Recycle Pro 
+ 315           1           2        500  0.00%  0.00%  0.00%   0 RMON Deferred Se 
+ 316           1           4        250  0.00%  0.00%  0.00%   0 EEM ED Media Ser 
+ 317           0           1          0  0.00%  0.00%  0.00%   0 Syslog Traps     
+ 318           0           1          0  0.00%  0.00%  0.00%   0 WAN Optimization 
+ 319           2           4        500  0.00%  0.00%  0.00%   0 EEM ED Routing   
+ 320          52         231        225  0.00%  0.00%  0.00%   0 EEM ED Syslog    
+ 321           9           4       2250  0.00%  0.00%  0.00%   0 EEM ED Generic   
+ 322           0           4          0  0.00%  0.00%  0.00%   0 EEM ED NHRP      
+ 323           1           4        250  0.00%  0.00%  0.00%   0 EEM ED Track     
+ 324           1           4        250  0.00%  0.00%  0.00%   0 EEM ED Resource  
+ 325         110         402        273  0.00%  0.00%  0.00%   0 Crypto cTCP proc 
+ 326           0           1          0  0.00%  0.00%  0.00%   0 RMON Packets     
+ 327           1           3        333  0.00%  0.00%  0.00%   0 RBM CORE         
+ 328           0           3          0  0.00%  0.00%  0.00%   0 CTS credentials  
+ 329           2           6        333  0.00%  0.00%  0.00%   0 DCM snmp dp Thre 
+ 330           1           3        333  0.00%  0.00%  0.00%   0 snmp dcm ma shim 
+ 331         156        1289        121  0.00%  0.00%  0.00%   0 Bulkstat-Client  
+ 332           0           3          0  0.00%  0.00%  0.00%   0 dcm_expression_p 
+ 333          81         224        361  0.00%  0.00%  0.00%   0 Syslog           
+ 334           0           1          0  0.00%  0.00%  0.00%   0 IP VFR proc      
+ 335           1           1       1000  0.00%  0.00%  0.00%   0 udp_transport Se 
+ 336         216        1287        167  0.00%  0.00%  0.00%   0 qos_mon_periodic 
+ 337           0           1          0  0.00%  0.00%  0.00%   0 IP SLAs Ethernet 
+ 338          18          60        300  0.00%  0.00%  0.00%   0 EEM Server       
+ 339           2           3        666  0.00%  0.00%  0.00%   0 EEM Policy Direc 
+ 340        6957          46     151239  0.00%  0.00%  0.01%   0 l4f mgt task     
+ 341           1           4        250  0.00%  0.00%  0.00%   0 EEM ED CLI       
+ 342           0           4          0  0.00%  0.00%  0.00%   0 EEM ED Counter   
+ 343           1           4        250  0.00%  0.00%  0.00%   0 EEM ED Interface 
+ 344           1           4        250  0.00%  0.00%  0.00%   0 EEM ED IOSWD     
+ 345           0           4          0  0.00%  0.00%  0.00%   0 EEM ED None      
+ 346           0           4          0  0.00%  0.00%  0.00%   0 EEM ED OIR       
+ 347           1           9        111  0.00%  0.00%  0.00%   0 EEM ED RF        
+ 348           0           4          0  0.00%  0.00%  0.00%   0 EEM ED SNMP      
+ 349           1           4        250  0.00%  0.00%  0.00%   0 EEM ED SNMP Obje 
+ 350           1           4        250  0.00%  0.00%  0.00%   0 EEM ED Ipsla     
+ 351           0           4          0  0.00%  0.00%  0.00%   0 EEM ED SNMP Noti 
+ 352          49         222        220  0.00%  0.00%  0.00%   0 EEM ED Timer     
+ 353           1           4        250  0.00%  0.00%  0.00%   0 EEM ED Test      
+ 354           0           4          0  0.00%  0.00%  0.00%   0 EEM ED Config    
+ 355           1           4        250  0.00%  0.00%  0.00%   0 EEM ED Env       
+ 356           0           4          0  0.00%  0.00%  0.00%   0 EEM ED DS        
+ 357           2           4        500  0.00%  0.00%  0.00%   0 EEM ED CRASH     
+ 358           0           1          0  0.00%  0.00%  0.00%   0 L4F OOB Process  
+ 359           0           4          0  0.00%  0.00%  0.00%   0 EEM ED Nf        
+ 360           1           4        250  0.00%  0.00%  0.00%   0 EEM ED RPC       
+ 361         283         786        360  0.00%  0.00%  0.00%   0 mdns Timer Proce 
+ 362           0           2          0  0.00%  0.00%  0.00%   0 MRIB Process     
+ 363           1          15         66  0.00%  0.00%  0.00%   0 EEM Helper Threa 
+ 184           0           2          0  0.00%  0.00%  0.00%   0 Ethernet PM Soft 
+ 366         466       12550         37  0.00%  0.00%  0.00%   0 CFT Timer Proces 
+ 368        1378       13807         99  0.00%  0.00%  0.00%   0 NTP              
+ 370        4480        8725        513  0.00%  0.02%  0.03%   0 OSPF-1 Hello    
+
+=== show memory statistics ===
+                Head    Total(b)     Used(b)     Free(b)   Lowest(b)  Largest(b)
+Processor    CAAE880   859380608    94500564   764880044   738283284   737355468
+      I/O    8DAE880    63963136    52845108    11118028    11116080    10941180
+
+=== show interfaces ===
+GigabitEthernet0/0 is up, line protocol is up 
+  Hardware is iGbE, address is 5000.0001.0000 (bia 5000.0001.0000)
+  Description: UPLINK_TO_ISP
+  Internet address is 10.4.15.248/24
+  MTU 1500 bytes, BW 1000000 Kbit/sec, DLY 10 usec, 
+     reliability 255/255, txload 1/255, rxload 1/255
+  Encapsulation ARPA, loopback not set
+  Keepalive set (10 sec)
+  Unknown, Unknown, link type is auto, media type is RJ45
+  output flow-control is unsupported, input flow-control is unsupported
+  ARP type: ARPA, ARP Timeout 04:00:00
+  Last input 00:00:00, output 00:00:00, output hang never
+  Last clearing of "show interface" counters never
+  Input queue: 0/75/0/0 (size/max/drops/flushes); Total output drops: 0
+  Queueing strategy: fifo
+  Output queue: 0/40 (size/max)
+  5 minute input rate 6000 bits/sec, 9 packets/sec
+  5 minute output rate 2000 bits/sec, 2 packets/sec
+     94379 packets input, 5915577 bytes, 0 no buffer
+     Received 0 broadcasts (0 IP multicasts)
+     0 runts, 0 giants, 0 throttles 
+     0 input errors, 0 CRC, 0 frame, 0 overrun, 0 ignored
+     0 watchdog, 0 multicast, 0 pause input
+     14081 packets output, 2773722 bytes, 0 underruns
+     0 output errors, 0 collisions, 1 interface resets
+     430 unknown protocol drops
+     0 babbles, 0 late collision, 0 deferred
+     0 lost carrier, 0 no carrier, 0 pause output
+     0 output buffer failures, 0 output buffers swapped out
+GigabitEthernet0/1 is up, line protocol is up 
+  Hardware is iGbE, address is 5000.0001.0001 (bia 5000.0001.0001)
+  MTU 1500 bytes, BW 1000000 Kbit/sec, DLY 10 usec, 
+     reliability 255/255, txload 1/255, rxload 1/255
+  Encapsulation ARPA, loopback not set
+  Keepalive set (10 sec)
+  Unknown, Unknown, link type is auto, media type is RJ45
+  output flow-control is unsupported, input flow-control is unsupported
+  ARP type: ARPA, ARP Timeout 04:00:00
+  Last input never, output 00:00:05, output hang never
+  Last clearing of "show interface" counters never
+  Input queue: 0/75/0/0 (size/max/drops/flushes); Total output drops: 0
+  Queueing strategy: fifo
+  Output queue: 0/40 (size/max)
+  5 minute input rate 0 bits/sec, 0 packets/sec
+  5 minute output rate 0 bits/sec, 0 packets/sec
+     0 packets input, 0 bytes, 0 no buffer
+     Received 0 broadcasts (0 IP multicasts)
+     0 runts, 0 giants, 0 throttles 
+     0 input errors, 0 CRC, 0 frame, 0 overrun, 0 ignored
+     0 watchdog, 0 multicast, 0 pause input
+     1985 packets output, 316906 bytes, 0 underruns
+     0 output errors, 0 collisions, 1 interface resets
+     0 unknown protocol drops
+     0 babbles, 0 late collision, 0 deferred
+     0 lost carrier, 0 no carrier, 0 pause output
+     0 output buffer failures, 0 output buffers swapped out
+GigabitEthernet0/2 is up, line protocol is up 
+  Hardware is iGbE, address is 5000.0001.0002 (bia 5000.0001.0002)
+  Description: LINK_TO_CORE1
+  Internet address is 10.10.1.1/30
+  MTU 1500 bytes, BW 1000000 Kbit/sec, DLY 10 usec, 
+     reliability 255/255, txload 1/255, rxload 1/255
+  Encapsulation ARPA, loopback not set
+  Keepalive set (10 sec)
+  Unknown, Unknown, link type is auto, media type is RJ45
+  output flow-control is unsupported, input flow-control is unsupported
+  ARP type: ARPA, ARP Timeout 04:00:00
+  Last input 00:00:08, output 00:00:05, output hang never
+  Last clearing of "show interface" counters never
+  Input queue: 0/75/0/0 (size/max/drops/flushes); Total output drops: 0
+  Queueing strategy: fifo
+  Output queue: 0/40 (size/max)
+  5 minute input rate 0 bits/sec, 0 packets/sec
+  5 minute output rate 0 bits/sec, 0 packets/sec
+     7739 packets input, 1434303 bytes, 0 no buffer
+     Received 0 broadcasts (0 IP multicasts)
+     0 runts, 0 giants, 0 throttles 
+     0 input errors, 0 CRC, 0 frame, 0 overrun, 0 ignored
+     0 watchdog, 0 multicast, 0 pause input
+     7488 packets output, 743328 bytes, 0 underruns
+     0 output errors, 0 collisions, 1 interface resets
+     0 unknown protocol drops
+     0 babbles, 0 late collision, 0 deferred
+     0 lost carrier, 0 no carrier, 0 pause output
+     0 output buffer failures, 0 output buffers swapped out
+GigabitEthernet0/3 is up, line protocol is up 
+  Hardware is iGbE, address is 5000.0001.0003 (bia 5000.0001.0003)
+  Description: LINK_TO_CORE2
+  Internet address is 10.10.2.1/30
+  MTU 1500 bytes, BW 1000000 Kbit/sec, DLY 10 usec, 
+     reliability 255/255, txload 1/255, rxload 1/255
+  Encapsulation ARPA, loopback not set
+  Keepalive set (10 sec)
+  Unknown, Unknown, link type is auto, media type is RJ45
+  output flow-control is unsupported, input flow-control is unsupported
+  ARP type: ARPA, ARP Timeout 04:00:00
+  Last input 00:00:02, output 00:00:02, output hang never
+  Last clearing of "show interface" counters never
+  Input queue: 0/75/0/0 (size/max/drops/flushes); Total output drops: 0
+  Queueing strategy: fifo
+  Output queue: 0/40 (size/max)
+  5 minute input rate 0 bits/sec, 0 packets/sec
+  5 minute output rate 0 bits/sec, 0 packets/sec
+     7127 packets input, 1372963 bytes, 0 no buffer
+     Received 0 broadcasts (0 IP multicasts)
+     0 runts, 0 giants, 0 throttles 
+     0 input errors, 0 CRC, 0 frame, 0 overrun, 0 ignored
+     0 watchdog, 0 multicast, 0 pause input
+     6184 packets output, 653210 bytes, 0 underruns
+     0 output errors, 0 collisions, 1 interface resets
+     0 unknown protocol drops
+     0 babbles, 0 late collision, 0 deferred
+     0 lost carrier, 0 no carrier, 0 pause output
+     0 output buffer failures, 0 output buffers swapped out
+Loopback0 is up, line protocol is up 
+  Hardware is Loopback
+  Description: MGMT_ID
+  Internet address is 1.1.1.1/32
+  MTU 1514 bytes, BW 8000000 Kbit/sec, DLY 5000 usec, 
+     reliability 255/255, txload 1/255, rxload 1/255
+  Encapsulation LOOPBACK, loopback not set
+  Keepalive set (10 sec)
+  Last input 00:14:16, output never, output hang never
+  Last clearing of "show interface" counters never
+  Input queue: 0/75/0/0 (size/max/drops/flushes); Total output drops: 0
+  Queueing strategy: fifo
+  Output queue: 0/0 (size/max)
+  5 minute input rate 0 bits/sec, 0 packets/sec
+  5 minute output rate 0 bits/sec, 0 packets/sec
+     0 packets input, 0 bytes, 0 no buffer
+     Received 0 broadcasts (0 IP multicasts)
+     0 runts, 0 giants, 0 throttles 
+     0 input errors, 0 CRC, 0 frame, 0 overrun, 0 ignored, 0 abort
+     3 packets output, 213 bytes, 0 underruns
+     0 output errors, 0 collisions, 0 interface resets
+     0 unknown protocol drops
+     0 output buffer failures, 0 output buffers swapped out
+NVI0 is up, line protocol is up 
+  Hardware is NVI
+  Interface is unnumbered. Using address of GigabitEthernet0/0 (10.4.15.248)
+  MTU 1514 bytes, BW 56 Kbit/sec, DLY 5000 usec, 
+     reliability 255/255, txload 1/255, rxload 1/255
+  Encapsulation UNKNOWN, loopback not set
+  Keepalive set (10 sec)
+  Last input never, output never, output hang never
+  Last clearing of "show interface" counters never
+  Input queue: 0/75/0/0 (size/max/drops/flushes); Total output drops: 0
+  5 minute input rate 0 bits/sec, 0 packets/sec
+  5 minute output rate 0 bits/sec, 0 packets/sec
+     0 packets input, 0 bytes, 0 no buffer
+     Received 0 broadcasts (0 IP multicasts)
+     0 runts, 0 giants, 0 throttles 
+     0 input errors, 0 CRC, 0 frame, 0 overrun, 0 ignored, 0 abort
+     0 packets output, 0 bytes, 0 underruns
+     0 output errors, 0 collisions, 0 interface resets
+     0 unknown protocol drops
+     0 output buffer failures, 0 output buffers swapped out
+
+=== show interfaces switchport ===
+                           ^
+% Invalid input detected at '^' marker.
+
+
+=== show vlan brief ===
+               ^
+% Invalid input detected at '^' marker.
+
+
+=== show spanning-tree detail ===
+                        ^
+% Invalid input detected at '^' marker.
+
+
+=== show ip route ===
+Codes: L - local, C - connected, S - static, R - RIP, M - mobile, B - BGP
+       D - EIGRP, EX - EIGRP external, O - OSPF, IA - OSPF inter area 
+       N1 - OSPF NSSA external type 1, N2 - OSPF NSSA external type 2
+       E1 - OSPF external type 1, E2 - OSPF external type 2
+       i - IS-IS, su - IS-IS summary, L1 - IS-IS level-1, L2 - IS-IS level-2
+       ia - IS-IS inter area, * - candidate default, U - per-user static route
+       o - ODR, P - periodic downloaded static route, H - NHRP, l - LISP
+       a - application route
+       + - replicated route, % - next hop override, p - overrides from PfR
+
+Gateway of last resort is 10.4.15.1 to network 0.0.0.0
+
+S*    0.0.0.0/0 [1/0] via 10.4.15.1
+      1.0.0.0/32 is subnetted, 1 subnets
+C        1.1.1.1 is directly connected, Loopback0
+      2.0.0.0/32 is subnetted, 1 subnets
+O        2.2.2.2 [110/2] via 10.10.1.2, 00:59:12, GigabitEthernet0/2
+      3.0.0.0/32 is subnetted, 1 subnets
+O        3.3.3.3 [110/2] via 10.10.2.2, 00:59:12, GigabitEthernet0/3
+      4.0.0.0/32 is subnetted, 1 subnets
+O        4.4.4.4 [110/3] via 10.10.2.2, 00:56:17, GigabitEthernet0/3
+                 [110/3] via 10.10.1.2, 00:56:17, GigabitEthernet0/2
+      5.0.0.0/32 is subnetted, 1 subnets
+O        5.5.5.5 [110/3] via 10.10.2.2, 00:55:22, GigabitEthernet0/3
+                 [110/3] via 10.10.1.2, 00:55:12, GigabitEthernet0/2
+      10.0.0.0/8 is variably subnetted, 11 subnets, 3 masks
+C        10.4.15.0/24 is directly connected, GigabitEthernet0/0
+L        10.4.15.248/32 is directly connected, GigabitEthernet0/0
+C        10.10.1.0/30 is directly connected, GigabitEthernet0/2
+L        10.10.1.1/32 is directly connected, GigabitEthernet0/2
+C        10.10.2.0/30 is directly connected, GigabitEthernet0/3
+L        10.10.2.1/32 is directly connected, GigabitEthernet0/3
+O        10.10.12.0/30 [110/2] via 10.10.2.2, 00:59:12, GigabitEthernet0/3
+                       [110/2] via 10.10.1.2, 00:58:42, GigabitEthernet0/2
+O        10.10.20.0/30 [110/2] via 10.10.1.2, 00:59:12, GigabitEthernet0/2
+O        10.10.20.4/30 [110/2] via 10.10.1.2, 00:59:12, GigabitEthernet0/2
+O        10.10.20.8/30 [110/2] via 10.10.2.2, 00:59:12, GigabitEthernet0/3
+O        10.10.20.12/30 [110/2] via 10.10.2.2, 00:59:12, GigabitEthernet0/3
+O     192.168.10.0/24 [110/3] via 10.10.2.2, 00:01:24, GigabitEthernet0/3
+                      [110/3] via 10.10.1.2, 00:01:24, GigabitEthernet0/2
+O     192.168.20.0/24 [110/3] via 10.10.2.2, 00:01:24, GigabitEthernet0/3
+                      [110/3] via 10.10.1.2, 00:01:24, GigabitEthernet0/2
+O     192.168.99.0/24 [110/3] via 10.10.2.2, 00:01:24, GigabitEthernet0/3
+                      [110/3] via 10.10.1.2, 00:01:24, GigabitEthernet0/2
+
+=== show ip ospf neighbor ===
+
+Neighbor ID     Pri   State           Dead Time   Address         Interface
+3.3.3.3           1   FULL/BDR        00:00:30    10.10.2.2       GigabitEthernet0/3
+2.2.2.2           1   FULL/BDR        00:00:34    10.10.1.2       GigabitEthernet0/2
+
+=== show cdp neighbors detail ===
+-------------------------
+Device ID: CORE1.lab.local
+Entry address(es): 
+  IP address: 10.10.1.2
+Platform: Cisco ,  Capabilities: Router Source-Route-Bridge 
+Interface: GigabitEthernet0/2,  Port ID (outgoing port): GigabitEthernet0/0
+Holdtime : 141 sec
+
+Version :
+Cisco IOS Software, IOSv Software (VIOS-ADVENTERPRISEK9-M), Version 15.6(2)T, RELEASE SOFTWARE (fc2)
+Technical Support: http://www.cisco.com/techsupport
+Copyright (c) 1986-2016 by Cisco Systems, Inc.
+Compiled Tue 22-Mar-16 16:19 by prod_rel_team
+
+advertisement version: 2
+Duplex: half
+Management address(es): 
+  IP address: 10.10.1.2
+
+-------------------------
+Device ID: CORE2.lab.local
+Entry address(es): 
+  IP address: 10.10.2.2
+Platform: Cisco ,  Capabilities: Router Source-Route-Bridge 
+Interface: GigabitEthernet0/3,  Port ID (outgoing port): GigabitEthernet0/0
+Holdtime : 126 sec
+
+Version :
+Cisco IOS Software, IOSv Software (VIOS-ADVENTERPRISEK9-M), Version 15.6(2)T, RELEASE SOFTWARE (fc2)
+Technical Support: http://www.cisco.com/techsupport
+Copyright (c) 1986-2016 by Cisco Systems, Inc.
+Compiled Tue 22-Mar-16 16:19 by prod_rel_team
+
+advertisement version: 2
+Duplex: half
+Management address(es): 
+  IP address: 10.10.2.2
+
+-------------------------
+Device ID: Switch
+Entry address(es): 
+  IP address: 10.4.15.28
+Platform: cisco WS-C2960-48PST-L,  Capabilities: Switch IGMP 
+Interface: GigabitEthernet0/0,  Port ID (outgoing port): FastEthernet0/1
+Holdtime : 134 sec
+
+Version :
+Cisco IOS Software, C2960 Software (C2960-LANBASEK9-M), Version 12.2(52)SE, RELEASE SOFTWARE (fc3)
+Copyright (c) 1986-2009 by Cisco Systems, Inc.
+Compiled Fri 25-Sep-09 08:49 by sasyamal
+
+advertisement version: 2
+Protocol Hello:  OUI=0x00000C, Protocol ID=0x0112; payload len=27, value=00000000FFFFFFFF010231FF0000000000009C4E2037B480FF0000
+VTP Management Domain: ''
+Native VLAN: 1
+Duplex: full (Mismatch)
+Management address(es): 
+  IP address: 10.4.15.28
+
+
+Total cdp entries displayed : 3
+
+=== show lldp neighbors detail ===
+------------------------------------------------
+Local Intf: Gi0/2
+Chassis id: 5000.000a.0000
+Port id: Gi0/0
+Port Description: UPLINK_TO_EDGE
+System Name: CORE1.lab.local
+
+System Description: 
+Cisco IOS Software, IOSv Software (VIOS-ADVENTERPRISEK9-M), Version 15.6(2)T, RELEASE SOFTWARE (fc2)
+Technical Support: http://www.cisco.com/techsupport
+Copyright (c) 1986-2016 by Cisco Systems, Inc.
+Compiled Tue 22-Mar-16 16:19 by prod_rel_team
+
+Time remaining: 96 seconds
+System Capabilities: B,R
+Enabled Capabilities: R
+Management Addresses:
+    IP: 10.10.1.2
+Auto Negotiation - not supported
+Physical media capabilities - not advertised
+Media Attachment Unit type - not advertised
+Vlan ID: - not advertised
+
+------------------------------------------------
+Local Intf: Gi0/3
+Chassis id: 5000.0002.0000
+Port id: Gi0/0
+Port Description: UPLINK_TO_EDGE
+System Name: CORE2.lab.local
+
+System Description: 
+Cisco IOS Software, IOSv Software (VIOS-ADVENTERPRISEK9-M), Version 15.6(2)T, RELEASE SOFTWARE (fc2)
+Technical Support: http://www.cisco.com/techsupport
+Copyright (c) 1986-2016 by Cisco Systems, Inc.
+Compiled Tue 22-Mar-16 16:19 by prod_rel_team
+
+Time remaining: 93 seconds
+System Capabilities: B,R
+Enabled Capabilities: R
+Management Addresses:
+    IP: 10.10.2.2
+Auto Negotiation - not supported
+Physical media capabilities - not advertised
+Media Attachment Unit type - not advertised
+Vlan ID: - not advertised
+
+
+Total entries displayed: 2
+
+
+=== show mac address-table ===
+             ^
+% Invalid input detected at '^' marker.
+
+
+=== show ip arp ===
+Protocol  Address          Age (min)  Hardware Addr   Type   Interface
+Internet  10.4.15.1               0   38ed.18e2.16f0  ARPA   GigabitEthernet0/0
+Internet  10.4.15.43             24   1098.1929.29eb  ARPA   GigabitEthernet0/0
+Internet  10.4.15.248             -   5000.0001.0000  ARPA   GigabitEthernet0/0
+Internet  10.10.1.1               -   5000.0001.0002  ARPA   GigabitEthernet0/2
+Internet  10.10.1.2              59   5000.000a.0000  ARPA   GigabitEthernet0/2
+Internet  10.10.2.1               -   5000.0001.0003  ARPA   GigabitEthernet0/3
+Internet  10.10.2.2              59   5000.0002.0000  ARPA   GigabitEthernet0/3
+
+=== show ssh ===
+Connection Version Mode Encryption  Hmac	 State	               Username
+0          2.0     IN   aes128-ctr  hmac-sha1    Session started       admin
+0          2.0     OUT  aes128-ctr  hmac-sha1    Session started       admin
+%No SSHv1 server connections running.
+
+=== show ntp status ===
+Clock is unsynchronized, stratum 16, no reference clock
+nominal freq is 1000.0003 Hz, actual freq is 1000.0003 Hz, precision is 2**17
+ntp uptime is 1287400 (1/100 of seconds), resolution is 1000
+reference time is 00000000.00000000 (00:00:00.000 UTC Mon Jan 1 1900)
+clock offset is 0.0000 msec, root delay is 0.00 msec
+root dispersion is 193.10 msec, peer dispersion is 0.00 msec
+loopfilter state is 'FSET' (Drift set from file), drift is 0.000000000 s/s
+system poll interval is 8, never updated.
+
+=== show logging ===
+Syslog logging: enabled (0 messages dropped, 3 messages rate-limited, 0 flushes, 0 overruns, xml disabled, filtering disabled)
+
+No Active Message Discriminator.
+
+
+
+No Inactive Message Discriminator.
+
+
+    Console logging: level debugging, 243 messages logged, xml disabled,
+                     filtering disabled
+    Monitor logging: level debugging, 0 messages logged, xml disabled,
+                     filtering disabled
+    Buffer logging:  level debugging, 243 messages logged, xml disabled,
+                    filtering disabled
+    Exception Logging: size (8192 bytes)
+    Count and timestamp logging messages: disabled
+    Persistent logging: disabled
+
+No active filter modules.
+
+    Trap logging: level informational, 247 message lines logged
+        Logging Source-Interface:       VRF Name:
+
+Log Buffer (51200 bytes):
+
+*Mar  1 00:00:00.572: %ATA-6-DEV_FOUND: device 0x1F0
+*Mar  1 00:00:10.293: %NVRAM-5-CONFIG_NVRAM_READ_OK: NVRAM configuration 'flash:/nvram' was read from disk.
+*Feb 25 15:35:45.909: %PA-3-PA_INIT_FAILED: Performance Agent failed to initialize (Missing Data License)
+*Feb 25 15:35:47.561: %LINK-3-UPDOWN: Interface GigabitEthernet0/0, changed state to up
+*Feb 25 15:35:47.562: %LINK-3-UPDOWN: Interface GigabitEthernet0/1, changed state to up
+*Feb 25 15:35:47.563: %LINK-3-UPDOWN: Interface GigabitEthernet0/2, changed state to up
+*Feb 25 15:35:47.563: %LINK-3-UPDOWN: Interface GigabitEthernet0/3, changed state to up
+*Feb 25 15:35:47.999: %CVAC-4-FILE_IGNORED: Configuration file flash0:/ios_config.txt is ignored : empty file
+*Feb 25 15:35:48.035: %SYS-5-LOG_CONFIG_CHANGE: Buffer logging: level debugging, xml disabled, filtering disabled, size (51200)
+*Feb 25 15:35:49.265: %LINEPROTO-5-UPDOWN: Line protocol on Interface GigabitEthernet0/0, changed state to up
+*Feb 25 15:35:49.265: %LINEPROTO-5-UPDOWN: Line protocol on Interface GigabitEthernet0/1, changed state to up
+*Feb 25 15:35:49.265: %LINEPROTO-5-UPDOWN: Line protocol on Interface GigabitEthernet0/2, changed state to up
+*Feb 25 15:35:49.266: %LINEPROTO-5-UPDOWN: Line protocol on Interface GigabitEthernet0/3, changed state to up
+*Feb 25 15:35:49.266: %LINEPROTO-5-UPDOWN: Line protocol on Interface Loopback0, changed state to up
+*Feb 25 15:35:49.266: %LINEPROTO-5-UPDOWN: Line protocol on Interface NVI0, changed state to up
+*Feb 25 15:35:49.948: %SYS-5-CONFIG_I: Configured from memory by console
+*Feb 25 15:35:50.247: %CVAC-4-FILE_IGNORED: Configuration file flash0:/ios_config.txt is ignored : empty file
+*Feb 25 15:35:50.672: %SYS-5-RESTART: System restarted --
+Cisco IOS Software, IOSv Software (VIOS-ADVENTERPRISEK9-M), Version 15.6(2)T, RELEASE SOFTWARE (fc2)
+Technical Support: http://www.cisco.com/techsupport
+Copyright (c) 1986-2016 by Cisco Systems, Inc.
+Compiled Tue 22-Mar-16 16:19 by prod_rel_team
+*Feb 25 15:35:50.699: %SSH-5-ENABLED: SSH 2.0 has been enabled
+*Feb 25 15:35:50.716: %CRYPTO-6-ISAKMP_ON_OFF: ISAKMP is OFF
+*Feb 25 15:35:50.716: %CRYPTO-6-GDOI_ON_OFF: GDOI is OFF
+*Feb 25 15:36:08.841: %CDP-4-DUPLEX_MISMATCH: duplex mismatch discovered on GigabitEthernet0/0 (not full duplex), with Switch FastEthernet0/1 (full duplex).
+*Feb 25 15:36:12.398: %PLATFORM-5-SIGNATURE_VERIFIED: Image 'flash0:/vios-adventerprisek9-m' passed code signing verification
+*Feb 25 15:36:34.479: %OSPF-5-ADJCHG: Process 1, Nbr 2.2.2.2 on GigabitEthernet0/2 from LOADING to FULL, Loading Done
+*Feb 25 15:36:35.259: %OSPF-5-ADJCHG: Process 1, Nbr 3.3.3.3 on GigabitEthernet0/3 from LOADING to FULL, Loading Done
+*Feb 25 15:37:08.751: %CDP-4-DUPLEX_MISMATCH: duplex mismatch discovered on GigabitEthernet0/0 (not full duplex), with Switch FastEthernet0/1 (full duplex).
+*Feb 25 15:38:08.721: %CDP-4-DUPLEX_MISMATCH: duplex mismatch discovered on GigabitEthernet0/0 (not full duplex), with Switch FastEthernet0/1 (full duplex).
+*Feb 25 15:39:08.700: %CDP-4-DUPLEX_MISMATCH: duplex mismatch discovered on GigabitEthernet0/0 (not full duplex), with Switch FastEthernet0/1 (full duplex).
+*Feb 25 15:40:08.614: %CDP-4-DUPLEX_MISMATCH: duplex mismatch discovered on GigabitEthernet0/0 (not full duplex), with Switch FastEthernet0/1 (full duplex).
+*Feb 25 15:41:08.569: %CDP-4-DUPLEX_MISMATCH: duplex mismatch discovered on GigabitEthernet0/0 (not full duplex), with Switch FastEthernet0/1 (full duplex).
+*Feb 25 15:42:08.536: %CDP-4-DUPLEX_MISMATCH: duplex mismatch discovered on GigabitEthernet0/0 (not full duplex), with Switch FastEthernet0/1 (full duplex).
+*Feb 25 15:43:08.485: %CDP-4-DUPLEX_MISMATCH: duplex mismatch discovered on GigabitEthernet0/0 (not full duplex), with Switch FastEthernet0/1 (full duplex).
+*Feb 25 15:44:08.405: %CDP-4-DUPLEX_MISMATCH: duplex mismatch discovered on GigabitEthernet0/0 (not full duplex), with Switch FastEthernet0/1 (full duplex).
+*Feb 25 15:45:08.375: %CDP-4-DUPLEX_MISMATCH: duplex mismatch discovered on GigabitEthernet0/0 (not full duplex), with Switch FastEthernet0/1 (full duplex).
+*Feb 25 15:46:08.366: %CDP-4-DUPLEX_MISMATCH: duplex mismatch discovered on GigabitEthernet0/0 (not full duplex), with Switch FastEthernet0/1 (full duplex).
+*Feb 25 15:47:08.334: %CDP-4-DUPLEX_MISMATCH: duplex mismatch discovered on GigabitEthernet0/0 (not full duplex), with Switch FastEthernet0/1 (full duplex).
+*Feb 25 15:48:08.327: %CDP-4-DUPLEX_MISMATCH: duplex mismatch discovered on GigabitEthernet0/0 (not full duplex), with Switch FastEthernet0/1 (full duplex).
+*Feb 25 15:49:08.309: %CDP-4-DUPLEX_MISMATCH: duplex mismatch discovered on GigabitEthernet0/0 (not full duplex), with Switch FastEthernet0/1 (full duplex).
+*Feb 25 15:50:08.292: %CDP-4-DUPLEX_MISMATCH: duplex mismatch discovered on GigabitEthernet0/0 (not full duplex), with Switch FastEthernet0/1 (full duplex).
+*Feb 25 15:51:08.280: %CDP-4-DUPLEX_MISMATCH: duplex mismatch discovered on GigabitEthernet0/0 (not full duplex), with Switch FastEthernet0/1 (full duplex).
+*Feb 25 15:52:08.275: %CDP-4-DUPLEX_MISMATCH: duplex mismatch discovered on GigabitEthernet0/0 (not full duplex), with Switch FastEthernet0/1 (full duplex).
+*Feb 25 15:53:08.272: %CDP-4-DUPLEX_MISMATCH: duplex mismatch discovered on GigabitEthernet0/0 (not full duplex), with Switch FastEthernet0/1 (full duplex).
+*Feb 25 15:54:08.272: %CDP-4-DUPLEX_MISMATCH: duplex mismatch discovered on GigabitEthernet0/0 (not full duplex), with Switch FastEthernet0/1 (full duplex).
+*Feb 25 15:55:08.242: %CDP-4-DUPLEX_MISMATCH: duplex mismatch discovered on GigabitEthernet0/0 (not full duplex), with Switch FastEthernet0/1 (full duplex).
+*Feb 25 15:56:08.083: %CDP-4-DUPLEX_MISMATCH: duplex mismatch discovered on GigabitEthernet0/0 (not full duplex), with Switch FastEthernet0/1 (full duplex).
+*Feb 25 15:57:08.048: %CDP-4-DUPLEX_MISMATCH: duplex mismatch discovered on GigabitEthernet0/0 (not full duplex), with Switch FastEthernet0/1 (full duplex).
+*Feb 25 15:58:08.012: %CDP-4-DUPLEX_MISMATCH: duplex mismatch discovered on GigabitEthernet0/0 (not full duplex), with Switch FastEthernet0/1 (full duplex).
+*Feb 25 15:59:07.936: %CDP-4-DUPLEX_MISMATCH: duplex mismatch discovered on GigabitEthernet0/0 (not full duplex), with Switch FastEthernet0/1 (full duplex).
+*Feb 25 16:00:07.878: %CDP-4-DUPLEX_MISMATCH: duplex mismatch discovered on GigabitEthernet0/0 (not full duplex), with Switch FastEthernet0/1 (full duplex).
+*Feb 25 16:01:07.848: %CDP-4-DUPLEX_MISMATCH: duplex mismatch discovered on GigabitEthernet0/0 (not full duplex), with Switch FastEthernet0/1 (full duplex).
+*Feb 25 16:02:07.835: %CDP-4-DUPLEX_MISMATCH: duplex mismatch discovered on GigabitEthernet0/0 (not full duplex), with Switch FastEthernet0/1 (full duplex).
+*Feb 25 16:03:07.814: %CDP-4-DUPLEX_MISMATCH: duplex mismatch discovered on GigabitEthernet0/0 (not full duplex), with Switch FastEthernet0/1 (full duplex).
+*Feb 25 16:04:07.787: %CDP-4-DUPLEX_MISMATCH: duplex mismatch discovered on GigabitEthernet0/0 (not full duplex), with Switch FastEthernet0/1 (full duplex).
+*Feb 25 16:05:07.738: %CDP-4-DUPLEX_MISMATCH: duplex mismatch discovered on GigabitEthernet0/0 (not full duplex), with Switch FastEthernet0/1 (full duplex).
+*Feb 25 16:06:07.731: %CDP-4-DUPLEX_MISMATCH: duplex mismatch discovered on GigabitEthernet0/0 (not full duplex), with Switch FastEthernet0/1 (full duplex).
+*Feb 25 16:07:07.718: %CDP-4-DUPLEX_MISMATCH: duplex mismatch discovered on GigabitEthernet0/0 (not full duplex), with Switch FastEthernet0/1 (full duplex).
+*Feb 25 16:08:07.712: %CDP-4-DUPLEX_MISMATCH: duplex mismatch discovered on GigabitEthernet0/0 (not full duplex), with Switch FastEthernet0/1 (full duplex).
+*Feb 25 16:09:07.693: %CDP-4-DUPLEX_MISMATCH: duplex mismatch discovered on GigabitEthernet0/0 (not full duplex), with Switch FastEthernet0/1 (full duplex).
+*Feb 25 16:10:07.669: %CDP-4-DUPLEX_MISMATCH: duplex mismatch discovered on GigabitEthernet0/0 (not full duplex), with Switch FastEthernet0/1 (full duplex).
+*Feb 25 16:11:07.647: %CDP-4-DUPLEX_MISMATCH: duplex mismatch discovered on GigabitEthernet0/0 (not full duplex), with Switch FastEthernet0/1 (full duplex).
+*Feb 25 16:12:07.640: %CDP-4-DUPLEX_MISMATCH: duplex mismatch discovered on GigabitEthernet0/0 (not full duplex), with Switch FastEthernet0/1 (full duplex).
+*Feb 25 16:13:07.624: %CDP-4-DUPLEX_MISMATCH: duplex mismatch discovered on GigabitEthernet0/0 (not full duplex), with Switch FastEthernet0/1 (full duplex).
+*Feb 25 16:14:07.595: %CDP-4-DUPLEX_MISMATCH: duplex mismatch discovered on GigabitEthernet0/0 (not full duplex), with Switch FastEthernet0/1 (full duplex).
+*Feb 25 16:15:07.563: %CDP-4-DUPLEX_MISMATCH: duplex mismatch discovered on GigabitEthernet0/0 (not full duplex), with Switch FastEthernet0/1 (full duplex).
+*Feb 25 16:16:07.541: %CDP-4-DUPLEX_MISMATCH: duplex mismatch discovered on GigabitEthernet0/0 (not full duplex), with Switch FastEthernet0/1 (full duplex).
+*Feb 25 16:17:07.409: %CDP-4-DUPLEX_MISMATCH: duplex mismatch discovered on GigabitEthernet0/0 (not full duplex), with Switch FastEthernet0/1 (full duplex).
+*Feb 25 16:18:07.298: %CDP-4-DUPLEX_MISMATCH: duplex mismatch discovered on GigabitEthernet0/0 (not full duplex), with Switch FastEthernet0/1 (full duplex).
+*Feb 25 16:19:07.285: %CDP-4-DUPLEX_MISMATCH: duplex mismatch discovered on GigabitEthernet0/0 (not full duplex), with Switch FastEthernet0/1 (full duplex).
+*Feb 25 16:20:07.252: %CDP-4-DUPLEX_MISMATCH: duplex mismatch discovered on GigabitEthernet0/0 (not full duplex), with Switch FastEthernet0/1 (full duplex).
+*Feb 25 16:21:07.252: %CDP-4-DUPLEX_MISMATCH: duplex mismatch discovered on GigabitEthernet0/0 (not full duplex), with Switch FastEthernet0/1 (full duplex).
+*Feb 25 16:22:07.244: %CDP-4-DUPLEX_MISMATCH: duplex mismatch discovered on GigabitEthernet0/0 (not full duplex), with Switch FastEthernet0/1 (full duplex).
+*Feb 25 16:23:07.239: %CDP-4-DUPLEX_MISMATCH: duplex mismatch discovered on GigabitEthernet0/0 (not full duplex), with Switch FastEthernet0/1 (full duplex).
+*Feb 25 16:24:07.175: %CDP-4-DUPLEX_MISMATCH: duplex mismatch discovered on GigabitEthernet0/0 (not full duplex), with Switch FastEthernet0/1 (full duplex).
+*Feb 25 16:25:07.157: %CDP-4-DUPLEX_MISMATCH: duplex mismatch discovered on GigabitEthernet0/0 (not full duplex), with Switch FastEthernet0/1 (full duplex).
+*Feb 25 16:26:07.027: %CDP-4-DUPLEX_MISMATCH: duplex mismatch discovered on GigabitEthernet0/0 (not full duplex), with Switch FastEthernet0/1 (full duplex).
+*Feb 25 16:27:07.032: %CDP-4-DUPLEX_MISMATCH: duplex mismatch discovered on GigabitEthernet0/0 (not full duplex), with Switch FastEthernet0/1 (full duplex).
+*Feb 25 16:28:07.032: %CDP-4-DUPLEX_MISMATCH: duplex mismatch discovered on GigabitEthernet0/0 (not full duplex), with Switch FastEthernet0/1 (full duplex).
+*Feb 25 16:29:07.037: %CDP-4-DUPLEX_MISMATCH: duplex mismatch discovered on GigabitEthernet0/0 (not full duplex), with Switch FastEthernet0/1 (full duplex).
+*Feb 25 16:30:06.882: %CDP-4-DUPLEX_MISMATCH: duplex mismatch discovered on GigabitEthernet0/0 (not full duplex), with Switch FastEthernet0/1 (full duplex).
+*Feb 25 16:31:06.858: %CDP-4-DUPLEX_MISMATCH: duplex mismatch discovered on GigabitEthernet0/0 (not full duplex), with Switch FastEthernet0/1 (full duplex).
+*Feb 25 16:32:06.850: %CDP-4-DUPLEX_MISMATCH: duplex mismatch discovered on GigabitEthernet0/0 (not full duplex), with Switch FastEthernet0/1 (full duplex).
+*Feb 25 16:33:06.851: %CDP-4-DUPLEX_MISMATCH: duplex mismatch discovered on GigabitEthernet0/0 (not full duplex), with Switch FastEthernet0/1 (full duplex).
+*Feb 25 16:34:06.855: %CDP-4-DUPLEX_MISMATCH: duplex mismatch discovered on GigabitEthernet0/0 (not full duplex), with Switch FastEthernet0/1 (full duplex).
+*Feb 25 16:35:06.819: %CDP-4-DUPLEX_MISMATCH: duplex mismatch discovered on GigabitEthernet0/0 (not full duplex), with Switch FastEthernet0/1 (full duplex).
+*Feb 25 16:36:06.670: %CDP-4-DUPLEX_MISMATCH: duplex mismatch discovered on GigabitEthernet0/0 (not full duplex), with Switch FastEthernet0/1 (full duplex).
+*Feb 25 16:37:06.584: %CDP-4-DUPLEX_MISMATCH: duplex mismatch discovered on GigabitEthernet0/0 (not full duplex), with Switch FastEthernet0/1 (full duplex).
+*Feb 25 16:38:06.564: %CDP-4-DUPLEX_MISMATCH: duplex mismatch discovered on GigabitEthernet0/0 (not full duplex), with Switch FastEthernet0/1 (full duplex).
+*Feb 25 16:39:06.532: %CDP-4-DUPLEX_MISMATCH: duplex mismatch discovered on GigabitEthernet0/0 (not full duplex), with Switch FastEthernet0/1 (full duplex).
+*Feb 25 16:40:06.517: %CDP-4-DUPLEX_MISMATCH: duplex mismatch discovered on GigabitEthernet0/0 (not full duplex), with Switch FastEthernet0/1 (full duplex).
+*Feb 25 16:41:06.227: %CDP-4-DUPLEX_MISMATCH: duplex mismatch discovered on GigabitEthernet0/0 (not full duplex), with Switch FastEthernet0/1 (full duplex).
+*Feb 25 16:42:06.096: %CDP-4-DUPLEX_MISMATCH: duplex mismatch discovered on GigabitEthernet0/0 (not full duplex), with Switch FastEthernet0/1 (full duplex).
+*Feb 25 16:43:06.025: %CDP-4-DUPLEX_MISMATCH: duplex mismatch discovered on GigabitEthernet0/0 (not full duplex), with Switch FastEthernet0/1 (full duplex).
+*Feb 25 16:44:05.716: %CDP-4-DUPLEX_MISMATCH: duplex mismatch discovered on GigabitEthernet0/0 (not full duplex), with Switch FastEthernet0/1 (full duplex).
+*Feb 25 16:45:05.708: %CDP-4-DUPLEX_MISMATCH: duplex mismatch discovered on GigabitEthernet0/0 (not full duplex), with Switch FastEthernet0/1 (full duplex).
+*Feb 25 16:46:05.525: %CDP-4-DUPLEX_MISMATCH: duplex mismatch discovered on GigabitEthernet0/0 (not full duplex), with Switch FastEthernet0/1 (full duplex).
+*Feb 25 16:47:05.415: %CDP-4-DUPLEX_MISMATCH: duplex mismatch discovered on GigabitEthernet0/0 (not full duplex), with Switch FastEthernet0/1 (full duplex).
+*Feb 25 16:48:05.291: %CDP-4-DUPLEX_MISMATCH: duplex mismatch discovered on GigabitEthernet0/0 (not full duplex), with Switch FastEthernet0/1 (full duplex).
+*Feb 25 16:49:05.117: %CDP-4-DUPLEX_MISMATCH: duplex mismatch discovered on GigabitEthernet0/0 (not full duplex), with Switch FastEthernet0/1 (full duplex).
+*Feb 25 16:50:04.802: %CDP-4-DUPLEX_MISMATCH: duplex mismatch discovered on GigabitEthernet0/0 (not full duplex), with Switch FastEthernet0/1 (full duplex).
+*Feb 25 16:51:04.669: %CDP-4-DUPLEX_MISMATCH: duplex mismatch discovered on GigabitEthernet0/0 (not full duplex), with Switch FastEthernet0/1 (full duplex).
+*Feb 25 16:52:04.525: %CDP-4-DUPLEX_MISMATCH: duplex mismatch discovered on GigabitEthernet0/0 (not full duplex), with Switch FastEthernet0/1 (full duplex).
+*Feb 25 16:53:04.504: %CDP-4-DUPLEX_MISMATCH: duplex mismatch discovered on GigabitEthernet0/0 (not full duplex), with Switch FastEthernet0/1 (full duplex).
+*Feb 25 16:54:04.483: %CDP-4-DUPLEX_MISMATCH: duplex mismatch discovered on GigabitEthernet0/0 (not full duplex), with Switch FastEthernet0/1 (full duplex).
+*Feb 25 16:55:04.324: %CDP-4-DUPLEX_MISMATCH: duplex mismatch discovered on GigabitEthernet0/0 (not full duplex), with Switch FastEthernet0/1 (full duplex).
+*Feb 25 16:56:04.220: %CDP-4-DUPLEX_MISMATCH: duplex mismatch discovered on GigabitEthernet0/0 (not full duplex), with Switch FastEthernet0/1 (full duplex).
+*Feb 25 16:57:04.193: %CDP-4-DUPLEX_MISMATCH: duplex mismatch discovered on GigabitEthernet0/0 (not full duplex), with Switch FastEthernet0/1 (full duplex).
+*Feb 25 16:58:04.186: %CDP-4-DUPLEX_MISMATCH: duplex mismatch discovered on GigabitEthernet0/0 (not full duplex), with Switch FastEthernet0/1 (full duplex).
+*Feb 25 16:59:04.104: %CDP-4-DUPLEX_MISMATCH: duplex mismatch discovered on GigabitEthernet0/0 (not full duplex), with Switch FastEthernet0/1 (full duplex).
+*Feb 25 17:00:03.773: %CDP-4-DUPLEX_MISMATCH: duplex mismatch discovered on GigabitEthernet0/0 (not full duplex), with Switch FastEthernet0/1 (full duplex).
+*Feb 25 17:01:03.747: %CDP-4-DUPLEX_MISMATCH: duplex mismatch discovered on GigabitEthernet0/0 (not full duplex), with Switch FastEthernet0/1 (full duplex).
+*Feb 25 17:02:03.606: %CDP-4-DUPLEX_MISMATCH: duplex mismatch discovered on GigabitEthernet0/0 (not full duplex), with Switch FastEthernet0/1 (full duplex).
+*Feb 25 17:03:03.591: %CDP-4-DUPLEX_MISMATCH: duplex mismatch discovered on GigabitEthernet0/0 (not full duplex), with Switch FastEthernet0/1 (full duplex).
+*Feb 25 17:04:03.567: %CDP-4-DUPLEX_MISMATCH: duplex mismatch discovered on GigabitEthernet0/0 (not full duplex), with Switch FastEthernet0/1 (full duplex).
+*Feb 25 17:05:03.609: %CDP-4-DUPLEX_MISMATCH: duplex mismatch discovered on GigabitEthernet0/0 (not full duplex), with Switch FastEthernet0/1 (full duplex).
+*Feb 25 17:06:02.806: %CDP-4-DUPLEX_MISMATCH: duplex mismatch discovered on GigabitEthernet0/0 (not full duplex), with Switch FastEthernet0/1 (full duplex).
+*Feb 25 17:07:02.787: %CDP-4-DUPLEX_MISMATCH: duplex mismatch discovered on GigabitEthernet0/0 (not full duplex), with Switch FastEthernet0/1 (full duplex).
+*Feb 25 17:08:02.757: %CDP-4-DUPLEX_MISMATCH: duplex mismatch discovered on GigabitEthernet0/0 (not full duplex), with Switch FastEthernet0/1 (full duplex).
+*Feb 25 17:09:02.588: %CDP-4-DUPLEX_MISMATCH: duplex mismatch discovered on GigabitEthernet0/0 (not full duplex), with Switch FastEthernet0/1 (full duplex).
+*Feb 25 17:10:02.581: %CDP-4-DUPLEX_MISMATCH: duplex mismatch discovered on GigabitEthernet0/0 (not full duplex), with Switch FastEthernet0/1 (full duplex).
+*Feb 25 17:11:02.561: %CDP-4-DUPLEX_MISMATCH: duplex mismatch discovered on GigabitEthernet0/0 (not full duplex), with Switch FastEthernet0/1 (full duplex).
+*Feb 25 17:12:02.512: %CDP-4-DUPLEX_MISMATCH: duplex mismatch discovered on GigabitEthernet0/0 (not full duplex), with Switch FastEthernet0/1 (full duplex).
+*Feb 25 17:13:02.491: %CDP-4-DUPLEX_MISMATCH: duplex mismatch discovered on GigabitEthernet0/0 (not full duplex), with Switch FastEthernet0/1 (full duplex).
+*Feb 25 17:14:02.453: %CDP-4-DUPLEX_MISMATCH: duplex mismatch discovered on GigabitEthernet0/0 (not full duplex), with Switch FastEthernet0/1 (full duplex).
+*Feb 25 17:15:02.206: %CDP-4-DUPLEX_MISMATCH: duplex mismatch discovered on GigabitEthernet0/0 (not full duplex), with Switch FastEthernet0/1 (full duplex).
+*Feb 25 17:16:02.120: %CDP-4-DUPLEX_MISMATCH: duplex mismatch discovered on GigabitEthernet0/0 (not full duplex), with Switch FastEthernet0/1 (full duplex).
+*Feb 25 17:17:02.098: %CDP-4-DUPLEX_MISMATCH: duplex mismatch discovered on GigabitEthernet0/0 (not full duplex), with Switch FastEthernet0/1 (full duplex).
+*Feb 25 17:18:02.077: %CDP-4-DUPLEX_MISMATCH: duplex mismatch discovered on GigabitEthernet0/0 (not full duplex), with Switch FastEthernet0/1 (full duplex).
+*Feb 25 17:19:01.906: %CDP-4-DUPLEX_MISMATCH: duplex mismatch discovered on GigabitEthernet0/0 (not full duplex), with Switch FastEthernet0/1 (full duplex).
+*Feb 25 17:20:01.807: %CDP-4-DUPLEX_MISMATCH: duplex mismatch discovered on GigabitEthernet0/0 (not full duplex), with Switch FastEthernet0/1 (full duplex).
+*Feb 25 17:21:01.719: %CDP-4-DUPLEX_MISMATCH: duplex mismatch discovered on GigabitEthernet0/0 (not full duplex), with Switch FastEthernet0/1 (full duplex).
+*Feb 25 17:22:01.700: %CDP-4-DUPLEX_MISMATCH: duplex mismatch discovered on GigabitEthernet0/0 (not full duplex), with Switch FastEthernet0/1 (full duplex).
+*Feb 25 17:23:01.680: %CDP-4-DUPLEX_MISMATCH: duplex mismatch discovered on GigabitEthernet0/0 (not full duplex), with Switch FastEthernet0/1 (full duplex).
+*Feb 25 17:24:01.615: %CDP-4-DUPLEX_MISMATCH: duplex mismatch discovered on GigabitEthernet0/0 (not full duplex), with Switch FastEthernet0/1 (full duplex).
+*Feb 25 17:25:01.604: %CDP-4-DUPLEX_MISMATCH: duplex mismatch discovered on GigabitEthernet0/0 (not full duplex), with Switch FastEthernet0/1 (full duplex).
+*Feb 25 17:26:01.593: %CDP-4-DUPLEX_MISMATCH: duplex mismatch discovered on GigabitEthernet0/0 (not full duplex), with Switch FastEthernet0/1 (full duplex).
+*Feb 25 17:27:01.574: %CDP-4-DUPLEX_MISMATCH: duplex mismatch discovered on GigabitEthernet0/0 (not full duplex), with Switch FastEthernet0/1 (full duplex).
+*Feb 25 17:28:01.525: %CDP-4-DUPLEX_MISMATCH: duplex mismatch discovered on GigabitEthernet0/0 (not full duplex), with Switch FastEthernet0/1 (full duplex).
+*Feb 25 17:29:01.517: %CDP-4-DUPLEX_MISMATCH: duplex mismatch discovered on GigabitEthernet0/0 (not full duplex), with Switch FastEthernet0/1 (full duplex).
+*Feb 25 17:30:01.505: %CDP-4-DUPLEX_MISMATCH: duplex mismatch discovered on GigabitEthernet0/0 (not full duplex), with Switch FastEthernet0/1 (full duplex).
+*Feb 25 17:31:01.470: %CDP-4-DUPLEX_MISMATCH: duplex mismatch discovered on GigabitEthernet0/0 (not full duplex), with Switch FastEthernet0/1 (full duplex).
+*Feb 25 17:32:01.453: %CDP-4-DUPLEX_MISMATCH: duplex mismatch discovered on GigabitEthernet0/0 (not full duplex), with Switch FastEthernet0/1 (full duplex).
+*Feb 25 17:33:01.400: %CDP-4-DUPLEX_MISMATCH: duplex mismatch discovered on GigabitEthernet0/0 (not full duplex), with Switch FastEthernet0/1 (full duplex).
+*Feb 25 17:34:01.384: %CDP-4-DUPLEX_MISMATCH: duplex mismatch discovered on GigabitEthernet0/0 (not full duplex), with Switch FastEthernet0/1 (full duplex).
+*Feb 25 17:35:01.346: %CDP-4-DUPLEX_MISMATCH: duplex mismatch discovered on GigabitEthernet0/0 (not full duplex), with Switch FastEthernet0/1 (full duplex).
+*Feb 25 17:36:01.234: %CDP-4-DUPLEX_MISMATCH: duplex mismatch discovered on GigabitEthernet0/0 (not full duplex), with Switch FastEthernet0/1 (full duplex).
+*Feb 25 17:37:01.133: %CDP-4-DUPLEX_MISMATCH: duplex mismatch discovered on GigabitEthernet0/0 (not full duplex), with Switch FastEthernet0/1 (full duplex).
+*Feb 25 17:38:01.115: %CDP-4-DUPLEX_MISMATCH: duplex mismatch discovered on GigabitEthernet0/0 (not full duplex), with Switch FastEthernet0/1 (full duplex).
+*Feb 25 17:39:00.812: %CDP-4-DUPLEX_MISMATCH: duplex mismatch discovered on GigabitEthernet0/0 (not full duplex), with Switch FastEthernet0/1 (full duplex).
+*Feb 25 17:40:00.790: %CDP-4-DUPLEX_MISMATCH: duplex mismatch discovered on GigabitEthernet0/0 (not full duplex), with Switch FastEthernet0/1 (full duplex).
+*Feb 25 17:41:00.535: %CDP-4-DUPLEX_MISMATCH: duplex mismatch discovered on GigabitEthernet0/0 (not full duplex), with Switch FastEthernet0/1 (full duplex).
+*Feb 25 17:42:00.256: %CDP-4-DUPLEX_MISMATCH: duplex mismatch discovered on GigabitEthernet0/0 (not full duplex), with Switch FastEthernet0/1 (full duplex).
+*Feb 25 17:42:58.600: %CDP-4-DUPLEX_MISMATCH: duplex mismatch discovered on GigabitEthernet0/0 (not full duplex), with Switch FastEthernet0/1 (full duplex).
+*Feb 25 17:43:57.907: %CDP-4-DUPLEX_MISMATCH: duplex mismatch discovered on GigabitEthernet0/0 (not full duplex), with Switch FastEthernet0/1 (full duplex).
+*Feb 25 17:44:57.821: %CDP-4-DUPLEX_MISMATCH: duplex mismatch discovered on GigabitEthernet0/0 (not full duplex), with Switch FastEthernet0/1 (full duplex).
+*Feb 25 17:45:57.653: %CDP-4-DUPLEX_MISMATCH: duplex mismatch discovered on GigabitEthernet0/0 (not full duplex), with Switch FastEthernet0/1 (full duplex).
+*Feb 25 17:46:56.864: %CDP-4-DUPLEX_MISMATCH: duplex mismatch discovered on GigabitEthernet0/0 (not full duplex), with Switch FastEthernet0/1 (full duplex).
+*Feb 25 17:47:56.772: %CDP-4-DUPLEX_MISMATCH: duplex mismatch discovered on GigabitEthernet0/0 (not full duplex), with Switch FastEthernet0/1 (full duplex).
+*Feb 25 17:48:56.641: %CDP-4-DUPLEX_MISMATCH: duplex mismatch discovered on GigabitEthernet0/0 (not full duplex), with Switch FastEthernet0/1 (full duplex).
+*Feb 25 17:49:55.924: %CDP-4-DUPLEX_MISMATCH: duplex mismatch discovered on GigabitEthernet0/0 (not full duplex), with Switch FastEthernet0/1 (full duplex).
+*Feb 25 17:50:55.731: %CDP-4-DUPLEX_MISMATCH: duplex mismatch discovered on GigabitEthernet0/0 (not full duplex), with Switch FastEthernet0/1 (full duplex).
+*Feb 25 17:51:55.633: %CDP-4-DUPLEX_MISMATCH: duplex mismatch discovered on GigabitEthernet0/0 (not full duplex), with Switch FastEthernet0/1 (full duplex).
+*Feb 25 17:52:55.577: %CDP-4-DUPLEX_MISMATCH: duplex mismatch discovered on GigabitEthernet0/0 (not full duplex), with Switch FastEthernet0/1 (full duplex).
+*Feb 25 17:53:55.188: %CDP-4-DUPLEX_MISMATCH: duplex mismatch discovered on GigabitEthernet0/0 (not full duplex), with Switch FastEthernet0/1 (full duplex).
+*Feb 25 17:54:55.099: %CDP-4-DUPLEX_MISMATCH: duplex mismatch discovered on GigabitEthernet0/0 (not full duplex), with Switch FastEthernet0/1 (full duplex).
+*Feb 25 17:55:54.919: %CDP-4-DUPLEX_MISMATCH: duplex mismatch discovered on GigabitEthernet0/0 (not full duplex), with Switch FastEthernet0/1 (full duplex).
+*Feb 25 17:56:54.818: %CDP-4-DUPLEX_MISMATCH: duplex mismatch discovered on GigabitEthernet0/0 (not full duplex), with Switch FastEthernet0/1 (full duplex).
+*Feb 25 17:57:54.802: %CDP-4-DUPLEX_MISMATCH: duplex mismatch discovered on GigabitEthernet0/0 (not full duplex), with Switch FastEthernet0/1 (full duplex).
+*Feb 25 17:58:54.743: %CDP-4-DUPLEX_MISMATCH: duplex mismatch discovered on GigabitEthernet0/0 (not full duplex), with Switch FastEthernet0/1 (full duplex).
+*Feb 25 17:59:54.572: %CDP-4-DUPLEX_MISMATCH: duplex mismatch discovered on GigabitEthernet0/0 (not full duplex), with Switch FastEthernet0/1 (full duplex).
+*Feb 25 18:00:51.867: %OSPF-5-ADJCHG: Process 1, Nbr 3.3.3.3 on GigabitEthernet0/3 from FULL to DOWN, Neighbor Down: Dead timer expired
+*Feb 25 18:00:51.869: %OSPF-5-ADJCHG: Process 1, Nbr 2.2.2.2 on GigabitEthernet0/2 from FULL to DOWN, Neighbor Down: Dead timer expired
+*Feb 25 18:00:53.382: %CDP-4-DUPLEX_MISMATCH: duplex mismatch discovered on GigabitEthernet0/0 (not full duplex), with Switch FastEthernet0/1 (full duplex).
+*Feb 25 18:01:52.915: %CDP-4-DUPLEX_MISMATCH: duplex mismatch discovered on GigabitEthernet0/0 (not full duplex), with Switch FastEthernet0/1 (full duplex).
+*Feb 25 18:02:52.175: %CDP-4-DUPLEX_MISMATCH: duplex mismatch discovered on GigabitEthernet0/0 (not full duplex), with Switch FastEthernet0/1 (full duplex).
+*Feb 25 18:03:51.866: %CDP-4-DUPLEX_MISMATCH: duplex mismatch discovered on GigabitEthernet0/0 (not full duplex), with Switch FastEthernet0/1 (full duplex).
+*Feb 25 18:04:51.636: %CDP-4-DUPLEX_MISMATCH: duplex mismatch discovered on GigabitEthernet0/0 (not full duplex), with Switch FastEthernet0/1 (full duplex).
+*Feb 25 18:05:51.423: %CDP-4-DUPLEX_MISMATCH: duplex mismatch discovered on GigabitEthernet0/0 (not full duplex), with Switch FastEthernet0/1 (full duplex).
+*Feb 25 18:06:51.224: %CDP-4-DUPLEX_MISMATCH: duplex mismatch discovered on GigabitEthernet0/0 (not full duplex), with Switch FastEthernet0/1 (full duplex).
+*Feb 25 18:07:50.835: %CDP-4-DUPLEX_MISMATCH: duplex mismatch discovered on GigabitEthernet0/0 (not full duplex), with Switch FastEthernet0/1 (full duplex).
+*Feb 25 18:08:50.218: %CDP-4-DUPLEX_MISMATCH: duplex mismatch discovered on GigabitEthernet0/0 (not full duplex), with Switch FastEthernet0/1 (full duplex).
+*Feb 25 18:09:48.232: %CDP-4-DUPLEX_MISMATCH: duplex mismatch discovered on GigabitEthernet0/0 (not full duplex), with Switch FastEthernet0/1 (full duplex).
+*Feb 25 18:10:41.960: %CDP-4-DUPLEX_MISMATCH: duplex mismatch discovered on GigabitEthernet0/0 (not full duplex), with Switch FastEthernet0/1 (full duplex).
+*Feb 25 18:10:48.586: %OSPF-5-ADJCHG: Process 1, Nbr 3.3.3.3 on GigabitEthernet0/3 from LOADING to FULL, Loading Done
+*Feb 25 18:10:49.904: %OSPF-5-ADJCHG: Process 1, Nbr 2.2.2.2 on GigabitEthernet0/2 from LOADING to FULL, Loading Done
+*Feb 25 18:11:41.672: %CDP-4-DUPLEX_MISMATCH: duplex mismatch discovered on GigabitEthernet0/0 (not full duplex), with Switch FastEthernet0/1 (full duplex).
+*Feb 25 18:12:40.947: %CDP-4-DUPLEX_MISMATCH: duplex mismatch discovered on GigabitEthernet0/0 (not full duplex), with Switch FastEthernet0/1 (full duplex).
+*Feb 25 18:13:40.376: %CDP-4-DUPLEX_MISMATCH: duplex mismatch discovered on GigabitEthernet0/0 (not full duplex), with Switch FastEthernet0/1 (full duplex).
+*Feb 25 18:14:40.290: %CDP-4-DUPLEX_MISMATCH: duplex mismatch discovered on GigabitEthernet0/0 (not full duplex), with Switch FastEthernet0/1 (full duplex).
+*Feb 25 18:15:39.740: %CDP-4-DUPLEX_MISMATCH: duplex mismatch discovered on GigabitEthernet0/0 (not full duplex), with Switch FastEthernet0/1 (full duplex).
+*Feb 25 18:16:39.688: %CDP-4-DUPLEX_MISMATCH: duplex mismatch discovered on GigabitEthernet0/0 (not full duplex), with Switch FastEthernet0/1 (full duplex).
+*Feb 25 18:17:39.494: %CDP-4-DUPLEX_MISMATCH: duplex mismatch discovered on GigabitEthernet0/0 (not full duplex), with Switch FastEthernet0/1 (full duplex).
+*Feb 25 18:18:39.446: %CDP-4-DUPLEX_MISMATCH: duplex mismatch discovered on GigabitEthernet0/0 (not full duplex), with Switch FastEthernet0/1 (full duplex).
+*Feb 25 18:19:39.373: %CDP-4-DUPLEX_MISMATCH: duplex mismatch discovered on GigabitEthernet0/0 (not full duplex), with Switch FastEthernet0/1 (full duplex).
+*Feb 25 18:20:39.245: %CDP-4-DUPLEX_MISMATCH: duplex mismatch discovered on GigabitEthernet0/0 (not full duplex), with Switch FastEthernet0/1 (full duplex).
+*Feb 25 18:21:38.939: %CDP-4-DUPLEX_MISMATCH: duplex mismatch discovered on GigabitEthernet0/0 (not full duplex), with Switch FastEthernet0/1 (full duplex).
+*Feb 25 18:22:38.761: %CDP-4-DUPLEX_MISMATCH: duplex mismatch discovered on GigabitEthernet0/0 (not full duplex), with Switch FastEthernet0/1 (full duplex).
+*Feb 25 18:23:38.630: %CDP-4-DUPLEX_MISMATCH: duplex mismatch discovered on GigabitEthernet0/0 (not full duplex), with Switch FastEthernet0/1 (full duplex).
+*Feb 25 18:24:38.301: %CDP-4-DUPLEX_MISMATCH: duplex mismatch discovered on GigabitEthernet0/0 (not full duplex), with Switch FastEthernet0/1 (full duplex).
+*Feb 25 18:25:38.081: %CDP-4-DUPLEX_MISMATCH: duplex mismatch discovered on GigabitEthernet0/0 (not full duplex), with Switch FastEthernet0/1 (full duplex).
+*Feb 25 18:26:37.894: %CDP-4-DUPLEX_MISMATCH: duplex mismatch discovered on GigabitEthernet0/0 (not full duplex), with Switch FastEthernet0/1 (full duplex).
+*Feb 25 18:27:37.590: %CDP-4-DUPLEX_MISMATCH: duplex mismatch discovered on GigabitEthernet0/0 (not full duplex), with Switch FastEthernet0/1 (full duplex).
+*Feb 25 18:28:37.432: %CDP-4-DUPLEX_MISMATCH: duplex mismatch discovered on GigabitEthernet0/0 (not full duplex), with Switch FastEthernet0/1 (full duplex).
+*Feb 25 18:29:37.000: %CDP-4-DUPLEX_MISMATCH: duplex mismatch discovered on GigabitEthernet0/0 (not full duplex), with Switch FastEthernet0/1 (full duplex).
+*Feb 25 18:30:36.860: %CDP-4-DUPLEX_MISMATCH: duplex mismatch discovered on GigabitEthernet0/0 (not full duplex), with Switch FastEthernet0/1 (full duplex).
+*Feb 25 18:31:36.728: %CDP-4-DUPLEX_MISMATCH: duplex mismatch discovered on GigabitEthernet0/0 (not full duplex), with Switch FastEthernet0/1 (full duplex).
+*Feb 25 18:32:36.649: %CDP-4-DUPLEX_MISMATCH: duplex mismatch discovered on GigabitEthernet0/0 (not full duplex), with Switch FastEthernet0/1 (full duplex).
+*Feb 25 18:33:36.524: %CDP-4-DUPLEX_MISMATCH: duplex mismatch discovered on GigabitEthernet0/0 (not full duplex), with Switch FastEthernet0/1 (full duplex).
+*Feb 25 18:34:36.433: %CDP-4-DUPLEX_MISMATCH: duplex mismatch discovered on GigabitEthernet0/0 (not full duplex), with Switch FastEthernet0/1 (full duplex).
+*Feb 25 18:35:36.281: %CDP-4-DUPLEX_MISMATCH: duplex mismatch discovered on GigabitEthernet0/0 (not full duplex), with Switch FastEthernet0/1 (full duplex).
+*Feb 25 18:36:35.960: %CDP-4-DUPLEX_MISMATCH: duplex mismatch discovered on GigabitEthernet0/0 (not full duplex), with Switch FastEthernet0/1 (full duplex).
+*Feb 25 18:37:35.892: %CDP-4-DUPLEX_MISMATCH: duplex mismatch discovered on GigabitEthernet0/0 (not full duplex), with Switch FastEthernet0/1 (full duplex).
+*Feb 25 18:38:35.569: %CDP-4-DUPLEX_MISMATCH: duplex mismatch discovered on GigabitEthernet0/0 (not full duplex), with Switch FastEthernet0/1 (full duplex).
+*Feb 25 18:39:35.515: %CDP-4-DUPLEX_MISMATCH: duplex mismatch discovered on GigabitEthernet0/0 (not full duplex), with Switch FastEthernet0/1 (full duplex).
+*Feb 25 18:40:35.471: %CDP-4-DUPLEX_MISMATCH: duplex mismatch discovered on GigabitEthernet0/0 (not full duplex), with Switch FastEthernet0/1 (full duplex).
+*Feb 25 18:41:35.382: %CDP-4-DUPLEX_MISMATCH: duplex mismatch discovered on GigabitEthernet0/0 (not full duplex), with Switch FastEthernet0/1 (full duplex).
+*Feb 25 18:42:35.250: %CDP-4-DUPLEX_MISMATCH: duplex mismatch discovered on GigabitEthernet0/0 (not full duplex), with Switch FastEthernet0/1 (full duplex).
+*Feb 25 18:43:35.220: %CDP-4-DUPLEX_MISMATCH: duplex mismatch discovered on GigabitEthernet0/0 (not full duplex), with Switch FastEthernet0/1 (full duplex).
+*Feb 25 18:44:35.126: %CDP-4-DUPLEX_MISMATCH: duplex mismatch discovered on GigabitEthernet0/0 (not full duplex), with Switch FastEthernet0/1 (full duplex).
+*Feb 25 18:45:35.077: %CDP-4-DUPLEX_MISMATCH: duplex mismatch discovered on GigabitEthernet0/0 (not full duplex), with Switch FastEthernet0/1 (full duplex).
+*Feb 25 18:46:34.971: %CDP-4-DUPLEX_MISMATCH: duplex mismatch discovered on GigabitEthernet0/0 (not full duplex), with Switch FastEthernet0/1 (full duplex).
+*Feb 25 18:47:34.824: %CDP-4-DUPLEX_MISMATCH: duplex mismatch discovered on GigabitEthernet0/0 (not full duplex), with Switch FastEthernet0/1 (full duplex).
+*Feb 25 18:48:34.668: %CDP-4-DUPLEX_MISMATCH: duplex mismatch discovered on GigabitEthernet0/0 (not full duplex), with Switch FastEthernet0/1 (full duplex).
+*Feb 25 18:49:34.362: %CDP-4-DUPLEX_MISMATCH: duplex mismatch discovered on GigabitEthernet0/0 (not full duplex), with Switch FastEthernet0/1 (full duplex).
+*Feb 25 18:50:34.312: %CDP-4-DUPLEX_MISMATCH: duplex mismatch discovered on GigabitEthernet0/0 (not full duplex), with Switch FastEthernet0/1 (full duplex).
+*Feb 25 18:51:34.223: %CDP-4-DUPLEX_MISMATCH: duplex mismatch discovered on GigabitEthernet0/0 (not full duplex), with Switch FastEthernet0/1 (full duplex).
+*Feb 25 18:52:34.061: %CDP-4-DUPLEX_MISMATCH: duplex mismatch discovered on GigabitEthernet0/0 (not full duplex), with Switch FastEthernet0/1 (full duplex).
+*Feb 25 18:53:33.965: %CDP-4-DUPLEX_MISMATCH: duplex mismatch discovered on GigabitEthernet0/0 (not full duplex), with Switch FastEthernet0/1 (full duplex).
+*Feb 25 18:54:33.532: %CDP-4-DUPLEX_MISMATCH: duplex mismatch discovered on GigabitEthernet0/0 (not full duplex), with Switch FastEthernet0/1 (full duplex).
+*Feb 25 18:55:33.497: %CDP-4-DUPLEX_MISMATCH: duplex mismatch discovered on GigabitEthernet0/0 (not full duplex), with Switch FastEthernet0/1 (full duplex).
+*Feb 25 18:56:33.487: %CDP-4-DUPLEX_MISMATCH: duplex mismatch discovered on GigabitEthernet0/0 (not full duplex), with Switch FastEthernet0/1 (full duplex).
+*Feb 25 18:57:33.446: %CDP-4-DUPLEX_MISMATCH: duplex mismatch discovered on GigabitEthernet0/0 (not full duplex), with Switch FastEthernet0/1 (full duplex).
+*Feb 25 18:58:33.419: %CDP-4-DUPLEX_MISMATCH: duplex mismatch discovered on GigabitEthernet0/0 (not full duplex), with Switch FastEthernet0/1 (full duplex).
+*Feb 25 18:59:33.360: %CDP-4-DUPLEX_MISMATCH: duplex mismatch discovered on GigabitEthernet0/0 (not full duplex), with Switch FastEthernet0/1 (full duplex).
+*Feb 25 19:00:33.339: %CDP-4-DUPLEX_MISMATCH: duplex mismatch discovered on GigabitEthernet0/0 (not full duplex), with Switch FastEthernet0/1 (full duplex).
+*Feb 25 19:01:33.428: %CDP-4-DUPLEX_MISMATCH: duplex mismatch discovered on GigabitEthernet0/0 (not full duplex), with Switch FastEthernet0/1 (full duplex).
+*Feb 25 19:02:33.237: %CDP-4-DUPLEX_MISMATCH: duplex mismatch discovered on GigabitEthernet0/0 (not full duplex), with Switch FastEthernet0/1 (full duplex).
+*Feb 25 19:03:33.200: %CDP-4-DUPLEX_MISMATCH: duplex mismatch discovered on GigabitEthernet0/0 (not full duplex), with Switch FastEthernet0/1 (full duplex).
+*Feb 25 19:04:33.064: %CDP-4-DUPLEX_MISMATCH: duplex mismatch discovered on GigabitEthernet0/0 (not full duplex), with Switch FastEthernet0/1 (full duplex).
+*Feb 25 19:05:32.999: %CDP-4-DUPLEX_MISMATCH: duplex mismatch discovered on GigabitEthernet0/0 (not full duplex), with Switch FastEthernet0/1 (full duplex).
+*Feb 25 19:06:32.862: %CDP-4-DUPLEX_MISMATCH: duplex mismatch discovered on GigabitEthernet0/0 (not full duplex), with Switch FastEthernet0/1 (full duplex).
+*Feb 25 19:07:32.769: %CDP-4-DUPLEX_MISMATCH: duplex mismatch discovered on GigabitEthernet0/0 (not full duplex), with Switch FastEthernet0/1 (full duplex).
+*Feb 25 19:08:32.723: %CDP-4-DUPLEX_MISMATCH: duplex mismatch discovered on GigabitEthernet0/0 (not full duplex), with Switch FastEthernet0/1 (full duplex).
+*Feb 25 19:09:32.660: %CDP-4-DUPLEX_MISMATCH: duplex mismatch discovered on GigabitEthernet0/0 (not full duplex), with Switch FastEthernet0/1 (full duplex).
+
+=== show etherchannel summary ===
+               ^
+% Invalid input detected at '^' marker.
+
+
+=== show standby brief ===
+
