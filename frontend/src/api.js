@@ -266,28 +266,42 @@ export async function uploadDocuments(projectId, files, metadata, folderId) {
  // Always append folder_id - if null/empty, send empty string (backend will treat as None)
  formData.append('folder_id', folderId || '');
  
- const token = getToken();
- const response = await fetch(`${API_BASE}/projects/${projectId}/documents`, {
-  method: 'POST',
-  headers: {
-   'Authorization': token ? `Bearer ${token}` : '',
-   // Don't set Content-Type - browser will set it with boundary
-  },
-  body: formData,
- });
- 
- if (!response.ok) {
-  let errorData;
-  try {
-   errorData = await response.json();
-  } catch {
-   errorData = { detail: `Upload failed with status ${response.status}` };
-  }
-  const msg = toErrorMessage(errorData.detail, null) || toErrorMessage(errorData.message, null) || toErrorMessage(errorData.error, null) || `Upload failed with status ${response.status}`;
-  throw new Error(msg);
- }
+  const token = getToken();
+  const response = await fetch(`${API_BASE}/projects/${projectId}/documents`, {
+    method: "POST",
+    headers: {
+      Authorization: token ? `Bearer ${token}` : "",
+      // Don't set Content-Type - browser will set it with boundary
+    },
+    body: formData,
+  });
 
- return response.json();
+  const rawText = await response.text();
+
+  if (!response.ok) {
+    let errorData;
+    try {
+      errorData = rawText ? JSON.parse(rawText) : { detail: `Upload failed with status ${response.status}` };
+    } catch {
+      errorData = { detail: rawText || `Upload failed with status ${response.status}` };
+    }
+    const msg =
+      toErrorMessage(errorData.detail, null) ||
+      toErrorMessage(errorData.message, null) ||
+      toErrorMessage(errorData.error, null) ||
+      `Upload failed with status ${response.status}`;
+    throw new Error(msg);
+  }
+
+  // Gracefully handle empty or non‑JSON success bodies
+  if (!rawText) {
+    return { message: "Upload succeeded", documents: [] };
+  }
+  try {
+    return JSON.parse(rawText);
+  } catch {
+    return { message: rawText, documents: [] };
+  }
 }
 
 export async function getDocuments(projectId, filters = {}, options = {}) {
