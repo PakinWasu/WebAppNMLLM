@@ -4001,32 +4001,44 @@ const DeviceDetailsView = ({ project, deviceId, goBack, goBackHref, goIndex, goI
       {/* INTERFACES */}
       {!loading && !error && tab === "interfaces" && (
         <div className="flex-1 min-h-0 overflow-auto">
-          <div className="h-[80vh] overflow-hidden rounded-2xl border border-slate-300 dark:border-slate-700">
-            <Table 
-              searchable
-              searchPlaceholder="Search interface name, IP, description..."
-              actions={<Button variant="secondary" onClick={onExportIfaces}>Export CSV</Button>}
-              columns={ifaceColumns} 
-              data={ifaces} 
-              empty="No interfaces" 
-              minWidthClass="min-w-[1400px]" 
-            />
+          <div className="max-h-[80vh] overflow-hidden rounded-2xl border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-900/30 flex flex-col">
+            <div className="flex items-center justify-between gap-2 px-4 py-2.5 border-b border-slate-200 dark:border-slate-700 bg-slate-50/70 dark:bg-slate-800/30">
+              <h3 className="text-sm font-semibold text-slate-800 dark:text-slate-200">Interfaces</h3>
+              <Button variant="secondary" onClick={onExportIfaces}>Export CSV</Button>
+            </div>
+            <div className="flex-1 min-h-0">
+              <Table 
+                searchable
+                searchPlaceholder="Search interface name, IP, description..."
+                columns={ifaceColumns} 
+                data={ifaces} 
+                empty="No interfaces" 
+                minWidthClass="min-w-[1400px]"
+                containerClassName="h-full"
+              />
+            </div>
           </div>
         </div>
       )}
 
       {/* VLANS */}
       {!loading && !error && tab === "vlans" && (
-        <div className="h-[80vh] overflow-hidden rounded-2xl border border-slate-300 dark:border-slate-700">
-          <Table 
-            searchable
-            searchPlaceholder="Search VLAN ID, name, status..."
-            actions={<Button variant="secondary" onClick={exportVlans}>Export CSV</Button>}
-            columns={vlanColumns} 
-            data={vlans} 
-            empty="No VLANs parsed" 
-            minWidthClass="min-w-[900px]" 
-          />
+        <div className="max-h-[80vh] overflow-hidden rounded-2xl border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-900/30 flex flex-col">
+          <div className="flex items-center justify-between gap-2 px-4 py-2.5 border-b border-slate-200 dark:border-slate-700 bg-slate-50/70 dark:bg-slate-800/30">
+            <h3 className="text-sm font-semibold text-slate-800 dark:text-slate-200">VLANs</h3>
+            <Button variant="secondary" onClick={exportVlans}>Export CSV</Button>
+          </div>
+          <div className="flex-1 min-h-0">
+            <Table 
+              searchable
+              searchPlaceholder="Search VLAN ID, name, status..."
+              columns={vlanColumns} 
+              data={vlans} 
+              empty="No VLANs parsed" 
+              minWidthClass="min-w-[900px]"
+              containerClassName="h-full"
+            />
+          </div>
         </div>
       )}
 
@@ -4050,99 +4062,117 @@ const DeviceDetailsView = ({ project, deviceId, goBack, goBackHref, goIndex, goI
             
             {/* STP Interfaces from parser - with full details */}
             {stpData.interfaces && Array.isArray(stpData.interfaces) && stpData.interfaces.length > 0 && (
-              <div className="mt-4 h-[60vh] overflow-hidden rounded-2xl border border-slate-300 dark:border-slate-700">
-                <Table
-                  searchable
-                  searchPlaceholder="Search port name..."
-                  columns={[
-                    { header: "Port", key: "port", cell: (r) => <span className="font-medium text-slate-200">{r.port}</span> },
-                    { header: "Role", key: "role", cell: (r) => {
-                      const role = r.role || "—";
-                      const colorClass = role === "Root" ? "text-emerald-500" : role === "Designated" ? "text-blue-500" : role === "Alternate" ? "text-amber-500" : "";
-                      return <span className={colorClass}>{role}</span>;
-                    }},
-                    { header: "State", key: "state", cell: (r) => {
-                      const state = r.state || "—";
-                      const colorClass = state === "Forwarding" ? "text-emerald-500" : state === "Blocking" ? "text-rose-500" : state === "Learning" ? "text-amber-500" : "";
-                      return <span className={colorClass}>{state}</span>;
-                    }},
-                    { header: "Cost", key: "cost", cell: (r) => r.cost ?? "—" },
-                    { header: "PortFast", key: "portfast_enabled", cell: (r) => {
-                      const enabled = r.portfast_enabled;
-                      return <span className={enabled ? "text-emerald-500" : "text-slate-400"}>{enabled ? "Enabled" : "Disabled"}</span>;
-                    }},
-                    { header: "BPDU Guard", key: "bpduguard_enabled", cell: (r) => {
-                      const enabled = r.bpduguard_enabled;
-                      return <span className={enabled ? "text-emerald-500" : "text-slate-400"}>{enabled ? "Enabled" : "Disabled"}</span>;
-                    }}
-                  ]}
-                  data={stpData.interfaces}
-                  empty="No STP port information available"
-                  minWidthClass="min-w-[800px]"
-                />
+              <div className="mt-4 max-h-[60vh] overflow-hidden rounded-2xl border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-900/30 flex flex-col">
+                <div className="flex items-center justify-between gap-2 px-4 py-2.5 border-b border-slate-200 dark:border-slate-700 bg-slate-50/70 dark:bg-slate-800/30">
+                  <h3 className="text-sm font-semibold text-slate-800 dark:text-slate-200">STP Ports</h3>
+                </div>
+                <div className="flex-1 min-h-0">
+                  <Table
+                    searchable
+                    searchPlaceholder="Search port name..."
+                    columns={[
+                      { header: "Port", key: "port", cell: (r) => <span className="font-medium text-slate-800 dark:text-slate-200">{r.port}</span> },
+                      { header: "Role", key: "role", cell: (r) => {
+                        const role = r.role || "—";
+                        const colorClass = role === "Root" ? "text-emerald-600 dark:text-emerald-500" : role === "Designated" ? "text-blue-600 dark:text-blue-500" : role === "Alternate" ? "text-amber-600 dark:text-amber-500" : "";
+                        return <span className={colorClass}>{role}</span>;
+                      }},
+                      { header: "State", key: "state", cell: (r) => {
+                        const state = r.state || "—";
+                        const colorClass = state === "Forwarding" ? "text-emerald-600 dark:text-emerald-500" : state === "Blocking" ? "text-rose-600 dark:text-rose-500" : state === "Learning" ? "text-amber-600 dark:text-amber-500" : "";
+                        return <span className={colorClass}>{state}</span>;
+                      }},
+                      { header: "Cost", key: "cost", cell: (r) => r.cost ?? "—" },
+                      { header: "PortFast", key: "portfast_enabled", cell: (r) => {
+                        const enabled = r.portfast_enabled;
+                        return <span className={enabled ? "text-emerald-600 dark:text-emerald-500" : "text-slate-500 dark:text-slate-400"}>{enabled ? "Enabled" : "Disabled"}</span>;
+                      }},
+                      { header: "BPDU Guard", key: "bpduguard_enabled", cell: (r) => {
+                        const enabled = r.bpduguard_enabled;
+                        return <span className={enabled ? "text-emerald-600 dark:text-emerald-500" : "text-slate-500 dark:text-slate-400"}>{enabled ? "Enabled" : "Disabled"}</span>;
+                      }}
+                    ]}
+                    data={stpData.interfaces}
+                    empty="No STP port information available"
+                    minWidthClass="min-w-[800px]"
+                    containerClassName="h-full"
+                  />
+                </div>
               </div>
             )}
             
             {/* Fallback: use stp_info.interfaces if main interfaces not available */}
             {(!stpData.interfaces || stpData.interfaces.length === 0) && stpData.stp_info?.interfaces && Array.isArray(stpData.stp_info.interfaces) && stpData.stp_info.interfaces.length > 0 && (
-              <div className="mt-4 h-[60vh] overflow-hidden rounded-2xl border border-slate-300 dark:border-slate-700">
-                <Table
-                  searchable
-                  searchPlaceholder="Search port name..."
-                  columns={[
-                    { header: "Port", key: "port", cell: (r) => <span className="font-medium text-slate-200">{r.port}</span> },
-                    { header: "Role", key: "role", cell: (r) => {
-                      const role = r.role || "—";
-                      const colorClass = role === "Root" ? "text-emerald-500" : role === "Designated" ? "text-blue-500" : role === "Alternate" ? "text-amber-500" : "";
-                      return <span className={colorClass}>{role}</span>;
-                    }},
-                    { header: "State", key: "state", cell: (r) => {
-                      const state = r.state || "—";
-                      const colorClass = state === "Forwarding" ? "text-emerald-500" : state === "Blocking" ? "text-rose-500" : state === "Learning" ? "text-amber-500" : "";
-                      return <span className={colorClass}>{state}</span>;
-                    }},
-                    { header: "Cost", key: "cost", cell: (r) => r.cost ?? "—" },
-                    { header: "PortFast", key: "portfast_enabled", cell: (r) => {
-                      const enabled = r.portfast_enabled;
-                      return <span className={enabled ? "text-emerald-500" : "text-slate-400"}>{enabled ? "Enabled" : "Disabled"}</span>;
-                    }},
-                    { header: "BPDU Guard", key: "bpduguard_enabled", cell: (r) => {
-                      const enabled = r.bpduguard_enabled;
-                      return <span className={enabled ? "text-emerald-500" : "text-slate-400"}>{enabled ? "Enabled" : "Disabled"}</span>;
-                    }}
-                  ]}
-                  data={stpData.stp_info.interfaces}
-                  empty="No STP port information available"
-                  minWidthClass="min-w-[800px]"
-                />
+              <div className="mt-4 max-h-[60vh] overflow-hidden rounded-2xl border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-900/30 flex flex-col">
+                <div className="flex items-center justify-between gap-2 px-4 py-2.5 border-b border-slate-200 dark:border-slate-700 bg-slate-50/70 dark:bg-slate-800/30">
+                  <h3 className="text-sm font-semibold text-slate-800 dark:text-slate-200">STP Ports</h3>
+                </div>
+                <div className="flex-1 min-h-0">
+                  <Table
+                    searchable
+                    searchPlaceholder="Search port name..."
+                    columns={[
+                      { header: "Port", key: "port", cell: (r) => <span className="font-medium text-slate-800 dark:text-slate-200">{r.port}</span> },
+                      { header: "Role", key: "role", cell: (r) => {
+                        const role = r.role || "—";
+                        const colorClass = role === "Root" ? "text-emerald-600 dark:text-emerald-500" : role === "Designated" ? "text-blue-600 dark:text-blue-500" : role === "Alternate" ? "text-amber-600 dark:text-amber-500" : "";
+                        return <span className={colorClass}>{role}</span>;
+                      }},
+                      { header: "State", key: "state", cell: (r) => {
+                        const state = r.state || "—";
+                        const colorClass = state === "Forwarding" ? "text-emerald-600 dark:text-emerald-500" : state === "Blocking" ? "text-rose-600 dark:text-rose-500" : state === "Learning" ? "text-amber-600 dark:text-amber-500" : "";
+                        return <span className={colorClass}>{state}</span>;
+                      }},
+                      { header: "Cost", key: "cost", cell: (r) => r.cost ?? "—" },
+                      { header: "PortFast", key: "portfast_enabled", cell: (r) => {
+                        const enabled = r.portfast_enabled;
+                        return <span className={enabled ? "text-emerald-600 dark:text-emerald-500" : "text-slate-500 dark:text-slate-400"}>{enabled ? "Enabled" : "Disabled"}</span>;
+                      }},
+                      { header: "BPDU Guard", key: "bpduguard_enabled", cell: (r) => {
+                        const enabled = r.bpduguard_enabled;
+                        return <span className={enabled ? "text-emerald-600 dark:text-emerald-500" : "text-slate-500 dark:text-slate-400"}>{enabled ? "Enabled" : "Disabled"}</span>;
+                      }}
+                    ]}
+                    data={stpData.stp_info.interfaces}
+                    empty="No STP port information available"
+                    minWidthClass="min-w-[800px]"
+                    containerClassName="h-full"
+                  />
+                </div>
               </div>
             )}
             
             {/* Fallback: Legacy port_roles format */}
             {(!stpData.interfaces || stpData.interfaces.length === 0) && (!stpData.stp_info?.interfaces || stpData.stp_info.interfaces.length === 0) && stpData.port_roles && Object.keys(stpData.port_roles).length > 0 && (
-              <div className="mt-4 h-[60vh] overflow-hidden rounded-2xl border border-slate-300 dark:border-slate-700">
-                <Table
-                  searchable
-                  searchPlaceholder="Search port name..."
-                  columns={[
-                    { header: "Port", key: "port" },
-                    { header: "Role", key: "role" },
-                    { header: "State", key: "state" },
-                    { header: "Cost", key: "cost", cell: (r) => r.cost || "—" },
-                    { header: "PortFast", key: "portfast", cell: (r) => r.portfast ? "Enabled" : "Disabled" },
-                    { header: "BPDU Guard", key: "bpduguard", cell: (r) => r.bpduguard ? "Enabled" : "Disabled" }
-                  ]}
-                  data={Object.entries(stpData.port_roles || {}).map(([port, role]) => ({
-                    port,
-                    role: role || "—",
-                    state: stpData.port_states?.[port] || "—",
-                    cost: stpData.port_costs?.[port] || null,
-                    portfast: stpData.portfast_enabled?.[port] || false,
-                    bpduguard: stpData.bpdu_guard_enabled?.[port] || false
-                  }))}
-                  empty="No STP port information available"
-                  minWidthClass="min-w-[800px]"
-                />
+              <div className="mt-4 max-h-[60vh] overflow-hidden rounded-2xl border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-900/30 flex flex-col">
+                <div className="flex items-center justify-between gap-2 px-4 py-2.5 border-b border-slate-200 dark:border-slate-700 bg-slate-50/70 dark:bg-slate-800/30">
+                  <h3 className="text-sm font-semibold text-slate-800 dark:text-slate-200">STP Ports</h3>
+                </div>
+                <div className="flex-1 min-h-0">
+                  <Table
+                    searchable
+                    searchPlaceholder="Search port name..."
+                    columns={[
+                      { header: "Port", key: "port" },
+                      { header: "Role", key: "role" },
+                      { header: "State", key: "state" },
+                      { header: "Cost", key: "cost", cell: (r) => r.cost || "—" },
+                      { header: "PortFast", key: "portfast", cell: (r) => r.portfast ? "Enabled" : "Disabled" },
+                      { header: "BPDU Guard", key: "bpduguard", cell: (r) => r.bpduguard ? "Enabled" : "Disabled" }
+                    ]}
+                    data={Object.entries(stpData.port_roles || {}).map(([port, role]) => ({
+                      port,
+                      role: role || "—",
+                      state: stpData.port_states?.[port] || "—",
+                      cost: stpData.port_costs?.[port] || null,
+                      portfast: stpData.portfast_enabled?.[port] || false,
+                      bpduguard: stpData.bpdu_guard_enabled?.[port] || false
+                    }))}
+                    empty="No STP port information available"
+                    minWidthClass="min-w-[800px]"
+                    containerClassName="h-full"
+                  />
+                </div>
               </div>
             )}
             
@@ -4159,39 +4189,51 @@ const DeviceDetailsView = ({ project, deviceId, goBack, goBackHref, goIndex, goI
         <div className="grid gap-6">
           {/* Full route table (Cisco show ip route / Huawei display ip routing-table) */}
           {routingData.routes && Array.isArray(routingData.routes) && routingData.routes.length > 0 && (
-            <div className="h-[50vh] overflow-hidden rounded-2xl border border-slate-300 dark:border-slate-700">
-              <Table
-                searchable
-                searchPlaceholder="Search protocol, network, next hop, interface..."
-                columns={[
-                  { header: "Protocol", key: "protocol", cell: (r) => { const p = r.protocol; const labels = { O: "OSPF", C: "Connected", L: "Local", S: "Static", B: "BGP", R: "RIP", D: "EIGRP", i: "ISIS" }; return p ? (labels[p] || p) : "—"; } },
-                  { header: "Network", key: "network" },
-                  { header: "Next hop", key: "next_hop", cell: (r) => r.next_hop || "—" },
-                  { header: "Interface", key: "interface", cell: (r) => r.interface || "—" }
-                ]}
-                data={routingData.routes}
-                empty="No routes"
-                minWidthClass="min-w-[800px]"
-              />
+            <div className="max-h-[55vh] overflow-hidden rounded-2xl border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-900/30 flex flex-col">
+              <div className="flex items-center justify-between gap-2 px-4 py-2.5 border-b border-slate-200 dark:border-slate-700 bg-slate-50/70 dark:bg-slate-800/30">
+                <h3 className="text-sm font-semibold text-slate-800 dark:text-slate-200">Routing Table</h3>
+              </div>
+              <div className="flex-1 min-h-0">
+                <Table
+                  searchable
+                  searchPlaceholder="Search protocol, network, next hop, interface..."
+                  columns={[
+                    { header: "Protocol", key: "protocol", cell: (r) => { const p = r.protocol; const labels = { O: "OSPF", C: "Connected", L: "Local", S: "Static", B: "BGP", R: "RIP", D: "EIGRP", i: "ISIS" }; return p ? (labels[p] || p) : "—"; } },
+                    { header: "Network", key: "network" },
+                    { header: "Next hop", key: "next_hop", cell: (r) => r.next_hop || "—" },
+                    { header: "Interface", key: "interface", cell: (r) => r.interface || "—" }
+                  ]}
+                  data={routingData.routes}
+                  empty="No routes"
+                  minWidthClass="min-w-[800px]"
+                  containerClassName="h-full"
+                />
+              </div>
             </div>
           )}
           {/* Static Routes */}
           {routingData.static && ((Array.isArray(routingData.static) && routingData.static.length > 0) || (routingData.static.routes && routingData.static.routes.length > 0)) && (
-            <div className="h-[50vh] overflow-hidden rounded-2xl border border-slate-300 dark:border-slate-700">
-              <Table
-                searchable
-                searchPlaceholder="Search network, next hop, interface..."
-                columns={[
-                  { header: "Network", key: "network" },
-                  { header: "Mask", key: "mask", cell: (r) => r.mask || "—" },
-                  { header: "Next Hop", key: "nexthop", cell: (r) => r.nexthop || r.next_hop || "—" },
-                  { header: "Interface", key: "interface", cell: (r) => r.interface || r.exit_interface || "—" },
-                  { header: "AD", key: "admin_distance", cell: (r) => r.admin_distance || "—" }
-                ]}
-                data={Array.isArray(routingData.static) ? routingData.static : (routingData.static.routes || [])}
-                empty="No static routes"
-                minWidthClass="min-w-[900px]"
-              />
+            <div className="max-h-[55vh] overflow-hidden rounded-2xl border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-900/30 flex flex-col">
+              <div className="flex items-center justify-between gap-2 px-4 py-2.5 border-b border-slate-200 dark:border-slate-700 bg-slate-50/70 dark:bg-slate-800/30">
+                <h3 className="text-sm font-semibold text-slate-800 dark:text-slate-200">Static Routes</h3>
+              </div>
+              <div className="flex-1 min-h-0">
+                <Table
+                  searchable
+                  searchPlaceholder="Search network, next hop, interface..."
+                  columns={[
+                    { header: "Network", key: "network" },
+                    { header: "Mask", key: "mask", cell: (r) => r.mask || "—" },
+                    { header: "Next Hop", key: "nexthop", cell: (r) => r.nexthop || r.next_hop || "—" },
+                    { header: "Interface", key: "interface", cell: (r) => r.interface || r.exit_interface || "—" },
+                    { header: "AD", key: "admin_distance", cell: (r) => r.admin_distance || "—" }
+                  ]}
+                  data={Array.isArray(routingData.static) ? routingData.static : (routingData.static.routes || [])}
+                  empty="No static routes"
+                  minWidthClass="min-w-[900px]"
+                  containerClassName="h-full"
+                />
+              </div>
             </div>
           )}
 
@@ -4206,46 +4248,54 @@ const DeviceDetailsView = ({ project, deviceId, goBack, goBackHref, goIndex, goI
               {routingData.ospf.interfaces && routingData.ospf.interfaces.length > 0 && (
                 <div className="mb-4">
                   <h3 className="text-sm font-semibold mb-2">OSPF Interfaces</h3>
-                  <div className="h-[30vh] overflow-auto rounded-xl border border-slate-300 dark:border-[#1F2937]">
-                    <Table
-                      columns={[
-                        { header: "Interface", key: "interface", cell: (r) => <span className="font-medium text-slate-800 dark:text-slate-200">{r.interface || r.name || "—"}</span> },
-                        { header: "Area", key: "area", cell: (r) => r.area ?? "—" },
-                        ...(routingData.ospf.interfaces.some(i => i.cost !== undefined && i.cost !== null) ? [{ header: "Cost", key: "cost", cell: (r) => r.cost ?? "—" }] : []),
-                        ...(routingData.ospf.interfaces.some(i => i.network_type) ? [{ header: "Network Type", key: "network_type", cell: (r) => r.network_type || "—" }] : [])
-                      ]}
-                      data={routingData.ospf.interfaces}
-                      empty="No OSPF interfaces"
-                      minWidthClass="min-w-[500px]"
-                    />
+                  <div className="max-h-[30vh] overflow-hidden rounded-xl border border-slate-300 dark:border-[#1F2937] bg-white dark:bg-slate-900/30 flex flex-col">
+                    <div className="flex-1 min-h-0">
+                      <Table
+                        columns={[
+                          { header: "Interface", key: "interface", cell: (r) => <span className="font-medium text-slate-800 dark:text-slate-200">{r.interface || r.name || "—"}</span> },
+                          { header: "Area", key: "area", cell: (r) => r.area ?? "—" },
+                          ...(routingData.ospf.interfaces.some(i => i.cost !== undefined && i.cost !== null) ? [{ header: "Cost", key: "cost", cell: (r) => r.cost ?? "—" }] : []),
+                          ...(routingData.ospf.interfaces.some(i => i.network_type) ? [{ header: "Network Type", key: "network_type", cell: (r) => r.network_type || "—" }] : [])
+                        ]}
+                        data={routingData.ospf.interfaces}
+                        empty="No OSPF interfaces"
+                        minWidthClass="min-w-[500px]"
+                        containerClassName="h-full"
+                        showToolbar={false}
+                      />
+                    </div>
                   </div>
                 </div>
               )}
               {routingData.ospf.neighbors && routingData.ospf.neighbors.length > 0 && (
                 <div className="mb-4">
                   <h3 className="text-sm font-semibold mb-2">OSPF Neighbors</h3>
-                  <div className="h-[30vh] overflow-auto rounded-xl border border-slate-300 dark:border-[#1F2937]">
-                    <Table
-                      columns={[
-                        { header: "Neighbor ID", key: "neighbor_id", cell: (r) => <span className="font-medium text-slate-800 dark:text-slate-200">{r.neighbor_id || "—"}</span> },
-                        { header: "Interface", key: "interface", cell: (r) => <span className="text-blue-600 dark:text-blue-400">{r.interface || "—"}</span> },
-                        { header: "State", key: "state", cell: (r) => {
-                          const state = r.state || "—";
-                          const colorClass = state.toUpperCase() === "FULL" ? "text-emerald-500" : state.toUpperCase().includes("2WAY") ? "text-amber-500" : "";
-                          return <span className={colorClass}>{state}</span>;
-                        }},
-                        { header: "Role", key: "dr_bdr", cell: (r) => {
-                          const role = r.dr_bdr || r.role || "—";
-                          const colorClass = role === "DR" ? "bg-emerald-100 text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-400" : role === "BDR" ? "bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-400" : "";
-                          return <span className={`px-2 py-0.5 rounded-full text-xs font-medium ${colorClass}`}>{role}</span>;
-                        }},
-                        { header: "Address", key: "address", cell: (r) => r.address || r.ip_address || "—" },
-                        { header: "Priority", key: "priority", cell: (r) => r.priority ?? "—" }
-                      ]}
-                      data={routingData.ospf.neighbors}
-                      empty="No OSPF neighbors"
-                      minWidthClass="min-w-[900px]"
-                    />
+                  <div className="max-h-[30vh] overflow-hidden rounded-xl border border-slate-300 dark:border-[#1F2937] bg-white dark:bg-slate-900/30 flex flex-col">
+                    <div className="flex-1 min-h-0">
+                      <Table
+                        columns={[
+                          { header: "Neighbor ID", key: "neighbor_id", cell: (r) => <span className="font-medium text-slate-800 dark:text-slate-200">{r.neighbor_id || "—"}</span> },
+                          { header: "Interface", key: "interface", cell: (r) => <span className="text-blue-700 dark:text-blue-400">{r.interface || "—"}</span> },
+                          { header: "State", key: "state", cell: (r) => {
+                            const state = r.state || "—";
+                            const colorClass = state.toUpperCase() === "FULL" ? "text-emerald-600 dark:text-emerald-500" : state.toUpperCase().includes("2WAY") ? "text-amber-600 dark:text-amber-500" : "";
+                            return <span className={colorClass}>{state}</span>;
+                          }},
+                          { header: "Role", key: "dr_bdr", cell: (r) => {
+                            const role = r.dr_bdr || r.role || "—";
+                            const colorClass = role === "DR" ? "bg-emerald-100 text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-400" : role === "BDR" ? "bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-400" : "";
+                            return <span className={`px-2 py-0.5 rounded-full text-xs font-medium ${colorClass}`}>{role}</span>;
+                          }},
+                          { header: "Address", key: "address", cell: (r) => r.address || r.ip_address || "—" },
+                          { header: "Priority", key: "priority", cell: (r) => r.priority ?? "—" }
+                        ]}
+                        data={routingData.ospf.neighbors}
+                        empty="No OSPF neighbors"
+                        minWidthClass="min-w-[900px]"
+                        containerClassName="h-full"
+                        showToolbar={false}
+                      />
+                    </div>
                   </div>
                 </div>
               )}
@@ -4263,17 +4313,21 @@ const DeviceDetailsView = ({ project, deviceId, goBack, goBackHref, goIndex, goI
               {routingData.eigrp.neighbors && routingData.eigrp.neighbors.length > 0 && (
                 <div className="mb-4">
                   <h3 className="text-sm font-semibold mb-2">EIGRP Neighbors</h3>
-                  <div className="h-[30vh] overflow-auto rounded-xl border border-slate-300 dark:border-[#1F2937]">
-                    <Table
-                      columns={[
-                        { header: "Neighbor", key: "neighbor" },
-                        { header: "Interface", key: "interface" },
-                        { header: "Hold Time", key: "hold_time", cell: (r) => r.hold_time || "—" }
-                      ]}
-                      data={routingData.eigrp.neighbors}
-                      empty="No EIGRP neighbors"
-                      minWidthClass="min-w-[600px]"
-                    />
+                  <div className="max-h-[30vh] overflow-hidden rounded-xl border border-slate-300 dark:border-[#1F2937] bg-white dark:bg-slate-900/30 flex flex-col">
+                    <div className="flex-1 min-h-0">
+                      <Table
+                        columns={[
+                          { header: "Neighbor", key: "neighbor" },
+                          { header: "Interface", key: "interface" },
+                          { header: "Hold Time", key: "hold_time", cell: (r) => r.hold_time || "—" }
+                        ]}
+                        data={routingData.eigrp.neighbors}
+                        empty="No EIGRP neighbors"
+                        minWidthClass="min-w-[600px]"
+                        containerClassName="h-full"
+                        showToolbar={false}
+                      />
+                    </div>
                   </div>
                 </div>
               )}
@@ -4293,19 +4347,23 @@ const DeviceDetailsView = ({ project, deviceId, goBack, goBackHref, goIndex, goI
               {routingData.bgp.peers && routingData.bgp.peers.length > 0 && (
                 <div>
                   <h3 className="text-sm font-semibold mb-2">BGP Peers</h3>
-                  <div className="h-[40vh] overflow-auto rounded-xl border border-slate-300 dark:border-[#1F2937]">
-                    <Table
-                      columns={[
-                        { header: "Peer IP", key: "peer", cell: (r) => r.peer || r.peer_ip || "—" },
-                        { header: "Remote AS", key: "remote_as" },
-                        { header: "State", key: "state", cell: (r) => r.state || "—" },
-                        { header: "Received", key: "received_prefixes", cell: (r) => r.received_prefixes || 0 },
-                        { header: "Advertised", key: "advertised_prefixes", cell: (r) => r.advertised_prefixes || 0 }
-                      ]}
-                      data={routingData.bgp.peers}
-                      empty="No BGP peers"
-                      minWidthClass="min-w-[900px]"
-                    />
+                  <div className="max-h-[40vh] overflow-hidden rounded-xl border border-slate-300 dark:border-[#1F2937] bg-white dark:bg-slate-900/30 flex flex-col">
+                    <div className="flex-1 min-h-0">
+                      <Table
+                        columns={[
+                          { header: "Peer IP", key: "peer", cell: (r) => r.peer || r.peer_ip || "—" },
+                          { header: "Remote AS", key: "remote_as" },
+                          { header: "State", key: "state", cell: (r) => r.state || "—" },
+                          { header: "Received", key: "received_prefixes", cell: (r) => r.received_prefixes || 0 },
+                          { header: "Advertised", key: "advertised_prefixes", cell: (r) => r.advertised_prefixes || 0 }
+                        ]}
+                        data={routingData.bgp.peers}
+                        empty="No BGP peers"
+                        minWidthClass="min-w-[900px]"
+                        containerClassName="h-full"
+                        showToolbar={false}
+                      />
+                    </div>
                   </div>
                 </div>
               )}
@@ -4382,27 +4440,33 @@ const DeviceDetailsView = ({ project, deviceId, goBack, goBackHref, goIndex, goI
           </div>
           
           {neighborsData.length > 0 ? (
-            <div className="h-[65vh] overflow-hidden rounded-2xl border border-slate-300 dark:border-slate-700">
-              <Table
-                searchable
-                searchPlaceholder="Search device name, IP, port..."
-                columns={[
-                  { header: "Device Name", key: "device_name", cell: (r) => <span className="font-medium text-slate-200">{r.device_name || r.neighbor_device_name || "—"}</span> },
-                  { header: "IP Address", key: "ip_address", cell: (r) => r.ip_address || r.neighbor_ip || "—" },
-                  { header: "Platform", key: "platform", cell: (r) => r.platform || r.model || "—" },
-                  { header: "Local Port", key: "local_port", cell: (r) => <span className="text-blue-400">{r.local_port || "—"}</span> },
-                  { header: "Remote Port", key: "remote_port", cell: (r) => <span className="text-emerald-400">{r.remote_port || "—"}</span> },
-                  { header: "Capabilities", key: "capabilities", cell: (r) => (Array.isArray(r.capabilities) ? r.capabilities.join(", ") : (r.capabilities || "—")) },
-                  { header: "Protocol", key: "discovery_protocol", cell: (r) => {
-                    const proto = r.discovery_protocol || r.protocol || "—";
-                    const colorClass = proto === "CDP" ? "bg-emerald-900/30 text-emerald-400" : proto === "LLDP" ? "bg-blue-900/30 text-blue-400" : "";
-                    return <span className={`px-2 py-0.5 rounded-full text-xs font-medium ${colorClass}`}>{proto}</span>;
-                  }}
-                ]}
-                data={neighborsData}
-                empty="No neighbor information available"
-                minWidthClass="min-w-[1100px]"
-              />
+            <div className="max-h-[70vh] overflow-hidden rounded-2xl border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-900/30 flex flex-col">
+              <div className="flex items-center justify-between gap-2 px-4 py-2.5 border-b border-slate-200 dark:border-slate-700 bg-slate-50/70 dark:bg-slate-800/30">
+                <h3 className="text-sm font-semibold text-slate-800 dark:text-slate-200">Neighbor Discovery</h3>
+              </div>
+              <div className="flex-1 min-h-0">
+                <Table
+                  searchable
+                  searchPlaceholder="Search device name, IP, port..."
+                  columns={[
+                    { header: "Device Name", key: "device_name", cell: (r) => <span className="font-medium text-slate-800 dark:text-slate-200">{r.device_name || r.neighbor_device_name || "—"}</span> },
+                    { header: "IP Address", key: "ip_address", cell: (r) => r.ip_address || r.neighbor_ip || "—" },
+                    { header: "Platform", key: "platform", cell: (r) => r.platform || r.model || "—" },
+                    { header: "Local Port", key: "local_port", cell: (r) => <span className="text-blue-700 dark:text-blue-400">{r.local_port || "—"}</span> },
+                    { header: "Remote Port", key: "remote_port", cell: (r) => <span className="text-emerald-700 dark:text-emerald-400">{r.remote_port || "—"}</span> },
+                    { header: "Capabilities", key: "capabilities", cell: (r) => (Array.isArray(r.capabilities) ? r.capabilities.join(", ") : (r.capabilities || "—")) },
+                    { header: "Protocol", key: "discovery_protocol", cell: (r) => {
+                      const proto = r.discovery_protocol || r.protocol || "—";
+                      const colorClass = proto === "CDP" ? "bg-emerald-100 text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-400" : proto === "LLDP" ? "bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-400" : "bg-slate-100 text-slate-700 dark:bg-slate-800/30 dark:text-slate-300";
+                      return <span className={`px-2 py-0.5 rounded-full text-xs font-medium ${colorClass}`}>{proto}</span>;
+                    }}
+                  ]}
+                  data={neighborsData}
+                  empty="No neighbor information available"
+                  minWidthClass="min-w-[1100px]"
+                  containerClassName="h-full"
+                />
+              </div>
             </div>
           ) : (
             <Card title="Neighbor Discovery Table">
@@ -4450,24 +4514,30 @@ const DeviceDetailsView = ({ project, deviceId, goBack, goBackHref, goIndex, goI
 
           {/* MAC Address Table */}
           {macArpData.mac_table && macArpData.mac_table.length > 0 ? (
-            <div className="h-[45vh] overflow-hidden rounded-2xl border border-slate-300 dark:border-slate-700">
-              <Table
-                searchable
-                searchPlaceholder="Search MAC address, VLAN, port..."
-                columns={[
-                  { header: "VLAN", key: "vlan", cell: (r) => <span className="font-medium text-blue-600 dark:text-blue-400">{r.vlan ?? "—"}</span> },
-                  { header: "MAC Address", key: "mac_address", cell: (r) => <span className="font-mono text-xs">{r.mac_address || "—"}</span> },
-                  { header: "Type", key: "type", cell: (r) => {
-                    const type = r.type || "Dynamic";
-                    const colorClass = type.toLowerCase() === "dynamic" ? "text-emerald-500" : type.toLowerCase() === "static" ? "text-amber-500" : "";
-                    return <span className={colorClass}>{type}</span>;
-                  }},
-                  { header: "Port", key: "port", cell: (r) => <span className="text-slate-300">{r.port || "—"}</span> }
-                ]}
-                data={macArpData.mac_table}
-                empty="No MAC address table entries"
-                minWidthClass="min-w-[700px]"
-              />
+            <div className="max-h-[55vh] overflow-hidden rounded-2xl border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-900/30 flex flex-col">
+              <div className="flex items-center justify-between gap-2 px-4 py-2.5 border-b border-slate-200 dark:border-slate-700 bg-slate-50/70 dark:bg-slate-800/30">
+                <h3 className="text-sm font-semibold text-slate-800 dark:text-slate-200">MAC Address Table</h3>
+              </div>
+              <div className="flex-1 min-h-0">
+                <Table
+                  searchable
+                  searchPlaceholder="Search MAC address, VLAN, port..."
+                  columns={[
+                    { header: "VLAN", key: "vlan", cell: (r) => <span className="font-medium text-blue-700 dark:text-blue-400">{r.vlan ?? "—"}</span> },
+                    { header: "MAC Address", key: "mac_address", cell: (r) => <span className="font-mono text-xs">{r.mac_address || "—"}</span> },
+                    { header: "Type", key: "type", cell: (r) => {
+                      const type = r.type || "Dynamic";
+                      const colorClass = type.toLowerCase() === "dynamic" ? "text-emerald-600 dark:text-emerald-500" : type.toLowerCase() === "static" ? "text-amber-600 dark:text-amber-500" : "";
+                      return <span className={colorClass}>{type}</span>;
+                    }},
+                    { header: "Port", key: "port", cell: (r) => <span className="text-slate-700 dark:text-slate-300">{r.port || "—"}</span> }
+                  ]}
+                  data={macArpData.mac_table}
+                  empty="No MAC address table entries"
+                  minWidthClass="min-w-[700px]"
+                  containerClassName="h-full"
+                />
+              </div>
             </div>
           ) : (
             <Card title="MAC Address Table">
@@ -4481,21 +4551,27 @@ const DeviceDetailsView = ({ project, deviceId, goBack, goBackHref, goIndex, goI
 
           {/* ARP Table */}
           {macArpData.arp_table && macArpData.arp_table.length > 0 ? (
-            <div className="h-[45vh] overflow-hidden rounded-2xl border border-slate-300 dark:border-slate-700">
-              <Table
-                searchable
-                searchPlaceholder="Search IP, MAC, interface..."
-                columns={[
-                  { header: "IP Address", key: "ip_address", cell: (r) => <span className="font-mono text-xs text-slate-200">{r.ip_address || "—"}</span> },
-                  { header: "MAC Address", key: "mac_address", cell: (r) => <span className="font-mono text-xs">{r.mac_address || r.hardware_addr || "—"}</span> },
-                  { header: "Type", key: "type", cell: (r) => r.type || "ARPA" },
-                  { header: "Interface", key: "interface", cell: (r) => <span className="text-blue-600 dark:text-blue-400">{r.interface || "—"}</span> },
-                  { header: "Age (min)", key: "age", cell: (r) => r.age ?? "—" }
-                ]}
-                data={macArpData.arp_table}
-                empty="No ARP table entries"
-                minWidthClass="min-w-[800px]"
-              />
+            <div className="max-h-[55vh] overflow-hidden rounded-2xl border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-900/30 flex flex-col">
+              <div className="flex items-center justify-between gap-2 px-4 py-2.5 border-b border-slate-200 dark:border-slate-700 bg-slate-50/70 dark:bg-slate-800/30">
+                <h3 className="text-sm font-semibold text-slate-800 dark:text-slate-200">ARP Table</h3>
+              </div>
+              <div className="flex-1 min-h-0">
+                <Table
+                  searchable
+                  searchPlaceholder="Search IP, MAC, interface..."
+                  columns={[
+                    { header: "IP Address", key: "ip_address", cell: (r) => <span className="font-mono text-xs text-slate-800 dark:text-slate-200">{r.ip_address || "—"}</span> },
+                    { header: "MAC Address", key: "mac_address", cell: (r) => <span className="font-mono text-xs">{r.mac_address || r.hardware_addr || "—"}</span> },
+                    { header: "Type", key: "type", cell: (r) => r.type || "ARPA" },
+                    { header: "Interface", key: "interface", cell: (r) => <span className="text-blue-700 dark:text-blue-400">{r.interface || "—"}</span> },
+                    { header: "Age (min)", key: "age", cell: (r) => r.age ?? "—" }
+                  ]}
+                  data={macArpData.arp_table}
+                  empty="No ARP table entries"
+                  minWidthClass="min-w-[800px]"
+                  containerClassName="h-full"
+                />
+              </div>
             </div>
           ) : (
             <Card title="ARP Table">
@@ -4540,39 +4616,45 @@ const DeviceDetailsView = ({ project, deviceId, goBack, goBackHref, goIndex, goI
 
           {/* User Accounts - handle both user_accounts and users structures */}
           {((securityData.user_accounts && securityData.user_accounts.length > 0) || (securityData.users && securityData.users.length > 0)) && (
-            <div className="h-[35vh] overflow-hidden rounded-xl border border-slate-300 dark:border-slate-700">
-              <Table
-                searchable
-                searchPlaceholder="Search username..."
-                columns={[
-                  {
-                    header: "Username",
-                    key: "username",
-                    cell: (r) => (
-                      <span className="font-medium text-slate-200">
-                        {r.username || "—"}
-                      </span>
-                    ),
-                  },
-                  {
-                    header: "Privilege Level",
-                    key: "privilege",
-                    cell: (r) => {
-                      const priv = r.privilege_level ?? r.privilege ?? "—";
-                      const colorClass =
-                        priv === 15
-                          ? "text-rose-500"
-                          : priv >= 5
-                          ? "text-amber-500"
-                          : "text-slate-500";
-                      return <span className={colorClass}>{priv}</span>;
+            <div className="max-h-[40vh] overflow-hidden rounded-2xl border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-900/30 flex flex-col">
+              <div className="flex items-center justify-between gap-2 px-4 py-2.5 border-b border-slate-200 dark:border-slate-700 bg-slate-50/70 dark:bg-slate-800/30">
+                <h3 className="text-sm font-semibold text-slate-800 dark:text-slate-200">Local User Accounts</h3>
+              </div>
+              <div className="flex-1 min-h-0">
+                <Table
+                  searchable
+                  searchPlaceholder="Search username..."
+                  columns={[
+                    {
+                      header: "Username",
+                      key: "username",
+                      cell: (r) => (
+                        <span className="font-medium text-slate-800 dark:text-slate-200">
+                          {r.username || "—"}
+                        </span>
+                      ),
                     },
-                  },
-                ]}
-                data={securityData.user_accounts || securityData.users || []}
-                empty="No user accounts"
-                minWidthClass="min-w-[300px]"
-              />
+                    {
+                      header: "Privilege Level",
+                      key: "privilege",
+                      cell: (r) => {
+                        const priv = r.privilege_level ?? r.privilege ?? "—";
+                        const colorClass =
+                          priv === 15
+                            ? "text-rose-600 dark:text-rose-500"
+                            : priv >= 5
+                            ? "text-amber-600 dark:text-amber-500"
+                            : "text-slate-600 dark:text-slate-500";
+                        return <span className={colorClass}>{priv}</span>;
+                      },
+                    },
+                  ]}
+                  data={securityData.user_accounts || securityData.users || []}
+                  empty="No user accounts"
+                  minWidthClass="min-w-[300px]"
+                  containerClassName="h-full"
+                />
+              </div>
             </div>
           )}
 
@@ -4615,17 +4697,21 @@ const DeviceDetailsView = ({ project, deviceId, goBack, goBackHref, goIndex, goI
               {securityData.snmp.communities && securityData.snmp.communities.length > 0 && (
                 <div>
                   <h4 className="text-sm font-semibold mb-2 text-slate-700 dark:text-slate-300">SNMP Communities</h4>
-                  <div className="h-[20vh] overflow-auto rounded-xl border border-slate-300 dark:border-[#1F2937]">
-                    <Table
-                      columns={[
-                        { header: "Name", key: "name" },
-                        { header: "Group", key: "group", cell: (r) => r.group || "—" },
-                        { header: "Access", key: "access", cell: (r) => r.access || "—" },
-                      ]}
-                      data={securityData.snmp.communities}
-                      empty="No SNMP communities"
-                      minWidthClass="min-w-[500px]"
-                    />
+                  <div className="max-h-[25vh] overflow-hidden rounded-xl border border-slate-300 dark:border-[#1F2937] bg-white dark:bg-slate-900/30 flex flex-col">
+                    <div className="flex-1 min-h-0">
+                      <Table
+                        columns={[
+                          { header: "Name", key: "name" },
+                          { header: "Group", key: "group", cell: (r) => r.group || "—" },
+                          { header: "Access", key: "access", cell: (r) => r.access || "—" },
+                        ]}
+                        data={securityData.snmp.communities}
+                        empty="No SNMP communities"
+                        minWidthClass="min-w-[500px]"
+                        containerClassName="h-full"
+                        showToolbar={false}
+                      />
+                    </div>
                   </div>
                 </div>
               )}
@@ -4669,21 +4755,28 @@ const DeviceDetailsView = ({ project, deviceId, goBack, goBackHref, goIndex, goI
                 {securityData.acls.map((acl, idx) => (
                   <Card key={idx} title={`ACL ${acl.acl_number || acl.name || `#${idx + 1}`}`} className="border border-slate-300 dark:border-gray-700">
                     {acl.rules && Array.isArray(acl.rules) && acl.rules.length > 0 ? (
-                      <div className="h-[40vh] overflow-auto rounded-xl border border-slate-300 dark:border-[#1F2937]">
-                        <Table
-                          columns={[
-                            { header: "Rule ID", key: "id" },
-                            { header: "Action", key: "action", cell: (r) => r.action?.toUpperCase() || "—" },
-                            { header: "Protocol", key: "protocol", cell: (r) => r.protocol || "—" },
-                            { header: "Source", key: "source", cell: (r) => r.source || r.source_ip || "—" },
-                            { header: "Source Mask", key: "source_mask", cell: (r) => r.source_mask || "—" },
-                            { header: "Destination", key: "destination", cell: (r) => r.destination || r.destination_ip || "—" },
-                            { header: "Destination Mask", key: "destination_mask", cell: (r) => r.destination_mask || "—" }
-                          ]}
-                          data={acl.rules}
-                          empty="No rules in this ACL"
-                          minWidthClass="min-w-[1200px]"
-                        />
+                      <div className="max-h-[45vh] overflow-hidden rounded-xl border border-slate-300 dark:border-[#1F2937] bg-white dark:bg-slate-900/30 flex flex-col">
+                        <div className="flex items-center justify-between gap-2 px-3 py-2 border-b border-slate-200 dark:border-slate-700 bg-slate-50/70 dark:bg-slate-800/30">
+                          <span className="text-xs font-semibold text-slate-800 dark:text-slate-200">ACL Rules</span>
+                        </div>
+                        <div className="flex-1 min-h-0">
+                          <Table
+                            columns={[
+                              { header: "Rule ID", key: "id" },
+                              { header: "Action", key: "action", cell: (r) => r.action?.toUpperCase() || "—" },
+                              { header: "Protocol", key: "protocol", cell: (r) => r.protocol || "—" },
+                              { header: "Source", key: "source", cell: (r) => r.source || r.source_ip || "—" },
+                              { header: "Source Mask", key: "source_mask", cell: (r) => r.source_mask || "—" },
+                              { header: "Destination", key: "destination", cell: (r) => r.destination || r.destination_ip || "—" },
+                              { header: "Destination Mask", key: "destination_mask", cell: (r) => r.destination_mask || "—" }
+                            ]}
+                            data={acl.rules}
+                            empty="No rules in this ACL"
+                            minWidthClass="min-w-[1200px]"
+                            containerClassName="h-full"
+                            showToolbar={false}
+                          />
+                        </div>
                       </div>
                     ) : (
                       <div className="text-sm text-gray-500 dark:text-gray-400">No rules defined for this ACL</div>
@@ -4737,29 +4830,42 @@ const DeviceDetailsView = ({ project, deviceId, goBack, goBackHref, goIndex, goI
           {(() => {
             const ethChannels = haData.etherchannel?.length ? haData.etherchannel : (haData.etherchannels?.length ? haData.etherchannels : (haData.port_channels || []));
             return ethChannels.length > 0 ? (
-              <div className="h-[45vh] overflow-hidden rounded-2xl border border-slate-300 dark:border-slate-700">
-                <Table
-                  searchable
-                  searchPlaceholder="Search port-channel, protocol..."
-                  columns={[
-                    { header: "Port-Channel", key: "name", cell: (r) => <span className="font-medium text-slate-200">{r.name || (r.id != null ? `Po${r.id}` : "—")}</span> },
-                    { header: "Protocol", key: "protocol", cell: (r) => r.protocol || r.mode || "—" },
-                    { header: "Member Interfaces", key: "members", cell: (r) => (Array.isArray(r.members) ? r.members.join(", ") : r.members) || "—" },
-                    { header: "Status", key: "status", cell: (r) => {
-                      const status = r.status || "—";
-                      const colorClass = status.toLowerCase().includes("up") ? "text-emerald-500" : status.toLowerCase().includes("down") ? "text-rose-500" : "";
-                      return <span className={colorClass}>{status}</span>;
-                    }}
-                  ]}
-                  data={ethChannels.map(p => ({ 
-                    name: p.name || (p.id != null ? `Po${p.id}` : "Po"), 
-                    protocol: p.protocol || p.mode, 
-                    members: p.members || [], 
-                    status: p.status 
-                  }))}
-                  empty="No Port-Channel information"
-                  minWidthClass="min-w-[800px]"
-                />
+              <div className="max-h-[55vh] overflow-hidden rounded-2xl border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-900/30 flex flex-col">
+                <div className="px-4 pt-3 pb-1 flex items-center justify-between">
+                  <h3 className="text-sm font-semibold text-slate-800 dark:text-slate-200">EtherChannel / Port-Channel</h3>
+                </div>
+                <div className="flex-1 min-h-0">
+                  <Table
+                    searchable
+                    searchPlaceholder="Search port-channel, protocol..."
+                    columns={[
+                      { header: "Port-Channel", key: "name", cell: (r) => <span className="font-medium text-slate-800 dark:text-slate-200">{r.name || (r.id != null ? `Po${r.id}` : "—")}</span> },
+                      { header: "Protocol", key: "protocol", cell: (r) => r.protocol || r.mode || "—" },
+                      { header: "Member Interfaces", key: "members", cell: (r) => {
+                          if (!r.members || !Array.isArray(r.members) || r.members.length === 0) return "—";
+                          const names = r.members.map(m => 
+                            typeof m === "string" ? m : (m.name || m.interface || m.ifname || m.port || "")
+                          ).filter(Boolean);
+                          return names.length ? names.join(", ") : "—";
+                        } 
+                      },
+                      { header: "Status", key: "status", cell: (r) => {
+                        const status = r.status || "—";
+                        const colorClass = status.toLowerCase().includes("up") ? "text-emerald-600 dark:text-emerald-500" : status.toLowerCase().includes("down") ? "text-rose-600 dark:text-rose-500" : "";
+                        return <span className={colorClass}>{status}</span>;
+                      }}
+                    ]}
+                    data={ethChannels.map(p => ({ 
+                      name: p.name || (p.id != null ? `Po${p.id}` : "Po"), 
+                      protocol: p.protocol || p.mode, 
+                      members: p.members || p.member_interfaces || p.interfaces || [], 
+                      status: p.status || p.state 
+                    }))}
+                    empty="No Port-Channel information"
+                    minWidthClass="min-w-[800px]"
+                    containerClassName="h-full"
+                  />
+                </div>
               </div>
             ) : null;
           })()}
@@ -4768,26 +4874,32 @@ const DeviceDetailsView = ({ project, deviceId, goBack, goBackHref, goIndex, goI
           {(() => { 
             const hsrpList = Array.isArray(haData.hsrp) ? haData.hsrp : (haData.hsrp?.groups || []); 
             return hsrpList.length > 0 ? (
-              <div className="h-[45vh] overflow-hidden rounded-2xl border border-slate-300 dark:border-slate-700">
-                <Table
-                  searchable
-                  searchPlaceholder="Search interface, virtual IP..."
-                  columns={[
-                    { header: "Group", key: "group_id", cell: (r) => <span className="font-medium">{r.group_id ?? r.group ?? "—"}</span> },
-                    { header: "Interface", key: "interface", cell: (r) => r.interface || "—" },
-                    { header: "Virtual IP", key: "virtual_ip", cell: (r) => <span className="text-blue-400">{r.virtual_ip || "—"}</span> },
-                    { header: "Status", key: "status", cell: (r) => {
-                      const status = r.status ?? r.state ?? "—";
-                      const colorClass = status.toLowerCase().includes("active") ? "text-emerald-500" : status.toLowerCase().includes("standby") ? "text-amber-500" : "";
-                      return <span className={colorClass}>{status}</span>;
-                    }},
-                    { header: "Priority", key: "priority", cell: (r) => r.priority || "—" },
-                    { header: "Preempt", key: "preempt", cell: (r) => r.preempt !== undefined ? (r.preempt ? "Yes" : "No") : "—" }
-                  ]}
-                  data={hsrpList}
-                  empty="No HSRP groups"
-                  minWidthClass="min-w-[800px]"
-                />
+              <div className="max-h-[55vh] overflow-hidden rounded-2xl border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-900/30 flex flex-col">
+                <div className="px-4 pt-3 pb-1 flex items-center justify-between">
+                  <h3 className="text-sm font-semibold text-slate-800 dark:text-slate-200">HSRP Groups</h3>
+                </div>
+                <div className="flex-1 min-h-0">
+                  <Table
+                    searchable
+                    searchPlaceholder="Search interface, virtual IP..."
+                    columns={[
+                      { header: "Group", key: "group_id", cell: (r) => <span className="font-medium">{r.group_id ?? r.group ?? "—"}</span> },
+                      { header: "Interface", key: "interface", cell: (r) => r.interface || "—" },
+                      { header: "Virtual IP", key: "virtual_ip", cell: (r) => <span className="text-blue-700 dark:text-blue-400">{r.virtual_ip || "—"}</span> },
+                      { header: "Status", key: "status", cell: (r) => {
+                        const status = r.status ?? r.state ?? "—";
+                        const colorClass = status.toLowerCase().includes("active") ? "text-emerald-600 dark:text-emerald-500" : status.toLowerCase().includes("standby") ? "text-amber-600 dark:text-amber-500" : "";
+                        return <span className={colorClass}>{status}</span>;
+                      }},
+                      { header: "Priority", key: "priority", cell: (r) => r.priority || "—" },
+                      { header: "Preempt", key: "preempt", cell: (r) => r.preempt !== undefined ? (r.preempt ? "Yes" : "No") : "—" }
+                    ]}
+                    data={hsrpList}
+                    empty="No HSRP groups"
+                    minWidthClass="min-w-[800px]"
+                    containerClassName="h-full"
+                  />
+                </div>
               </div>
             ) : null;
           })()}
@@ -4796,26 +4908,32 @@ const DeviceDetailsView = ({ project, deviceId, goBack, goBackHref, goIndex, goI
           {(() => { 
             const vrrpList = Array.isArray(haData.vrrp) ? haData.vrrp : (haData.vrrp?.groups || []); 
             return vrrpList.length > 0 ? (
-              <div className="h-[45vh] overflow-hidden rounded-2xl border border-slate-300 dark:border-slate-700">
-                <Table
-                  searchable
-                  searchPlaceholder="Search interface, virtual IP..."
-                  columns={[
-                    { header: "VRID", key: "vrid", cell: (r) => <span className="font-medium">{r.vrid ?? r.group ?? "—"}</span> },
-                    { header: "Interface", key: "interface", cell: (r) => r.interface || "—" },
-                    { header: "Virtual IP", key: "virtual_ip", cell: (r) => <span className="text-blue-400">{r.virtual_ip || "—"}</span> },
-                    { header: "State", key: "state", cell: (r) => {
-                      const state = r.state || r.status || "—";
-                      const colorClass = state.toLowerCase().includes("master") ? "text-emerald-500" : state.toLowerCase().includes("backup") ? "text-amber-500" : "";
-                      return <span className={colorClass}>{state}</span>;
-                    }},
-                    { header: "Priority", key: "priority", cell: (r) => r.priority ?? r.priority_run ?? "—" },
-                    { header: "Preempt", key: "preempt", cell: (r) => r.preempt !== undefined ? (r.preempt ? "Yes" : "No") : "—" }
-                  ]}
-                  data={vrrpList}
-                  empty="No VRRP groups"
-                  minWidthClass="min-w-[800px]"
-                />
+              <div className="max-h-[55vh] overflow-hidden rounded-2xl border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-900/30 flex flex-col">
+                <div className="px-4 pt-3 pb-1 flex items-center justify-between">
+                  <h3 className="text-sm font-semibold text-slate-800 dark:text-slate-200">VRRP Groups</h3>
+                </div>
+                <div className="flex-1 min-h-0">
+                  <Table
+                    searchable
+                    searchPlaceholder="Search interface, virtual IP..."
+                    columns={[
+                      { header: "VRID", key: "vrid", cell: (r) => <span className="font-medium">{r.vrid ?? r.group ?? "—"}</span> },
+                      { header: "Interface", key: "interface", cell: (r) => r.interface || "—" },
+                      { header: "Virtual IP", key: "virtual_ip", cell: (r) => <span className="text-blue-700 dark:text-blue-400">{r.virtual_ip || "—"}</span> },
+                      { header: "State", key: "state", cell: (r) => {
+                        const state = r.state || r.status || "—";
+                        const colorClass = state.toLowerCase().includes("master") ? "text-emerald-600 dark:text-emerald-500" : state.toLowerCase().includes("backup") ? "text-amber-600 dark:text-amber-500" : "";
+                        return <span className={colorClass}>{state}</span>;
+                      }},
+                      { header: "Priority", key: "priority", cell: (r) => r.priority ?? r.priority_run ?? "—" },
+                      { header: "Preempt", key: "preempt", cell: (r) => r.preempt !== undefined ? (r.preempt ? "Yes" : "No") : "—" }
+                    ]}
+                    data={vrrpList}
+                    empty="No VRRP groups"
+                    minWidthClass="min-w-[800px]"
+                    containerClassName="h-full"
+                  />
+                </div>
               </div>
             ) : null;
           })()}
@@ -6617,7 +6735,7 @@ const HistoryPage = ({ project, can, authedUser }) => {
             placeholder="Search (filename, user, description...)"
             value={searchDoc}
             onChange={(e) => setSearchDoc(e.target.value)}
-            className="w-72 pl-8 pr-3 py-1.5 text-xs rounded-lg bg-slate-800/80 border border-slate-600 text-slate-200 placeholder-slate-500 focus:outline-none focus:ring-1 focus:ring-sky-500 focus:border-sky-500"
+            className="w-72 pl-8 pr-3 py-1.5 text-xs rounded-lg bg-white dark:bg-slate-800/80 border border-slate-300 dark:border-slate-600 text-slate-900 dark:text-slate-200 placeholder-slate-400 dark:placeholder-slate-500 focus:outline-none focus:ring-1 focus:ring-sky-500 focus:border-sky-500"
           />
           <svg className="absolute left-2.5 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-slate-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
@@ -6627,14 +6745,14 @@ const HistoryPage = ({ project, can, authedUser }) => {
       
       {/* Active filters bar */}
       {Object.keys(columnFilters).length > 0 && (
-        <div className="flex-shrink-0 flex items-center gap-2 px-1 py-1.5 mb-2 bg-slate-800/30 rounded-lg border border-slate-700/50">
-          <span className="text-xs text-slate-400 ml-1">Filters:</span>
+        <div className="flex-shrink-0 flex items-center gap-2 px-1 py-1.5 mb-2 bg-sky-50 border border-sky-200 rounded-lg dark:bg-slate-800/30 dark:border-slate-700/50">
+          <span className="text-xs text-sky-700 dark:text-slate-400 ml-1">Filters:</span>
           {Object.entries(columnFilters).map(([key, value]) => {
             const col = historyColumns.find(c => c.key === key);
             return (
               <span 
                 key={key} 
-                className="inline-flex items-center gap-1 px-2 py-0.5 text-xs bg-sky-800/50 text-sky-300 rounded-full"
+                className="inline-flex items-center gap-1 px-2 py-0.5 text-xs bg-sky-100 text-sky-700 dark:bg-sky-800/50 dark:text-sky-300 rounded-full"
               >
                 <span className="font-medium">{col?.header || key}:</span>
                 <span className="max-w-[100px] truncate">{value}</span>
@@ -6655,14 +6773,14 @@ const HistoryPage = ({ project, can, authedUser }) => {
           })}
           <button 
             onClick={() => setColumnFilters({})}
-            className="ml-auto text-xs text-sky-400 hover:text-sky-200 font-medium mr-1"
+            className="ml-auto text-xs text-sky-700 hover:text-sky-900 dark:text-sky-400 dark:hover:text-sky-200 font-medium mr-1"
           >
             Clear all
           </button>
         </div>
       )}
       
-      <div className="flex-1 min-h-0 flex flex-col overflow-hidden rounded-xl border border-slate-700 bg-slate-900/50">
+      <div className="flex-1 min-h-0 flex flex-col overflow-hidden rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900/50">
         {loading ? (
           <div className="flex-1 flex items-center justify-center text-gray-500 dark:text-gray-400">
             <div className="text-center">
@@ -6672,10 +6790,10 @@ const HistoryPage = ({ project, can, authedUser }) => {
         ) : (
           <div className="flex-1 min-h-0 flex flex-col overflow-hidden">
             <div className="flex-1 min-h-0 overflow-hidden">
-              <table className="w-full text-xs">
-                <thead className="bg-slate-800/80 sticky top-0 z-20">
+              <table className="w-full text-xs text-slate-800 dark:text-slate-200">
+                <thead className="bg-slate-100 dark:bg-slate-800/80 sticky top-0 z-20">
                   <tr>
-                    <th className="text-center px-2 py-2.5 font-medium text-slate-300 w-10">#</th>
+                    <th className="text-center px-2 py-2.5 font-medium text-slate-800 dark:text-slate-300 w-10">#</th>
                     {historyColumns.map((col, colIdx) => {
                       const hasFilter = columnFilters[col.key] != null;
                       const isOpen = openFilterColumn === col.key;
@@ -6685,12 +6803,12 @@ const HistoryPage = ({ project, can, authedUser }) => {
                       const sortDirection = isSorted ? sortConfig.direction : null;
                       
                       return (
-                        <th key={col.key} className="text-left px-3 py-2.5 font-medium text-slate-300 whitespace-nowrap relative group">
+                        <th key={col.key} className="text-left px-3 py-2.5 font-medium text-slate-800 dark:text-slate-300 whitespace-nowrap relative group">
                           <div className="flex items-center gap-1">
                             {/* Clickable header for sorting */}
                             <button
                               onClick={() => handleSort(col.key)}
-                              className="flex items-center gap-0.5 hover:text-slate-100 transition-colors cursor-pointer"
+                              className="flex items-center gap-0.5 hover:text-slate-900 dark:hover:text-slate-100 transition-colors cursor-pointer"
                             >
                               <span>{col.header}</span>
                               {/* Sort icon */}
@@ -6706,8 +6824,8 @@ const HistoryPage = ({ project, can, authedUser }) => {
                                 onClick={(e) => { e.stopPropagation(); setOpenFilterColumn(isOpen ? null : col.key); }}
                                 className={`p-0.5 rounded transition-all ${
                                   hasFilter 
-                                    ? 'text-sky-400 bg-sky-900/30' 
-                                    : 'text-slate-500 opacity-0 group-hover:opacity-100 hover:text-slate-300 hover:bg-slate-700'
+                                    ? 'text-sky-700 bg-sky-100 dark:text-sky-400 dark:bg-sky-900/30' 
+                                    : 'text-slate-400 opacity-0 group-hover:opacity-100 hover:text-slate-700 hover:bg-slate-100 dark:text-slate-500 dark:hover:text-slate-300 dark:hover:bg-slate-700'
                                 }`}
                                 title="Filter"
                               >
@@ -6741,30 +6859,30 @@ const HistoryPage = ({ project, can, authedUser }) => {
                         </th>
                       );
                     })}
-                    <th className="text-left px-3 py-2.5 font-medium text-slate-300">Desc.</th>
-                    <th className="text-left px-3 py-2.5 font-medium text-slate-300">Actions</th>
+                    <th className="text-left px-3 py-2.5 font-medium text-slate-600 dark:text-slate-300">Desc.</th>
+                    <th className="text-left px-3 py-2.5 font-medium text-slate-600 dark:text-slate-300">Actions</th>
                   </tr>
                 </thead>
-                <tbody className="divide-y divide-slate-700/50">
+                <tbody className="divide-y divide-slate-100 dark:divide-slate-700/50 bg-white dark:bg-slate-900">
                   {paginatedDocs.length === 0 ? (
                     <tr>
-                      <td colSpan={11} className="text-center py-8 text-slate-500">No document uploads yet</td>
+                      <td colSpan={11} className="text-center py-8 text-slate-500 dark:text-slate-400">No document uploads yet</td>
                     </tr>
                   ) : (
                     paginatedDocs.map((r, idx) => (
-                      <tr key={r.document_id || idx} className="hover:bg-slate-800/30">
-                        <td className="text-center px-2 py-2.5 text-slate-400 w-10">{(clampedPage - 1) * ROWS_PER_PAGE + idx + 1}</td>
-                        <td className="px-3 py-2.5 whitespace-nowrap text-slate-300">{formatDateTime(r.created_at)}</td>
+                      <tr key={r.document_id || idx} className="hover:bg-slate-50 dark:hover:bg-slate-800/30">
+                        <td className="text-center px-2 py-2.5 text-slate-700 dark:text-slate-400 w-10">{(clampedPage - 1) * ROWS_PER_PAGE + idx + 1}</td>
+                        <td className="px-3 py-2.5 whitespace-nowrap text-slate-800 dark:text-slate-300">{formatDateTime(r.created_at)}</td>
                         <td className="px-3 py-2.5 max-w-[180px]">
-                          <span className="block truncate font-medium text-slate-200" title={r.filename}>{r.filename}</span>
+                          <span className="block truncate font-medium text-slate-900 dark:text-slate-200" title={r.filename}>{r.filename}</span>
                         </td>
-                        <td className="px-3 py-2.5 text-slate-300">{r.metadata?.who || r.uploader}</td>
-                        <td className="px-3 py-2.5 text-slate-300">{r.metadata?.what || "—"}</td>
-                        <td className="px-3 py-2.5 text-slate-300">{r.metadata?.where || "—"}</td>
-                        <td className="px-3 py-2.5 text-slate-300">{r.metadata?.when || "—"}</td>
-                        <td className="px-3 py-2.5 text-slate-300">{r.metadata?.why || "—"}</td>
+                        <td className="px-3 py-2.5 text-slate-800 dark:text-slate-300">{r.metadata?.who || r.uploader}</td>
+                        <td className="px-3 py-2.5 text-slate-800 dark:text-slate-300">{r.metadata?.what || "—"}</td>
+                        <td className="px-3 py-2.5 text-slate-800 dark:text-slate-300">{r.metadata?.where || "—"}</td>
+                        <td className="px-3 py-2.5 text-slate-800 dark:text-slate-300">{r.metadata?.when || "—"}</td>
+                        <td className="px-3 py-2.5 text-slate-800 dark:text-slate-300">{r.metadata?.why || "—"}</td>
                         <td className="px-3 py-2.5">
-                          <span className="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-blue-900/30 text-blue-300">
+                          <span className="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-300">
                             {`v${r.version}${r.is_latest ? ' (Latest)' : ''}`}
                           </span>
                         </td>
@@ -6772,7 +6890,7 @@ const HistoryPage = ({ project, can, authedUser }) => {
                           <button
                             onClick={() => openDescription(r)}
                             title="View description"
-                            className="px-2 py-1 text-xs rounded bg-slate-700 hover:bg-slate-600 text-slate-200 transition-colors"
+                            className="px-2 py-1 text-xs rounded bg-slate-200 hover:bg-slate-300 text-slate-800 dark:bg-slate-700 dark:hover:bg-slate-600 dark:text-slate-200 transition-colors"
                           >
                             View
                           </button>
@@ -6788,7 +6906,7 @@ const HistoryPage = ({ project, can, authedUser }) => {
                                   alert('Download failed: ' + formatError(error));
                                 }
                               }}
-                              className="px-2 py-1 text-xs rounded bg-slate-700 hover:bg-slate-600 text-slate-200 transition-colors"
+                              className="px-2 py-1 text-xs rounded bg-slate-200 hover:bg-slate-300 text-slate-800 dark:bg-slate-700 dark:hover:bg-slate-600 dark:text-slate-200 transition-colors"
                             >
                               Download
                             </button>
@@ -6797,7 +6915,7 @@ const HistoryPage = ({ project, can, authedUser }) => {
                                 e.stopPropagation();
                                 await loadVersions(r.document_id, r);
                               }}
-                              className="px-2 py-1 text-xs rounded bg-slate-700 hover:bg-slate-600 text-slate-200 transition-colors"
+                              className="px-2 py-1 text-xs rounded bg-slate-200 hover:bg-slate-300 text-slate-800 dark:bg-slate-700 dark:hover:bg-slate-600 dark:text-slate-200 transition-colors"
                             >
                               Versions
                             </button>
