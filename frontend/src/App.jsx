@@ -672,8 +672,8 @@ export default function App() {
                                   href={`#/project/${encodeURIComponent(route.projectId)}/tab/${encodeURIComponent(t.id)}`}
                                   onClick={(e) => handleNavClick(e, () => setRoute({ ...route, tab: t.id }))}
                                   className={`flex items-center gap-1.5 px-2.5 py-1.5 text-xs font-medium transition rounded-xl whitespace-nowrap border ${(route.tab || "summary") === t.id
-                                      ? "bg-white/90 dark:bg-white/10 backdrop-blur-sm border-slate-300/80 dark:border-slate-600/80 text-slate-800 dark:text-slate-100 shadow-sm"
-                                      : "bg-transparent dark:bg-transparent border-transparent text-slate-600 dark:text-slate-400 hover:bg-slate-100/90 dark:hover:bg-slate-800/60 hover:border-slate-300 dark:hover:border-slate-700"
+                                    ? "bg-white/90 dark:bg-white/10 backdrop-blur-sm border-slate-300/80 dark:border-slate-600/80 text-slate-800 dark:text-slate-100 shadow-sm"
+                                    : "bg-transparent dark:bg-transparent border-transparent text-slate-600 dark:text-slate-400 hover:bg-slate-100/90 dark:hover:bg-slate-800/60 hover:border-slate-300 dark:hover:border-slate-700"
                                     }`}
                                   title={`Go to ${t.label}`}
                                 >
@@ -1342,8 +1342,8 @@ const ProjectAnalysisPanel = ({ project, summaryRows, coreCount, distCount, acce
             type="button"
             onClick={() => setActiveTab("overview")}
             className={`px-3 py-2.5 text-xs sm:text-sm font-medium rounded-t-lg border transition-colors ${activeTab === "overview"
-                ? "bg-white/85 dark:bg-white/10 border-slate-300/70 dark:border-slate-600/70 border-b-white dark:border-b-slate-900/50 text-slate-800 dark:text-slate-100 shadow-sm -mb-px"
-                : "border-transparent text-slate-700 dark:text-slate-400 hover:bg-slate-100/80 dark:hover:bg-slate-800/40 hover:text-slate-900 dark:hover:text-slate-300"
+              ? "bg-white/85 dark:bg-white/10 border-slate-300/70 dark:border-slate-600/70 border-b-white dark:border-b-slate-900/50 text-slate-800 dark:text-slate-100 shadow-sm -mb-px"
+              : "border-transparent text-slate-700 dark:text-slate-400 hover:bg-slate-100/80 dark:hover:bg-slate-800/40 hover:text-slate-900 dark:hover:text-slate-300"
               }`}
           >
             Network Overview
@@ -1352,8 +1352,8 @@ const ProjectAnalysisPanel = ({ project, summaryRows, coreCount, distCount, acce
             type="button"
             onClick={() => setActiveTab("recommendations")}
             className={`px-3 py-2.5 text-xs sm:text-sm font-medium rounded-t-lg border transition-colors ${activeTab === "recommendations"
-                ? "bg-white/85 dark:bg-white/10 border-slate-300/70 dark:border-slate-600/70 border-b-white dark:border-b-slate-900/50 text-slate-800 dark:text-slate-100 shadow-sm -mb-px"
-                : "border-transparent text-slate-700 dark:text-slate-400 hover:bg-slate-100/80 dark:hover:bg-slate-800/40 hover:text-slate-900 dark:hover:text-slate-300"
+              ? "bg-white/85 dark:bg-white/10 border-slate-300/70 dark:border-slate-600/70 border-b-white dark:border-b-slate-900/50 text-slate-800 dark:text-slate-100 shadow-sm -mb-px"
+              : "border-transparent text-slate-700 dark:text-slate-400 hover:bg-slate-100/80 dark:hover:bg-slate-800/40 hover:text-slate-900 dark:hover:text-slate-300"
               }`}
           >
             Recommendations
@@ -2087,8 +2087,8 @@ const RecommendationsCard = ({ project, summaryRows, fullHeight, onRegisterGener
                         }}>
                           <div className="flex items-start gap-2 mb-1.5">
                             <span className={`text-sm font-semibold px-2 py-0.5 rounded ${sev === "high" ? "bg-rose-500 text-white" :
-                                sev === "medium" ? "bg-yellow-500 text-white" :
-                                  "bg-green-500 text-white"
+                              sev === "medium" ? "bg-yellow-500 text-white" :
+                                "bg-green-500 text-white"
                               }`}>
                               {sev.toUpperCase()}
                             </span>
@@ -2977,6 +2977,7 @@ const DeviceDetailsView = ({ project, deviceId, goBack, goBackHref, goIndex, goI
   // Note: All device info is now stored in device_overview, not top-level fields
   const facts = {
     device: deviceData?.device_name || deviceId,
+    sourceFilename: deviceData?.source_filename || "—",
     model: overview.model || "—",
     osVersion: overview.os_version || "—",
     serial: overview.serial_number || "—",
@@ -3615,7 +3616,7 @@ const DeviceDetailsView = ({ project, deviceId, goBack, goBackHref, goIndex, goI
             More Details — {facts.device}
           </h2>
           <span className="text-sm text-slate-600 dark:text-slate-400">
-            From config/show parsing • Mgmt IP: {facts.mgmtIp || "—"}
+            From config/show parsing {facts.sourceFilename && facts.sourceFilename !== "—" ? `(${facts.sourceFilename})` : ""} • Mgmt IP: {facts.mgmtIp || "—"}
           </span>
         </div>
         {!loading && !error && (
@@ -3637,8 +3638,8 @@ const DeviceDetailsView = ({ project, deviceId, goBack, goBackHref, goIndex, goI
                   key={t.id}
                   onClick={() => setTab(t.id)}
                   className={`px-3 py-1.5 rounded-xl text-xs font-medium transition-all border ${tab === t.id
-                      ? "bg-white/90 dark:bg-white/10 backdrop-blur-sm border-slate-300/80 dark:border-slate-600/80 text-slate-800 dark:text-slate-100 shadow-sm"
-                      : "bg-slate-100/80 dark:bg-slate-800/50 border-slate-300 dark:border-slate-700/60 text-slate-700 dark:text-slate-400 hover:bg-slate-200/80 dark:hover:bg-slate-700/50 hover:text-slate-900 dark:hover:text-slate-300"
+                    ? "bg-white/90 dark:bg-white/10 backdrop-blur-sm border-slate-300/80 dark:border-slate-600/80 text-slate-800 dark:text-slate-100 shadow-sm"
+                    : "bg-slate-100/80 dark:bg-slate-800/50 border-slate-300 dark:border-slate-700/60 text-slate-700 dark:text-slate-400 hover:bg-slate-200/80 dark:hover:bg-slate-700/50 hover:text-slate-900 dark:hover:text-slate-300"
                     }`}
                 >
                   {t.label}
@@ -3720,8 +3721,8 @@ const DeviceDetailsView = ({ project, deviceId, goBack, goBackHref, goIndex, goI
                     type="button"
                     onClick={() => setLlmPanelTab("summary")}
                     className={`px-4 py-2.5 text-sm font-medium rounded-t-lg border transition-colors ${llmPanelTab === "summary"
-                        ? "bg-white/90 dark:bg-white/10 border-slate-300/70 dark:border-slate-600/70 border-b-white dark:border-b-slate-900/50 text-slate-800 dark:text-slate-100 shadow-sm -mb-px"
-                        : "border-transparent text-slate-700 dark:text-slate-400 hover:bg-slate-100/80 dark:hover:bg-slate-800/40 hover:text-slate-900 dark:hover:text-slate-300"
+                      ? "bg-white/90 dark:bg-white/10 border-slate-300/70 dark:border-slate-600/70 border-b-white dark:border-b-slate-900/50 text-slate-800 dark:text-slate-100 shadow-sm -mb-px"
+                      : "border-transparent text-slate-700 dark:text-slate-400 hover:bg-slate-100/80 dark:hover:bg-slate-800/40 hover:text-slate-900 dark:hover:text-slate-300"
                       }`}
                   >
                     Device Summary
@@ -3730,8 +3731,8 @@ const DeviceDetailsView = ({ project, deviceId, goBack, goBackHref, goIndex, goI
                     type="button"
                     onClick={() => setLlmPanelTab("recommendations")}
                     className={`px-4 py-2.5 text-sm font-medium rounded-t-lg border transition-colors ${llmPanelTab === "recommendations"
-                        ? "bg-white/90 dark:bg-white/10 border-slate-300/70 dark:border-slate-600/70 border-b-white dark:border-b-slate-900/50 text-slate-800 dark:text-slate-100 shadow-sm -mb-px"
-                        : "border-transparent text-slate-700 dark:text-slate-400 hover:bg-slate-100/80 dark:hover:bg-slate-800/40 hover:text-slate-900 dark:hover:text-slate-300"
+                      ? "bg-white/90 dark:bg-white/10 border-slate-300/70 dark:border-slate-600/70 border-b-white dark:border-b-slate-900/50 text-slate-800 dark:text-slate-100 shadow-sm -mb-px"
+                      : "border-transparent text-slate-700 dark:text-slate-400 hover:bg-slate-100/80 dark:hover:bg-slate-800/40 hover:text-slate-900 dark:hover:text-slate-300"
                       }`}
                   >
                     AI Recommendations
@@ -3740,8 +3741,8 @@ const DeviceDetailsView = ({ project, deviceId, goBack, goBackHref, goIndex, goI
                     type="button"
                     onClick={() => setLlmPanelTab("drift")}
                     className={`px-4 py-2.5 text-sm font-medium rounded-t-lg border transition-colors ${llmPanelTab === "drift"
-                        ? "bg-white/90 dark:bg-white/10 border-slate-300/70 dark:border-slate-600/70 border-b-white dark:border-b-slate-900/50 text-slate-800 dark:text-slate-100 shadow-sm -mb-px"
-                        : "border-transparent text-slate-700 dark:text-slate-400 hover:bg-slate-100/80 dark:hover:bg-slate-800/40 hover:text-slate-900 dark:hover:text-slate-300"
+                      ? "bg-white/90 dark:bg-white/10 border-slate-300/70 dark:border-slate-600/70 border-b-white dark:border-b-slate-900/50 text-slate-800 dark:text-slate-100 shadow-sm -mb-px"
+                      : "border-transparent text-slate-700 dark:text-slate-400 hover:bg-slate-100/80 dark:hover:bg-slate-800/40 hover:text-slate-900 dark:hover:text-slate-300"
                       }`}
                   >
                     Config Drift
@@ -3816,8 +3817,8 @@ const DeviceDetailsView = ({ project, deviceId, goBack, goBackHref, goIndex, goI
                                 }}>
                                   <div className="flex items-start gap-2 mb-1">
                                     <span className={`text-[10px] font-semibold px-1.5 py-0.5 rounded ${sev === "high" ? "bg-rose-500 text-white" :
-                                        sev === "medium" ? "bg-yellow-500 text-white" :
-                                          "bg-green-500 text-white"
+                                      sev === "medium" ? "bg-yellow-500 text-white" :
+                                        "bg-green-500 text-white"
                                       }`}>
                                       {sev.toUpperCase()}
                                     </span>
@@ -5004,8 +5005,8 @@ const DeviceDetailsView = ({ project, deviceId, goBack, goBackHref, goIndex, goI
                 key={t.id}
                 onClick={() => setRawSubTab(t.id)}
                 className={`px-4 py-2 rounded-xl text-sm font-semibold border transition-all ${rawSubTab === t.id
-                    ? "bg-white/90 dark:bg-white/10 backdrop-blur-sm border-slate-300/80 dark:border-slate-600/80 text-slate-800 dark:text-slate-100 shadow-sm"
-                    : "bg-slate-100/80 dark:bg-slate-800/50 border-slate-300 dark:border-slate-700/60 text-slate-600 dark:text-slate-400 hover:bg-slate-200/80 dark:hover:bg-slate-700/50"
+                  ? "bg-white/90 dark:bg-white/10 backdrop-blur-sm border-slate-300/80 dark:border-slate-600/80 text-slate-800 dark:text-slate-100 shadow-sm"
+                  : "bg-slate-100/80 dark:bg-slate-800/50 border-slate-300 dark:border-slate-700/60 text-slate-600 dark:text-slate-400 hover:bg-slate-200/80 dark:hover:bg-slate-700/50"
                   }`}
               >
                 {t.label}
@@ -5410,8 +5411,8 @@ const UploadConfigForm = ({ project, authedUser, onClose, onUpload }) => {
                   onDragOver={handleDrag}
                   onDrop={handleDrop}
                   className={`border-2 border-dashed rounded-xl p-6 text-center transition-colors ${dragActive
-                      ? 'border-slate-400/80 dark:border-slate-500/80 bg-slate-100/80 dark:bg-white/10'
-                      : 'border-gray-300 dark:border-gray-700 hover:border-gray-400 dark:hover:border-gray-600'
+                    ? 'border-slate-400/80 dark:border-slate-500/80 bg-slate-100/80 dark:bg-white/10'
+                    : 'border-gray-300 dark:border-gray-700 hover:border-gray-400 dark:hover:border-gray-600'
                     }`}
                 >
                   <input
@@ -5756,8 +5757,8 @@ const UploadDocumentForm = ({ project, authedUser, onClose, onUpload, folderStru
                   onDragOver={handleDrag}
                   onDrop={handleDrop}
                   className={`border-2 border-dashed rounded-xl p-6 text-center transition-colors ${dragActive
-                      ? 'border-slate-400/80 dark:border-slate-500/80 bg-slate-100/80 dark:bg-white/10'
-                      : 'border-gray-300 dark:border-gray-700 hover:border-gray-400 dark:hover:border-gray-600'
+                    ? 'border-slate-400/80 dark:border-slate-500/80 bg-slate-100/80 dark:bg-white/10'
+                    : 'border-gray-300 dark:border-gray-700 hover:border-gray-400 dark:hover:border-gray-600'
                     }`}
                 >
                   <input
@@ -6841,8 +6842,8 @@ const HistoryPage = ({ project, can, authedUser }) => {
                               <button
                                 onClick={(e) => { e.stopPropagation(); setOpenFilterColumn(isOpen ? null : col.key); }}
                                 className={`p-0.5 rounded transition-all ${hasFilter
-                                    ? 'text-sky-700 bg-sky-100 dark:text-sky-400 dark:bg-sky-900/30'
-                                    : 'text-slate-400 opacity-0 group-hover:opacity-100 hover:text-slate-700 hover:bg-slate-100 dark:text-slate-500 dark:hover:text-slate-300 dark:hover:bg-slate-700'
+                                  ? 'text-sky-700 bg-sky-100 dark:text-sky-400 dark:bg-sky-900/30'
+                                  : 'text-slate-400 opacity-0 group-hover:opacity-100 hover:text-slate-700 hover:bg-slate-100 dark:text-slate-500 dark:hover:text-slate-300 dark:hover:bg-slate-700'
                                   }`}
                                 title="Filter"
                               >
@@ -10753,6 +10754,8 @@ const TopologyGraph = ({ project, projectId, routeToHash, handleNavClick, onOpen
   const [topologyNotificationData, setTopologyNotificationData] = React.useState(null);
   /** True while fetching graph data (fast endpoint). Graph shows loading. */
   const [isGraphLoading, setIsGraphLoading] = React.useState(true);
+  const [refreshKey, setRefreshKey] = React.useState(0);
+  const summaryRowsKey = JSON.stringify(project.summaryRows || []);
   /** True while LLM is analyzing (slow). Graph stays interactive; only AI panel shows loading. */
   const isAiLoading = generatingTopology;
 
@@ -11414,6 +11417,11 @@ const TopologyGraph = ({ project, projectId, routeToHash, handleNavClick, onOpen
 
   const doGenerateTopologyRef = React.useRef(null);
 
+  const handleRefreshTopology = () => {
+    setIsGraphLoading(true);
+    setRefreshKey(prev => prev + 1);
+  };
+
   const handleGenerateTopology = () => {
     const projectId = project.project_id || project.id;
     if (!projectId) {
@@ -11609,7 +11617,7 @@ const TopologyGraph = ({ project, projectId, routeToHash, handleNavClick, onOpen
       }
     })();
     return () => { cancelled = true; };
-  }, [project.project_id || project.id]);
+  }, [project.project_id || project.id, summaryRowsKey, refreshKey]);
 
   // Handle zoom
   const handleZoomIn = () => {
@@ -12093,17 +12101,17 @@ const TopologyGraph = ({ project, projectId, routeToHash, handleNavClick, onOpen
                 </button>
               </div>
             </div>
-            {/* AI Topology - icon only (other topo buttons also icon-only) */}
+            {/* Refresh Topology button */}
             {!editMode && (
               <button
                 type="button"
-                onClick={handleGenerateTopology}
-                disabled={generatingTopology || llmBusy}
-                className="w-8 h-8 flex items-center justify-center rounded-xl bg-white/90 dark:bg-white/10 backdrop-blur-sm border border-slate-300/80 dark:border-slate-600/80 text-slate-700 dark:text-slate-200 shadow-sm hover:bg-white dark:hover:bg-white/15 transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex-shrink-0 text-base"
-                title={generatingTopology ? "Analyzing topology... Please wait." : llmBusy ? (llmBusyMessage || "Another LLM task is running. You can switch to Documents/History tab.") : "Generate topology with AI"}
-                aria-label={generatingTopology ? "Generating topology..." : "Generate topology with AI"}
+                onClick={handleRefreshTopology}
+                disabled={isGraphLoading}
+                className="w-8 h-8 flex items-center justify-center rounded-xl bg-white/90 dark:bg-white/10 backdrop-blur-sm border border-slate-300/80 dark:border-slate-600/80 text-slate-700 dark:text-slate-200 shadow-sm hover:bg-white dark:hover:bg-white/15 transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex-shrink-0 text-lg"
+                title="Refresh topology"
+                aria-label="Refresh topology"
               >
-                {generatingTopology || llmBusy ? "⏳" : "✨"}
+                {isGraphLoading ? "⏳" : "↻"}
               </button>
             )}
           </div>

@@ -234,16 +234,9 @@ async def upload_documents_endpoint(
                             skip_reason = None
                             
                             if not is_latest_version and new_extracted_date:
-                                # Check if current parsed_config has a newer date
-                                current_parsed = await db()["parsed_configs"].find_one(
-                                    {"project_id": project_id, "device_name": device_name, "is_latest_config": True},
-                                    sort=[("extracted_date", -1)]
-                                )
-                                if current_parsed:
-                                    current_date = current_parsed.get("extracted_date")
-                                    if current_date and new_extracted_date < current_date:
-                                        should_update_parsed = False
-                                        skip_reason = f"Historical file (date {new_extracted_date}) older than current ({current_date})"
+                                # Even if it's an older date, if the user explicitly uploads it,
+                                # we want to parse it. We bypass the date check block that used to skip it.
+                                pass
                             
                             # Log parsed data structure for debugging
                             print(f"\n=== Parsing result for {device_name} ===")
