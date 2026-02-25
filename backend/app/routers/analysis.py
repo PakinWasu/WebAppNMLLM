@@ -446,6 +446,7 @@ async def get_device_config_drift(
             "from_filename": result_data.get("from_filename"),
             "to_filename": result_data.get("to_filename"),
             "changes": result_data.get("changes", []),
+             "difference_percent": result_data.get("difference_percent"),
             "metrics": saved_result.get("metrics", {}),
             "project_id": project_id,
             "generated_at": _iso_generated_at(saved_result.get("generated_at")),
@@ -539,7 +540,9 @@ async def analyze_device_config_drift(
                 status_code=500,
                 detail=result.get("content", "LLM config drift analysis failed."),
             )
-        changes = (result.get("parsed_response") or {}).get("changes", [])
+        parsed = result.get("parsed_response") or {}
+        changes = parsed.get("changes", [])
+        difference_percent = parsed.get("difference_percent")
         metrics = result.get("metrics", {})
 
         from ..services.topology_service import topology_service
@@ -551,8 +554,10 @@ async def analyze_device_config_drift(
                 "from_filename": from_filename,
                 "to_filename": to_filename,
                 "changes": changes,
+                "difference_percent": difference_percent,
             },
-            analysis_summary=f"{len(changes)} changes",
+            analysis_summary=f"{len(changes)} changes"
+            + (f" (~{difference_percent:.1f}% different)" if isinstance(difference_percent, (int, float)) else ""),
             metrics=metrics,
             llm_used=True,
         )
@@ -569,8 +574,10 @@ async def analyze_device_config_drift(
                         "from_filename": from_filename,
                         "to_filename": to_filename,
                         "changes": changes,
+                        "difference_percent": difference_percent,
                     },
-                    "analysis_summary": f"{len(changes)} changes",
+                    "analysis_summary": f"{len(changes)} changes"
+                    + (f" (~{difference_percent:.1f}% different)" if isinstance(difference_percent, (int, float)) else ""),
                     "metrics": metrics,
                     "llm_used": True,
                     "generated_at": datetime.utcnow(),

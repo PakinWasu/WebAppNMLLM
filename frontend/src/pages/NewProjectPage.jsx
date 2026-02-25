@@ -82,7 +82,8 @@ export default function NewProjectPage({
         desc || "",
         topoUrl,
         visibility,
-        "Daily"
+        "Daily",
+        status
       );
       for (const member of members) {
         try {

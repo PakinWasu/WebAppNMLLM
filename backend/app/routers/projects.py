@@ -59,6 +59,7 @@ async def create_project(body: ProjectCreate, user=Depends(get_current_user)):
         "topo_url": body.topo_url,
         "visibility": body.visibility or "Private",
         "backup_interval": body.backup_interval or "Daily",
+        "status": body.status or "Planning",
         "created_at": created_at,
         "created_by": user["username"],
     }
@@ -80,6 +81,7 @@ async def create_project(body: ProjectCreate, user=Depends(get_current_user)):
         "topo_url": body.topo_url,
         "visibility": body.visibility or "Private",
         "backup_interval": body.backup_interval or "Daily",
+        "status": body.status or "Planning",
         "created_at": created_at.isoformat(),
         "created_by": user["username"],
     }

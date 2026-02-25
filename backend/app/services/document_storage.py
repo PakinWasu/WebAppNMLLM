@@ -58,14 +58,14 @@ def extract_date_from_filename(filename: str) -> Optional[datetime]:
             try:
                 if fmt == 'YMD':
                     year, month, day = int(groups[0]), int(groups[1]), int(groups[2])
-                    hour = int(groups[3]) if groups[3] else 0
-                    minute = int(groups[4]) if groups[4] else 0
-                    second = int(groups[5]) if groups[5] else 0
+                    hour = int(groups[3]) if len(groups) > 3 and groups[3] else 0
+                    minute = int(groups[4]) if len(groups) > 4 and groups[4] else 0
+                    second = int(groups[5]) if len(groups) > 5 and groups[5] else 0
                 elif fmt == 'YMD_COMPACT':
                     year, month, day = int(groups[0]), int(groups[1]), int(groups[2])
-                    hour = int(groups[3]) if groups[3] else 0
-                    minute = int(groups[4]) if groups[4] else 0
-                    second = int(groups[5]) if groups[5] else 0
+                    hour = int(groups[3]) if len(groups) > 3 and groups[3] else 0
+                    minute = int(groups[4]) if len(groups) > 4 and groups[4] else 0
+                    second = int(groups[5]) if len(groups) > 5 and groups[5] else 0
                 elif fmt == 'DMY' or fmt == 'DMY_COMPACT':
                     day, month, year = int(groups[0]), int(groups[1]), int(groups[2])
                     hour, minute, second = 0, 0, 0
@@ -74,6 +74,29 @@ def extract_date_from_filename(filename: str) -> Optional[datetime]:
                     hour, minute, second = 0, 0, 0
                 else:
                     continue
+
+                # If we didn't get an explicit time from the pattern,
+                # try to derive HH[MM[SS]] from the characters AFTER the matched date.
+                if hour == 0 and minute == 0 and second == 0:
+                    tail = name_without_ext[match.end():]
+                    # Keep only digits after the date
+                    tail_digits = re.sub(r"\D", "", tail)
+                    try:
+                        if len(tail_digits) >= 6:
+                            hour = int(tail_digits[0:2])
+                            minute = int(tail_digits[2:4])
+                            second = int(tail_digits[4:6])
+                        elif len(tail_digits) >= 4:
+                            hour = int(tail_digits[0:2])
+                            minute = int(tail_digits[2:4])
+                            second = 0
+                        elif len(tail_digits) >= 2:
+                            hour = int(tail_digits[0:2])
+                            minute = 0
+                            second = 0
+                    except ValueError:
+                        # If parsing of tail digits fails, just keep 00:00:00
+                        hour, minute, second = 0, 0, 0
                 
                 # Validate date components
                 if 1 <= month <= 12 and 1 <= day <= 31 and 1990 <= year <= 2100:
@@ -421,36 +444,54 @@ async def upload_documents(
         # Calculate hash
         file_hash = await calculate_file_hash(file_content)
         
-        # Get or create document ID
+        # Get filename for this upload
         filename = file.filename or "unnamed"
         
-        # Check if file with same name exists in the same folder
-        # First, try to find existing document with same filename and folder_id
+        # Smart date extraction + filename prefix for grouping
+        # extracted_date is stored on each version for sorting / history
+        # filename_prefix is used to group config files for the same device
+        extracted_date = extract_date_from_filename(filename)
+        filename_prefix = get_filename_prefix(filename)
+        
+        # Decide how to group versions:
+        # - Config folder: group by filename_prefix (device-based versioning)
+        # - Other folders: group by exact filename + folder (document-based versioning)
         parent_document_id = None
         document_id = None
         
-        # Build query to find existing document
-        find_query = {
-            "project_id": project_id,
-            "filename": filename,
-            "is_latest": True
-        }
-        # If folder_id is provided, also match by folder_id
-        # If folder_id is None, match documents with folder_id = None or missing
-        if folder_id is not None:
-            find_query["folder_id"] = folder_id
+        if folder_id == "Config":
+            # Look for existing config document for the same device/prefix in Config folder
+            existing_doc = await db()["documents"].find_one(
+                {
+                    "project_id": project_id,
+                    "folder_id": folder_id,
+                    "filename_prefix": filename_prefix,
+                    "is_latest": True,
+                }
+            )
         else:
-            # Match documents with folder_id = None or missing
-            find_query["$or"] = [
-                {"folder_id": None},
-                {"folder_id": {"$exists": False}}
-            ]
-        
-        # Find existing document with same filename and folder
-        existing_doc = await db()["documents"].find_one(find_query)
+            # Build query to find existing document with same filename and folder
+            find_query = {
+                "project_id": project_id,
+                "filename": filename,
+                "is_latest": True,
+            }
+            # If folder_id is provided, also match by folder_id
+            # If folder_id is None, match documents with folder_id = None or missing
+            if folder_id is not None:
+                find_query["folder_id"] = folder_id
+            else:
+                # Match documents with folder_id = None or missing
+                find_query["$or"] = [
+                    {"folder_id": None},
+                    {"folder_id": {"$exists": False}},
+                ]
+            
+            # Find existing document with same filename and folder
+            existing_doc = await db()["documents"].find_one(find_query)
         
         if existing_doc:
-            # File with same name exists in same folder - create new version
+            # Existing document/group found - create new version in that group
             document_id = existing_doc["document_id"]
             parent_document_id = document_id
             
@@ -468,7 +509,7 @@ async def upload_documents(
             # Mark previous versions as not latest
             await mark_previous_versions_not_latest(project_id, document_id)
         else:
-            # First version of this filename in this folder - generate new document ID
+            # First version for this filename / device in this folder - generate new document ID
             document_id = str(uuid.uuid4())
             new_version = 1
         
@@ -500,10 +541,6 @@ async def upload_documents(
             filename_lower = filename.lower()
             if filename_lower.endswith(('.txt', '.cfg', '.conf', '.log')):
                 content_type = "text/plain"
-        
-        # Smart date extraction from filename
-        extracted_date = extract_date_from_filename(filename)
-        filename_prefix = get_filename_prefix(filename)
         
         # Temporarily set is_latest=True (will be updated after insert)
         document_doc = {

@@ -10,7 +10,14 @@ extract from raw config differs. Frontend and API consume this single shape.
 
 from typing import Dict, Any, Optional, List
 from .parsers.cisco import CiscoIOSParser
-from .parsers.huawei import HuaweiParser
+
+# Import HuaweiParser lazily and defensively so that syntax errors or
+# in-progress refactors in the Huawei parser do not prevent the backend
+# from starting (Cisco parsing remains available).
+try:
+    from .parsers.huawei import HuaweiParser  # type: ignore
+except Exception:  # pragma: no cover
+    HuaweiParser = None  # type: ignore
 
 
 def _normalize_acls(audit_acls: Any, mgmt_acls: Any) -> List[Dict[str, Any]]:

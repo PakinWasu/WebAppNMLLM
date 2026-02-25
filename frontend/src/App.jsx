@@ -2640,14 +2640,12 @@ const SummaryPage = ({ project, projectId: projectIdProp, routeToHash, handleNav
           </div>
         </div>
 
-        {showUploadConfig && folderStructure && (
-          <UploadDocumentForm
+        {showUploadConfig && (
+          <UploadConfigForm
             project={project}
             authedUser={authedUser}
             onClose={() => setShowUploadConfig(false)}
             onUpload={handleUpload}
-            folderStructure={folderStructure}
-            defaultFolderId="Config"
           />
         )}
 
@@ -3893,6 +3891,17 @@ const DeviceDetailsView = ({ project, deviceId, goBack, goBackHref, goIndex, goI
                               <span className="mx-2">→</span>
                               <span className="font-medium">{safeDisplay(deviceDriftData.to_filename)}</span>
                             </div>
+                            {deviceDriftData.difference_percent != null && (
+                              <div className="text-slate-600 dark:text-slate-400 text-xs">
+                                Estimated difference:{" "}
+                                <span className="font-semibold">
+                                  {typeof deviceDriftData.difference_percent === "number"
+                                    ? `${Number(deviceDriftData.difference_percent.toFixed(1)).toString().replace(/\.0$/, "")}%`
+                                    : `${safeDisplay(deviceDriftData.difference_percent)}%`}
+                                </span>{" "}
+                                of configuration changed.
+                              </div>
+                            )}
                             <div className="space-y-2">
                               {(deviceDriftData.changes || []).map((c, i) => {
                                 const typeColors = {
@@ -4534,20 +4543,35 @@ const DeviceDetailsView = ({ project, deviceId, goBack, goBackHref, goIndex, goI
             <div className="h-[35vh] overflow-hidden rounded-xl border border-slate-300 dark:border-slate-700">
               <Table
                 searchable
-                searchPlaceholder="Search username, role..."
+                searchPlaceholder="Search username..."
                 columns={[
-                  { header: "Username", key: "username", cell: (r) => <span className="font-medium text-slate-200">{r.username || "—"}</span> },
-                  { header: "Privilege Level", key: "privilege", cell: (r) => {
-                    const priv = r.privilege_level ?? r.privilege ?? "—";
-                    const colorClass = priv === 15 ? "text-rose-500" : priv >= 5 ? "text-amber-500" : "text-slate-500";
-                    return <span className={colorClass}>{priv}</span>;
-                  }},
-                  { header: "Role", key: "role", cell: (r) => r.role || "—" },
-                  { header: "Auth Type", key: "auth", cell: (r) => r.auth || r.secret ? "Local" : "—" }
+                  {
+                    header: "Username",
+                    key: "username",
+                    cell: (r) => (
+                      <span className="font-medium text-slate-200">
+                        {r.username || "—"}
+                      </span>
+                    ),
+                  },
+                  {
+                    header: "Privilege Level",
+                    key: "privilege",
+                    cell: (r) => {
+                      const priv = r.privilege_level ?? r.privilege ?? "—";
+                      const colorClass =
+                        priv === 15
+                          ? "text-rose-500"
+                          : priv >= 5
+                          ? "text-amber-500"
+                          : "text-slate-500";
+                      return <span className={colorClass}>{priv}</span>;
+                    },
+                  },
                 ]}
                 data={securityData.user_accounts || securityData.users || []}
                 empty="No user accounts"
-                minWidthClass="min-w-[500px]"
+                minWidthClass="min-w-[300px]"
               />
             </div>
           )}
@@ -6306,7 +6330,7 @@ const PerformanceMetricsView = ({ metrics }) => {
 };
 
 /* ========= HISTORY PAGE ========= */
-const ROWS_PER_PAGE = 10;
+const ROWS_PER_PAGE = 15;
 
 // Filter dropdown component for History table headers
 const HistoryFilterDropdown = ({ uniqueValues, filterValue, onFilterChange, onClose, position = "left" }) => {
@@ -6902,11 +6926,11 @@ const HistoryPage = ({ project, can, authedUser }) => {
                 ) : (
                   <Table
                     columns={[
-                      { header: "Version", key: "version", cell: (v) => `v${v.version} ${v.is_latest ? '(Latest)' : ''}` },
+                      { header: "Version", key: "version", cell: (v) => `${v.displayVersion || `v${v.version}`} ${v.is_latest_display ? '(Latest)' : ''}` },
+                      { header: "Filename", key: "filename", cell: (v) => safeDisplay(v.filename) },
                       { header: "Uploaded By", key: "uploader", cell: (v) => v.uploader },
                       { header: "Uploaded At", key: "created_at", cell: (v) => formatDateTime(v.created_at) },
                       { header: "Size", key: "size", cell: (v) => `${(v.size / 1024).toFixed(1)} KB` },
-                      { header: "Hash", key: "file_hash", cell: (v) => <span className="font-mono text-xs">{v.file_hash ? v.file_hash.substring(0, 16) + '...' : 'N/A'}</span> },
                       { 
                         header: "Actions", 
                         key: "actions", 
@@ -8024,7 +8048,29 @@ const DocumentsPage = ({ project, can, authedUser, uploadHistory, setUploadHisto
       console.log('Version data received:', versionData);
       
       if (versionData && versionData.versions && Array.isArray(versionData.versions)) {
-        setVersions(versionData.versions);
+        // Sort versions so that the newest logical version (by extracted_date or created_at)
+        // appears first, and assign displayVersion numbers so that the latest is highest v.
+        const sorted = [...versionData.versions].sort((a, b) => {
+          const da = a.extracted_date ? new Date(a.extracted_date) : null;
+          const db = b.extracted_date ? new Date(b.extracted_date) : null;
+          if (da && db) return db - da;
+          if (da && !db) return -1;
+          if (!da && db) return 1;
+          const ca = a.created_at ? new Date(a.created_at) : null;
+          const cb = b.created_at ? new Date(b.created_at) : null;
+          if (ca && cb) return cb - ca;
+          return 0;
+        });
+        
+        const total = sorted.length;
+        const processed = sorted.map((v, idx) => ({
+          ...v,
+          // Latest (first row) will get highest version label
+          displayVersion: `v${total - idx}`,
+          is_latest_display: idx === 0 || v.is_latest,
+        }));
+        
+        setVersions(processed);
         // Update versionDocument with filename from API if available
         if (versionData.filename) {
           setVersionDocument(prev => ({
@@ -9064,11 +9110,11 @@ const DocumentsPage = ({ project, can, authedUser, uploadHistory, setUploadHisto
                 ) : (
                   <Table
                     columns={[
-                      { header: "Version", key: "version", cell: (v) => `v${v.version} ${v.is_latest ? '(Latest)' : ''}` },
+                      { header: "Version", key: "version", cell: (v) => `${v.displayVersion || `v${v.version}`} ${v.is_latest_display ? '(Latest)' : ''}` },
+                      { header: "Filename", key: "filename", cell: (v) => safeDisplay(v.filename) },
                       { header: "Uploaded By", key: "uploader", cell: (v) => v.uploader },
                       { header: "Uploaded At", key: "created_at", cell: (v) => formatDateTime(v.created_at) },
                       { header: "Size", key: "size", cell: (v) => `${(v.size / 1024).toFixed(1)} KB` },
-                      { header: "Hash", key: "file_hash", cell: (v) => <span className="font-mono text-xs">{v.file_hash ? v.file_hash.substring(0, 16) + '...' : 'N/A'}</span> },
                       { 
                         header: "Actions", 
                         key: "actions", 

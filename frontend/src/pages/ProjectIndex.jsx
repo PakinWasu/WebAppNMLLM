@@ -1,5 +1,5 @@
 import React, { useState, useMemo } from "react";
-import { Card, Badge, Input } from "../components/ui";
+import { Card, Badge, Input, Select, Button } from "../components/ui";
 import { safeDisplay } from "../utils/format";
 
 export default function ProjectIndex({
@@ -12,13 +12,74 @@ export default function ProjectIndex({
   handleNavClick,
 }) {
   const [q, setQ] = useState("");
+  const [statusFilter, setStatusFilter] = useState("all");
+  const [sortBy, setSortBy] = useState("updated_desc");
+
   const visible = useMemo(() => {
     if (!authedUser) return [];
+
     const mine = projects.filter(
       (p) => can("see-all-projects") || isMember(p, authedUser.username)
     );
-    return mine.filter((p) => p.name.toLowerCase().includes(q.toLowerCase()));
-  }, [projects, authedUser, q, can, isMember]);
+
+    const qLower = q.trim().toLowerCase();
+
+    let list = mine.filter((p) => {
+      if (!qLower) return true;
+      const name = (p.name || "").toLowerCase();
+      const desc = (p.desc || "").toLowerCase();
+      return name.includes(qLower) || desc.includes(qLower);
+    });
+
+    if (statusFilter !== "all") {
+      list = list.filter(
+        (p) => (p.status || "").toLowerCase() === statusFilter
+      );
+    }
+
+    const parseDate = (value) => {
+      if (!value) return null;
+      const d = new Date(value);
+      return isNaN(d.getTime()) ? null : d;
+    };
+
+    const toNumber = (value) => {
+      if (typeof value === "number") return value;
+      const n = parseInt(value, 10);
+      return isNaN(n) ? 0 : n;
+    };
+
+    list = [...list].sort((a, b) => {
+      switch (sortBy) {
+        case "name_asc": {
+          return (a.name || "").localeCompare(b.name || "", undefined, {
+            sensitivity: "base",
+          });
+        }
+        case "devices_desc": {
+          return toNumber(b.devices) - toNumber(a.devices);
+        }
+        case "status_asc": {
+          return (a.status || "").localeCompare(b.status || "", undefined, {
+            sensitivity: "base",
+          });
+        }
+        case "updated_desc":
+        default: {
+          const da = parseDate(a.updated || a.updated_at);
+          const db = parseDate(b.updated || b.updated_at);
+          if (da && db) return db - da;
+          if (da && !db) return -1;
+          if (!da && db) return 1;
+          return (a.name || "").localeCompare(b.name || "", undefined, {
+            sensitivity: "base",
+          });
+        }
+      }
+    });
+
+    return list;
+  }, [projects, authedUser, q, can, isMember, statusFilter, sortBy]);
 
   const linkProps = (targetRoute) => ({
     href: routeToHash ? routeToHash(targetRoute) : "#/",
@@ -26,14 +87,14 @@ export default function ProjectIndex({
   });
 
   return (
-    <div className="min-h-[60vh] flex flex-col gap-8 px-4 sm:px-6 lg:px-8">
+    <div className="min-h-[60vh] flex flex-col gap-6 px-4 sm:px-6 lg:px-8 mt-4">
       {/* Header */}
-      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+      <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-4">
         <h1 className="text-2xl font-bold text-slate-800 dark:text-slate-100 tracking-tight">
           My Projects
         </h1>
-        <div className="flex flex-col sm:flex-row gap-3 sm:gap-3">
-          <div className="flex-1 sm:min-w-[220px]">
+        <div className="flex flex-col sm:flex-row gap-3 sm:gap-4 mt-1 sm:mt-0">
+          <div className="flex-1 sm:min-w-[240px]">
             <Input
               placeholder="Search projects..."
               value={q}
@@ -69,6 +130,62 @@ export default function ProjectIndex({
               Change Password & Information
             </a>
           </div>
+        </div>
+      </div>
+
+      {/* Filters & sorting */}
+      <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-2">
+        <div className="flex flex-col sm:flex-row gap-2 sm:items-center md:justify-end w-full">
+          <div className="flex items-center gap-2">
+            <span className="text-xs text-slate-500 dark:text-slate-400">
+              Status
+            </span>
+            <Select
+              value={statusFilter}
+              onChange={setStatusFilter}
+              options={[
+                { value: "all", label: "All statuses" },
+                { value: "planning", label: "Planning" },
+                { value: "design", label: "Design" },
+                { value: "implementation", label: "Implementation" },
+                { value: "testing", label: "Testing" },
+                { value: "production", label: "Production" },
+                { value: "maintenance", label: "Maintenance" },
+                { value: "shared", label: "Shared" },
+                { value: "inactive", label: "Inactive" },
+                { value: "archived", label: "Archived" },
+              ]}
+            />
+          </div>
+          <div className="flex items-center gap-2">
+            <span className="text-xs text-slate-500 dark:text-slate-400">
+              Sort by
+            </span>
+            <Select
+              value={sortBy}
+              onChange={setSortBy}
+              options={[
+                { value: "updated_desc", label: "Last updated (newest first)" },
+                { value: "name_asc", label: "Name (A → Z)" },
+                { value: "devices_desc", label: "Devices (most first)" },
+                { value: "status_asc", label: "Status (A → Z)" },
+              ]}
+            />
+          </div>
+          {(statusFilter !== "all" || sortBy !== "updated_desc" || q.trim()) && (
+            <Button
+              variant="secondary"
+              size="sm"
+              onClick={() => {
+                setStatusFilter("all");
+                setSortBy("updated_desc");
+                setQ("");
+              }}
+              className="text-xs"
+            >
+              Clear filters
+            </Button>
+          )}
         </div>
       </div>
 

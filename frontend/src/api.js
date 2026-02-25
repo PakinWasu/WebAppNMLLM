@@ -156,7 +156,7 @@ export async function getProjects() {
  return api('/projects');
 }
 
-export async function createProject(name, description, topoUrl, visibility, backupInterval) {
+export async function createProject(name, description, topoUrl, visibility, backupInterval, status) {
  return api('/projects', {
   method: 'POST',
   body: JSON.stringify({ 
@@ -164,7 +164,8 @@ export async function createProject(name, description, topoUrl, visibility, back
     description,
     topo_url: topoUrl || null,
     visibility: visibility || "Private",
-    backup_interval: backupInterval || "Daily"
+    backup_interval: backupInterval || "Daily",
+    status: status || "Planning",
   }),
  });
 }

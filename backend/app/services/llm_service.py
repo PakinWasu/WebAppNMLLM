@@ -6,6 +6,7 @@ import time
 import logging
 from typing import Dict, Any, Optional, List
 from datetime import datetime
+import difflib
 
 import httpx
 
@@ -132,18 +133,25 @@ SYSTEM_PROMPT_DEVICE_RECOMMENDATIONS = """You are a Network Solution Architect. 
 - Output ONLY JSON, no markdown, no code blocks. Parseable directly as JSON object."""
 
 # Config Drift summary (More Detail page - Config Drift tab)
-SYSTEM_PROMPT_CONFIG_DRIFT = """You are a Network Engineer comparing two device configurations. Analyze configuration changes in detail.
+SYSTEM_PROMPT_CONFIG_DRIFT = """You are a Network Engineer comparing two device configurations.
+You will be given a unified diff between the OLD and NEW running configuration.
+
+Your job is to analyze ONLY the lines shown in the diff and describe all configuration changes in detail.
 
 **Task: Detailed configuration drift analysis**
 For each change found, provide:
 1. The exact section/feature affected (e.g., "interface GigabitEthernet0/0", "OSPF", "VLAN 10")
-2. What specifically changed with actual values
+2. What specifically changed with actual values (old vs new lines)
 3. Potential impact of the change
+4. Overall how different the new config is from the old one as a percentage of the configuration (0–100%), based on logical changes (not just line count).
+
+You MUST NOT invent changes that are not visible in the diff.
 
 **Output Format:** Return ONLY valid JSON:
 {
+  "difference_percent": 0-100 number,
   "changes": [
-    { 
+    {
       "type": "add|remove|modify",
       "section": "Feature or config section name",
       "description": "Detailed description with actual config values",
@@ -154,11 +162,13 @@ For each change found, provide:
 }
 
 **Examples:**
-- {"type":"add","section":"Interface GigabitEthernet0/1","description":"Added new interface with IP 10.0.0.1/24","old_value":null,"new_value":"ip address 10.0.0.1 255.255.255.0"}
-- {"type":"modify","section":"NTP Configuration","description":"Changed NTP server address","old_value":"ntp server 10.10.1.10","new_value":"ntp server 10.10.1.11"}
-- {"type":"remove","section":"VLAN 40","description":"Removed VLAN 40 (Marketing)","old_value":"vlan 40 name Marketing","new_value":null}
+- {"difference_percent": 12.5, "changes":[{"type":"add","section":"Interface GigabitEthernet0/1","description":"Added new interface with IP 10.0.0.1/24","old_value":null,"new_value":"ip address 10.0.0.1 255.255.255.0"}]}
+- {"difference_percent": 3, "changes":[{"type":"modify","section":"NTP Configuration","description":"Changed NTP server address","old_value":"ntp server 10.10.1.10","new_value":"ntp server 10.10.1.11"}]}
+- {"difference_percent": 0, "changes":[]}
 
-**CRITICAL:** Output ONLY valid JSON, no markdown, no code blocks."""
+**CRITICAL:**
+- Always include a numeric difference_percent between 0 and 100.
+- Output ONLY valid JSON, no markdown, no code blocks."""
 
 
 class LLMService:
@@ -1131,33 +1141,70 @@ List issues and actionable recommendations for this device only. Return ONLY val
                 "invalid_input",
                 0,
             )
-        
+
         # Extract only running-config section from each file
         old_config = self._extract_running_config(old_content)
         new_config = self._extract_running_config(new_content)
-        
+
         print(f"[CONFIG_DRIFT] Original sizes: old={len(old_content)}, new={len(new_content)}", flush=True)
         print(f"[CONFIG_DRIFT] Extracted config sizes: old={len(old_config)}, new={len(new_config)}", flush=True)
-        
+
         # Truncate to avoid token overflow
         max_chars = 15000
         old_config = old_config[:max_chars]
         new_config = new_config[:max_chars]
-        
+
         from_label = from_filename or "old"
         to_label = to_filename or "new"
+
+        # Build unified diff so the LLM sees the exact line-level changes
+        old_lines = old_config.splitlines()
+        new_lines = new_config.splitlines()
+        diff_lines = list(
+            difflib.unified_diff(
+                old_lines,
+                new_lines,
+                fromfile=from_label,
+                tofile=to_label,
+                lineterm="",
+            )
+        )
+        diff_text = "\n".join(diff_lines)
+
+        # If there is no diff after extraction, short‑circuit without calling the LLM
+        if not diff_text.strip():
+            inference_time_ms = (time.perf_counter() - start_time) * 1000
+            return {
+                "content": "",
+                "parsed_response": {"changes": [], "difference_percent": 0.0},
+                "metrics": {
+                    "inference_time_ms": inference_time_ms,
+                    "token_usage": {
+                        "prompt_tokens": 0,
+                        "completion_tokens": 0,
+                        "total_tokens": 0,
+                    },
+                    "model_name": self.model_name,
+                    "timestamp": datetime.utcnow(),
+                },
+            }
+
         user_prompt = f"""Device: {device_name}
 Compare: {from_label} → {to_label}
 
-=== OLD CONFIGURATION ===
-{old_config}
+The following is a unified diff between the OLD and NEW running configuration.
+Lines starting with '-' exist only in the OLD config.
+Lines starting with '+' exist only in the NEW config.
 
-=== NEW CONFIGURATION ===
-{new_config}
+=== UNIFIED DIFF ===
+{diff_text}
 
 === TASK ===
-Compare the two configurations and list all changes (additions, removals, modifications).
-For each change, provide: section name, detailed description with actual config values, old_value, new_value.
+Using ONLY the diff above, list all configuration changes (additions, removals, modifications).
+Treat each related group of +/- lines inside the same logical section (for example, a specific interface, routing process, or ACL) as one change item.
+
+For each change, provide: section name (e.g., "interface GigabitEthernet0/0", "OSPF"), 
+a detailed description with actual old and new CLI lines, old_value, and new_value.
 Return ONLY valid JSON."""
 
         url = f"{self.base_url}/api/chat"
@@ -1196,6 +1243,8 @@ Return ONLY valid JSON."""
             changes = parsed_response.get("changes") or []
             if not isinstance(changes, list):
                 changes = []
+
+            # Validate changes list
             validated = []
             for c in changes:
                 if isinstance(c, dict) and c.get("type"):
@@ -1208,9 +1257,26 @@ Return ONLY valid JSON."""
                             "old_value": c.get("old_value"),
                             "new_value": c.get("new_value"),
                         })
+
+            # Extract and normalize difference_percent (0–100)
+            diff_raw = parsed_response.get("difference_percent")
+            difference_percent: Optional[float] = None
+            try:
+                if isinstance(diff_raw, (int, float)):
+                    val = float(diff_raw)
+                elif isinstance(diff_raw, str) and diff_raw.strip():
+                    # Strip potential % sign
+                    val = float(diff_raw.strip().replace("%", ""))
+                else:
+                    val = None
+                if val is not None and 0.0 <= val <= 100.0:
+                    difference_percent = round(val, 2)
+            except (ValueError, TypeError):
+                difference_percent = None
+
             return {
                 "content": ai_response,
-                "parsed_response": {"changes": validated},
+                "parsed_response": {"changes": validated, "difference_percent": difference_percent},
                 "metrics": {
                     "inference_time_ms": inference_time_ms,
                     "token_usage": token_usage,

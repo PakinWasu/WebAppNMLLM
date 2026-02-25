@@ -696,17 +696,24 @@ async def list_document_versions(
     versions = []
     async for doc in db()["documents"].find(
         {"document_id": document_id, "project_id": project_id},
-        sort=[("version", -1)]
+        sort=[("created_at", -1)]
     ):
+        extracted = doc.get("extracted_date")
+        if isinstance(extracted, datetime):
+            extracted_serialized = extracted.isoformat()
+        else:
+            extracted_serialized = extracted
+        
         versions.append({
             "document_id": doc["document_id"],
             "version": doc["version"],
             "filename": doc["filename"],
-            "size": doc["size"],
-            "uploader": doc["uploader"],
-            "created_at": doc["created_at"].isoformat() if isinstance(doc["created_at"], datetime) else doc["created_at"],
-            "is_latest": doc["is_latest"],
-            "file_hash": doc["file_hash"]
+            "size": doc.get("size"),
+            "uploader": doc.get("uploader"),
+            "created_at": doc["created_at"].isoformat() if isinstance(doc.get("created_at"), datetime) else doc.get("created_at"),
+            "is_latest": bool(doc.get("is_latest")),
+            "file_hash": doc.get("file_hash"),
+            "extracted_date": extracted_serialized,
         })
     
     if not versions:

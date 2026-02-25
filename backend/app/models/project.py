@@ -7,6 +7,7 @@ class ProjectCreate(BaseModel):
     topo_url: str | None = None
     visibility: str | None = "Private"
     backup_interval: str | None = "Daily"
+    status: str | None = "Planning"
 
 class ProjectUpdate(BaseModel):
     name: str
