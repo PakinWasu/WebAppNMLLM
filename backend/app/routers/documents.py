@@ -58,13 +58,13 @@ async def upload_documents_endpoint(
     """Upload multiple documents in a single batch with shared metadata"""
     # Check project access
     await check_project_access(project_id, user)
-
+    
     # Check upload permission
     await check_upload_permission(project_id, user)
-
+    
     if not files:
         raise HTTPException(status_code=400, detail="No files provided")
-
+    
     # Create metadata
     metadata = DocumentMetadata(
         who=who,
@@ -72,11 +72,9 @@ async def upload_documents_endpoint(
         where=where,
         when=when,
         why=why,
-        description=description,
+        description=description
     )
-
-    uploaded: List[dict] = []
-
+    
     try:
         # Upload documents
         # Convert empty string to None for folder_id
@@ -446,34 +444,17 @@ async def upload_documents_endpoint(
         return {
             "message": f"Successfully uploaded {len(uploaded)} document(s)",
             "batch_id": uploaded[0]["upload_batch_id"] if uploaded else None,
-            "documents": uploaded,
+            "documents": uploaded
         }
     except ValueError as e:
         raise HTTPException(status_code=400, detail=str(e))
     except HTTPException:
         raise  # Re-raise HTTP exceptions
     except Exception as e:
-        # If documents were already uploaded but post-processing failed (e.g. parsing),
-        # return a partial-success response instead of hard error so the UI does not
-        # confuse the user. Log the error to backend logs for troubleshooting.
+        # Extract error message properly
         error_msg = str(e)
-        if uploaded:
-            import traceback as _tb
-
-            print("Non-fatal error after upload_documents:", error_msg)
-            print(_tb.format_exc())
-            return {
-                "message": f"Uploaded {len(uploaded)} document(s), but post-processing failed: {error_msg}",
-                "batch_id": uploaded[0].get("upload_batch_id") if uploaded else None,
-                "documents": uploaded,
-            }
-
-        # Extract error message properly for true upload/storage failures
         if "Operation not permitted" in error_msg or "Permission denied" in error_msg:
-            error_msg = (
-                f"Storage permission error: {error_msg}. "
-                "Please check storage directory permissions in Docker."
-            )
+            error_msg = f"Storage permission error: {error_msg}. Please check storage directory permissions in Docker."
         raise HTTPException(status_code=500, detail=error_msg)
 
 
