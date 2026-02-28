@@ -614,7 +614,22 @@ export async function deleteFolder(projectId, folderId) {
   });
 }
 
-// Analysis API
+export async function downloadFolder(projectId, folderId) {
+  const token = getToken();
+  const response = await fetch(`${API_BASE}/projects/${projectId}/folders/${folderId}/download`, {
+    headers: {
+      'Authorization': token ? `Bearer ${token}` : '',
+    },
+  });
+  
+  if (!response.ok) {
+    const errorText = await response.text();
+    throw new Error(errorText || 'Failed to download folder');
+  }
+  
+  return response.blob();
+}
+
 export async function createAnalysis(projectId, deviceName, analysisType, customPrompt = null, includeOriginalContent = false) {
   return api(`/projects/${projectId}/analysis`, {
     method: 'POST',

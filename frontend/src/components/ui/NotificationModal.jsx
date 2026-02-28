@@ -46,13 +46,12 @@ export default function NotificationModal({
         <div className="flex items-start justify-between mb-4">
           <h3
             id="notification-modal-title"
-            className={`text-lg font-semibold ${
-              type === "success"
+            className={`text-lg font-semibold ${type === "success"
                 ? "text-green-600 dark:text-green-400"
                 : type === "error"
                   ? "text-red-600 dark:text-red-400"
                   : "text-slate-700 dark:text-slate-300"
-            }`}
+              }`}
           >
             {title}
           </h3>
@@ -83,7 +82,7 @@ export default function NotificationModal({
                   📊 Tokens:{" "}
                   {metrics.token_usage.total_tokens ||
                     (metrics.token_usage.prompt_tokens || 0) +
-                      (metrics.token_usage.completion_tokens || 0) ||
+                    (metrics.token_usage.completion_tokens || 0) ||
                     0}
                   {metrics.token_usage.prompt_tokens !== undefined &&
                     ` (Prompt: ${metrics.token_usage.prompt_tokens}, Completion: ${metrics.token_usage.completion_tokens || 0})`}

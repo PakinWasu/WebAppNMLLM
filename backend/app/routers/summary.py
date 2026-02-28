@@ -497,6 +497,17 @@ async def get_summary(
                     rt_protos.append("OSPF")
                 if isinstance(bgp, dict) and (bgp.get("as_number") or bgp.get("local_as")):
                     rt_protos.append("BGP")
+                
+                # Check for RIP
+                rip = routing.get("rip")
+                if isinstance(rip, dict) and (rip.get("version") or rip.get("networks") or rip.get("interfaces")):
+                    rt_protos.append("RIP")
+                
+                # Check for EIGRP
+                eigrp = routing.get("eigrp")
+                if isinstance(eigrp, dict) and (eigrp.get("as_number") or eigrp.get("router_id")):
+                    rt_protos.append("EIGRP")
+                
                 static_routes = routing.get("static", [])
                 if isinstance(static_routes, list) and len(static_routes) > 0:
                     rt_protos.append("Static")
@@ -649,6 +660,17 @@ async def get_summary(
                     rt_protos.append("OSPF")
                 if isinstance(bgp, dict) and (bgp.get("as_number") or bgp.get("local_as")):
                     rt_protos.append("BGP")
+                
+                # Check for RIP
+                rip = routing.get("rip")
+                if isinstance(rip, dict) and (rip.get("version") or rip.get("networks") or rip.get("interfaces")):
+                    rt_protos.append("RIP")
+                
+                # Check for EIGRP
+                eigrp = routing.get("eigrp")
+                if isinstance(eigrp, dict) and (eigrp.get("as_number") or eigrp.get("router_id")):
+                    rt_protos.append("EIGRP")
+                
                 static_routes = routing.get("static", [])
                 if isinstance(static_routes, list) and len(static_routes) > 0:
                     rt_protos.append("Static")

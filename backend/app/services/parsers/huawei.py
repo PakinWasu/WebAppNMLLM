@@ -2,7 +2,7 @@
 
 import re
 from typing import Dict, List, Any, Optional
-from datetime import datetime
+from datetime import datetime, timezone
 from pydantic import BaseModel, Field
 from .base import BaseParser
 
@@ -22,7 +22,7 @@ class DeviceOverview(BaseModel):
     uptime: Optional[str] = None
     cpu_utilization: Optional[int] = None  # Integer % (2.3.2.1.8)
     memory_utilization: Optional[int] = None  # Integer %; single field to match cpu_utilization (2.3.2.1.8)
-    last_config_upload: datetime = Field(default_factory=datetime.now)
+    last_config_upload: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
 
 
 class InterfaceInfo(BaseModel):
@@ -823,7 +823,7 @@ class HuaweiParser(BaseParser):
             "uptime": None,
             "cpu_utilization": None,
             "memory_utilization": None,
-            "last_config_upload": datetime.now(),
+            "last_config_upload": datetime.now(timezone.utc),
         }
         
         # Extract hostname - PRIORITIZE sysname command over prompt

@@ -6,7 +6,7 @@ import MainLayout from "./components/layout/MainLayout";
 import Header from "./components/layout/Header";
 import { Badge, Button, Card, CodeBlock, ConfirmationModal, Field, Input, NotificationModal, PasswordInput, Select, SelectWithOther, Table, ToastContainer } from "./components/ui";
 import { parseHash } from "./utils/routing";
-import { formatDateTime, formatDate, safeDisplay, safeChild, formatError } from "./utils/format";
+import { formatDateTime, formatDate, formatFilenameDate, safeDisplay, safeChild, formatError } from "./utils/format";
 import { CMDSET, SAMPLE_CORE_SW1, SAMPLE_DIST_SW2, createUploadRecord } from "./utils/constants";
 import { globalPollingService, notifyLLMResultReady } from "./services/llmPolling";
 import { useHashRoute, useLLMQueue } from "./hooks";
@@ -2516,12 +2516,12 @@ const SummaryPage = ({ project, projectId: projectIdProp, routeToHash, handleNav
     { header: "UNUSED", key: "unused", width: "70px" },
     { header: "VLANS", key: "vlans", width: "60px" },
     { header: "NATIVE VLAN", key: "native_vlan", width: "90px" },
-    { header: "TRUNK ALLOWED", key: "trunk_allowed", width: "100px" },
+    { header: "TRUNK ALLOWED", key: "trunk_allowed", width: "100px", cell: (r) => r.trunk_allowed || "—" },
     { header: "STP", key: "stp", width: "70px" },
     { header: "STP ROLE", key: "stp_role", width: "80px" },
     { header: "OSPF NEIGH", key: "ospf_neigh", width: "90px" },
     { header: "BGP ASN/NEIGH", key: "bgp_asn_neigh", width: "110px" },
-    { header: "RT-PROTO", key: "rt_proto", width: "80px" },
+    { header: "RT-PROTO", key: "rt_proto", width: "80px", cell: (r) => r.rt_proto || "—" },
     { header: "CPU%", key: "cpu", width: "60px" },
     { header: "MEM%", key: "mem", width: "60px" },
     {
@@ -3616,7 +3616,7 @@ const DeviceDetailsView = ({ project, deviceId, goBack, goBackHref, goIndex, goI
             More Details — {facts.device}
           </h2>
           <span className="text-sm text-slate-600 dark:text-slate-400">
-            From config/show parsing {facts.sourceFilename && facts.sourceFilename !== "—" ? `(${facts.sourceFilename})` : ""} • Mgmt IP: {facts.mgmtIp || "—"}
+            From config/show parsing {facts.sourceFilename && facts.sourceFilename !== "—" ? "(" + facts.sourceFilename + ")" : ""} • Mgmt IP: {facts.mgmtIp || "—"}
           </span>
         </div>
         {!loading && !error && (
@@ -6732,6 +6732,105 @@ const HistoryPage = ({ project, can, authedUser }) => {
     setShowDescriptionModal(true);
   };
 
+  // Download all history as CSV
+  const downloadHistoryCSV = async () => {
+    try {
+      const projectId = project.project_id || project.id;
+
+      // Get all documents (without pagination and filters)
+      const allDocs = await api.getDocuments(projectId, {}, { timeout: 60000 });
+
+      if (!Array.isArray(allDocs) || allDocs.length === 0) {
+        alert('No documents found to export');
+        return;
+      }
+
+      // Create CSV headers mapping to History view columns
+      const headers = [
+        'Time',
+        'Filename',
+        'Responsible User',
+        'Activity Type',
+        'Site',
+        'Op. Timing',
+        'Purpose',
+        'Version',
+        'Description'
+      ];
+
+      // Helper to escape CSV values
+      const csvEscape = (val) => {
+        if (val == null) return '""';
+        let str = String(val);
+        // Clean up any newlines or carriage returns that might break CSV formatting
+        str = str.replace(/\r?\n|\r/g, " ");
+        return `"${str.replace(/"/g, '""')}"`;
+      };
+
+      // Create CSV data
+      const csvData = [];
+
+      for (const doc of allDocs) {
+        // Get all versions for this document
+        try {
+          const versionData = await api.getDocumentVersions(projectId, doc.document_id);
+          const docVersions = versionData?.versions || [];
+
+          // Create rows for each version
+          for (const ver of docVersions) {
+            // Use metadata from the specific version if available, fallback to latest doc's metadata
+            const meta = ver.metadata || doc.metadata || {};
+            csvData.push([
+              csvEscape(formatDateTime(ver.created_at || doc.created_at)),
+              csvEscape(doc.filename),
+              csvEscape(meta.who || ver.uploader || doc.uploader),
+              csvEscape(meta.what || "—"),
+              csvEscape(meta.where || "—"),
+              csvEscape(meta.when || "—"),
+              csvEscape(meta.why || "—"),
+              csvEscape(`v${ver.version}${ver.is_latest ? ' (Latest)' : ''}`),
+              csvEscape(meta.description || "—")
+            ].join(','));
+          }
+        } catch (error) {
+          console.error('Failed to get versions for document:', doc.document_id, error);
+          // Fallback: Add at least the main document info if version fetch fails
+          csvData.push([
+            csvEscape(formatDateTime(doc.created_at)),
+            csvEscape(doc.filename),
+            csvEscape(doc.metadata?.who || doc.uploader),
+            csvEscape(doc.metadata?.what || "—"),
+            csvEscape(doc.metadata?.where || "—"),
+            csvEscape(doc.metadata?.when || "—"),
+            csvEscape(doc.metadata?.why || "—"),
+            csvEscape(`v${doc.version}${doc.is_latest ? ' (Latest)' : ''}`),
+            csvEscape(doc.metadata?.description || "—")
+          ].join(','));
+        }
+      }
+
+      // Combine headers and data
+      const csvContent = [headers.join(','), ...csvData].join('\n');
+
+      // Create download link
+      const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+      const url = URL.createObjectURL(blob);
+      const link = document.createElement('a');
+      link.href = url;
+      // Use Thai date for filename
+      const thaiDate = formatFilenameDate();
+      link.download = `history_${project.name || 'project'}_${thaiDate}.csv`;
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+      URL.revokeObjectURL(url);
+
+    } catch (error) {
+      console.error('Failed to download history CSV:', error);
+      alert('Failed to download history CSV: ' + (error.message || error));
+    }
+  };
+
   // Show at most 3 page number buttons; window slides with current page
   const getPageNumbers = () => {
     if (totalPages <= 3) {
@@ -6748,17 +6847,26 @@ const HistoryPage = ({ project, can, authedUser }) => {
       {/* Header with search box */}
       <div className="flex-shrink-0 flex items-center justify-between mb-3 px-1">
         <h2 className="text-xl font-semibold text-gray-900 dark:text-gray-100">History</h2>
-        <div className="relative">
-          <input
-            type="text"
-            placeholder="Search (filename, user, description...)"
-            value={searchDoc}
-            onChange={(e) => setSearchDoc(e.target.value)}
-            className="w-72 pl-8 pr-3 py-1.5 text-xs rounded-lg bg-white dark:bg-slate-800/80 border border-slate-300 dark:border-slate-600 text-slate-900 dark:text-slate-200 placeholder-slate-400 dark:placeholder-slate-500 focus:outline-none focus:ring-1 focus:ring-sky-500 focus:border-sky-500"
-          />
-          <svg className="absolute left-2.5 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-slate-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
-          </svg>
+        <div className="flex items-center gap-3">
+          <button
+            onClick={downloadHistoryCSV}
+            className="px-3 py-1.5 text-sm rounded bg-green-600 hover:bg-green-700 text-white font-medium transition-colors"
+            title="Download all history as CSV"
+          >
+            📊 CSV
+          </button>
+          <div className="relative">
+            <input
+              type="text"
+              placeholder="Search (filename, user, description...)"
+              value={searchDoc}
+              onChange={(e) => setSearchDoc(e.target.value)}
+              className="w-72 pl-8 pr-3 py-1.5 text-xs rounded-lg bg-white dark:bg-slate-800/80 border border-slate-300 dark:border-slate-600 text-slate-900 dark:text-slate-200 placeholder-slate-400 dark:placeholder-slate-500 focus:outline-none focus:ring-1 focus:ring-sky-500 focus:border-sky-500"
+            />
+            <svg className="absolute left-2.5 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-slate-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
+            </svg>
+          </div>
         </div>
       </div>
 
@@ -8666,6 +8774,40 @@ const DocumentsPage = ({ project, can, authedUser, uploadHistory, setUploadHisto
     }
   };
 
+  const handleDownloadFolder = async (folderId) => {
+    // Prevent downloading Config folder and Other folder
+    if (folderId === "Config" || folderId === "Other") {
+      alert("Cannot download this folder.");
+      return;
+    }
+
+    try {
+      const projectId = project.project_id || project.id;
+
+      // Get folder name for the download filename
+      const allFolders = [...customFolders, { id: "Config", name: "Config" }, { id: "Other", name: "Other" }];
+      const folder = allFolders.find(f => f.id === folderId);
+      const folderName = folder ? folder.name : "folder";
+
+      // Download folder as ZIP
+      const blob = await api.downloadFolder(projectId, folderId);
+
+      // Create download link
+      const url = window.URL.createObjectURL(blob);
+      const link = document.createElement('a');
+      link.href = url;
+      link.download = `${folderName.replace(/[^a-zA-Z0-9]/g, '_')}_${new Date().toISOString().slice(0, 10)}.zip`;
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+      window.URL.revokeObjectURL(url);
+
+    } catch (error) {
+      console.error('Failed to download folder:', error);
+      alert(`Failed to download folder: ${formatError(error)}`);
+    }
+  };
+
   const handleSaveFolder = async () => {
     if (!folderName.trim()) {
       alert("Please enter a folder name.");
@@ -9076,6 +9218,7 @@ const DocumentsPage = ({ project, can, authedUser, uploadHistory, setUploadHisto
               {selectedFolder && (
                 <>
                   <Button variant="secondary" onClick={() => handleEditFolder(selectedFolder)}>Rename</Button>
+                  <Button variant="secondary" onClick={() => handleDownloadFolder(selectedFolder)}>Download</Button>
                   <Button variant="danger" onClick={() => handleDeleteFolder(selectedFolder)}>Delete</Button>
                 </>
               )}

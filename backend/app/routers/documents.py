@@ -712,6 +712,7 @@ async def list_document_versions(
             "is_latest": bool(doc.get("is_latest")),
             "file_hash": doc.get("file_hash"),
             "extracted_date": extracted_serialized,
+            "metadata": doc.get("metadata", {}),
         })
     
     if not versions:

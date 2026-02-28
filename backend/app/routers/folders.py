@@ -1,7 +1,11 @@
 from fastapi import APIRouter, Depends, HTTPException
+from fastapi.responses import StreamingResponse
 from typing import Optional, List
 from pydantic import BaseModel
 from datetime import datetime, timezone
+import zipfile
+import io
+import os
 
 from ..db.mongo import db
 from ..dependencies.auth import get_current_user, check_project_access, check_project_editor_or_admin
@@ -192,18 +196,21 @@ async def delete_folder(
     if folder_index is None:
         raise HTTPException(status_code=404, detail="Folder not found")
     
-    # Check if folder has documents
-    docs_count = await db()["documents"].count_documents({
-        "project_id": project_id,
-        "folder_id": folder_id,
-        "is_latest": True
-    })
-    
-    if docs_count > 0:
-        raise HTTPException(
-            status_code=400, 
-            detail=f"Cannot delete folder: {docs_count} document(s) still in this folder. Please move or delete documents first."
-        )
+    # Delete all documents in this folder first
+    await db()["documents"].update_many(
+        {
+            "project_id": project_id,
+            "folder_id": folder_id,
+            "is_latest": True
+        },
+        {
+            "$set": {
+                "deleted": True,
+                "deleted_at": datetime.now(timezone.utc).isoformat(),
+                "deleted_by": user["username"]
+            }
+        }
+    )
     
     # Soft delete: mark as deleted
     folders[folder_index]["deleted"] = True
@@ -216,4 +223,128 @@ async def delete_folder(
     )
     
     return {"message": "Folder deleted successfully"}
+
+
+@router.get("/{folder_id}/download")
+async def download_folder(
+    project_id: str,
+    folder_id: str,
+    user=Depends(get_current_user)
+):
+    """Download folder and all its contents as ZIP file"""
+    await check_project_access(project_id, user)
+    
+    # Prevent downloading Config folder
+    if folder_id == "Config":
+        raise HTTPException(status_code=400, detail="Cannot download Config folder")
+    
+    # Get folder information
+    folders_doc = await db()["project_folders"].find_one({"project_id": project_id})
+    if not folders_doc:
+        raise HTTPException(status_code=404, detail="No folders found for this project")
+    
+    folders = folders_doc.get("folders", [])
+    target_folder = None
+    
+    for folder in folders:
+        if folder.get("id") == folder_id and not folder.get("deleted", False):
+            target_folder = folder
+            break
+    
+    if not target_folder:
+        raise HTTPException(status_code=404, detail="Folder not found")
+    
+    # Get all folders to build hierarchy
+    all_folders = folders_doc.get("folders", [])
+    
+    # Build folder hierarchy - get all subfolders recursively
+    def get_all_subfolders(folder_id):
+        subfolders = []
+        for folder in all_folders:
+            if (folder.get("parent_id") == folder_id and 
+                not folder.get("deleted", False)):
+                subfolders.append(folder)
+                # Recursively get subfolders
+                subfolders.extend(get_all_subfolders(folder["id"]))
+        return subfolders
+    
+    # Get target folder and all its subfolders
+    folder_hierarchy = [target_folder] + get_all_subfolders(folder_id)
+    folder_ids = [f["id"] for f in folder_hierarchy]
+    
+    # Get all documents in this folder and all subfolders
+    documents = []
+    cursor = db()["documents"].find({
+        "project_id": project_id,
+        "folder_id": {"$in": folder_ids},
+        "is_latest": True,
+        "deleted": {"$ne": True}
+    })
+    
+    async for doc in cursor:
+        documents.append(doc)
+    
+    if not documents:
+        raise HTTPException(status_code=404, detail="No documents found in this folder")
+    
+    # Create folder path mapping
+    def get_folder_path(doc_folder_id):
+        # Build full path from target folder to document's folder
+        path_parts = []
+        current_id = doc_folder_id
+        
+        while current_id:
+            folder = next((f for f in all_folders if f["id"] == current_id), None)
+            if not folder:
+                break
+                
+            folder_name = folder["name"].replace(" ", "_").replace("/", "_")
+            path_parts.insert(0, folder_name)
+            current_id = folder.get("parent_id")
+            
+            # Stop when we reach the target folder
+            if folder["id"] == folder_id:
+                break
+        
+        return "/".join(path_parts) if path_parts else ""
+    
+    # Create ZIP file in memory
+    zip_buffer = io.BytesIO()
+    
+    with zipfile.ZipFile(zip_buffer, 'w', zipfile.ZIP_DEFLATED) as zip_file:
+        for doc in documents:
+            try:
+                # Get file path
+                from ..services.document_storage import get_document_file_path
+                file_path = await get_document_file_path(project_id, doc["document_id"])
+                
+                # Read file content
+                if os.path.exists(file_path):
+                    # Sanitize filename for ZIP
+                    filename = doc["filename"]
+                    safe_filename = os.path.basename(filename)
+                    
+                    # Get folder path for this document
+                    folder_path = get_folder_path(doc["folder_id"])
+                    zip_path = f"{folder_path}/{safe_filename}" if folder_path else safe_filename
+                    
+                    # Add file to ZIP with folder structure
+                    zip_file.write(file_path, zip_path)
+                    
+            except Exception as e:
+                # Skip files that can't be read
+                print(f"Error adding file {doc.get('filename', 'unknown')} to ZIP: {e}")
+                continue
+    
+    zip_buffer.seek(0)
+    
+    # Generate ZIP filename
+    folder_name = target_folder["name"].replace(" ", "_").replace("/", "_")
+    zip_filename = f"{folder_name}_{datetime.now().strftime('%Y%m%d_%H%M%S')}.zip"
+    
+    return StreamingResponse(
+        io.BytesIO(zip_buffer.read()),
+        media_type="application/zip",
+        headers={"Content-Disposition": f"attachment; filename={zip_filename}"}
+    )
 

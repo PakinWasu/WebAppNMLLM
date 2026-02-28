@@ -4,13 +4,14 @@ import React from "react";
 export const DISPLAY_TIMEZONE = "Asia/Bangkok";
 
 /**
- * Format date/time for display (Thailand time, en-US).
+ * Format date/time for display (Thailand time, DD/MM/YYYY).
  */
 export function formatDateTime(dateString) {
   if (!dateString) return "—";
   try {
     const date = new Date(dateString);
-    return date.toLocaleString("en-US", {
+    // Use en-GB for DD/MM/YYYY format
+    return date.toLocaleString("en-GB", {
       timeZone: DISPLAY_TIMEZONE,
       year: "numeric",
       month: "2-digit",
@@ -19,9 +20,28 @@ export function formatDateTime(dateString) {
       minute: "2-digit",
       second: "2-digit",
       hour12: false,
-    });
+    }).replace(/\//g, '/'); // Ensure / separator
   } catch (e) {
     return dateString;
+  }
+}
+
+/**
+ * Format date for filename (Thailand YYYY-MM-DD).
+ */
+export function formatFilenameDate(dateInput) {
+  try {
+    const date = dateInput ? new Date(dateInput) : new Date();
+    const parts = date.toLocaleDateString("en-GB", {
+      timeZone: DISPLAY_TIMEZONE,
+      year: "numeric",
+      month: "2-digit",
+      day: "2-digit",
+    }).split('/');
+    // en-GB gives DD/MM/YYYY -> return YYYY-MM-DD
+    return `${parts[2]}-${parts[1]}-${parts[0]}`;
+  } catch (e) {
+    return new Date().toISOString().slice(0, 10);
   }
 }
 
