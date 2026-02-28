@@ -23,9 +23,24 @@ Output must be in JSON format with the following keys:
 Strictly avoid hallucination. If data is missing, state 'Not found'."""
 
 # Project-Level Analysis System Prompt - Network Overview (Scope 2.3.5.1)
-SYSTEM_PROMPT_PROJECT_OVERVIEW = """You analyze network configs. Return ONLY JSON, nothing else.
+SYSTEM_PROMPT_PROJECT_OVERVIEW = """You are a Senior Network Architect. Analyze the provided network device data and return a comprehensive overview.
 
-{"health_status":"Healthy","overview":"network summary","interfaces":"interface summary","vlans":"vlan summary","routing":"routing summary","security":"security summary","highlights":["point1","point2"]}"""
+For EACH section below, write 2-4 detailed sentences using ACTUAL values from the data (device names, IPs, VLAN IDs, protocol parameters, interface counts). Do NOT write generic statements.
+
+Return ONLY valid JSON with these keys:
+{
+  "health_status": "Healthy|Warning|Critical",
+  "overview": "Network architecture summary: how many devices, their roles (Core/Distribution/Access), topology design (redundant/single-path), overall health. Mention specific device names and models.",
+  "interfaces": "Total interface count, how many are up vs down. Trunk vs access port distribution. Notable speed/duplex configurations. Mention specific port utilization rates.",
+  "vlans": "Total VLAN count with actual VLAN IDs and names. Which VLANs are most widely deployed. Native VLAN configuration. Any VLAN inconsistencies across devices.",
+  "stp": "STP mode in use (PVST/RSTP/MST). Root bridge device name and priority. Any non-default STP configurations. Potential loop risks.",
+  "routing": "Which routing protocols are active (OSPF/BGP/EIGRP/RIP/Static). OSPF areas and router IDs. BGP AS numbers and peering. Route redistribution if any.",
+  "security": "SSH vs Telnet status. AAA/TACACS configuration. ACL presence. Port security, DHCP snooping, 802.1X status. Password encryption. Any security concerns.",
+  "ha": "High availability setup: HSRP/VRRP groups and VIPs. EtherChannel/LACP bundles. Redundant uplinks. Failover readiness.",
+  "highlights": ["Key finding 1 with specific values", "Key finding 2", "Key finding 3", "Key finding 4", "Key finding 5"]
+}
+
+CRITICAL: Output ONLY valid JSON. No markdown, no code blocks. Be specific with actual values from the data."""
 
 # Per-Device Overview (More Detail page - Device Summary tab)
 SYSTEM_PROMPT_DEVICE_OVERVIEW = """You are a Network Engineer analyzing a single device configuration. Provide detailed analysis.
@@ -411,50 +426,115 @@ class LLMService:
                 details=str(e),
             )
         
-        # Build compact summary for LLM (avoid sending too much data)
+        # Build enriched summary for LLM (detailed per-device stats)
         try:
-            # Create a very compact summary
-            device_names = [d.get("device_name", "unknown") for d in aggregated_data.get("devices", [])]
+            device_summaries = []
             total_interfaces = 0
-            total_vlans = set()
+            total_up = 0
+            total_down = 0
+            total_trunk = 0
+            total_access = 0
+            all_vlans = {}  # vlan_id -> {name, devices[]}
             routing_protocols = set()
-            stp_modes = set()
+            stp_info = {}  # device -> {mode, root}
+            ha_info = []  # HSRP/VRRP/EtherChannel entries
+            neighbor_map = {}  # device -> [neighbor names]
             
             for device in aggregated_data.get("devices", []):
+                dname = device.get("device_name", "unknown")
+                overview = device.get("device_overview", {})
                 ifaces = device.get("interfaces", [])
-                if isinstance(ifaces, list):
-                    total_interfaces += len(ifaces)
                 vlans = device.get("vlans", {})
-                if isinstance(vlans, dict):
-                    total_vlans.update(vlans.keys())
-                elif isinstance(vlans, list):
-                    total_vlans.update([str(v.get("vlan_id", v)) if isinstance(v, dict) else str(v) for v in vlans[:20]])
                 routing = device.get("routing", {})
-                if isinstance(routing, dict):
-                    if routing.get("ospf"):
-                        routing_protocols.add("OSPF")
-                    if routing.get("bgp"):
-                        routing_protocols.add("BGP")
-                    if routing.get("eigrp"):
-                        routing_protocols.add("EIGRP")
-                    if routing.get("static_routes"):
-                        routing_protocols.add("Static")
                 stp = device.get("stp", {})
-                if isinstance(stp, dict) and stp.get("mode"):
-                    stp_modes.add(stp.get("mode"))
+                neighbors = device.get("neighbors", [])
+                
+                # Interface stats
+                iface_count = len(ifaces) if isinstance(ifaces, list) else 0
+                up_count = sum(1 for i in ifaces if isinstance(i, dict) and i.get("oper_status") == "up") if isinstance(ifaces, list) else 0
+                down_count = sum(1 for i in ifaces if isinstance(i, dict) and i.get("oper_status") == "down") if isinstance(ifaces, list) else 0
+                trunk_count = sum(1 for i in ifaces if isinstance(i, dict) and i.get("port_mode") == "trunk") if isinstance(ifaces, list) else 0
+                access_count = sum(1 for i in ifaces if isinstance(i, dict) and i.get("port_mode") == "access") if isinstance(ifaces, list) else 0
+                total_interfaces += iface_count
+                total_up += up_count
+                total_down += down_count
+                total_trunk += trunk_count
+                total_access += access_count
+                
+                # VLAN details
+                if isinstance(vlans, dict):
+                    vlan_list = vlans.get("vlan_list", [])
+                    details = vlans.get("details", [])
+                    if isinstance(vlan_list, list):
+                        for v in vlan_list[:30]:
+                            vid = str(v.get("vlan_id", v) if isinstance(v, dict) else v)
+                            vname = v.get("name", "") if isinstance(v, dict) else ""
+                            if vid not in all_vlans:
+                                all_vlans[vid] = {"name": vname, "devices": []}
+                            all_vlans[vid]["devices"].append(dname)
+                
+                # Routing details
+                if isinstance(routing, dict):
+                    ospf = routing.get("ospf", {})
+                    if ospf and isinstance(ospf, dict):
+                        rid = ospf.get("router_id", "")
+                        areas = list(ospf.get("areas", {}).keys()) if isinstance(ospf.get("areas"), dict) else []
+                        routing_protocols.add(f"OSPF(rid={rid},areas={areas})" if rid else "OSPF")
+                    bgp = routing.get("bgp", {})
+                    if bgp and isinstance(bgp, dict):
+                        asn = bgp.get("as_number", "")
+                        routing_protocols.add(f"BGP(AS{asn})" if asn else "BGP")
+                    if routing.get("eigrp"):
+                        eigrp = routing["eigrp"]
+                        eas = eigrp.get("as_number", "") if isinstance(eigrp, dict) else ""
+                        routing_protocols.add(f"EIGRP(AS{eas})" if eas else "EIGRP")
+                    if routing.get("rip"):
+                        routing_protocols.add("RIP")
+                    if routing.get("static_routes"):
+                        sr = routing["static_routes"]
+                        routing_protocols.add(f"Static({len(sr)} routes)" if isinstance(sr, list) else "Static")
+                
+                # STP details
+                if isinstance(stp, dict) and (stp.get("mode") or stp.get("stp_mode")):
+                    stp_info[dname] = {
+                        "mode": stp.get("mode") or stp.get("stp_mode", "Unknown"),
+                        "root": bool(stp.get("root_bridge") or stp.get("is_root")),
+                    }
+                
+                # Neighbor info
+                if isinstance(neighbors, list) and neighbors:
+                    neighbor_map[dname] = [
+                        n.get("device_id", n.get("neighbor", "")) for n in neighbors[:8] if isinstance(n, dict)
+                    ]
+                
+                # Per-device summary
+                dev_summary = {
+                    "name": dname,
+                    "model": overview.get("model", ""),
+                    "vendor": device.get("vendor", ""),
+                    "interfaces": f"{iface_count} total ({up_count} up, {down_count} down, {trunk_count} trunk, {access_count} access)",
+                }
+                device_summaries.append(dev_summary)
             
+            # Build enriched summary
             compact_summary = {
-                "device_count": len(device_names),
-                "device_names": device_names,
+                "device_count": len(device_summaries),
+                "devices": device_summaries,
                 "total_interfaces": total_interfaces,
-                "vlan_count": len(total_vlans),
-                "vlans_sample": list(total_vlans)[:10],
+                "interface_stats": {"up": total_up, "down": total_down, "trunk": total_trunk, "access": total_access},
+                "vlan_count": len(all_vlans),
+                "vlans": {vid: {"name": info["name"], "on_devices": info["devices"]} for vid, info in list(all_vlans.items())[:20]},
                 "routing_protocols": list(routing_protocols),
-                "stp_modes": list(stp_modes) if stp_modes else ["Unknown"]
+                "stp": stp_info if stp_info else {"mode": "Unknown"},
+                "neighbors": neighbor_map if neighbor_map else {},
+                "ha": ha_info if ha_info else "No HA data",
             }
             
-            aggregated_json = json.dumps(compact_summary, separators=(",", ":"), ensure_ascii=False)
-            print(f"[LLM_OVERVIEW] Compact summary size: {len(aggregated_json)} chars", flush=True)
+            aggregated_json = json.dumps(compact_summary, separators=(",", ":"), ensure_ascii=False, default=str)
+            # Limit to prevent token overflow
+            if len(aggregated_json) > 10000:
+                aggregated_json = aggregated_json[:10000] + "...[truncated]"
+            print(f"[LLM_OVERVIEW] Enriched summary size: {len(aggregated_json)} chars", flush=True)
         except (TypeError, ValueError) as e:
             logger.exception("Error creating compact summary for project %s: %s", project_id, e)
             return self._error_result(
@@ -464,9 +544,12 @@ class LLMService:
                 details=str(e),
             )
 
-        user_prompt = f"""Network: {aggregated_json}
+        user_prompt = f"""Analyze this network data and provide a detailed overview for each section.
 
-Return JSON only: {{"health_status":"Healthy","overview":"...","interfaces":"...","vlans":"...","routing":"...","security":"...","highlights":["..."]}}"""
+{aggregated_json}
+
+Return ONLY valid JSON with keys: health_status, overview, interfaces, vlans, stp, routing, security, ha, highlights.
+Be specific: use actual device names, VLAN IDs, IP addresses, protocol parameters from the data above."""
 
         url = f"{self.base_url}/api/chat"
         payload = {
@@ -479,7 +562,7 @@ Return JSON only: {{"health_status":"Healthy","overview":"...","interfaces":"...
             "options": {
                 "temperature": 0.3,
                 "top_p": 0.9,
-                "num_predict": 2048,
+                "num_predict": 3072,
             },
         }
 
@@ -1505,13 +1588,15 @@ Return ONLY valid JSON with 'network_overview' and 'gap_analysis' keys as specif
             health_status = "Unknown"
         
         # Simple format: convert flat fields to sections for display
-        section_keys = ["overview", "interfaces", "vlans", "routing", "security"]
+        section_keys = ["overview", "interfaces", "vlans", "stp", "routing", "security", "ha"]
         section_titles = {
             "overview": "Network Overview",
             "interfaces": "Interfaces", 
             "vlans": "VLANs",
+            "stp": "Spanning Tree (STP)",
             "routing": "Routing",
-            "security": "Security"
+            "security": "Security",
+            "ha": "High Availability"
         }
         
         sections = {}
