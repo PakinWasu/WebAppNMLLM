@@ -33,6 +33,7 @@ class InterfaceInfo(BaseModel):
     oper_status: Optional[str] = None
     description: Optional[str] = None
     ipv4_address: Optional[str] = None
+    ip_address: Optional[str] = None  # Standardized field to match Cisco
     subnet_mask: Optional[str] = None  # Dotted (255.255.255.0) or prefix length ("24")
     ipv6_address: Optional[str] = None
     mac_address: Optional[str] = None
@@ -40,12 +41,17 @@ class InterfaceInfo(BaseModel):
     duplex: Optional[str] = None
     mtu: Optional[int] = None
     port_mode: Optional[str] = None
+    mode: Optional[str] = None  # Standardized field to match Cisco
     access_vlan: Optional[int] = None
     native_vlan: Optional[int] = None
     allowed_vlans: Optional[str] = None
     stp_role: Optional[str] = None  # STP role from display stp brief
     stp_state: Optional[str] = None  # STP state from display stp brief
     stp_edged_port: Optional[bool] = None  # STP edged-port (portfast) enabled
+    # Additional standardized fields for Cisco compatibility
+    status: Optional[str] = None  # Standardized from admin_status
+    protocol: Optional[str] = None  # Standardized from oper_status
+    line_protocol: Optional[str] = None
 
 
 class VlanL2Switching(BaseModel):
@@ -90,7 +96,7 @@ class StaticRoute(BaseModel):
     """Static route entry"""
     network: str
     mask: str
-    nexthop: str
+    next_hop: str
     interface: Optional[str] = None
 
 
@@ -527,6 +533,14 @@ class HuaweiParser(BaseParser):
                 out["device_info"] = device_info
                 out["security_audit"] = security_audit
                 out["high_availability"] = high_availability
+                
+                # Standardize main structure keys to match Cisco
+                out["arp_mac_table"] = out.get("mac_arp", {})
+                out["security_mgmt"] = out.get("security", {})
+                # Remove old keys to avoid confusion
+                out.pop("mac_arp", None)
+                out.pop("security", None)
+                
                 return out
             except Exception as e:
                 print(f"⚠️ Error building DeviceConfig from {filename}: {e}")
@@ -537,15 +551,8 @@ class HuaweiParser(BaseParser):
                     "device_info": device_info,
                     "security_audit": security_audit,
                     "high_availability": high_availability,
-                    "device_overview": device_overview,
-                    "interfaces": interfaces,
-                    "vlans": vlans,
-                    "stp": stp,
-                    "routing": routing,
-                    "neighbors": neighbors,
-                    "mac_arp": mac_arp,
-                    "security": security,
-                    "ha": ha,
+                    "arp_mac_table": {},  # Standardized to match Cisco
+                    "security_mgmt": {},  # Standardized to match Cisco
                 }
         except Exception as e:
             # Final fallback - return minimal structure
@@ -846,7 +853,7 @@ class HuaweiParser(BaseParser):
                         if ec["interface"].lower() in line.lower():
                             ec["status"] = "Up"
                             break
-        return {"ether_channels": ether_channels}
+        return {"ether_channels": ether_channels, "etherchannel": ether_channels}
 
     def extract_device_overview(self, content: str) -> Dict[str, Any]:
         """2.3.2.1 Device Overview"""
@@ -1069,6 +1076,9 @@ class HuaweiParser(BaseParser):
             line_proto = re.search(r"Line\s+protocol\s+current\s+state\s*:\s*(\w+)", block, re.IGNORECASE)
             oper_status = (line_proto.group(1) or "up").lower() if line_proto else "up"
             out: Dict[str, Any] = {"name": name, "admin_status": admin_status, "oper_status": oper_status, "line_protocol": oper_status}
+            # Standardized status fields to match Cisco
+            out["status"] = admin_status  # Map admin_status to status for Cisco compatibility
+            out["protocol"] = oper_status  # Map oper_status to protocol for Cisco compatibility
             desc_m = re.search(r"Description\s*:\s*(.*?)(?:\n|$)", block, re.IGNORECASE | re.DOTALL)
             if desc_m:
                 desc = desc_m.group(1).strip()
@@ -1080,6 +1090,7 @@ class HuaweiParser(BaseParser):
             ip_m = re.search(r"Internet\s+Address\s+is\s+(\d+\.\d+\.\d+\.\d+)(?:/\d+)?", block, re.IGNORECASE)
             if ip_m and is_valid_ipv4(ip_m.group(1)):
                 out["ipv4_address"] = ip_m.group(1)
+                out["ip_address"] = ip_m.group(1)  # Standardized field
             pvid_m = re.search(r"PVID\s*:\s*(\d+)", block, re.IGNORECASE)
             if pvid_m:
                 out["access_vlan"] = int(pvid_m.group(1))
@@ -1180,21 +1191,26 @@ class HuaweiParser(BaseParser):
         """Return a single default interface record. Used so we never append; we only merge by key."""
         return {
             "name": canonical_name,
-            "admin_status": "up",
-            "oper_status": None,
-            "line_protocol": None,
+            "type": None,
             "description": None,
-            "ipv4_address": None,
+            "ip_address": None,  # Standardized to match Cisco
             "subnet_mask": None,
             "ipv6_address": None,
+            "status": "up",  # Standardized to match Cisco
+            "protocol": "up",  # Standardized to match Cisco
             "mac_address": None,
             "speed": None,
             "duplex": None,
             "mtu": None,
-            "port_mode": None,
+            "mode": None,  # Standardized to match Cisco
             "access_vlan": None,
             "native_vlan": None,
             "allowed_vlans": None,
+            # Keep Huawei-specific fields for compatibility
+            "admin_status": "up",
+            "oper_status": None,
+            "line_protocol": None,
+            "port_mode": None,
             "stp_role": None,
             "stp_state": None,
             "stp_edged_port": None,
@@ -1236,8 +1252,10 @@ class HuaweiParser(BaseParser):
                     oper_status = 'down' if phy in ('*down', 'down') else ('up' if phy == 'up' else None)
                     iface = _get_or_create(name)
                     iface["admin_status"] = admin_status
+                    iface["status"] = admin_status  # Standardized field
                     if oper_status is not None:
                         iface["oper_status"] = oper_status
+                        iface["protocol"] = oper_status  # Standardized field
                     iface["line_protocol"] = protocol if protocol in ('up', 'down') else 'up'
                     if description is not None:
                         iface["description"] = description
@@ -1266,6 +1284,7 @@ class HuaweiParser(BaseParser):
                         protocol = parts[2].lower() if len(parts) > 2 else None
                         if phy in ('up', 'down'):
                             iface["oper_status"] = phy
+                            iface["protocol"] = phy  # Standardized field
                         if protocol in ('up', 'down'):
                             iface["line_protocol"] = protocol
                         if len(parts) > 3 and parts[3] and not parts[3].startswith('*') and parts[3] != 'down':
@@ -1312,11 +1331,13 @@ class HuaweiParser(BaseParser):
                     iface = _get_or_create(name)
                     if phy in ('up', 'down'):
                         iface["oper_status"] = iface.get("oper_status") or phy
+                        iface["protocol"] = iface.get("protocol") or phy  # Standardized field
                     if proto in ('up', 'down'):
                         iface["line_protocol"] = iface.get("line_protocol") or proto
                     if ip_val and ip_val != 'unassigned' and re.match(r'\d+\.\d+\.\d+\.\d+', ip_val):
                         parts_ip = ip_val.split('/')
                         iface["ipv4_address"] = iface.get("ipv4_address") or parts_ip[0]
+                        iface["ip_address"] = iface.get("ip_address") or parts_ip[0]  # Standardized field
                         if len(parts_ip) > 1 and parts_ip[1].strip():
                             iface["subnet_mask"] = iface.get("subnet_mask") or parts_ip[1].strip()
         
@@ -1418,8 +1439,20 @@ class HuaweiParser(BaseParser):
                 if iface.get("speed") and iface.get("duplex") is None:
                     iface["duplex"] = "full"
         
-        # Convert dictionary values to list
-        return list(interfaces_dict.values())
+        # Convert dictionary values to list and ensure standardized fields
+        interfaces_list = list(interfaces_dict.values())
+        for iface in interfaces_list:
+            # Ensure standardized fields are populated from Huawei-specific fields
+            if iface.get("port_mode") and not iface.get("mode"):
+                iface["mode"] = iface["port_mode"]
+            if iface.get("admin_status") and not iface.get("status"):
+                iface["status"] = iface["admin_status"]
+            if iface.get("oper_status") and not iface.get("protocol"):
+                iface["protocol"] = iface["oper_status"]
+            if iface.get("ipv4_address") and not iface.get("ip_address"):
+                iface["ip_address"] = iface["ipv4_address"]
+        
+        return interfaces_list
     
     def _parse_interface_config(self, iface_name: str, iface_config: str) -> Dict[str, Any]:
         """Parse configuration for a single interface (2.3.2.2: port_mode access/trunk/routed/hybrid, IP, VLAN)."""
@@ -1427,6 +1460,7 @@ class HuaweiParser(BaseParser):
             "name": iface_name,
             "type": self._get_interface_type(iface_name),
             "admin_status": "down" if "shutdown" in iface_config.lower() else "up",
+            "status": "down" if "shutdown" in iface_config.lower() else "up",  # Standardized field
             "oper_status": None,
             "description": None,
             "ipv4_address": None,
@@ -1499,6 +1533,7 @@ class HuaweiParser(BaseParser):
                 mask_candidate = ipv4_match.group(2)
                 if is_valid_ipv4(ip_candidate):
                     iface["ipv4_address"] = ip_candidate
+                    iface["ip_address"] = ip_candidate  # Standardized field
                 if mask_candidate:
                     iface["subnet_mask"] = mask_candidate.strip()
                 if iface.get("port_mode") is None:
@@ -1516,7 +1551,12 @@ class HuaweiParser(BaseParser):
         # port link-type: access | trunk | hybrid (2.3.2.2.13)
         port_mode_match = re.search(r'port\s+link-type\s+(access|trunk|hybrid)', iface_config, re.IGNORECASE)
         if port_mode_match:
-            iface["port_mode"] = port_mode_match.group(1).lower()
+            port_mode = port_mode_match.group(1).lower()
+            if port_mode is not None:
+                iface["port_mode"] = port_mode
+                iface["mode"] = port_mode  # Standardized field to match Cisco
+            elif iface.get("port_mode"):
+                iface["mode"] = iface["port_mode"]  # Ensure mode is set if port_mode exists
         
         # Extract access VLAN
         access_vlan_match = re.search(r'port\s+default\s+vlan\s+(\d+)', iface_config, re.IGNORECASE)
@@ -1765,6 +1805,7 @@ class HuaweiParser(BaseParser):
             "access_ports": access_ports,
             "trunk_ports": trunk_ports,
             "total_vlan_count": len(details_by_id),
+            "total_count": len(details_by_id),  # Standardized to match Cisco
         }
     
     def extract_stp(self, content: str) -> Dict[str, Any]:
@@ -1782,8 +1823,11 @@ class HuaweiParser(BaseParser):
             "bpdu_protection_global": False,
             "portfast_enabled": False,
             "bpduguard_enabled": False,
+            "bpdu_guard": False,  # Standardized to match Cisco
             "interfaces": [],
             "stp_info": None,
+            "bridge_priority": 32768,  # Standardized to match Cisco
+            "root_bridge_status": "Not Root",  # Standardized to match Cisco
         }
 
         # 1. Extract Global Info (Mode, Root, etc.)
@@ -1814,6 +1858,7 @@ class HuaweiParser(BaseParser):
                 if re.search(r"BPDU-Protection\s*:\s*Enabled", global_section, re.IGNORECASE):
                     stp_data["bpdu_protection_global"] = True
                     stp_data["bpduguard_enabled"] = True
+                    stp_data["bpdu_guard"] = True  # Standardized to match Cisco
 
         # 2. Parse Interface Details
         iface_map: Dict[str, Dict[str, Any]] = {}
@@ -1900,6 +1945,7 @@ class HuaweiParser(BaseParser):
                     iface_map[current_iface]["portfast_enabled"] = edged_m.group(1).strip().lower() == "enabled"
                 if "BPDU-Protection" in line_strip and "Enabled" in line_strip:
                     iface_map[current_iface]["bpduguard_enabled"] = True
+                    iface_map[current_iface]["bpdu_guard"] = True  # Standardized to match Cisco
 
         # 3. Convert Map to List
         stp_data["interfaces"] = list(iface_map.values())
@@ -1907,6 +1953,10 @@ class HuaweiParser(BaseParser):
         # 4. root_bridges for MSTP (Cisco schema compatibility)
         if stp_data.get("root_bridge_id") and (stp_data.get("stp_mode") or "").upper() == "MSTP":
             stp_data["root_bridges"] = [0]
+        
+        # Standardize additional fields for Cisco compatibility
+        stp_data["bridge_priority"] = stp_data.get("priority", 32768)
+        stp_data["root_bridge_status"] = stp_data.get("is_root", False)  # Boolean for Pydantic
 
         # 5. Nested stp_info (MUST NOT BE NULL)
         stp_data["stp_info"] = {
@@ -2007,6 +2057,7 @@ class HuaweiParser(BaseParser):
 
         routing_data: Dict[str, Any] = {
             "static_routes": {"routes": []},
+            "static": [],  # Backward compatibility
             "ospf": None,
             "rip": None,
             "bgp": None,
@@ -2065,6 +2116,14 @@ class HuaweiParser(BaseParser):
                 "admin_distance": pref,
                 "is_default_route": is_default,
             })
+            # Also add to static field for backward compatibility
+            routing_data["static"].append({
+                "network": network_cidr,
+                "next_hop": next_hop,
+                "interface": interface or "",
+                "admin_distance": pref,
+                "is_default_route": is_default,
+            })
         # Fallback: if no config block but "ip route-static" in content, parse from full content
         if not routing_data["static_routes"]["routes"] and "ip route-static" in content:
             for line in content.splitlines():
@@ -2105,6 +2164,14 @@ class HuaweiParser(BaseParser):
                     "network": network_cidr,
                     "next_hop": next_hop,
                     "interface": interface,
+                    "admin_distance": pref,
+                    "is_default_route": is_default,
+                })
+                # Also add to static field for backward compatibility
+                routing_data["static"].append({
+                    "network": network_cidr,
+                    "next_hop": next_hop,
+                    "interface": interface or "",
                     "admin_distance": pref,
                     "is_default_route": is_default,
                 })
@@ -2329,40 +2396,214 @@ class HuaweiParser(BaseParser):
         # Enrich OSPF from runtime: neighbors (display ospf peer), DR/BDR (display ospf brief), learned_prefixes from route table
         ospf_peer_section = re.search(r"display\s+ospf\s+peer(.*?)(?=display\s+|#\s*$|\n\s*\[?<?\w+>?\]?\s*$|\Z)", content, re.IGNORECASE | re.DOTALL)
         if ospf_peer_section and routing_data.get("ospf") and routing_data["ospf"].get("process_id") is not None:
-            for line in ospf_peer_section.group(1).split("\n"):
-                # Format: "Area Id  Interface  Neighbor id  State" -> "0.0.0.0  Vlanif802  10.255.9.1  Full"
-                neigh_m = re.search(r"(\d+\.\d+\.\d+\.\d+)\s+(\S+)\s+(\d+\.\d+\.\d+\.\d+)\s+(Full|FULL|2-Way|Down|Init|ExStart|Exchange|Loading)", line, re.IGNORECASE)
-                if neigh_m and is_valid_ipv4(neigh_m.group(3)):
-                    nid = neigh_m.group(3)
-                    if not any(n.get("neighbor_id") == nid for n in routing_data["ospf"].get("neighbors", [])):
-                        routing_data["ospf"]["neighbors"].append({
-                            "neighbor_id": nid,
-                            "area": neigh_m.group(1),
-                            "interface": neigh_m.group(2),
-                            "state": neigh_m.group(4),
-                        })
+            peer_lines = ospf_peer_section.group(1).split("\n")
+            current_peer_area = None
+            current_peer_iface = None
+            current_peer_obj: Optional[Dict[str, Any]] = None
+
+            def _flush_current_peer() -> None:
+                nonlocal current_peer_obj
+                if not current_peer_obj or not current_peer_obj.get("neighbor_id"):
+                    current_peer_obj = None
+                    return
+                nid2 = current_peer_obj.get("neighbor_id")
+                existing2 = next((n for n in routing_data["ospf"].get("neighbors", []) if n.get("neighbor_id") == nid2), None)
+                if existing2:
+                    for k2, v2 in current_peer_obj.items():
+                        if v2 is not None and (existing2.get(k2) is None or existing2.get(k2) == ""):
+                            existing2[k2] = v2
+                else:
+                    routing_data["ospf"].setdefault("neighbors", []).append(current_peer_obj)
+                current_peer_obj = None
+
+            for line in peer_lines:
+                line_strip = line.strip()
+                if not line_strip:
+                    _flush_current_peer()
+                    continue
+
+                area_if_m = re.search(
+                    r"^Area\s+(\S+)\s+interface\s+([\d.]+)\s*\(([^)]+)\)",
+                    line_strip,
+                    re.IGNORECASE,
+                )
+                if area_if_m:
+                    current_peer_area = area_if_m.group(1)
+                    current_peer_iface = area_if_m.group(3)
+                    _flush_current_peer()
+                    continue
+
+                rid_addr_m = re.search(
+                    r"Router\s+ID\s*:\s*(\d+\.\d+\.\d+\.\d+).*?Address\s*:\s*(\d+\.\d+\.\d+\.\d+)",
+                    line_strip,
+                    re.IGNORECASE,
+                )
+                if rid_addr_m and is_valid_ipv4(rid_addr_m.group(1)):
+                    _flush_current_peer()
+                    current_peer_obj = {
+                        "neighbor_id": rid_addr_m.group(1),
+                        "address": rid_addr_m.group(2) if is_valid_ipv4(rid_addr_m.group(2)) else None,
+                        "area": current_peer_area,
+                        "interface": current_peer_iface,
+                    }
+                    continue
+
+                if current_peer_obj is not None:
+                    state_pri_m = re.search(
+                        r"State\s*:\s*([A-Za-z0-9_-]+).*?Priority\s*:\s*(\d+)",
+                        line_strip,
+                        re.IGNORECASE,
+                    )
+                    if state_pri_m:
+                        current_peer_obj["state"] = state_pri_m.group(1)
+                        try:
+                            current_peer_obj["priority"] = int(state_pri_m.group(2))
+                        except ValueError:
+                            pass
+                        mode_role_m = re.search(r"\bNbr\s+is\s+(DR|BDR)\b", line_strip, re.IGNORECASE)
+                        if mode_role_m:
+                            current_peer_obj["dr_bdr"] = mode_role_m.group(1).upper()
+                        continue
+
+                    dr_bdr_m = re.search(r"\bDR\s*:\s*([\d.]+)\s+BDR\s*:\s*([\d.]+)", line_strip, re.IGNORECASE)
+                    if dr_bdr_m:
+                        current_peer_obj["dr"] = dr_bdr_m.group(1)
+                        current_peer_obj["bdr"] = dr_bdr_m.group(2)
+                        continue
+
+                # Huawei variants seen in the wild:
+                # - "Area Id  Interface  Neighbor id  State" -> "0.0.0.0  Vlanif802  10.255.9.1  Full"
+                # - Cisco-like tables may also include Priority / Address / DR/BDR flag
+                # We try multiple patterns and fill whichever fields are present.
+                neigh: Optional[Dict[str, Any]] = None
+
+                # Pattern A: Area + Interface + Neighbor + State (current implementation)
+                m_a = re.search(
+                    r"(\d+\.\d+\.\d+\.\d+)\s+(\S+)\s+(\d+\.\d+\.\d+\.\d+)\s+(Full|FULL|2-Way|Down|Init|ExStart|Exchange|Loading)",
+                    line_strip,
+                    re.IGNORECASE,
+                )
+                if m_a and is_valid_ipv4(m_a.group(3)):
+                    neigh = {
+                        "neighbor_id": m_a.group(3),
+                        "area": m_a.group(1),
+                        "interface": m_a.group(2),
+                        "state": m_a.group(4),
+                    }
+
+                # Pattern B: NeighborID + Priority + State + (DR/BDR) + Address + Interface (Cisco-like)
+                if neigh is None:
+                    m_b = re.search(
+                        r"^(\d+\.\d+\.\d+\.\d+)\s+(\d+)\s+(FULL|2WAY|EXSTART|INIT|DOWN|LOADING|EXCHANGE)\s*(?:[/\s]*(DR|BDR))?\s+(\d+\.\d+\.\d+\.\d+)\s+(\S+)\s*$",
+                        line_strip,
+                        re.IGNORECASE,
+                    )
+                    if m_b and is_valid_ipv4(m_b.group(1)):
+                        neigh = {
+                            "neighbor_id": m_b.group(1),
+                            "priority": int(m_b.group(2)),
+                            "state": (m_b.group(3) or "").upper(),
+                            "dr_bdr": (m_b.group(4) or "").upper() or None,
+                            "address": m_b.group(5) if is_valid_ipv4(m_b.group(5)) else None,
+                            "interface": m_b.group(6),
+                        }
+
+                # Pattern C: Interface + NeighborID + Address + State + Pri
+                if neigh is None:
+                    m_c = re.search(
+                        r"^(\S+)\s+(\d+\.\d+\.\d+\.\d+)\s+(\d+\.\d+\.\d+\.\d+)\s+(Full|FULL|2-Way|Down|Init|ExStart|Exchange|Loading)\s+(?:Pri|Priority)\s*[:=]?\s*(\d+)",
+                        line_strip,
+                        re.IGNORECASE,
+                    )
+                    if m_c and is_valid_ipv4(m_c.group(2)):
+                        neigh = {
+                            "neighbor_id": m_c.group(2),
+                            "interface": m_c.group(1),
+                            "address": m_c.group(3) if is_valid_ipv4(m_c.group(3)) else None,
+                            "state": m_c.group(4),
+                            "priority": int(m_c.group(5)),
+                        }
+
+                if not neigh or not neigh.get("neighbor_id"):
+                    continue
+
+                nid = neigh.get("neighbor_id")
+                existing = next((n for n in routing_data["ospf"].get("neighbors", []) if n.get("neighbor_id") == nid), None)
+                if existing:
+                    for k, v in neigh.items():
+                        if v is not None and (existing.get(k) is None or existing.get(k) == ""):
+                            existing[k] = v
+                else:
+                    routing_data["ospf"].setdefault("neighbors", []).append(neigh)
+
+            _flush_current_peer()
+
+        # OSPF Interface Priority from display ospf interface
+        ospf_int_section = re.search(r"display\s+ospf\s+interface(.*?)(?=display\s+|#\s*$|\n\s*\[?<?\w+>?\]?\s*$|\Z)", content, re.IGNORECASE | re.DOTALL)
+        if ospf_int_section and routing_data.get("ospf") and isinstance(routing_data["ospf"].get("dr_bdr_info"), dict):
+            block = ospf_int_section.group(1)
+            current_if = None
+            for line in block.split("\n"):
+                line_strip = line.strip()
+                if not line_strip:
+                    continue
+                # Interface headers can vary: "Interface: Vlanif802" or "Vlanif802" or "Interface Vlanif802"
+                if_m = re.search(r"^(?:Interface\s*:?\s*)(\S+)$", line_strip, re.IGNORECASE) or re.search(r"^([A-Za-z]+[\w./-]+)\s+is\s+\w+", line_strip)
+                if if_m:
+                    current_if = if_m.group(1)
+                    continue
+                if not current_if:
+                    continue
+                pri_m = re.search(r"\b(?:Pri|Priority)\b\s*[:=]?\s*(\d+)", line_strip, re.IGNORECASE)
+                if pri_m:
+                    try:
+                        pri = int(pri_m.group(1))
+                    except ValueError:
+                        continue
+                    routing_data["ospf"].setdefault("dr_bdr_info", {}).setdefault(current_if, {})
+                    routing_data["ospf"]["dr_bdr_info"][current_if]["priority"] = pri
         # OSPF DR/BDR (2.3.2.5.2.6) from display ospf brief
         ospf_brief_section = re.search(r"display\s+ospf\s+brief(.*?)(?=display\s+|#\s*$|\n\s*\[?<?\w+>?\]?\s*$|\Z)", content, re.IGNORECASE | re.DOTALL)
         if ospf_brief_section and routing_data.get("ospf") and isinstance(routing_data["ospf"].get("dr_bdr_info"), dict):
             block = ospf_brief_section.group(1)
             current_if = None
+            current_area = None
+            iface_area_map: Dict[str, str] = {}
             for line in block.split("\n"):
+                area_m = re.search(r"^\s*Area\s*:\s*(\S+)", line, re.IGNORECASE)
+                if area_m:
+                    current_area = area_m.group(1).strip()
                 if_m = re.search(r"Interface:\s*[\d.]+\s*\((\S+)\)|Interface:\s*(\S+)", line, re.IGNORECASE)
                 if if_m:
                     current_if = if_m.group(1) or if_m.group(2)
+                    if current_if and current_area:
+                        iface_area_map[current_if] = current_area
                 if current_if:
                     state_m = re.search(r"State:\s*(DR|BDR|DROther)", line, re.IGNORECASE)
+                    pri_m = re.search(r"Priority\s*:\s*(\d+)", line, re.IGNORECASE)
                     dr_m = re.search(r"(?<!Backup\s)Designated\s+Router:\s*([\d.]+)", line, re.IGNORECASE)
                     bdr_m = re.search(r"Backup\s+Designated\s+Router:\s*([\d.]+)", line, re.IGNORECASE)
-                    if state_m or dr_m or bdr_m:
+                    if state_m or pri_m or dr_m or bdr_m:
                         if current_if not in routing_data["ospf"]["dr_bdr_info"]:
                             routing_data["ospf"]["dr_bdr_info"][current_if] = {}
                         if state_m:
                             routing_data["ospf"]["dr_bdr_info"][current_if]["role"] = state_m.group(1).upper()
+                        if pri_m:
+                            try:
+                                routing_data["ospf"]["dr_bdr_info"][current_if]["priority"] = int(pri_m.group(1))
+                            except ValueError:
+                                pass
                         if dr_m:
                             routing_data["ospf"]["dr_bdr_info"][current_if]["dr"] = dr_m.group(1)
                         if bdr_m:
                             routing_data["ospf"]["dr_bdr_info"][current_if]["bdr"] = bdr_m.group(1)
+
+            # Build Cisco-like interface list: [{interface, area}, ...]
+            if iface_area_map:
+                ospf_if_list: List[Dict[str, Any]] = []
+                for ifname, area in iface_area_map.items():
+                    ospf_if_list.append({"interface": ifname, "area": area})
+                routing_data["ospf"]["interfaces"] = ospf_if_list
 
         # RIP from runtime (display rip): Preference, timers, routes in database, interfaces enabled (2.3.2.5.5.6, 2.3.2.5.5.7)
         rip_display = re.search(r"display\s+rip(.*?)(?=display\s+|#\s*$|\n\s*\[?<?\w+>?\]?\s*$|\Z)", content, re.IGNORECASE | re.DOTALL)
@@ -2401,8 +2642,8 @@ class HuaweiParser(BaseParser):
             routing_data["static"].append({
                 "network": parts[0] if parts else "",
                 "mask": parts[1] if len(parts) > 1 else "32",
-                "nexthop": r.get("next_hop"),
-                "interface": r.get("interface"),
+                "next_hop": r.get("next_hop") or "",
+                "interface": r.get("interface") or "",
             })
         routing_data["routes"] = []
         route_table_section = re.search(
@@ -2595,6 +2836,7 @@ class HuaweiParser(BaseParser):
         # OSPF learned prefix summary (2.3.2.5.2.7): from routing table entries with protocol O
         if routing_data.get("ospf") and isinstance(routing_data["ospf"].get("learned_prefixes"), list):
             routing_data["ospf"]["learned_prefixes"] = [r["network"] for r in routing_data.get("routes", []) if r.get("protocol") == "O"]
+            routing_data["ospf"]["learned_prefix_count"] = len(routing_data["ospf"]["learned_prefixes"])
 
         return routing_data
     

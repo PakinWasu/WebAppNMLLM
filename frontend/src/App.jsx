@@ -5,6 +5,7 @@ import * as api from "./api";
 import MainLayout from "./components/layout/MainLayout";
 import Header from "./components/layout/Header";
 import { Badge, Button, Card, CodeBlock, ConfirmationModal, Field, Input, NotificationModal, PasswordInput, Select, SelectWithOther, Table, ToastContainer } from "./components/ui";
+import { RoutingSection } from "./components/RoutingSection";
 import { parseHash } from "./utils/routing";
 import { formatDateTime, formatDate, formatFilenameDate, safeDisplay, safeChild, formatError } from "./utils/format";
 import { CMDSET, SAMPLE_CORE_SW1, SAMPLE_DIST_SW2, createUploadRecord } from "./utils/constants";
@@ -3563,7 +3564,7 @@ const DeviceDetailsView = ({ project, deviceId, goBack, goBackHref, goIndex, goI
 
   // Tabs
   const [tab, setTab] = React.useState("overview"); // overview | interfaces | vlans | stp | routing | neighbors | macarp | security | ha | raw
-  const [rawSubTab, setRawSubTab] = React.useState("parsed"); // parsed | original
+  const [rawSubTab, setRawSubTab] = React.useState("original"); // original | parsed
   const [llmPanelTab, setLlmPanelTab] = React.useState("summary"); // summary | recommendations | drift — folder-like selection for LLM section
   const [routeTableSearch, setRouteTableSearch] = React.useState("");
   const filteredRouteTable = React.useMemo(() => {
@@ -4193,238 +4194,7 @@ const DeviceDetailsView = ({ project, deviceId, goBack, goBackHref, goIndex, goI
 
       {/* ROUTING */}
       {!loading && !error && tab === "routing" && (
-        <div className="grid gap-6">
-          {/* Full route table (Cisco show ip route / Huawei display ip routing-table) */}
-          {routingData.routes && Array.isArray(routingData.routes) && routingData.routes.length > 0 && (
-            <div className="max-h-[55vh] overflow-hidden rounded-2xl border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-900/30 flex flex-col">
-              <div className="flex items-center justify-between gap-2 px-4 py-2.5 border-b border-slate-200 dark:border-slate-700 bg-slate-50/70 dark:bg-slate-800/30">
-                <h3 className="text-sm font-semibold text-slate-800 dark:text-slate-200">Routing Table</h3>
-              </div>
-              <div className="flex-1 min-h-0">
-                <Table
-                  searchable
-                  searchPlaceholder="Search protocol, network, next hop, interface..."
-                  columns={[
-                    { header: "Protocol", key: "protocol", cell: (r) => { const p = r.protocol; const labels = { O: "OSPF", C: "Connected", L: "Local", S: "Static", B: "BGP", R: "RIP", D: "EIGRP", i: "ISIS" }; return p ? (labels[p] || p) : "—"; } },
-                    { header: "Network", key: "network" },
-                    { header: "Next hop", key: "next_hop", cell: (r) => r.next_hop || "—" },
-                    { header: "Interface", key: "interface", cell: (r) => r.interface || "—" }
-                  ]}
-                  data={routingData.routes}
-                  empty="No routes"
-                  minWidthClass="min-w-[800px]"
-                  containerClassName="h-full"
-                />
-              </div>
-            </div>
-          )}
-          {/* Static Routes */}
-          {routingData.static && ((Array.isArray(routingData.static) && routingData.static.length > 0) || (routingData.static.routes && routingData.static.routes.length > 0)) && (
-            <div className="max-h-[55vh] overflow-hidden rounded-2xl border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-900/30 flex flex-col">
-              <div className="flex items-center justify-between gap-2 px-4 py-2.5 border-b border-slate-200 dark:border-slate-700 bg-slate-50/70 dark:bg-slate-800/30">
-                <h3 className="text-sm font-semibold text-slate-800 dark:text-slate-200">Static Routes</h3>
-              </div>
-              <div className="flex-1 min-h-0">
-                <Table
-                  searchable
-                  searchPlaceholder="Search network, next hop, interface..."
-                  columns={[
-                    { header: "Network", key: "network" },
-                    { header: "Mask", key: "mask", cell: (r) => r.mask || "—" },
-                    { header: "Next Hop", key: "nexthop", cell: (r) => r.nexthop || r.next_hop || "—" },
-                    { header: "Interface", key: "interface", cell: (r) => r.interface || r.exit_interface || "—" },
-                    { header: "AD", key: "admin_distance", cell: (r) => r.admin_distance || "—" }
-                  ]}
-                  data={Array.isArray(routingData.static) ? routingData.static : (routingData.static.routes || [])}
-                  empty="No static routes"
-                  minWidthClass="min-w-[900px]"
-                  containerClassName="h-full"
-                />
-              </div>
-            </div>
-          )}
-
-          {/* OSPF */}
-          {routingData.ospf && (
-            <Card title="OSPF">
-              <div className="grid gap-4 md:grid-cols-3 text-sm mb-4">
-                <Metric k="Router ID" v={routingData.ospf.router_id || "—"} />
-                <Metric k="Process ID" v={routingData.ospf.process_id || "—"} />
-                <Metric k="Areas" v={(Array.isArray(routingData.ospf.areas) ? routingData.ospf.areas.join(", ") : null) || "—"} />
-              </div>
-              {routingData.ospf.interfaces && routingData.ospf.interfaces.length > 0 && (
-                <div className="mb-4">
-                  <h3 className="text-sm font-semibold mb-2">OSPF Interfaces</h3>
-                  <div className="max-h-[30vh] overflow-hidden rounded-xl border border-slate-300 dark:border-[#1F2937] bg-white dark:bg-slate-900/30 flex flex-col">
-                    <div className="flex-1 min-h-0">
-                      <Table
-                        columns={[
-                          { header: "Interface", key: "interface", cell: (r) => <span className="font-medium text-slate-800 dark:text-slate-200">{r.interface || r.name || "—"}</span> },
-                          { header: "Area", key: "area", cell: (r) => r.area ?? "—" },
-                          ...(routingData.ospf.interfaces.some(i => i.cost !== undefined && i.cost !== null) ? [{ header: "Cost", key: "cost", cell: (r) => r.cost ?? "—" }] : []),
-                          ...(routingData.ospf.interfaces.some(i => i.network_type) ? [{ header: "Network Type", key: "network_type", cell: (r) => r.network_type || "—" }] : [])
-                        ]}
-                        data={routingData.ospf.interfaces}
-                        empty="No OSPF interfaces"
-                        minWidthClass="min-w-[500px]"
-                        containerClassName="h-full"
-                        showToolbar={false}
-                      />
-                    </div>
-                  </div>
-                </div>
-              )}
-              {routingData.ospf.neighbors && routingData.ospf.neighbors.length > 0 && (
-                <div className="mb-4">
-                  <h3 className="text-sm font-semibold mb-2">OSPF Neighbors</h3>
-                  <div className="max-h-[30vh] overflow-hidden rounded-xl border border-slate-300 dark:border-[#1F2937] bg-white dark:bg-slate-900/30 flex flex-col">
-                    <div className="flex-1 min-h-0">
-                      <Table
-                        columns={[
-                          { header: "Neighbor ID", key: "neighbor_id", cell: (r) => <span className="font-medium text-slate-800 dark:text-slate-200">{r.neighbor_id || "—"}</span> },
-                          { header: "Interface", key: "interface", cell: (r) => <span className="text-blue-700 dark:text-blue-400">{r.interface || "—"}</span> },
-                          {
-                            header: "State", key: "state", cell: (r) => {
-                              const state = r.state || "—";
-                              const colorClass = state.toUpperCase() === "FULL" ? "text-emerald-600 dark:text-emerald-500" : state.toUpperCase().includes("2WAY") ? "text-amber-600 dark:text-amber-500" : "";
-                              return <span className={colorClass}>{state}</span>;
-                            }
-                          },
-                          {
-                            header: "Role", key: "dr_bdr", cell: (r) => {
-                              const role = r.dr_bdr || r.role || "—";
-                              const colorClass = role === "DR" ? "bg-emerald-100 text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-400" : role === "BDR" ? "bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-400" : "";
-                              return <span className={`px-2 py-0.5 rounded-full text-xs font-medium ${colorClass}`}>{role}</span>;
-                            }
-                          },
-                          { header: "Address", key: "address", cell: (r) => r.address || r.ip_address || "—" },
-                          { header: "Priority", key: "priority", cell: (r) => r.priority ?? "—" }
-                        ]}
-                        data={routingData.ospf.neighbors}
-                        empty="No OSPF neighbors"
-                        minWidthClass="min-w-[900px]"
-                        containerClassName="h-full"
-                        showToolbar={false}
-                      />
-                    </div>
-                  </div>
-                </div>
-              )}
-            </Card>
-          )}
-
-          {/* EIGRP */}
-          {routingData.eigrp && (
-            <Card title="EIGRP">
-              <div className="grid gap-4 md:grid-cols-3 text-sm mb-4">
-                <Metric k="AS Number" v={routingData.eigrp.as_number || "—"} />
-                <Metric k="Router ID" v={routingData.eigrp.router_id || "—"} />
-                <Metric k="Neighbors" v={routingData.eigrp.neighbors?.length || 0} />
-              </div>
-              {routingData.eigrp.neighbors && routingData.eigrp.neighbors.length > 0 && (
-                <div className="mb-4">
-                  <h3 className="text-sm font-semibold mb-2">EIGRP Neighbors</h3>
-                  <div className="max-h-[30vh] overflow-hidden rounded-xl border border-slate-300 dark:border-[#1F2937] bg-white dark:bg-slate-900/30 flex flex-col">
-                    <div className="flex-1 min-h-0">
-                      <Table
-                        columns={[
-                          { header: "Neighbor", key: "neighbor" },
-                          { header: "Interface", key: "interface" },
-                          { header: "Hold Time", key: "hold_time", cell: (r) => r.hold_time || "—" }
-                        ]}
-                        data={routingData.eigrp.neighbors}
-                        empty="No EIGRP neighbors"
-                        minWidthClass="min-w-[600px]"
-                        containerClassName="h-full"
-                        showToolbar={false}
-                      />
-                    </div>
-                  </div>
-                </div>
-              )}
-            </Card>
-          )}
-
-          {/* BGP */}
-          {routingData.bgp && (
-            <Card title="BGP">
-              <div className="grid gap-4 md:grid-cols-3 text-sm mb-4">
-                <Metric k="AS Number" v={routingData.bgp.as_number ?? routingData.bgp.local_as ?? "—"} />
-                <Metric k="Router ID" v={routingData.bgp.router_id || "—"} />
-                <Metric k="Peers" v={routingData.bgp.peers?.length || 0} />
-                <Metric k="Received Prefixes" v={routingData.bgp.received_prefixes || 0} />
-                <Metric k="Advertised Prefixes" v={routingData.bgp.advertised_prefixes || 0} />
-              </div>
-              {routingData.bgp.peers && routingData.bgp.peers.length > 0 && (
-                <div>
-                  <h3 className="text-sm font-semibold mb-2">BGP Peers</h3>
-                  <div className="max-h-[40vh] overflow-hidden rounded-xl border border-slate-300 dark:border-[#1F2937] bg-white dark:bg-slate-900/30 flex flex-col">
-                    <div className="flex-1 min-h-0">
-                      <Table
-                        columns={[
-                          { header: "Peer IP", key: "peer", cell: (r) => r.peer || r.peer_ip || "—" },
-                          { header: "Remote AS", key: "remote_as" },
-                          { header: "State", key: "state", cell: (r) => r.state || "—" },
-                          { header: "Received", key: "received_prefixes", cell: (r) => r.received_prefixes || 0 },
-                          { header: "Advertised", key: "advertised_prefixes", cell: (r) => r.advertised_prefixes || 0 }
-                        ]}
-                        data={routingData.bgp.peers}
-                        empty="No BGP peers"
-                        minWidthClass="min-w-[900px]"
-                        containerClassName="h-full"
-                        showToolbar={false}
-                      />
-                    </div>
-                  </div>
-                </div>
-              )}
-            </Card>
-          )}
-
-          {/* RIP */}
-          {routingData.rip && (
-            <Card title="RIP">
-              <div className="grid gap-4 md:grid-cols-3 text-sm">
-                <Metric k="Version" v={routingData.rip.version || "—"} />
-                <Metric k="Networks" v={(Array.isArray(routingData.rip.networks) ? routingData.rip.networks.join(", ") : null) || "—"} />
-                <Metric k="Interfaces" v={(Array.isArray(routingData.rip.interfaces) ? routingData.rip.interfaces.join(", ") : null) || "—"} />
-              </div>
-            </Card>
-          )}
-
-          {/* Check if routing data is effectively empty */}
-          {(() => {
-            const hasRoutes = routingData.routes && routingData.routes.length > 0;
-            const hasStatic = routingData.static && ((Array.isArray(routingData.static) && routingData.static.length > 0) || (routingData.static.routes && routingData.static.routes.length > 0));
-            const hasOspf = routingData.ospf && (routingData.ospf.router_id || routingData.ospf.process_id || (routingData.ospf.neighbors && routingData.ospf.neighbors.length > 0));
-            const hasEigrp = routingData.eigrp && (routingData.eigrp.as_number || (routingData.eigrp.neighbors && routingData.eigrp.neighbors.length > 0));
-            const hasBgp = routingData.bgp && (routingData.bgp.local_as || (routingData.bgp.peers && routingData.bgp.peers.length > 0));
-            const hasRip = routingData.rip && routingData.rip.version;
-            const hasNoRouting = !hasRoutes && !hasStatic && !hasOspf && !hasEigrp && !hasBgp && !hasRip;
-
-            if (hasNoRouting) {
-              return (
-                <Card title="Routing Information">
-                  <div className="p-4 rounded-xl border border-slate-300 dark:border-slate-700 bg-slate-50 dark:bg-slate-800/50">
-                    <div className="flex items-center gap-3 mb-3">
-                      <span className="text-2xl">🔀</span>
-                      <span className="text-sm font-medium text-slate-700 dark:text-slate-300">No routing protocols configured</span>
-                    </div>
-                    <div className="text-sm text-gray-500 dark:text-gray-400 space-y-1">
-                      <p>This device appears to be operating as a Layer 2 switch without routing capabilities.</p>
-                      <ul className="list-disc list-inside mt-2 ml-2 text-xs">
-                        <li>No OSPF, EIGRP, BGP, or RIP protocols detected</li>
-                        <li>No static routes configured</li>
-                        <li>For L2 switches, routing is typically handled by upstream distribution/core devices</li>
-                      </ul>
-                    </div>
-                  </div>
-                </Card>
-              );
-            }
-            return null;
-          })()}
-        </div>
+        <RoutingSection routingData={routingData} />
       )}
 
       {/* NEIGHBORS */}
@@ -4998,8 +4768,8 @@ const DeviceDetailsView = ({ project, deviceId, goBack, goBackHref, goIndex, goI
           {/* Tabs for Raw view */}
           <div className="flex gap-2 flex-wrap">
             {[
-              { id: "parsed", label: "Parsed Data (JSON)" },
-              { id: "original", label: "Original File Content" }
+              { id: "original", label: "Original File Content" },
+              { id: "parsed", label: "Parsed Data (JSON)" }
             ].map((t) => (
               <button
                 key={t.id}

@@ -1,0 +1,8 @@
+ip,hostname,username,password,secret,port,device_type
+10.4.15.248,ISP,admin,cisco,,22,cisco_ios
+10.4.15.248,CORE1,admin,cisco,,2001,cisco_ios
+10.4.15.248,CORE2,admin,cisco,,2002,cisco_ios
+10.4.15.248,DIST1,admin,cisco,cisco,3001,cisco_ios
+10.4.15.248,DIST2,admin,cisco,cisco,3002,cisco_ios
+10.4.15.248,ACC1,admin,cisco,,4001,cisco_ios
+10.4.15.248,ACC2,admin,cisco,,4002,cisco_ios

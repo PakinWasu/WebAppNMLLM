@@ -1361,6 +1361,7 @@ class CiscoIOSParser(BaseParser):
         """2.3.2.5 - routes (with distance/metric), ospf (interfaces, learned_prefix_count), eigrp, bgp, rip."""
         routes: List[Dict[str, Any]] = []
         route_block = _get_section(content, r"show\s+ip\s+route")
+        config_block = _get_section(content, r"show\s+running-config") or content
         if route_block:
             for line in route_block.split("\n"):
                 line_stripped = line.strip()
@@ -1405,28 +1406,52 @@ class CiscoIOSParser(BaseParser):
                     "distance": distance,
                     "metric": metric,
                 })
-        config_block = _get_section(content, r"show\s+running-config") or content
-        for m in re.finditer(
-            r"ip\s+route\s+(\d+\.\d+\.\d+\.\d+)\s+(\d+\.\d+\.\d+\.\d+)\s+(\d+\.\d+\.\d+\.\d+)(?:\s+(\d+))?(?:\s+(\S+))?",
-            config_block,
-            re.IGNORECASE,
-        ):
-            network_addr, mask, next_hop = m.group(1), m.group(2), m.group(3)
+        # --- Static Routes (2.3.2.5.1) ---
+        static_routes = []
+        
+        # Parse static routes from full content (not just config section)
+        matches = list(re.finditer(
+            r"ip\s+route\s+(\d+\.\d+\.\d+\.\d+)\s+(\d+\.\d+\.\d+\.\d+)\s+(\d+\.\d+\.\d+\.\d+|\S+)(?:\s+(\d+))?(?:\s+(\S+))?$",
+            content,
+            re.IGNORECASE | re.MULTILINE,
+        ))
+        
+        for m in matches:
+            network_addr, mask, third_param = m.group(1), m.group(2), m.group(3)
             fourth, fifth = (m.group(4) or "").strip(), (m.group(5) or "").strip()
-            ad = 1
-            interface = ""
-            if fourth:
-                if fourth.isdigit():
-                    ad = int(fourth)
-                    if fifth and re.match(r"^(Gi|Fa|Eth|Te|Se|Lo|Vl|Po|Serial|GigabitEthernet)", fifth, re.IGNORECASE):
-                        interface = fifth
-                elif re.match(r"^(Gi|Fa|Eth|Te|Se|Lo|Vl|Po|Serial|GigabitEthernet)", fourth, re.IGNORECASE):
-                    interface = fourth
+            admin_distance = 1
+            next_hop = None
+            interface = None
+            
+            # Determine if third_param is IP address (next hop) or interface name
+            if re.match(r"^\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3}$", third_param):
+                next_hop = third_param
+                if fourth:
+                    if fourth.isdigit():
+                        admin_distance = int(fourth)
+                        if fifth and re.match(r"^(Gi|Fa|Eth|Te|Se|Lo|Vl|Po|Serial|GigabitEthernet)", fifth, re.IGNORECASE):
+                            interface = fifth
+                    elif re.match(r"^(Gi|Fa|Eth|Te|Se|Lo|Vl|Po|Serial|GigabitEthernet)", fourth, re.IGNORECASE):
+                        interface = fourth
+            else:
+                # third_param is interface name (directly connected)
+                interface = third_param
+                if fourth and fourth.isdigit():
+                    admin_distance = int(fourth)
+            
             cidr = _mask_to_cidr(mask)
             network = f"{network_addr}/{cidr}" if cidr is not None else network_addr
-            if next((r for r in routes if r["network"] == network and r.get("protocol") == "S"), None):
-                continue
-            routes.append({"protocol": "S", "network": network, "next_hop": next_hop, "interface": interface, "distance": ad, "metric": 0})
+            
+            # Check if default route (0.0.0.0/0)
+            is_default_route = network == "0.0.0.0/0"
+            
+            static_routes.append({
+                "network": network,
+                "next_hop": next_hop,
+                "interface": interface,
+                "admin_distance": admin_distance,
+                "is_default_route": is_default_route
+            })
 
         ospf = {"router_id": None, "process_id": None, "areas": [], "interfaces": [], "neighbors": [], "dr_bdr": {}, "learned_prefix_count": None}
         eigrp = {"as_number": None, "router_id": None, "neighbors": [], "hold_time": None, "learned_routes": []}
@@ -1521,22 +1546,48 @@ class CiscoIOSParser(BaseParser):
             eigrp_as = re.search(r'Routing\s+Protocol\s+is\s+"eigrp\s+(\d+)"', ip_protocols, re.IGNORECASE)
             if eigrp_as:
                 eigrp["as_number"] = int(eigrp_as.group(1))
+        if ip_protocols and eigrp.get("router_id") is None:
+            rid2_m = re.search(r"\bRouter-ID\s*:\s*(\d+\.\d+\.\d+\.\d+)", ip_protocols, re.IGNORECASE)
+            if rid2_m:
+                eigrp["router_id"] = rid2_m.group(1)
+        if ip_protocols and eigrp.get("hold_time") is None:
+            hold_m = re.search(r"\bNSF-aware\s+route\s+hold\s+timer\s+is\s+(\d+)", ip_protocols, re.IGNORECASE)
+            if hold_m:
+                try:
+                    eigrp["hold_time"] = int(hold_m.group(1))
+                except ValueError:
+                    pass
         eigrp_neigh_section = _get_section(content, r"show\s+ip\s+eigrp\s+neighbors")
         if not eigrp_neigh_section:
             eigrp_neigh_section = _get_section(content, r"show\s+ip\s+eigrp\s+neighbour")
         if eigrp_neigh_section:
             for line in eigrp_neigh_section.split("\n"):
                 line_strip = line.strip()
-                if not line_strip or "Address" in line_strip and "Interface" in line_strip:
+                if not line_strip:
                     continue
-                nbr_m = re.match(r"(\d+\.\d+\.\d+\.\d+)\s+(\S+)\s+(\d+)", line_strip)
+                if line_strip.startswith("EIGRP-"):
+                    continue
+                if line_strip.startswith("H") and "Address" in line_strip and "Interface" in line_strip:
+                    continue
+
+                # Format example:
+                # 1   10.0.11.2               Gi0/0                    13 00:09:18    4   100  0  11
+                nbr_m = re.match(
+                    r"^\s*\d+\s+(\d+\.\d+\.\d+\.\d+)\s+(\S+)\s+(\d+)\s+(\d{2}:\d{2}:\d{2})\b",
+                    line_strip,
+                )
                 if nbr_m:
                     eigrp["neighbors"].append({
                         "address": nbr_m.group(1),
                         "interface": nbr_m.group(2),
                         "hold_time": int(nbr_m.group(3)),
+                        "uptime": nbr_m.group(4),
                     })
-        eigrp["learned_routes"] = [r for r in routes if (r.get("protocol") or "").strip().startswith("D")]
+
+        eigrp["learned_routes"] = [
+            r for r in routes
+            if (r.get("protocol") or "").strip().startswith("D") or (r.get("protocol") or "").strip().upper().startswith("EX")
+        ]
 
         # --- BGP (Scope 2.3.2.5.4) ---
         bgp_m = re.search(r"router\s+bgp\s+(\d+)", config_block, re.IGNORECASE)
@@ -1780,7 +1831,14 @@ class CiscoIOSParser(BaseParser):
         if not rip["interfaces"] and rip["participating_interfaces"]:
             rip["interfaces"] = [p["name"] for p in rip["participating_interfaces"]]
 
-        result = {"routes": routes, "ospf": ospf, "eigrp": eigrp, "bgp": bgp, "rip": rip}
+        result = {
+            "static_routes": {"routes": static_routes},
+            "routes": routes, 
+            "ospf": ospf, 
+            "eigrp": eigrp, 
+            "bgp": bgp, 
+            "rip": rip
+        }
         if rip_found:
             result["rip_v2_info"] = rip
         return result

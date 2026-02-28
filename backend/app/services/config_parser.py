@@ -350,6 +350,41 @@ def normalize_huawei_to_legacy(parsed: Dict[str, Any]) -> Dict[str, Any]:
     ospf_obj = routing_raw.get("ospf")
     if not isinstance(ospf_obj, dict):
         ospf_obj = {"router_id": None, "process_id": None, "areas": [], "interfaces": [], "neighbors": [], "dr_bdr_info": {}, "learned_prefixes": []}
+
+    # Ensure OSPF interfaces are Cisco-like objects: [{interface, area}, ...]
+    # Some older Huawei parses store OSPF networks as strings ("<net> <wildcard>").
+    # UI expects interface+area rows; when we don't have a direct mapping, infer
+    # participating interfaces from runtime-derived blocks.
+    try:
+        _ifaces = ospf_obj.get("interfaces")
+        if isinstance(_ifaces, list) and _ifaces and isinstance(_ifaces[0], str):
+            inferred_ifaces: List[str] = []
+            dr_bdr_info = ospf_obj.get("dr_bdr_info")
+            if isinstance(dr_bdr_info, dict):
+                inferred_ifaces.extend([k for k in dr_bdr_info.keys() if isinstance(k, str) and k])
+            neighbors = ospf_obj.get("neighbors")
+            if isinstance(neighbors, list):
+                for n in neighbors:
+                    if not isinstance(n, dict):
+                        continue
+                    ifname = n.get("interface")
+                    if isinstance(ifname, str) and ifname:
+                        inferred_ifaces.append(ifname)
+            seen = set()
+            inferred_ifaces_unique = []
+            for n in inferred_ifaces:
+                if n in seen:
+                    continue
+                seen.add(n)
+                inferred_ifaces_unique.append(n)
+            default_area = None
+            areas = ospf_obj.get("areas")
+            if isinstance(areas, list) and areas and isinstance(areas[0], str):
+                default_area = areas[0]
+            if inferred_ifaces_unique:
+                ospf_obj["interfaces"] = [{"interface": ifn, "area": default_area} for ifn in inferred_ifaces_unique]
+    except Exception:
+        pass
     eigrp_obj = routing_raw.get("eigrp")
     if not isinstance(eigrp_obj, dict):
         eigrp_obj = {"as_number": None, "router_id": None, "neighbors": [], "hold_time": None, "learned_routes": []}
