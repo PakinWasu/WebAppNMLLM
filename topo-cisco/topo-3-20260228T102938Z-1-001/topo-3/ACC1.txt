@@ -1,0 +1,1102 @@
+ACC1#term len 0
+ACC1#! --- System Info ---
+ACC1#show version
+Cisco IOS Software, Solaris Software (I86BI_LINUXL2-IPBASEK9-M), Experimental Version 15.1(20130726:213425) [dstivers-july26-2013-team_track 105]
+Copyright (c) 1986-2013 by Cisco Systems, Inc.
+Compiled Fri 26-Jul-13 16:12 by dstivers
+
+ROM: Bootstrap program is Linux
+
+ACC1 uptime is 9 minutes
+System returned to ROM by reload at 0
+System image file is "unix:/opt/unetlab/addons/iol/bin/i86bi-linux-l2-ipbasek9-15.1g.bin"
+Last reload reason: Unknown reason
+
+
+
+This product contains cryptographic features and is subject to United
+States and local country laws governing import, export, transfer and
+use. Delivery of Cisco cryptographic products does not imply
+third-party authority to import, export, distribute or use encryption.
+Importers, exporters, distributors and users are responsible for
+compliance with U.S. and local country laws. By using this product you
+agree to comply with applicable laws and regulations. If you are unable
+to comply with U.S. and local laws, return this product immediately.
+
+A summary of U.S. laws governing Cisco cryptographic products may be found at:
+http://www.cisco.com/wwl/export/crypto/tool/stqrg.html
+
+If you require further assistance please contact us by sending email to
+export@cisco.com.
+
+Linux Unix (Intel-x86) processor with 985906K bytes of memory.
+Processor board ID 67108992
+8 Ethernet interfaces
+1 Virtual Ethernet interface
+1024K bytes of NVRAM.
+
+Configuration register is 0x0
+
+ACC1#show running-config
+Building configuration...
+
+Current configuration : 1971 bytes
+!
+! Last configuration change at 12:43:45 ICT Sat Feb 28 2026
+!
+version 15.1
+service timestamps debug datetime msec
+service timestamps log datetime msec
+no service password-encryption
+service compress-config
+!
+hostname ACC1
+!
+boot-start-marker
+boot-end-marker
+!
+!
+!
+username admin privilege 15 secret 4 tnhtc92DXBhelxjYk8LWJrPV36S2i4ntXrpb4RFmfqY
+no aaa new-model
+clock timezone ICT 7 0
+no ipv6 cef
+ipv6 multicast rpf use-bgp
+no ip routing
+!
+ip domain-name lab.local
+no ip cef
+!
+!
+!
+!
+!
+spanning-tree mode pvst
+spanning-tree extend system-id
+no spanning-tree vlan 1-4094
+!
+!
+!
+!
+vlan internal allocation policy ascending
+!
+ip ssh version 2
+!
+!
+!
+!
+!
+!
+!
+!
+!
+interface Ethernet0/0
+ switchport access vlan 99
+ switchport trunk encapsulation dot1q
+ switchport mode access
+ duplex auto
+ no keepalive
+!
+interface Ethernet0/1
+ switchport trunk encapsulation dot1q
+ switchport trunk native vlan 10
+ switchport mode trunk
+!
+interface Ethernet0/2
+ shutdown
+ duplex auto
+!
+interface Ethernet0/3
+ shutdown
+ duplex auto
+!
+interface Ethernet1/0
+ switchport access vlan 10
+ switchport mode access
+ shutdown
+ duplex auto
+ spanning-tree portfast
+ spanning-tree bpduguard enable
+!
+interface Ethernet1/1
+ switchport access vlan 10
+ switchport mode access
+ shutdown
+ duplex auto
+ spanning-tree portfast
+ spanning-tree bpduguard enable
+!
+interface Ethernet1/2
+ switchport access vlan 10
+ switchport mode access
+ shutdown
+ duplex auto
+ spanning-tree portfast
+ spanning-tree bpduguard enable
+!
+interface Ethernet1/3
+ switchport access vlan 10
+ switchport mode access
+ shutdown
+ duplex auto
+ spanning-tree portfast
+ spanning-tree bpduguard enable
+!
+interface Vlan99
+ ip address 192.168.99.11 255.255.255.0
+ no ip route-cache
+!
+ip default-gateway 192.168.99.2
+!
+no ip http server
+!
+!
+!
+!
+snmp-server community public RO
+snmp-server community private RW
+!
+control-plane
+!
+!
+line con 0
+ logging synchronous
+line aux 0
+line vty 0 4
+ login local
+ transport input all
+!
+ntp server 192.168.99.2
+end
+
+ACC1#show processes cpu sorted
+CPU utilization for five seconds: 0%/0%; one minute: 0%; five minutes: 0%
+ PID Runtime(ms)     Invoked      uSecs   5Sec   1Min   5Min TTY Process
+  50         170       61543          2  0.15%  0.12%  0.09%   0 Ethernet Msec Ti
+ 107         112       68797          1  0.15%  0.08%  0.06%   0 HQF Input Shaper
+   3           0           5          0  0.00%  0.00%  0.00%   0 DHCPD Timer    
+   4          22          73        301  0.00%  0.00%  0.00%   0 Check heaps    
+   5           0          10          0  0.00%  0.00%  0.00%   0 Pool Manager   
+   6           0           1          0  0.00%  0.00%  0.00%   0 DiscardQ Backgro
+   2           2         111         18  0.00%  0.00%  0.00%   0 Load Meter     
+   8           0          14          0  0.00%  0.00%  0.00%   0 WATCH_AFS      
+   9           0           1          0  0.00%  0.00%  0.00%   0 OIR Handler    
+  10           0           2          0  0.00%  0.00%  0.00%   0 DDR Timers     
+  11           0           2          0  0.00%  0.00%  0.00%   0 Dialer event   
+   1           0           4          0  0.00%  0.00%  0.00%   0 Chunk Manager  
+   7           0           2          0  0.00%  0.00%  0.00%   0 Timers         
+  12           0           2          0  0.00%  0.00%  0.00%   0 Serial Backgroun
+  15           3         584          5  0.00%  0.00%  0.00%   0 ARP Background 
+  16           0           1          0  0.00%  0.00%  0.00%   0 AAA_SERVER_DEADT
+  17           0           1          0  0.00%  0.00%  0.00%   0 Policy Manager 
+  18           0           1          0  0.00%  0.00%  0.00%   0 Entity MIB API 
+  19           0         110          0  0.00%  0.00%  0.00%   0 IPC Event Notifi
+  20           0         534          0  0.00%  0.00%  0.00%   0 IPC Mcast Pendin
+  21           0          10          0  0.00%  0.00%  0.00%   0 IPC Dynamic Cach
+  22           0           1          0  0.00%  0.00%  0.00%   0 IPC Session Serv
+  23           0           1          0  0.00%  0.00%  0.00%   0 IPC Zone Manager
+  13           0           1          0  0.00%  0.00%  0.00%   0 IFS Agent Manage
+  14           0          11          0  0.00%  0.00%  0.00%   0 ARP Input      
+  26           0           1          0  0.00%  0.00%  0.00%   0 IPC Process leve
+  24           1         534          1  0.00%  0.00%  0.00%   0 IPC Periodic Tim
+  28           0          32          0  0.00%  0.00%  0.00%   0 IPC Check Queue
+  29           0           1          0  0.00%  0.00%  0.00%   0 IPC Seat RX Cont
+  30           0           1          0  0.00%  0.00%  0.00%   0 IPC Seat TX Cont
+  31           0          55          0  0.00%  0.00%  0.00%   0 IPC Keep Alive M
+  32           1         110          9  0.00%  0.00%  0.00%   0 IPC Loadometer 
+  33           0           3          0  0.00%  0.00%  0.00%   0 PrstVbl        
+  34           0           1          0  0.00%  0.00%  0.00%   0 SERIAL A'detect
+  35           0           1          0  0.00%  0.00%  0.00%   0 ARP Snoop      
+  36           2         549          3  0.00%  0.00%  0.00%   0 GraphIt        
+  37           0           1          0  0.00%  0.00%  0.00%   0 Inode Table Dest
+  38           0           1          0  0.00%  0.00%  0.00%   0 Critical Bkgnd 
+  39           2         375          5  0.00%  0.00%  0.00%   0 Net Background 
+  40           0           2          0  0.00%  0.00%  0.00%   0 IDB Work       
+  41           0          15          0  0.00%  0.00%  0.00%   0 Logger         
+  42           5         543          9  0.00%  0.00%  0.00%   0 TTY Background 
+  43           1           3        333  0.00%  0.00%  0.00%   0 IF-MGR control p
+  44           0          11          0  0.00%  0.00%  0.00%   0 IF-MGR event pro
+  45           0           1          0  0.00%  0.00%  0.00%   0 AggMgr Process 
+  46           0           1          0  0.00%  0.00%  0.00%   0 Transport Port A
+  25           2         534          3  0.00%  0.00%  0.00%   0 IPC Deferred Por
+  48           0           2          0  0.00%  0.00%  0.00%   0 Ethernet CFM   
+  49          14        3126          4  0.00%  0.00%  0.00%   0 Ethernet Timer C
+  27           0           1          0  0.00%  0.00%  0.00%   0 IPC Seat Manager
+  51           0           2          0  0.00%  0.00%  0.00%   0 Ethernet CFM IOU
+  52           0           2          0  0.00%  0.00%  0.00%   0 AAA Server     
+  47           1         164          6  0.00%  0.00%  0.00%   0 HC Counter Timer
+  54           0           1          0  0.00%  0.00%  0.00%   0 ACCT Periodic Pr
+  55           0           1          0  0.00%  0.00%  0.00%   0 AAA System Acct
+  56           0           1          0  0.00%  0.00%  0.00%   0 AUTH POLICY Fram
+  57           0          13          0  0.00%  0.00%  0.00%   0 Auth Manager   
+  58           0           2          0  0.00%  0.00%  0.00%   0 Dot1x Mgr Proces
+  59           0           1          0  0.00%  0.00%  0.00%   0 EAP Framework  
+  60           0           1          0  0.00%  0.00%  0.00%   0 EAP Test       
+  61           0           2          0  0.00%  0.00%  0.00%   0 EFP Errd       
+  62           0           2          0  0.00%  0.00%  0.00%   0 Ethernet LMI   
+  63           0           1          0  0.00%  0.00%  0.00%   0 SSS Manager    
+  64           0           1          0  0.00%  0.00%  0.00%   0 SSS Feature Mana
+  65           5        2140          2  0.00%  0.00%  0.00%   0 SSS Feature Time
+  66           0           2          0  0.00%  0.00%  0.00%   0 SSM connection m
+  67           0           2          0  0.00%  0.00%  0.00%   0 ATM OAM Input  
+  68           0           2          0  0.00%  0.00%  0.00%   0 ATM OAM TIMER  
+  69           0           1          0  0.00%  0.00%  0.00%   0 IPv6 ping proces
+  70           0           1          0  0.00%  0.00%  0.00%   0 PPPATM Session d
+  71           0           2          0  0.00%  0.00%  0.00%   0 PASVC create VA
+  72           0           5          0  0.00%  0.00%  0.00%   0 DHCP Snooping  
+  73           0           7          0  0.00%  0.00%  0.00%   0 802.1x switch  
+  74           0           1          0  0.00%  0.00%  0.00%   0 802.1x Webauth F
+  75           1           7        142  0.00%  0.00%  0.00%   0 DTP Protocol   
+  76           3         547          5  0.00%  0.00%  0.00%   0 PI MATM Aging Pr
+  77           0          10          0  0.00%  0.00%  0.00%   0 Port-Security  
+  78           0           2          0  0.00%  0.00%  0.00%   0 IP Host Track Pr
+  79           0          57          0  0.00%  0.00%  0.00%   0 Ethchnl        
+  80           0           1          0  0.00%  0.00%  0.00%   0 UNIX IP Source g
+  81           0          11          0  0.00%  0.00%  0.00%   0 process unix_l2_
+  82           0           2          0  0.00%  0.00%  0.00%   0 CMD HANDLER    
+  83           0           3          0  0.00%  0.00%  0.00%   0 VMATM Callback 
+  84           3          87         34  0.00%  0.00%  0.00%   0 CDP Protocol   
+  85          21          47        446  0.00%  0.01%  0.00%   0 Exec           
+  86           0           3          0  0.00%  0.00%  0.00%   0 SSH Event handle
+  87           0           2          0  0.00%  0.00%  0.00%   0 AAA Dictionary R
+  88           0           2          0  0.00%  0.00%  0.00%   0 CEF switching ba
+  89           0           1          0  0.00%  0.00%  0.00%   0 ADJ NSF process
+  90           0           2          0  0.00%  0.00%  0.00%   0 IP ARP Adjacency
+  91          35       15176          2  0.00%  0.01%  0.00%   0 IP ARP Retry Age
+  92           0          14          0  0.00%  0.00%  0.00%   0 IP Input       
+  93           0           1          0  0.00%  0.00%  0.00%   0 ICMP event handl
+  53           0           1          0  0.00%  0.00%  0.00%   0 AAA ACCT Proc  
+  95           0           3          0  0.00%  0.00%  0.00%   0 PIM register asy
+  97           1         160          6  0.00%  0.00%  0.00%   0 Spanning Tree  
+  98           0           1          0  0.00%  0.00%  0.00%   0 PPP IP Add Route
+  99           0           1          0  0.00%  0.00%  0.00%   0 Critical Auth  
+ 100           0           2          0  0.00%  0.00%  0.00%   0 Dot1x Supplicant
+ 101           0           2          0  0.00%  0.00%  0.00%   0 Dot1x Supplicant
+ 102           0           2          0  0.00%  0.00%  0.00%   0 Dot1x Supplicant
+ 103           0          11          0  0.00%  0.00%  0.00%   0 CEF background p
+ 104           0           1          0  0.00%  0.00%  0.00%   0 fib_fib_bfd_sb e
+ 105           0           1          0  0.00%  0.00%  0.00%   0 IP IRDP        
+ 106         212       68798          3  0.00%  0.14%  0.12%   0 HQF Shaper Backg
+  94           1        1064          0  0.00%  0.00%  0.00%   0 IP ARP Track   
+ 108           0           1          0  0.00%  0.00%  0.00%   0 MAB Framework  
+ 109           0           2          0  0.00%  0.00%  0.00%   0 Routing Topology
+ 110           0           4          0  0.00%  0.00%  0.00%   0 IP RIB Update  
+ 111           0          15          0  0.00%  0.00%  0.00%   0 DHCPD Database 
+ 112           0           3          0  0.00%  0.00%  0.00%   0 SpanTree Helper
+ 113           0           1          0  0.00%  0.00%  0.00%   0 TCP Timer      
+ 114           0           1          0  0.00%  0.00%  0.00%   0 TCP Protocols  
+ 115           0           1          0  0.00%  0.00%  0.00%   0 COPS           
+ 116           2         544          3  0.00%  0.00%  0.00%   0 Socket Timers  
+ 117           0           1          0  0.00%  0.00%  0.00%   0 Probe Input    
+ 118           0           2          0  0.00%  0.00%  0.00%   0 HTTP CORE      
+ 119           0           1          0  0.00%  0.00%  0.00%   0 IP SNMP        
+ 120           0           1          0  0.00%  0.00%  0.00%   0 PDU DISPATCHER 
+ 122           0           2          0  0.00%  0.00%  0.00%   0 ADJ background 
+ 123           0           1          0  0.00%  0.00%  0.00%   0 IPv6 RIB Cleanup
+ 124           0           1          0  0.00%  0.00%  0.00%   0 IPv6 RIB Event H
+ 125           0           1          0  0.00%  0.00%  0.00%   0 PAD InCall     
+ 126           0           2          0  0.00%  0.00%  0.00%   0 X.25 Background
+ 127           0           1          0  0.00%  0.00%  0.00%   0 X.25 Encaps Mana
+ 128           1        1088          0  0.00%  0.00%  0.00%   0 DHCPD Receive  
+ 129           0           3          0  0.00%  0.00%  0.00%   0 Flow Exporter Ti
+ 130           0           1          0  0.00%  0.00%  0.00%   0 RARP Input     
+ 131           0           6          0  0.00%  0.00%  0.00%   0 IGMPSN L2MCM   
+ 132           7       86599          0  0.00%  0.56%  0.14%   0 IGMPSN MRD     
+ 133           0           1          0  0.00%  0.00%  0.00%   0 IGMPSN         
+ 134           0           2          0  0.00%  0.00%  0.00%   0 ADJ resolve proc
+ 135           0           3          0  0.00%  0.00%  0.00%   0 MFIB Master back
+ 136           0           2          0  0.00%  0.00%  0.00%   0 Multicast Offloa
+ 137           0           2          0  0.00%  0.00%  0.00%   0 MVPN mgr Process
+ 138           0           2          0  0.00%  0.00%  0.00%   0 static         
+ 139           2          55         36  0.00%  0.00%  0.00%   0 QoS stats proces
+ 140           0           2          0  0.00%  0.00%  0.00%   0 SNMP Timers    
+ 141           0           2          0  0.00%  0.00%  0.00%   0 AAA Cached Serve
+ 142           0           2          0  0.00%  0.00%  0.00%   0 LINE AAA       
+ 143           0           2          0  0.00%  0.00%  0.00%   0 TPLUS          
+ 144           0           2          0  0.00%  0.00%  0.00%   0 ENABLE AAA     
+ 145           0           2          0  0.00%  0.00%  0.00%   0 LOCAL AAA      
+ 146           3        1064          2  0.00%  0.00%  0.00%   0 Timer Library  
+ 147           0           3          0  0.00%  0.00%  0.00%   0 NIST rng proc  
+ 148           0           2          0  0.00%  0.00%  0.00%   0 Crypto Support 
+ 149           0           1          0  0.00%  0.00%  0.00%   0 IPSECv6 PS Proc
+ 150           0           1          0  0.00%  0.00%  0.00%   0 EM Background Pr
+ 151           0           3          0  0.00%  0.00%  0.00%   0 LDAP process   
+ 152           0           3          0  0.00%  0.00%  0.00%   0 Collection proce
+ 153           0           2          0  0.00%  0.00%  0.00%   0 MMON PROCESS   
+ 154          48       17109          2  0.00%  0.01%  0.00%   0 MMON MENG      
+ 155           3           9        333  0.00%  0.00%  0.00%   0 crypto engine pr
+ 156           5         547          9  0.00%  0.00%  0.00%   0 Crypto IKEv2   
+ 157           0           1          0  0.00%  0.00%  0.00%   0 IKEv2 AAA handle
+ 158           0           3          0  0.00%  0.00%  0.00%   0 CRYPTO MAP FREE
+ 159           0           1          0  0.00%  0.00%  0.00%   0 Crypto INT     
+ 160           0           3          0  0.00%  0.00%  0.00%   0 Crypto IKE Dispa
+ 161           0           3          0  0.00%  0.00%  0.00%   0 Crypto IKMP    
+ 162           0           1          0  0.00%  0.00%  0.00%   0 IPSEC manual key
+ 163           0          29          0  0.00%  0.00%  0.00%   0 IPSEC key engine
+ 164           0           1          0  0.00%  0.00%  0.00%   0 Crypto ACL     
+ 165           0           1          0  0.00%  0.00%  0.00%   0 Crypto PAS Proc
+ 166           0           1          0  0.00%  0.00%  0.00%   0 IPSec background
+ 167           0           4          0  0.00%  0.00%  0.00%   0 Crypto CA      
+ 168           0           1          0  0.00%  0.00%  0.00%   0 Crypto PKI-CRL 
+ 169           0           1          0  0.00%  0.00%  0.00%   0 encrypt proc   
+ 170          20           5       4000  0.00%  0.00%  0.00%   0 crypto sw pk pro
+ 171           1           2        500  0.00%  0.00%  0.00%   0 DHCP Security He
+ 172           0           3          0  0.00%  0.00%  0.00%   0 pm scp dummy pro
+ 173           0          86          0  0.00%  0.00%  0.00%   0 PM Callback    
+ 174           0          45          0  0.00%  0.00%  0.00%   0 dhcp snooping sw
+ 175           0           2          0  0.00%  0.00%  0.00%   0 AAA SEND STOP EV
+ 176           0           1          0  0.00%  0.00%  0.00%   0 Test AAA Client
+ 177           0           1          0  0.00%  0.00%  0.00%   0 Syslog Traps   
+ 178           0          11          0  0.00%  0.00%  0.00%   0 Syslog         
+ 179           0           4          0  0.00%  0.00%  0.00%   0 VLAN Manager   
+ 181           0           1          0  0.00%  0.00%  0.00%   0 Net Input      
+ 182           2         112         17  0.00%  0.00%  0.00%   0 Compute load avg
+ 183          24          20       1200  0.00%  0.01%  0.00%   0 Per-minute Jobs
+ 184           5         551          9  0.00%  0.00%  0.00%   0 Per-Second Jobs
+ 185           0           2          0  0.00%  0.00%  0.00%   0 MRIB Process   
+ 186           0           1          0  0.00%  0.00%  0.00%   0 SNMP ENGINE    
+ 187           0           1          0  0.00%  0.00%  0.00%   0 IP SNMPV6      
+ 188           0           1          0  0.00%  0.00%  0.00%   0 SNMP Traps     
+ 189           2         549          3  0.00%  0.00%  0.00%   0 NTP            
+ACC1#show memory statistics
+                Head    Total(b)     Used(b)     Free(b)   Lowest(b)  Largest(b)
+Processor   B75A7010   1009568544    30756660   978811884   977529968   978427204
+ACC1#
+ACC1#! --- Interfaces & VLANs ---
+ACC1#show interfaces
+Ethernet0/0 is up, line protocol is up (connected)
+  Hardware is AmdP2, address is aabb.cc00.8000 (bia aabb.cc00.8000)
+  MTU 1500 bytes, BW 10000 Kbit/sec, DLY 1000 usec,
+     reliability 255/255, txload 1/255, rxload 1/255
+  Encapsulation ARPA, loopback not set
+  Keepalive not set
+  Auto-duplex, Auto-speed, media type is unknown
+  input flow-control is off, output flow-control is unsupported
+  ARP type: ARPA, ARP Timeout 04:00:00
+  Last input 00:00:00, output 00:00:20, output hang never
+  Last clearing of "show interface" counters never
+  Input queue: 0/2000/0/0 (size/max/drops/flushes); Total output drops: 0
+  Queueing strategy: fifo
+  Output queue: 0/0 (size/max)
+  5 minute input rate 0 bits/sec, 0 packets/sec
+  5 minute output rate 0 bits/sec, 0 packets/sec
+     140 packets input, 11254 bytes, 0 no buffer
+     Received 126 broadcasts (0 multicasts)
+     0 runts, 0 giants, 0 throttles
+     0 input errors, 0 CRC, 0 frame, 0 overrun, 0 ignored
+     0 input packets with dribble condition detected
+     33 packets output, 7731 bytes, 0 underruns
+     0 output errors, 0 collisions, 0 interface resets
+     0 unknown protocol drops
+     0 babbles, 0 late collision, 0 deferred
+     0 lost carrier, 0 no carrier
+     0 output buffer failures, 0 output buffers swapped out
+Ethernet0/1 is up, line protocol is up (connected)
+  Hardware is AmdP2, address is aabb.cc00.8010 (bia aabb.cc00.8010)
+  MTU 1500 bytes, BW 10000 Kbit/sec, DLY 1000 usec,
+     reliability 255/255, txload 1/255, rxload 10/255
+  Encapsulation ARPA, loopback not set
+  Keepalive set (10 sec)
+  Auto-duplex, Auto-speed, media type is unknown
+  input flow-control is off, output flow-control is unsupported
+  ARP type: ARPA, ARP Timeout 04:00:00
+  Last input 00:00:18, output 00:00:00, output hang never
+  Last clearing of "show interface" counters never
+  Input queue: 0/2000/0/0 (size/max/drops/flushes); Total output drops: 0
+  Queueing strategy: fifo
+  Output queue: 0/0 (size/max)
+  5 minute input rate 409000 bits/sec, 853 packets/sec
+  5 minute output rate 0 bits/sec, 0 packets/sec
+     273744 packets input, 16427508 bytes, 0 no buffer
+     Received 92 broadcasts (0 multicasts)
+     0 runts, 0 giants, 0 throttles
+     0 input errors, 0 CRC, 0 frame, 0 overrun, 0 ignored
+     0 input packets with dribble condition detected
+     26 packets output, 4584 bytes, 0 underruns
+     0 output errors, 0 collisions, 0 interface resets
+     0 unknown protocol drops
+     0 babbles, 0 late collision, 0 deferred
+     0 lost carrier, 0 no carrier
+     0 output buffer failures, 0 output buffers swapped out
+Ethernet0/2 is administratively down, line protocol is down (disabled)
+  Hardware is AmdP2, address is aabb.cc00.8020 (bia aabb.cc00.8020)
+  MTU 1500 bytes, BW 10000 Kbit/sec, DLY 1000 usec,
+     reliability 255/255, txload 1/255, rxload 1/255
+  Encapsulation ARPA, loopback not set
+  Keepalive set (10 sec)
+  Auto-duplex, Auto-speed, media type is unknown
+  input flow-control is off, output flow-control is unsupported
+  ARP type: ARPA, ARP Timeout 04:00:00
+  Last input never, output 00:09:07, output hang never
+  Last clearing of "show interface" counters never
+  Input queue: 0/2000/0/0 (size/max/drops/flushes); Total output drops: 0
+  Queueing strategy: fifo
+  Output queue: 0/0 (size/max)
+  5 minute input rate 0 bits/sec, 0 packets/sec
+  5 minute output rate 0 bits/sec, 0 packets/sec
+     0 packets input, 0 bytes, 0 no buffer
+     Received 0 broadcasts (0 multicasts)
+     0 runts, 0 giants, 0 throttles
+     0 input errors, 0 CRC, 0 frame, 0 overrun, 0 ignored
+     0 input packets with dribble condition detected
+     2 packets output, 154 bytes, 0 underruns
+     0 output errors, 0 collisions, 0 interface resets
+     0 unknown protocol drops
+     0 babbles, 0 late collision, 0 deferred
+     0 lost carrier, 0 no carrier
+     0 output buffer failures, 0 output buffers swapped out
+Ethernet0/3 is administratively down, line protocol is down (disabled)
+  Hardware is AmdP2, address is aabb.cc00.8030 (bia aabb.cc00.8030)
+  MTU 1500 bytes, BW 10000 Kbit/sec, DLY 1000 usec,
+     reliability 255/255, txload 1/255, rxload 1/255
+  Encapsulation ARPA, loopback not set
+  Keepalive set (10 sec)
+  Auto-duplex, Auto-speed, media type is unknown
+  input flow-control is off, output flow-control is unsupported
+  ARP type: ARPA, ARP Timeout 04:00:00
+  Last input never, output 00:09:07, output hang never
+  Last clearing of "show interface" counters never
+  Input queue: 0/2000/0/0 (size/max/drops/flushes); Total output drops: 0
+  Queueing strategy: fifo
+  Output queue: 0/0 (size/max)
+  5 minute input rate 0 bits/sec, 0 packets/sec
+  5 minute output rate 0 bits/sec, 0 packets/sec
+     0 packets input, 0 bytes, 0 no buffer
+     Received 0 broadcasts (0 multicasts)
+     0 runts, 0 giants, 0 throttles
+     0 input errors, 0 CRC, 0 frame, 0 overrun, 0 ignored
+     0 input packets with dribble condition detected
+     2 packets output, 154 bytes, 0 underruns
+     0 output errors, 0 collisions, 0 interface resets
+     0 unknown protocol drops
+     0 babbles, 0 late collision, 0 deferred
+     0 lost carrier, 0 no carrier
+     0 output buffer failures, 0 output buffers swapped out
+Ethernet1/0 is administratively down, line protocol is down (disabled)
+  Hardware is AmdP2, address is aabb.cc00.8001 (bia aabb.cc00.8001)
+  MTU 1500 bytes, BW 10000 Kbit/sec, DLY 1000 usec,
+     reliability 255/255, txload 1/255, rxload 1/255
+  Encapsulation ARPA, loopback not set
+  Keepalive set (10 sec)
+  Auto-duplex, Auto-speed, media type is unknown
+  input flow-control is off, output flow-control is unsupported
+  ARP type: ARPA, ARP Timeout 04:00:00
+  Last input never, output 00:09:07, output hang never
+  Last clearing of "show interface" counters never
+  Input queue: 0/2000/0/0 (size/max/drops/flushes); Total output drops: 0
+  Queueing strategy: fifo
+  Output queue: 0/0 (size/max)
+  5 minute input rate 0 bits/sec, 0 packets/sec
+  5 minute output rate 0 bits/sec, 0 packets/sec
+     0 packets input, 0 bytes, 0 no buffer
+     Received 0 broadcasts (0 multicasts)
+     0 runts, 0 giants, 0 throttles
+     0 input errors, 0 CRC, 0 frame, 0 overrun, 0 ignored
+     0 input packets with dribble condition detected
+     4 packets output, 308 bytes, 0 underruns
+     0 output errors, 0 collisions, 0 interface resets
+     0 unknown protocol drops
+     0 babbles, 0 late collision, 0 deferred
+     0 lost carrier, 0 no carrier
+     0 output buffer failures, 0 output buffers swapped out
+Ethernet1/1 is administratively down, line protocol is down (disabled)
+  Hardware is AmdP2, address is aabb.cc00.8011 (bia aabb.cc00.8011)
+  MTU 1500 bytes, BW 10000 Kbit/sec, DLY 1000 usec,
+     reliability 255/255, txload 1/255, rxload 1/255
+  Encapsulation ARPA, loopback not set
+  Keepalive set (10 sec)
+  Auto-duplex, Auto-speed, media type is unknown
+  input flow-control is off, output flow-control is unsupported
+  ARP type: ARPA, ARP Timeout 04:00:00
+  Last input never, output 00:09:07, output hang never
+  Last clearing of "show interface" counters never
+  Input queue: 0/2000/0/0 (size/max/drops/flushes); Total output drops: 0
+  Queueing strategy: fifo
+  Output queue: 0/0 (size/max)
+  5 minute input rate 0 bits/sec, 0 packets/sec
+  5 minute output rate 0 bits/sec, 0 packets/sec
+     0 packets input, 0 bytes, 0 no buffer
+     Received 0 broadcasts (0 multicasts)
+     0 runts, 0 giants, 0 throttles
+     0 input errors, 0 CRC, 0 frame, 0 overrun, 0 ignored
+     0 input packets with dribble condition detected
+     4 packets output, 308 bytes, 0 underruns
+     0 output errors, 0 collisions, 0 interface resets
+     0 unknown protocol drops
+     0 babbles, 0 late collision, 0 deferred
+     0 lost carrier, 0 no carrier
+     0 output buffer failures, 0 output buffers swapped out
+Ethernet1/2 is administratively down, line protocol is down (disabled)
+  Hardware is AmdP2, address is aabb.cc00.8021 (bia aabb.cc00.8021)
+  MTU 1500 bytes, BW 10000 Kbit/sec, DLY 1000 usec,
+     reliability 255/255, txload 1/255, rxload 1/255
+  Encapsulation ARPA, loopback not set
+  Keepalive set (10 sec)
+  Auto-duplex, Auto-speed, media type is unknown
+  input flow-control is off, output flow-control is unsupported
+  ARP type: ARPA, ARP Timeout 04:00:00
+  Last input never, output 00:09:07, output hang never
+  Last clearing of "show interface" counters never
+  Input queue: 0/2000/0/0 (size/max/drops/flushes); Total output drops: 0
+  Queueing strategy: fifo
+  Output queue: 0/0 (size/max)
+  5 minute input rate 0 bits/sec, 0 packets/sec
+  5 minute output rate 0 bits/sec, 0 packets/sec
+     0 packets input, 0 bytes, 0 no buffer
+     Received 0 broadcasts (0 multicasts)
+     0 runts, 0 giants, 0 throttles
+     0 input errors, 0 CRC, 0 frame, 0 overrun, 0 ignored
+     0 input packets with dribble condition detected
+     4 packets output, 308 bytes, 0 underruns
+     0 output errors, 0 collisions, 0 interface resets
+     0 unknown protocol drops
+     0 babbles, 0 late collision, 0 deferred
+     0 lost carrier, 0 no carrier
+     0 output buffer failures, 0 output buffers swapped out
+Ethernet1/3 is administratively down, line protocol is down (disabled)
+  Hardware is AmdP2, address is aabb.cc00.8031 (bia aabb.cc00.8031)
+  MTU 1500 bytes, BW 10000 Kbit/sec, DLY 1000 usec,
+     reliability 255/255, txload 1/255, rxload 1/255
+  Encapsulation ARPA, loopback not set
+  Keepalive set (10 sec)
+  Auto-duplex, Auto-speed, media type is unknown
+  input flow-control is off, output flow-control is unsupported
+  ARP type: ARPA, ARP Timeout 04:00:00
+  Last input never, output 00:09:07, output hang never
+  Last clearing of "show interface" counters never
+  Input queue: 0/2000/0/0 (size/max/drops/flushes); Total output drops: 0
+  Queueing strategy: fifo
+  Output queue: 0/0 (size/max)
+  5 minute input rate 0 bits/sec, 0 packets/sec
+  5 minute output rate 0 bits/sec, 0 packets/sec
+     0 packets input, 0 bytes, 0 no buffer
+     Received 0 broadcasts (0 multicasts)
+     0 runts, 0 giants, 0 throttles
+     0 input errors, 0 CRC, 0 frame, 0 overrun, 0 ignored
+     0 input packets with dribble condition detected
+     4 packets output, 308 bytes, 0 underruns
+     0 output errors, 0 collisions, 0 interface resets
+     0 unknown protocol drops
+     0 babbles, 0 late collision, 0 deferred
+     0 lost carrier, 0 no carrier
+     0 output buffer failures, 0 output buffers swapped out
+Vlan99 is up, line protocol is up
+  Hardware is Ethernet SVI, address is aabb.cc80.8000 (bia aabb.cc80.8000)
+  Internet address is 192.168.99.11/24
+  MTU 1500 bytes, BW 1000000 Kbit/sec, DLY 10 usec,
+     reliability 255/255, txload 1/255, rxload 1/255
+  Encapsulation ARPA, loopback not set
+  Keepalive not supported
+  ARP type: ARPA, ARP Timeout 04:00:00
+  Last input 00:00:20, output never, output hang never
+  Last clearing of "show interface" counters never
+  Input queue: 0/75/0/0 (size/max/drops/flushes); Total output drops: 0
+  Queueing strategy: fifo
+  Output queue: 0/40 (size/max)
+  5 minute input rate 0 bits/sec, 0 packets/sec
+  5 minute output rate 0 bits/sec, 0 packets/sec
+     14 packets input, 880 bytes, 0 no buffer
+     Received 9 broadcasts (0 IP multicasts)
+     0 runts, 0 giants, 0 throttles
+     0 input errors, 0 CRC, 0 frame, 0 overrun, 0 ignored
+     12 packets output, 960 bytes, 0 underruns
+     0 output errors, 0 interface resets
+     0 unknown protocol drops
+     0 output buffer failures, 0 output buffers swapped out
+ACC1#show interfaces switchport
+Name: Et0/0
+Switchport: Enabled
+Administrative Mode: static access
+Operational Mode: static access
+Administrative Trunking Encapsulation: dot1q
+Operational Trunking Encapsulation: native
+Negotiation of Trunking: Off
+Access Mode VLAN: 99 (VLAN0099)
+Trunking Native Mode VLAN: 1 (default)
+Administrative Native VLAN tagging: enabled
+Voice VLAN: none
+Administrative private-vlan host-association: none
+Administrative private-vlan mapping: none
+Administrative private-vlan trunk native VLAN: none
+Administrative private-vlan trunk Native VLAN tagging: enabled
+Administrative private-vlan trunk encapsulation: dot1q
+Administrative private-vlan trunk normal VLANs: none
+Administrative private-vlan trunk associations: none
+Administrative private-vlan trunk mappings: none
+Operational private-vlan: none
+Trunking VLANs Enabled: ALL
+Pruning VLANs Enabled: 2-1001
+Capture Mode Disabled
+Capture VLANs Allowed: ALL
+
+Appliance trust: none
+
+Name: Et0/1
+Switchport: Enabled
+Administrative Mode: trunk
+Operational Mode: trunk
+Administrative Trunking Encapsulation: dot1q
+Operational Trunking Encapsulation: dot1q
+Negotiation of Trunking: On
+Access Mode VLAN: 1 (default)
+Trunking Native Mode VLAN: 10 (VLAN0010)
+Administrative Native VLAN tagging: enabled
+Voice VLAN: none
+Administrative private-vlan host-association: none
+Administrative private-vlan mapping: none
+Administrative private-vlan trunk native VLAN: none
+Administrative private-vlan trunk Native VLAN tagging: enabled
+Administrative private-vlan trunk encapsulation: dot1q
+Administrative private-vlan trunk normal VLANs: none
+Administrative private-vlan trunk associations: none
+Administrative private-vlan trunk mappings: none
+Operational private-vlan: none
+Trunking VLANs Enabled: ALL
+Pruning VLANs Enabled: 2-1001
+Capture Mode Disabled
+Capture VLANs Allowed: ALL
+
+Appliance trust: none
+
+Name: Et0/2
+Switchport: Enabled
+Administrative Mode: dynamic desirable
+Operational Mode: down
+Administrative Trunking Encapsulation: negotiate
+Negotiation of Trunking: On
+Access Mode VLAN: 1 (default)
+Trunking Native Mode VLAN: 1 (default)
+Administrative Native VLAN tagging: enabled
+Voice VLAN: none
+Administrative private-vlan host-association: none
+Administrative private-vlan mapping: none
+Administrative private-vlan trunk native VLAN: none
+Administrative private-vlan trunk Native VLAN tagging: enabled
+Administrative private-vlan trunk encapsulation: dot1q
+Administrative private-vlan trunk normal VLANs: none
+Administrative private-vlan trunk associations: none
+Administrative private-vlan trunk mappings: none
+Operational private-vlan: none
+Trunking VLANs Enabled: ALL
+Pruning VLANs Enabled: 2-1001
+Capture Mode Disabled
+Capture VLANs Allowed: ALL
+
+Appliance trust: none
+
+Name: Et0/3
+Switchport: Enabled
+Administrative Mode: dynamic desirable
+Operational Mode: down
+Administrative Trunking Encapsulation: negotiate
+Negotiation of Trunking: On
+Access Mode VLAN: 1 (default)
+Trunking Native Mode VLAN: 1 (default)
+Administrative Native VLAN tagging: enabled
+Voice VLAN: none
+Administrative private-vlan host-association: none
+Administrative private-vlan mapping: none
+Administrative private-vlan trunk native VLAN: none
+Administrative private-vlan trunk Native VLAN tagging: enabled
+Administrative private-vlan trunk encapsulation: dot1q
+Administrative private-vlan trunk normal VLANs: none
+Administrative private-vlan trunk associations: none
+Administrative private-vlan trunk mappings: none
+Operational private-vlan: none
+Trunking VLANs Enabled: ALL
+Pruning VLANs Enabled: 2-1001
+Capture Mode Disabled
+Capture VLANs Allowed: ALL
+
+Appliance trust: none
+
+Name: Et1/0
+Switchport: Enabled
+Administrative Mode: static access
+Operational Mode: down
+Administrative Trunking Encapsulation: negotiate
+Negotiation of Trunking: Off
+Access Mode VLAN: 10 (VLAN0010)
+Trunking Native Mode VLAN: 1 (default)
+Administrative Native VLAN tagging: enabled
+Voice VLAN: none
+Administrative private-vlan host-association: none
+Administrative private-vlan mapping: none
+Administrative private-vlan trunk native VLAN: none
+Administrative private-vlan trunk Native VLAN tagging: enabled
+Administrative private-vlan trunk encapsulation: dot1q
+Administrative private-vlan trunk normal VLANs: none
+Administrative private-vlan trunk associations: none
+Administrative private-vlan trunk mappings: none
+Operational private-vlan: none
+Trunking VLANs Enabled: ALL
+Pruning VLANs Enabled: 2-1001
+Capture Mode Disabled
+Capture VLANs Allowed: ALL
+
+Appliance trust: none
+
+Name: Et1/1
+Switchport: Enabled
+Administrative Mode: static access
+Operational Mode: down
+Administrative Trunking Encapsulation: negotiate
+Negotiation of Trunking: Off
+Access Mode VLAN: 10 (VLAN0010)
+Trunking Native Mode VLAN: 1 (default)
+Administrative Native VLAN tagging: enabled
+Voice VLAN: none
+Administrative private-vlan host-association: none
+Administrative private-vlan mapping: none
+Administrative private-vlan trunk native VLAN: none
+Administrative private-vlan trunk Native VLAN tagging: enabled
+Administrative private-vlan trunk encapsulation: dot1q
+Administrative private-vlan trunk normal VLANs: none
+Administrative private-vlan trunk associations: none
+Administrative private-vlan trunk mappings: none
+Operational private-vlan: none
+Trunking VLANs Enabled: ALL
+Pruning VLANs Enabled: 2-1001
+Capture Mode Disabled
+Capture VLANs Allowed: ALL
+
+Appliance trust: none
+
+Name: Et1/2
+Switchport: Enabled
+Administrative Mode: static access
+Operational Mode: down
+Administrative Trunking Encapsulation: negotiate
+Negotiation of Trunking: Off
+Access Mode VLAN: 10 (VLAN0010)
+Trunking Native Mode VLAN: 1 (default)
+Administrative Native VLAN tagging: enabled
+Voice VLAN: none
+Administrative private-vlan host-association: none
+Administrative private-vlan mapping: none
+Administrative private-vlan trunk native VLAN: none
+Administrative private-vlan trunk Native VLAN tagging: enabled
+Administrative private-vlan trunk encapsulation: dot1q
+Administrative private-vlan trunk normal VLANs: none
+Administrative private-vlan trunk associations: none
+Administrative private-vlan trunk mappings: none
+Operational private-vlan: none
+Trunking VLANs Enabled: ALL
+Pruning VLANs Enabled: 2-1001
+Capture Mode Disabled
+Capture VLANs Allowed: ALL
+
+Appliance trust: none
+
+Name: Et1/3
+Switchport: Enabled
+Administrative Mode: static access
+Operational Mode: down
+Administrative Trunking Encapsulation: negotiate
+Negotiation of Trunking: Off
+Access Mode VLAN: 10 (VLAN0010)
+Trunking Native Mode VLAN: 1 (default)
+Administrative Native VLAN tagging: enabled
+Voice VLAN: none
+Administrative private-vlan host-association: none
+Administrative private-vlan mapping: none
+Administrative private-vlan trunk native VLAN: none
+Administrative private-vlan trunk Native VLAN tagging: enabled
+Administrative private-vlan trunk encapsulation: dot1q
+Administrative private-vlan trunk normal VLANs: none
+Administrative private-vlan trunk associations: none
+Administrative private-vlan trunk mappings: none
+Operational private-vlan: none
+Trunking VLANs Enabled: ALL
+Pruning VLANs Enabled: 2-1001
+Capture Mode Disabled
+Capture VLANs Allowed: ALL
+
+Appliance trust: none
+ACC1#show ip interface brief
+Interface              IP-Address      OK? Method Status                Protocol
+Ethernet0/0            unassigned      YES unset  up                    up
+Ethernet0/1            unassigned      YES unset  up                    up
+Ethernet0/2            unassigned      YES unset  administratively down down
+Ethernet0/3            unassigned      YES unset  administratively down down
+Ethernet1/0            unassigned      YES unset  administratively down down
+Ethernet1/1            unassigned      YES unset  administratively down down
+Ethernet1/2            unassigned      YES unset  administratively down down
+Ethernet1/3            unassigned      YES unset  administratively down down
+Vlan99                 192.168.99.11   YES NVRAM  up                    up
+ACC1#show ipv6 interface brief
+Ethernet0/0            [up/up]
+    unassigned
+Ethernet0/1            [up/up]
+    unassigned
+Ethernet0/2            [administratively down/down]
+    unassigned
+Ethernet0/3            [administratively down/down]
+    unassigned
+Ethernet1/0            [administratively down/down]
+    unassigned
+Ethernet1/1            [administratively down/down]
+    unassigned
+Ethernet1/2            [administratively down/down]
+    unassigned
+Ethernet1/3            [administratively down/down]
+    unassigned
+Vlan99                 [up/up]
+    unassigned
+ACC1#show vlan brief
+
+VLAN Name                             Status    Ports
+---- -------------------------------- --------- -------------------------------
+1    default                          active    Et0/2, Et0/3
+10   VLAN0010                         active    Et1/0, Et1/1, Et1/2, Et1/3
+20   VLAN0020                         active
+99   VLAN0099                         active    Et0/0
+1002 fddi-default                     act/unsup
+1003 token-ring-default               act/unsup
+1004 fddinet-default                  act/unsup
+1005 trnet-default                    act/unsup
+ACC1#show spanning-tree
+
+No spanning tree instance exists.
+
+ACC1#show spanning-tree summary
+Switch is in pvst mode
+Root bridge for: none
+Extended system ID           is enabled
+Portfast Default             is disabled
+PortFast BPDU Guard Default  is disabled
+Portfast BPDU Filter Default is disabled
+Loopguard Default            is disabled
+EtherChannel misconfig guard is enabled
+Configured Pathcost method used is short
+UplinkFast                   is disabled
+BackboneFast                 is disabled
+
+Name                   Blocking Listening Learning Forwarding STP Active
+---------------------- -------- --------- -------- ---------- ----------
+Total                        0         0        0          0          0
+ACC1#show spanning-tree detail
+
+No spanning tree instance exists.
+
+ACC1#
+ACC1#! --- Routing & Neighbors ---
+ACC1#show ip protocols
+*** IP Routing is NSF aware ***
+
+ACC1#show ip route
+Default gateway is 192.168.99.2
+
+Host               Gateway           Last Use    Total Uses  Interface
+ICMP redirect cache is empty
+ACC1#show ipv6 route
+ACC1#show ip ospf
+ACC1#show ip ospf neighbor
+ACC1#show ip eigrp neighbors
+ACC1#show ip rip database
+ACC1#show ip route rip
+Default gateway is 192.168.99.2
+
+Host               Gateway           Last Use    Total Uses  Interface
+ICMP redirect cache is empty
+ACC1#show ip bgp summary
+% BGP not active
+
+ACC1#show bgp ipv4 unicast summary
+% BGP not active
+
+ACC1#show cdp neighbors detail
+-------------------------
+Device ID: DIST2.lab.local
+Entry address(es):
+  IP address: 10.14.2.2
+Platform: Linux Unix,  Capabilities: Router Switch IGMP
+Interface: Ethernet0/1,  Port ID (outgoing port): Ethernet0/2
+Holdtime : 131 sec
+
+Version :
+Cisco IOS Software, Solaris Software (I86BI_LINUXL2-IPBASEK9-M), Experimental Version 15.1(20130726:213425) [dstivers-july26-2013-team_track 105]
+Copyright (c) 1986-2013 by Cisco Systems, Inc.
+Compiled Fri 26-Jul-13 16:12 by dstivers
+
+advertisement version: 2
+VTP Management Domain: ''
+Native VLAN: 10
+Duplex: full
+Management address(es):
+  IP address: 10.14.2.2
+
+-------------------------
+Device ID: DIST1
+Entry address(es):
+  IP address: 192.168.99.2
+Platform: Linux Unix,  Capabilities: Router Switch IGMP
+Interface: Ethernet0/0,  Port ID (outgoing port): Ethernet0/2
+Holdtime : 121 sec
+
+Version :
+Cisco IOS Software, Solaris Software (I86BI_LINUXL2-IPBASEK9-M), Experimental Version 15.1(20130726:213425) [dstivers-july26-2013-team_track 105]
+Copyright (c) 1986-2013 by Cisco Systems, Inc.
+Compiled Fri 26-Jul-13 16:12 by dstivers
+
+advertisement version: 2
+VTP Management Domain: ''
+Native VLAN: 99
+Duplex: half
+Management address(es):
+  IP address: 192.168.99.2
+
+ACC1#show lldp neighbors detail
+            ^
+% Invalid input detected at '^' marker.
+
+ACC1#
+ACC1#! --- Tables ---
+ACC1#show mac address-table
+          Mac Address Table
+-------------------------------------------
+
+Vlan    Mac Address       Type        Ports
+----    -----------       --------    -----
+  99    aabb.cc80.6000    DYNAMIC     Et0/0
+  10    aabb.cc80.b000    DYNAMIC     Et0/1
+Total Mac Addresses for this criterion: 2
+ACC1#show ip arp
+Protocol  Address          Age (min)  Hardware Addr   Type   Interface
+Internet  192.168.99.2            8   aabb.cc80.6000  ARPA   Vlan99
+Internet  192.168.99.11           -   aabb.cc80.8000  ARPA   Vlan99
+ACC1#show ipv6 neighbors
+ACC1#
+ACC1#! --- Security & Management ---
+ACC1#show ssh
+%No SSHv2 server connections running.
+%No SSHv1 server connections running.
+ACC1#show ntp status
+Clock is unsynchronized, stratum 16, no reference clock
+nominal freq is 250.0000 Hz, actual freq is 250.0000 Hz, precision is 2**10
+ntp uptime is 54800 (1/100 of seconds), resolution is 4000
+reference time is 00000000.00000000 (07:00:00.000 ICT Mon Jan 1 1900)
+clock offset is 0.0000 msec, root delay is 0.00 msec
+root dispersion is 8.22 msec, peer dispersion is 0.00 msec
+loopfilter state is 'FSET' (Drift set from file), drift is 0.000000000 s/s
+system poll interval is 8, never updated.
+ACC1#show logging
+Syslog logging: enabled (0 messages dropped, 0 messages rate-limited, 0 flushes, 0 overruns, xml disabled, filtering disabled)
+
+No Active Message Discriminator.
+
+
+
+No Inactive Message Discriminator.
+
+
+    Console logging: level debugging, 28 messages logged, xml disabled,
+                     filtering disabled
+    Monitor logging: level debugging, 0 messages logged, xml disabled,
+                     filtering disabled
+    Buffer logging:  level debugging, 28 messages logged, xml disabled,
+                    filtering disabled
+    Exception Logging: size (4096 bytes)
+    Count and timestamp logging messages: disabled
+    Persistent logging: disabled
+    Trap logging: level informational, 31 message lines logged
+        Logging Source-Interface:       VRF Name:
+
+Log Buffer (4096 bytes):
+
+*Feb 28 05:35:32.265: %SPANTREE-5-EXTENDED_SYSID: Extended SysId enabled for type vlan
+*Feb 28 05:35:32.310: %SYS-6-CLOCKUPDATE: System clock has been updated from 05:35:32 UTC Sat Feb 28 2026 to 12:35:32 ICT Sat Feb 28 2026, configured from console by console.
+*Feb 28 05:35:32.373: %SYS-5-CONFIG_I: Configured from memory by console
+*Feb 28 05:35:32.394: %SYS-5-RESTART: System restarted --
+Cisco IOS Software, Solaris Software (I86BI_LINUXL2-IPBASEK9-M), Experimental Version 15.1(20130726:213425) [dstivers-july26-2013-team_track 105]
+Copyright (c) 1986-2013 by Cisco Systems, Inc.
+Compiled Fri 26-Jul-13 16:12 by dstivers
+*Feb 28 05:35:32.400: %SSH-5-ENABLED: SSH 2.0 has been enabled
+*Feb 28 05:35:32.405: %CRYPTO-6-ISAKMP_ON_OFF: ISAKMP is OFF
+*Feb 28 05:35:32.405: %CRYPTO-6-ISAKMP_ON_OFF: ISAKMP is OFF
+*Feb 28 05:35:34.098: %LINK-3-UPDOWN: Interface Ethernet0/0, changed state to up
+*Feb 28 05:35:34.111: %LINK-5-CHANGED: Interface Ethernet0/1, changed state to administratively down
+*Feb 28 05:35:34.120: %LINK-5-CHANGED: Interface Ethernet0/2, changed state to administratively down
+*Feb 28 05:35:34.128: %LINK-5-CHANGED: Interface Ethernet0/3, changed state to administratively down
+*Feb 28 05:35:34.141: %LINK-5-CHANGED: Interface Ethernet1/0, changed state to administratively down
+*Feb 28 05:35:34.159: %LINK-5-CHANGED: Interface Ethernet1/1, changed state to administratively down
+*Feb 28 05:35:34.168: %LINK-5-CHANGED: Interface Ethernet1/2, changed state to administratively down
+*Feb 28 05:35:34.176: %LINK-5-CHANGED: Interface Ethernet1/3, changed state to administratively down
+*Feb 28 05:35:34.405: %LINK-3-UPDOWN: Interface Vlan99, changed state to up
+*Feb 28 05:35:35.103: %LINEPROTO-5-UPDOWN: Line protocol on Interface Ethernet0/0, changed state to up
+*Feb 28 05:35:35.111: %LINEPROTO-5-UPDOWN: Line protocol on Interface Ethernet0/1, changed state to down
+*Feb 28 05:35:35.120: %LINEPROTO-5-UPDOWN: Line protocol on Interface Ethernet0/2, changed state to down
+*Feb 28 05:35:35.129: %LINEPROTO-5-UPDOWN: Line protocol on Interface Ethernet0/3, changed state to down
+*Feb 28 05:35:35.146: %LINEPROTO-5-UPDOWN: Line protocol on Interface Ethernet1/0, changed state to down
+*Feb 28 05:35:35.159: %LINEPROTO-5-UPDOWN: Line protocol on Interface Ethernet1/1, changed state to down
+*Feb 28 05:35:35.176: %LINEPROTO-5-UPDOWN: Line protocol on Interface Ethernet1/2, changed state to down
+*Feb 28 05:35:35.176: %LINEPROTO-5-UPDOWN: Line protocol on Interface Ethernet1/3, changed state to down
+*Feb 28 05:35:35.406: %LINEPROTO-5-UPDOWN: Line protocol on Interface Vlan99, changed state to up
+*Feb 28 05:43:45.293: %SYS-5-CONFIG_I: Configured from console by console
+*Feb 28 05:43:47.289: %LINK-3-UPDOWN: Interface Ethernet0/1, changed state to up
+*Feb 28 05:43:48.292: %LINEPROTO-5-UPDOWN: Line protocol on Interface Ethernet0/1, changed state to up
+ACC1#show access-lists
+ACC1#show snmp
+Chassis: 67108992
+0 SNMP packets input
+    0 Bad SNMP version errors
+    0 Unknown community name
+    0 Illegal operation for community name supplied
+    0 Encoding errors
+    0 Number of requested variables
+    0 Number of altered variables
+    0 Get-request PDUs
+    0 Get-next PDUs
+    0 Set-request PDUs
+    0 Input queue packet drops (Maximum queue size 1000)
+0 SNMP packets output
+    0 Too big errors (Maximum packet size 1500)
+    0 No such name errors
+    0 Bad values errors
+    0 General errors
+    0 Response PDUs
+    0 Trap PDUs
+SNMP global trap: disabled
+
+SNMP logging: disabled
+ACC1#show snmp community
+
+Community name: private
+Community Index: private
+Community SecurityName: private
+storage-type: nonvolatile        active
+
+
+Community name: public
+Community Index: public
+Community SecurityName: public
+storage-type: nonvolatile        active
+
+
+ACC1#show snmp host
+ACC1#show snmp user
+
+ACC1#
+ACC1#! --- HA ---
+ACC1#show etherchannel summary
+Flags:  D - down        P - bundled in port-channel
+        I - stand-alone s - suspended
+        H - Hot-standby (LACP only)
+        R - Layer3      S - Layer2
+        U - in use      f - failed to allocate aggregator
+
+        M - not in use, minimum links not met
+        u - unsuitable for bundling
+        w - waiting to be aggregated
+        d - default port
+
+
+Number of channel-groups in use: 0
+Number of aggregators:           0
+
+Group  Port-channel  Protocol    Ports
+------+-------------+-----------+-----------------------------------------------
+
+ACC1#show standby brief
+ACC1#show vrrp brief
+Interface          Grp Pri Time  Own Pre State   Master addr     Group addr

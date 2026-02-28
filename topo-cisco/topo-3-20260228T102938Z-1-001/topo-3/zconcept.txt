@@ -1,0 +1,37 @@
+1. โซน EDGE (Security & External Routing)
+
+BGP: รัน eBGP คุยกับ ISP (LLM จะได้ข้อมูล AS Number, Peers, Advertised/Received Prefixes)
+
+Static Route: สร้าง Static Route ชี้ไปยัง Network ปลายทางแบบเฉพาะเจาะจง (เช่น ip route 10.99.99.0 255.255.255.0 Null0) จะได้ไม่โชว์แค่ 0.0.0.0
+
+ACL: สร้าง Access-list ชื่อ MONITOR-TRAFFIC แขวนไว้ที่พอร์ตขาออก
+
+NAT: ทำ Port Forwarding ให้สคริปต์ Netmiko ทะลุเข้ามาเก็บคอนฟิกได้
+
+2. โซน CORE (Backbone & High Availability)
+
+OSPF: รัน OSPF Area 0 คุยกับ EDGE (LLM จะได้ Area ID, Router ID)
+
+EIGRP: รัน EIGRP AS 100 จ่าย Route ลงไปให้ฝั่ง DIST
+
+RIPv2: CORE2 จะเชื่อมต่อกับ BRANCH-RTR ด้วย RIP version 2 (LLM จะได้ข้อมูล Networks และ Interfaces ของ RIP)
+
+VRRP: CORE1 และ CORE2 ทำตัวเป็น Gateway ลอย (VRRP) สำหรับวง Server (VLAN 30)
+
+EtherChannel (L3): มัดสายระหว่าง CORE1-CORE2 เป็น Layer 3 Port-channel (No switchport)
+
+3. โซน DISTRIBUTION (L2/L3 Boundary)
+
+HSRP: DIST1 และ DIST2 ทำตัวเป็น Gateway ลอย (HSRP) สำหรับวง User (VLAN 10, 20)
+
+EtherChannel (L2): มัดสายเป็น Trunk Layer 2 Port-channel
+
+STP (Spanning Tree): DIST1 บังคับเป็น Root Bridge, DIST2 เป็น Secondary Root
+
+4. โซน ACCESS (End-Devices & Security)
+
+VLANs & Access: ผูก VLAN ลงพอร์ต
+
+STP Features: เปิด Spanning-tree PortFast และ BPDU Guard ที่พอร์ตขาลง
+
+Management: ทุกตัว (ตั้งแต่ Edge ยัน Access) จะถูกคอนฟิก SSH, NTP, Syslog (Logging), AAA และ SNMP (v2c/v3) ตามที่คุณลิสต์ไว้ทั้งหมด

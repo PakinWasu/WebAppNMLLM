@@ -102,11 +102,48 @@ class OSPFInfo(BaseModel):
     networks: List[str] = Field(default_factory=list)
 
 
+class RIPTimer(BaseModel):
+    """RIP Timers (Seconds)"""
+    update: Optional[int] = 30
+    age: Optional[int] = 180
+    garbage_collect: Optional[int] = 120
+    # Cisco-compat aliases (mapped from Age/Garbage)
+    invalid: Optional[int] = 180
+    hold_down: Optional[int] = 180
+    flush: Optional[int] = 240
+
+
+class RIPRoute(BaseModel):
+    """RIP Route Entry"""
+    network: str
+    admin_distance: Optional[int] = 100
+    metric: Optional[int] = None
+    next_hop: Optional[str] = None
+    interface: Optional[str] = None
+    # Cisco-compat aliases
+    hop_count: Optional[int] = None
+
+
+class RIPV2Info(BaseModel):
+    """Enhanced RIP Information (2.3.2.5.5)"""
+    version: Optional[int] = 2
+    timers: RIPTimer = Field(default_factory=RIPTimer)
+    networks: List[str] = Field(default_factory=list)  # Advertised
+    advertised_networks: List[str] = Field(default_factory=list)
+    learned_routes: List[RIPRoute] = Field(default_factory=list)
+    passive_interfaces: List[str] = Field(default_factory=list)
+    participating_interfaces: List[Dict[str, Any]] = Field(default_factory=list)
+    auto_summary: Optional[bool] = None
+    admin_distance: Optional[int] = 100
+
+
 class RIPInfo(BaseModel):
-    """RIP configuration"""
+    """RIP configuration (Legacy wrapper for backward compatibility)"""
     process_id: Optional[int] = None
     version: Optional[int] = None
     networks: List[str] = Field(default_factory=list)
+    # Merged detailed info
+    details: Optional[RIPV2Info] = None
 
 
 class BGPInfo(BaseModel):
@@ -2092,6 +2129,8 @@ class HuaweiParser(BaseParser):
             "interfaces": [],
             "auto_summary": True,
             "passive_interfaces": [],
+            "silent_all": False,
+            "silent_disabled": [],
             "timers": {"update": 30, "invalid": 180, "garbage": 120},
             "admin_distance": 100,
         }
@@ -2165,12 +2204,22 @@ class HuaweiParser(BaseParser):
                             }
                         except ValueError:
                             pass
-                if "undo summary" in line_stripped or line_stripped.strip() == "undo summary":
+                if "undo summary" in line_stripped:
                     rip_data["auto_summary"] = False
                 if line_stripped.startswith("silent-interface "):
-                    iface = line_stripped.split()[-1]
-                    if iface not in rip_data["passive_interfaces"]:
-                        rip_data["passive_interfaces"].append(iface)
+                    parts = line_stripped.split()
+                    if len(parts) >= 2:
+                        val = parts[1]
+                        if val == "all":
+                            rip_data["silent_all"] = True
+                        elif val == "disable":
+                            # 'silent-interface disable Ethernet0/0/0'
+                            if len(parts) >= 3:
+                                rip_data["silent_disabled"].append(parts[2])
+                        else:
+                            # 'silent-interface Ethernet0/0/1'
+                            if val not in rip_data["passive_interfaces"]:
+                                rip_data["passive_interfaces"].append(val)
 
             elif current_protocol == "bgp":
                 if line_stripped.startswith("peer ") and "as-number" in line_stripped:
@@ -2448,11 +2497,100 @@ class HuaweiParser(BaseParser):
 
         # RIP learned networks (2.3.2.5.5.2) and hop count (2.3.2.5.5.3): from routing table protocol R
         if routing_data.get("rip") is not None:
-            routing_data["rip"].setdefault("learned_networks", [])
+            rip = routing_data["rip"]
+            rip["learned_routes"] = []
             rip_routes = [r for r in routing_data.get("routes", []) if (r.get("protocol") or "").upper() == "R"]
-            routing_data["rip"]["learned_networks"] = [r["network"] for r in rip_routes]
+            
+            for rr in rip_routes:
+                route_obj = {
+                    "network": rr["network"],
+                    "admin_distance": rr.get("admin_distance", 100),
+                    "metric": rr.get("metric"),
+                    "hop_count": rr.get("metric"),
+                    "next_hop": rr.get("next_hop"),
+                    "interface": rr.get("interface"),
+                    "uptime": "" # Huawei route table brief usually doesn't show uptime
+                }
+                rip["learned_routes"].append(route_obj)
+            
+            rip["learned_networks"] = [r["network"] for r in rip_routes]
             metrics = [r["metric"] for r in rip_routes if r.get("metric") is not None]
-            routing_data["rip"]["hop_count"] = max(metrics) if metrics else None
+            rip["hop_count"] = max(metrics) if metrics else None
+
+            # Participating interfaces (2.3.2.5.5.4)
+            # Cisco parity: name, send, recv
+            rip["participating_interfaces"] = []
+            silent_all = rip.get("silent_all", False)
+            silent_disabled = rip.get("silent_disabled", [])
+            
+            # Re-calculate based on networks
+            p_ifaces = []
+            for net in rip.get("networks", []):
+                for iface, ip in interface_ip_map.items():
+                    if _ip_in_rip_network(ip, net) and iface not in p_ifaces:
+                        p_ifaces.append(iface)
+            
+            for iface in p_ifaces:
+                # Is it passive?
+                is_passive = False
+                canonical_if = _canonical_interface_name_huawei(iface)
+                
+                # Check if this specific interface or its canonical name is in silent_disabled
+                is_disabled = any(_canonical_interface_name_huawei(sd) == canonical_if for sd in silent_disabled)
+                
+                if silent_all:
+                    if not is_disabled:
+                        is_passive = True
+                elif iface in rip.get("passive_interfaces", []):
+                    # Manual passive entry
+                    is_passive = True
+                
+                if is_passive:
+                    if iface not in rip["passive_interfaces"]:
+                        rip["passive_interfaces"].append(iface)
+                else:
+                    # Not passive, remove from passive_interfaces if it was there (e.g. from silent_all logic)
+                    if iface in rip["passive_interfaces"]:
+                        rip["passive_interfaces"].remove(iface)
+                
+                rip["participating_interfaces"].append({
+                    "name": iface,
+                    "send": str(rip.get("version") or "2"),
+                    "recv": str(rip.get("version") or "2"),
+                    "passive": is_passive
+                })
+            
+            # Sync legacy fields
+            rip["interfaces"] = [p["name"] for p in rip["participating_interfaces"] if not p.get("passive")]
+            rip["advertised_networks"] = rip.get("networks", [])
+            
+            # Convert Timers to Cisco Names
+            timers = rip.get("timers", {"update": 30, "invalid": 180, "garbage": 120})
+            rip["timers"] = {
+                "update": timers.get("update", 30),
+                "age": timers.get("invalid", 180),
+                "garbage_collect": timers.get("garbage", 120),
+                "invalid": timers.get("invalid", 180),
+                "hold_down": timers.get("invalid", 180), # Huawei Age is roughly Cisco Invalid/Hold
+                "flush": timers.get("garbage", 120) + timers.get("invalid", 180) # Huawei flush is usually age + garbage
+            }
+            
+            # Wrap in RIPV2Info for validation/export
+            try:
+                rip_info = RIPV2Info(
+                    version=int(rip.get("version", 2)) if str(rip.get("version")).isdigit() else 2,
+                    timers=RIPTimer(**rip["timers"]),
+                    networks=rip["networks"],
+                    advertised_networks=rip["advertised_networks"],
+                    learned_routes=[RIPRoute(**r) for r in rip["learned_routes"]],
+                    passive_interfaces=rip["passive_interfaces"],
+                    participating_interfaces=rip["participating_interfaces"],
+                    auto_summary=rip.get("auto_summary"),
+                    admin_distance=rip.get("admin_distance", 100)
+                )
+                rip["details"] = rip_info.model_dump()
+            except Exception as e:
+                print(f"RIP Validation Error: {e}")
 
         # OSPF learned prefix summary (2.3.2.5.2.7): from routing table entries with protocol O
         if routing_data.get("ospf") and isinstance(routing_data["ospf"].get("learned_prefixes"), list):

@@ -1,8 +1,35 @@
 """Cisco IOS/IOS-XE configuration parser - spec 2.3.2.1 through 2.3.2.9"""
 
 import re
-from typing import Dict, List, Any, Optional
+from typing import Dict, List, Any, Optional, Union
+from pydantic import BaseModel
 from .base import BaseParser
+
+class RIPTimer(BaseModel):
+    """2.3.2.5.5.6 - RIP Timers"""
+    update: Optional[int] = None
+    invalid: Optional[int] = None
+    hold_down: Optional[int] = None
+    flush: Optional[int] = None
+
+class RIPRoute(BaseModel):
+    """2.3.2.5.5.3 - Learned RIP Route"""
+    network: str
+    admin_distance: Optional[int] = None
+    hop_count: Optional[int] = None
+    next_hop: Optional[str] = None
+    uptime: Optional[str] = None
+
+class RIPV2Info(BaseModel):
+    """2.3.2.5.5 - Comprehensive RIP Information"""
+    version: Optional[int] = None
+    advertised_networks: List[str] = []
+    learned_routes: List[RIPRoute] = []
+    participating_interfaces: List[Dict[str, Any]] = []
+    auto_summary: Optional[bool] = None
+    passive_interfaces: List[str] = []
+    timers: RIPTimer = RIPTimer()
+    admin_distance: Optional[int] = None
 
 
 def _get_section(content: str, command_pattern: str) -> Optional[str]:
@@ -1404,7 +1431,23 @@ class CiscoIOSParser(BaseParser):
         ospf = {"router_id": None, "process_id": None, "areas": [], "interfaces": [], "neighbors": [], "dr_bdr": {}, "learned_prefix_count": None}
         eigrp = {"as_number": None, "router_id": None, "neighbors": [], "hold_time": None, "learned_routes": []}
         bgp = {"local_as": None, "peers": [], "router_id": None}
-        rip = {"version": None, "timers": {"update": None, "invalid": None, "hold": None, "flush": None}, "interfaces": [], "passive_interfaces": []}
+        rip = {
+            "version": None,
+            "advertised_networks": [],
+            "learned_routes": [],
+            "participating_interfaces": [],
+            "auto_summary": None,
+            "passive_interfaces": [],
+            "timers": {
+                "update": None,
+                "invalid": None,
+                "hold": None,        # Legacy
+                "hold_down": None,   # 2.3.2.5.5.6
+                "flush": None,
+            },
+            "admin_distance": None,
+            "interfaces": [],        # Legacy
+        }
 
         # --- OSPF (Scope 2.3.2.5.2) ---
         ospf_m = re.search(r"router\s+ospf\s+(\d+)", config_block, re.IGNORECASE)
@@ -1551,36 +1594,196 @@ class CiscoIOSParser(BaseParser):
             if "neighbor_ip" not in p and p.get("peer"):
                 p["neighbor_ip"] = p["peer"]
 
-        # --- RIP (Scope 2.3.2.5.5) ---
-        rip_m = re.search(r"router\s+rip", config_block, re.IGNORECASE)
-        if rip_m:
-            section = re.search(r"router\s+rip(.*?)(?=router\s+|ip\s+|^!\s*$|\n\s*end\s*$|$)", config_block, re.IGNORECASE | re.DOTALL)
-            if section:
-                body = section.group(1)
-                ver_m = re.search(r"version\s+(\d+)", body, re.IGNORECASE)
+        # --- RIP / RIPv2 (Scope 2.3.2.5.5) ---
+        rip_found = False
+
+        # --- Source 1: running-config (router rip section) ---
+        rip_config_m = re.search(r"router\s+rip", config_block, re.IGNORECASE)
+        if rip_config_m:
+            rip_found = True
+            # Extract the router rip section body (until next 'router', top-level 'ip', '!' or 'end')
+            rip_section = re.search(
+                r"router\s+rip\s*\n(.*?)(?=\nrouter\s+|\n!\s*\n|\nend\s*$|\nip\s+(?:route|prefix|access|name))",
+                config_block, re.IGNORECASE | re.DOTALL
+            )
+            if rip_section:
+                rip_body = rip_section.group(1)
+
+                # 2.3.2.5.5.1 - Version
+                ver_m = re.search(r"version\s+(\d+)", rip_body, re.IGNORECASE)
                 if ver_m:
                     rip["version"] = int(ver_m.group(1))
-                for pass_m in re.finditer(r"passive-interface\s+(\S+)", body, re.IGNORECASE):
-                    rip["passive_interfaces"].append(pass_m.group(1))
-        if ip_protocols:
-            rip_timers = re.search(r"Sending\s+updates\s+every\s+(\d+)\s+seconds", ip_protocols, re.IGNORECASE)
-            if rip_timers:
-                rip["timers"]["update"] = int(rip_timers.group(1))
-            inv_m = re.search(r"Invalid\s+after\s+(\d+)\s+seconds", ip_protocols, re.IGNORECASE)
-            if inv_m:
-                rip["timers"]["invalid"] = int(inv_m.group(1))
-            hold_m = re.search(r"hold\s+down\s+(\d+)", ip_protocols, re.IGNORECASE)
-            if hold_m:
-                rip["timers"]["hold"] = int(hold_m.group(1))
-            flush_m = re.search(r"flushed\s+after\s+(\d+)", ip_protocols, re.IGNORECASE)
-            if flush_m:
-                rip["timers"]["flush"] = int(flush_m.group(1))
-            rip_if_m = re.search(r"Sending\s+updates\s+every\s+\d+\s+seconds[^.]*\.\s*on\s+([^\n]+)", ip_protocols, re.IGNORECASE | re.DOTALL)
-            if rip_if_m:
-                if_str = rip_if_m.group(1).strip()
-                rip["interfaces"] = [x.strip() for x in re.split(r"[\s,]+", if_str) if x.strip() and re.match(r"^(Gi|Fa|Eth|Te|Se|Lo|Vl|Serial|GigabitEthernet)", x.strip(), re.IGNORECASE)]
 
-        return {"routes": routes, "ospf": ospf, "eigrp": eigrp, "bgp": bgp, "rip": rip}
+                # 2.3.2.5.5.2 - Advertised networks (from 'network x.x.x.x')
+                for net_m in re.finditer(r"^\s*network\s+(\d+\.\d+\.\d+\.\d+)", rip_body, re.IGNORECASE | re.MULTILINE):
+                    net = net_m.group(1)
+                    if net not in rip["advertised_networks"]:
+                        rip["advertised_networks"].append(net)
+
+                # 2.3.2.5.5.5 - Auto-summary (default is enabled; 'no auto-summary' disables)
+                if re.search(r"no\s+auto-summary", rip_body, re.IGNORECASE):
+                    rip["auto_summary"] = False
+                else:
+                    rip["auto_summary"] = True
+
+                # 2.3.2.5.5.5 - Passive interfaces
+                passive_default = bool(re.search(r"passive-interface\s+default", rip_body, re.IGNORECASE))
+                if passive_default:
+                    rip["passive_interfaces"] = ["default"]
+                else:
+                    for pass_m in re.finditer(r"passive-interface\s+(\S+)", rip_body, re.IGNORECASE):
+                        iface = pass_m.group(1)
+                        if iface.lower() != "default" and iface not in rip["passive_interfaces"]:
+                            rip["passive_interfaces"].append(iface)
+
+        # --- Source 2: show ip protocols (RIP section only - section splitting) ---
+        if ip_protocols:
+            protocol_blocks = re.split(
+                r'(?=Routing\s+Protocol\s+is\s+")',
+                ip_protocols, flags=re.IGNORECASE
+            )
+            rip_protocol_block = ""
+            for pblock in protocol_blocks:
+                if re.match(r'\s*Routing\s+Protocol\s+is\s+"rip"', pblock, re.IGNORECASE):
+                    rip_protocol_block = pblock
+                    rip_found = True
+                    break
+
+            if rip_protocol_block:
+                # 2.3.2.5.5.1 - Version from show ip protocols
+                send_ver_m = re.search(r"Default\s+version\s+control:\s+send\s+version\s+(\d+),\s*receive\s+version\s+(\d+)", rip_protocol_block, re.IGNORECASE)
+                if send_ver_m and rip["version"] is None:
+                    rip["version"] = int(send_ver_m.group(1))
+
+                # 2.3.2.5.5.4 - Participating Interfaces with send/recv versions
+                iface_header_m = re.search(
+                    r"Interface\s+Send\s+Recv[^\n]*\n((?:\s+\S+\s+\d+\s+\d+[^\n]*\n?)+)",
+                    rip_protocol_block, re.IGNORECASE
+                )
+                if iface_header_m:
+                    iface_lines = iface_header_m.group(1)
+                    for ifl in iface_lines.strip().split("\n"):
+                        ifl = ifl.strip()
+                        ifm = re.match(r"(\S+)\s+(\d+)\s+(\d+)", ifl)
+                        if ifm:
+                            rip["participating_interfaces"].append({
+                                "name": ifm.group(1),
+                                "send": ifm.group(2),
+                                "recv": ifm.group(3),
+                            })
+                            if ifm.group(1) not in rip["interfaces"]:
+                                rip["interfaces"].append(ifm.group(1))
+
+                # 2.3.2.5.5.2 - Routing for Networks (from show ip protocols)
+                routing_for_m = re.search(
+                    r"Routing\s+for\s+Networks:\s*\n(.*?)(?:\n\s*(?:Passive|Routing\s+Information|Default\s+version|Maximum|Automatic|Distance)|\n\s*\n)",
+                    rip_protocol_block, re.IGNORECASE | re.DOTALL
+                )
+                if routing_for_m:
+                    for nl in routing_for_m.group(1).strip().split("\n"):
+                        net = nl.strip().rstrip("/")
+                        if re.match(r"^\d+\.\d+\.\d+\.\d+(?:/\d+)?$", net) and net not in rip["advertised_networks"]:
+                            rip["advertised_networks"].append(net)
+
+                # 2.3.2.5.5.5 - Auto-summary from show ip protocols
+                auto_m = re.search(r"Automatic\s+network\s+summarization\s+is\s+(in\s+effect|not\s+in\s+effect)", rip_protocol_block, re.IGNORECASE)
+                if auto_m:
+                    rip["auto_summary"] = "not" not in auto_m.group(1).lower()
+
+                # 2.3.2.5.5.5 - Passive interfaces from show ip protocols
+                passive_section_m = re.search(
+                    r"Passive\s+Interface\(s\):\s*\n(.*?)(?:\n\s*(?:Routing|Default|Maximum|Distance|Address)|\n\s*\n)",
+                    rip_protocol_block, re.IGNORECASE | re.DOTALL
+                )
+                if passive_section_m:
+                    for pl in passive_section_m.group(1).strip().split("\n"):
+                        iface = pl.strip()
+                        if iface and re.match(r"^[A-Za-z]", iface) and iface not in rip["passive_interfaces"]:
+                            rip["passive_interfaces"].append(iface)
+
+                # 2.3.2.5.5.6 - Timers
+                update_m = re.search(r"Sending\s+updates\s+every\s+(\d+)\s+seconds", rip_protocol_block, re.IGNORECASE)
+                if update_m:
+                    rip["timers"]["update"] = int(update_m.group(1))
+                inv_m = re.search(r"Invalid\s+after\s+(\d+)\s+seconds", rip_protocol_block, re.IGNORECASE)
+                if inv_m:
+                    rip["timers"]["invalid"] = int(inv_m.group(1))
+                hold_m = re.search(r"hold\s*down\s+(\d+)", rip_protocol_block, re.IGNORECASE)
+                if hold_m:
+                    rip["timers"]["hold"] = int(hold_m.group(1))
+                    rip["timers"]["hold_down"] = int(hold_m.group(1))
+                flush_m = re.search(r"flushed\s+after\s+(\d+)", rip_protocol_block, re.IGNORECASE)
+                if flush_m:
+                    rip["timers"]["flush"] = int(flush_m.group(1))
+
+                # 2.3.2.5.5.7 - Administrative Distance
+                dist_m = re.search(r"(?:Default\s+)?[Dd]istance.*?(\d+)", rip_protocol_block, re.IGNORECASE)
+                if dist_m:
+                    rip["admin_distance"] = int(dist_m.group(1))
+
+                # Fallback interfaces
+                if not rip["participating_interfaces"]:
+                    on_m = re.search(
+                        r"Sending\s+updates\s+every\s+\d+\s+seconds[^.]*\.\s*on\s+([^\n]+)",
+                        rip_protocol_block, re.IGNORECASE | re.DOTALL
+                    )
+                    if on_m:
+                        if_str = on_m.group(1).strip()
+                        for iname in re.split(r"[\s,]+", if_str):
+                            iname = iname.strip()
+                            if iname and re.match(r"^(Gi|Fa|Eth|Te|Se|Lo|Vl|Serial|GigabitEthernet|FastEthernet|Loopback|Vlan)", iname, re.IGNORECASE):
+                                rip["participating_interfaces"].append({
+                                    "name": iname,
+                                    "send": str(rip["version"] or ""),
+                                    "recv": str(rip["version"] or ""),
+                                })
+                                if iname not in rip["interfaces"]:
+                                    rip["interfaces"].append(iname)
+
+        # --- Source 3: Routing table (filtered for RIP 'R') ---
+        # Prioritize show ip route; fallback to show ip route rip
+        rip_data_source = route_block if route_block else _get_section(content, r"show\s+ip\s+route\s+rip")
+        if rip_data_source:
+            for line in rip_data_source.split("\n"):
+                line_strip = line.strip()
+                # 2.3.2.5.5.3 - Learned routes (Network, [AD/Metric], Next-hop, Uptime, Interface)
+                # Format: R 10.10.1.0/30 [120/1] via 10.20.1.2, 00:00:20, GigabitEthernet0/0
+                m = re.match(
+                    r"^\s*[R*]+\s+([\d.]+(?:/\d+)?)\s+\[(\d+)/(\d+)\]\s+via\s+([\d.]+)(?:,\s*(\d+:\d+:\d+))?(?:,\s*(\S+))?",
+                    line_strip
+                )
+                if m:
+                    rip["learned_routes"].append({
+                        "network": m.group(1),
+                        "admin_distance": int(m.group(2)),
+                        "hop_count": int(m.group(3)),
+                        "next_hop": m.group(4),
+                        "uptime": m.group(5) or "",
+                        "interface": m.group(6) or "",
+                    })
+
+        if not rip["learned_routes"]:
+            for r in routes:
+                if (r.get("protocol") or "").upper() == "R":
+                    rip["learned_routes"].append({
+                        "network": r.get("network", ""),
+                        "admin_distance": r.get("distance"),
+                        "hop_count": r.get("metric"),
+                        "next_hop": r.get("next_hop", ""),
+                        "uptime": "",
+                    })
+
+        if rip["admin_distance"] is None and rip_found:
+            rip["admin_distance"] = 120
+
+        # Sync legacy interfaces
+        if not rip["interfaces"] and rip["participating_interfaces"]:
+            rip["interfaces"] = [p["name"] for p in rip["participating_interfaces"]]
+
+        result = {"routes": routes, "ospf": ospf, "eigrp": eigrp, "bgp": bgp, "rip": rip}
+        if rip_found:
+            result["rip_v2_info"] = rip
+        return result
 
     def _normalize_neighbor_device_name(self, name: str) -> str:
         """Remove domain suffix for display (e.g. CORE1.lab.local -> CORE1). Keeps FQDN if no dot after hostname."""
