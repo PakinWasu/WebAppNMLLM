@@ -179,15 +179,35 @@ def normalize_cisco_to_legacy(parsed: Dict[str, Any]) -> Dict[str, Any]:
         ssh = sec_audit.get("ssh") or {}
         snmp = sec_audit.get("snmp") or {}
         ntp = sec_audit.get("ntp") or {}
+        aaa = sec_audit.get("aaa") or {}
         logging_obj = sec_audit.get("logging") or {}
         _log_host = (logging_obj.get("syslog_servers") or [None])[0] if logging_obj.get("syslog_servers") else sec_mgmt.get("logging_host")
         _logging_enabled = logging_obj.get("syslog_enabled") if logging_obj.get("syslog_enabled") is not None else bool(_log_host)
         security = {
             "users": sec_mgmt.get("users") or [],
-            "aaa": {"protocols": sec_audit.get("aaa") and sec_audit["aaa"].get("protocols") or []},
-            "ssh": {"version": ssh.get("version"), "enabled": ssh.get("status") == "Enabled"},
-            "snmp": {"enabled": snmp.get("status") == "Enabled", "communities": snmp.get("communities") or []},
-            "ntp": {"enabled": bool(ntp.get("servers")), "servers": ntp.get("servers") or [], "sync_status": ntp.get("sync_status") or "unknown"},
+            "aaa": {
+                "protocols": aaa.get("protocols") or [],
+                "authentication": aaa.get("authentication"),
+                "authorization": aaa.get("authorization"),
+                "accounting": aaa.get("accounting"),
+            },
+            "ssh": {
+                "version": ssh.get("version"),
+                "enabled": ssh.get("status") == "Enabled",
+                "connection_timeout": ssh.get("connection_timeout"),
+                "auth_retries": ssh.get("auth_retries"),
+            },
+            "snmp": {
+                "enabled": snmp.get("status") == "Enabled",
+                "version": snmp.get("version"),
+                "communities": snmp.get("communities") or [],
+            },
+            "ntp": {
+                "enabled": bool(ntp.get("servers")),
+                "servers": ntp.get("servers") or [],
+                "sync_status": ntp.get("sync_status") or "unknown",
+                "stratum": ntp.get("stratum"),
+            },
             "logging": {"enabled": _logging_enabled, "console_level": logging_obj.get("console_level"), "log_hosts": [_log_host] if _log_host else []},
             "acls": _normalize_acls(sec_audit.get("acls"), sec_mgmt.get("acls")),
         }

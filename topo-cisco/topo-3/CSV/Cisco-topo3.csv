@@ -1,0 +1,11 @@
+ip,hostname,username,password,secret,port,device_type
+10.10.1.1,EDGE,admin,cisco,cisco,22,cisco_ios
+10.10.1.2,CORE1,admin,cisco,cisco,22,cisco_ios
+10.10.2.2,CORE2,admin,cisco,cisco,22,cisco_ios
+10.13.1.1,DIST1,admin,cisco,cisco,22,cisco_ios
+10.14.2.1,DIST2,admin,cisco,cisco,22,cisco_ios
+192.168.99.11,ACC1,admin,cisco,cisco,22,cisco_ios
+192.168.99.12,ACC2,admin,cisco,cisco,22,cisco_ios
+192.168.99.13,ACC3,admin,cisco,cisco,22,cisco_ios
+192.168.99.14,ACC4,admin,cisco,cisco,22,cisco_ios
+10.20.1.2,BRANCH,admin,cisco,cisco,22,cisco_ios

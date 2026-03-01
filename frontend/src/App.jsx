@@ -4486,9 +4486,9 @@ const DeviceDetailsView = ({ project, deviceId, goBack, goBackHref, goIndex, goI
                     <div className="flex-1 min-h-0">
                       <Table
                         columns={[
-                          { header: "Name", key: "name" },
-                          { header: "Group", key: "group", cell: (r) => r.group || "—" },
-                          { header: "Access", key: "access", cell: (r) => r.access || "—" },
+                          { header: "Name", key: "name", cell: (r) => (typeof r === "string" ? r : (r?.name || r?.community || "—")) },
+                          { header: "Group", key: "group", cell: (r) => (typeof r === "object" && r ? (r.group || "—") : "—") },
+                          { header: "Access", key: "access", cell: (r) => (typeof r === "object" && r ? (r.access || r.mode || "—") : "—") },
                         ]}
                         data={securityData.snmp.communities}
                         empty="No SNMP communities"
@@ -4545,22 +4545,37 @@ const DeviceDetailsView = ({ project, deviceId, goBack, goBackHref, goIndex, goI
                           <span className="text-xs font-semibold text-slate-800 dark:text-slate-200">ACL Rules</span>
                         </div>
                         <div className="flex-1 min-h-0">
-                          <Table
-                            columns={[
-                              { header: "Rule ID", key: "id" },
-                              { header: "Action", key: "action", cell: (r) => r.action?.toUpperCase() || "—" },
-                              { header: "Protocol", key: "protocol", cell: (r) => r.protocol || "—" },
-                              { header: "Source", key: "source", cell: (r) => r.source || r.source_ip || "—" },
-                              { header: "Source Mask", key: "source_mask", cell: (r) => r.source_mask || "—" },
-                              { header: "Destination", key: "destination", cell: (r) => r.destination || r.destination_ip || "—" },
-                              { header: "Destination Mask", key: "destination_mask", cell: (r) => r.destination_mask || "—" }
-                            ]}
-                            data={acl.rules}
-                            empty="No rules in this ACL"
-                            minWidthClass="min-w-[1200px]"
-                            containerClassName="h-full"
-                            showToolbar={false}
-                          />
+                          {(() => {
+                            const rules = acl.rules;
+                            const hasStringRules = rules.some(r => typeof r === "string");
+                            const data = hasStringRules
+                              ? rules.map((r, i) => (typeof r === "string" ? { id: i + 1, rule: r } : { id: r.id ?? i + 1, ...r }))
+                              : rules;
+                            const columns = hasStringRules
+                              ? [
+                                  { header: "Rule ID", key: "id" },
+                                  { header: "Rule", key: "rule", cell: (r) => r.rule || "—" },
+                                ]
+                              : [
+                                  { header: "Rule ID", key: "id" },
+                                  { header: "Action", key: "action", cell: (r) => r.action?.toUpperCase() || "—" },
+                                  { header: "Protocol", key: "protocol", cell: (r) => r.protocol || "—" },
+                                  { header: "Source", key: "source", cell: (r) => r.source || r.source_ip || "—" },
+                                  { header: "Source Mask", key: "source_mask", cell: (r) => r.source_mask || "—" },
+                                  { header: "Destination", key: "destination", cell: (r) => r.destination || r.destination_ip || "—" },
+                                  { header: "Destination Mask", key: "destination_mask", cell: (r) => r.destination_mask || "—" }
+                                ];
+                            return (
+                              <Table
+                                columns={columns}
+                                data={data}
+                                empty="No rules in this ACL"
+                                minWidthClass={hasStringRules ? "min-w-[700px]" : "min-w-[1200px]"}
+                                containerClassName="h-full"
+                                showToolbar={false}
+                              />
+                            );
+                          })()}
                         </div>
                       </div>
                     ) : (

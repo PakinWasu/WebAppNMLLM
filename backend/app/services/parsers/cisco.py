@@ -695,6 +695,7 @@ class CiscoIOSParser(BaseParser):
             "type": _determine_interface_type(canonical_name),
             "description": None,
             "ip_address": None,
+            "ipv6_address": None,
             "subnet_mask": None,
             "status": "up",
             "protocol": "up",
@@ -745,6 +746,35 @@ class CiscoIOSParser(BaseParser):
                     mask_val = ip_m.group(2).strip() if ip_m.lastindex >= 2 else None
                     if mask_val:
                         iface["subnet_mask"] = mask_val  # dotted (255.255.255.0), prefix (24), or from CIDR
+            except Exception:
+                pass
+
+            # IPv6 address (best-effort): prefer global unicast; fallback to link-local
+            # Examples:
+            #   ipv6 address 2001:db8::1/64
+            #   ipv6 address 2001:db8::1 64
+            #   ipv6 address fe80::1 link-local
+            try:
+                ipv6_globals: List[str] = []
+                for mm in re.finditer(r"^\s*ipv6\s+address\s+([0-9a-fA-F:]+)(?:/(\d+)|(\s+\d+))?\s*(?:eui-64)?\s*$", block, re.IGNORECASE | re.MULTILINE):
+                    addr = (mm.group(1) or "").strip()
+                    prefix = (mm.group(2) or "").strip()
+                    if not prefix and mm.group(3):
+                        prefix = (mm.group(3) or "").strip()
+                    prefix = prefix.strip()
+                    if prefix.startswith(" "):
+                        prefix = prefix.strip()
+                    if addr:
+                        ipv6_globals.append(f"{addr}/{prefix}" if prefix else addr)
+                ipv6_link_local = None
+                ll_m = re.search(r"^\s*ipv6\s+address\s+([0-9a-fA-F:]+)\s+link-local\s*$", block, re.IGNORECASE | re.MULTILINE)
+                if ll_m:
+                    ipv6_link_local = (ll_m.group(1) or "").strip()
+
+                if ipv6_globals and not iface.get("ipv6_address"):
+                    iface["ipv6_address"] = ipv6_globals[0]
+                elif ipv6_link_local and not iface.get("ipv6_address"):
+                    iface["ipv6_address"] = ipv6_link_local
             except Exception:
                 pass
             try:
@@ -842,6 +872,29 @@ class CiscoIOSParser(BaseParser):
                     iface["status"] = status.lower()
                 if protocol:
                     iface["protocol"] = protocol.lower()
+
+        # Source C: show ipv6 interface brief - merge ipv6_address (same key = update, no new row)
+        # Example formats vary by platform, so do best-effort extraction.
+        ipv6_brief = _get_section(content, r"show\s+ipv6\s+interface\s+brief")
+        if not ipv6_brief:
+            ipv6_brief_m = re.search(r"show\s+ipv6\s+interface\s+brief\s*(.*?)(?=show\s+|\n\s*[\w-]+#|$)", content, re.IGNORECASE | re.DOTALL)
+            ipv6_brief = ipv6_brief_m.group(1).strip() if ipv6_brief_m else None
+        if ipv6_brief:
+            for line in ipv6_brief.split("\n"):
+                if not line.strip() or line.strip().lower().startswith("interface"):
+                    continue
+                # Common: "Gi0/0                 [up/up]   2001:db8::1" or "GigabitEthernet0/0   up/up  2001:db8::1"
+                m = re.match(r"^(\S+)\s+.*?\s+([0-9a-fA-F:]+)(?:/(\d+))?\b", line.strip())
+                if not m:
+                    continue
+                name = m.group(1)
+                addr = (m.group(2) or "").strip()
+                pref = (m.group(3) or "").strip()
+                if not addr:
+                    continue
+                iface = _get_or_create(name)
+                if not iface.get("ipv6_address"):
+                    iface["ipv6_address"] = f"{addr}/{pref}" if pref else addr
         # Deep parse: block-based extraction from "show interfaces" (Description, MAC, IP, MTU, BW, Duplex, Speed, Media, Encapsulation)
         # Note: Interface names here may be short (Gi0/1), so we normalize them before lookup
         deep_blocks = self._parse_show_interfaces_blocks(content)
@@ -1600,11 +1653,25 @@ class CiscoIOSParser(BaseParser):
                 if rid_m:
                     bgp["router_id"] = rid_m.group(1)
                 for nb_m in re.finditer(r"neighbor\s+(\d+\.\d+\.\d+\.\d+)\s+remote-as\s+(\d+)", config_block, re.IGNORECASE):
-                    bgp["peers"].append({"neighbor_ip": nb_m.group(1), "remote_as": int(nb_m.group(2)), "state": "configured_but_down", "prefixes_received": None})
+                    bgp["peers"].append({"neighbor_ip": nb_m.group(1), "remote_as": int(nb_m.group(2)), "state": "configured_but_down", "prefixes_received": None, "prefixes_advertised": None})
             except (ValueError, TypeError):
                 pass
         bgp_summary = _get_section(content, r"show\s+ip\s+bgp\s+summary")
         if bgp_summary:
+            if bgp.get("router_id") is None or bgp.get("local_as") is None:
+                header_m = re.search(
+                    r"BGP\s+router\s+identifier\s+(\d+\.\d+\.\d+\.\d+),\s+local\s+AS\s+number\s+(\d+)",
+                    bgp_summary,
+                    re.IGNORECASE,
+                )
+                if header_m:
+                    if bgp.get("router_id") is None:
+                        bgp["router_id"] = header_m.group(1)
+                    if bgp.get("local_as") is None:
+                        try:
+                            bgp["local_as"] = int(header_m.group(2))
+                        except ValueError:
+                            pass
             for line in bgp_summary.split("\n"):
                 line_strip = line.strip()
                 if not line_strip or line_strip.startswith("Neighbor") or line_strip.startswith("BGP"):
@@ -1640,7 +1707,107 @@ class CiscoIOSParser(BaseParser):
                         if "neighbor_ip" not in existing:
                             existing["neighbor_ip"] = neighbor_ip
                     else:
-                        bgp["peers"].append({"neighbor_ip": neighbor_ip, "remote_as": remote_as, "state": state or "Unknown", "prefixes_received": prefixes_received})
+                        bgp["peers"].append({"neighbor_ip": neighbor_ip, "remote_as": remote_as, "state": state or "Unknown", "prefixes_received": prefixes_received, "prefixes_advertised": None})
+
+        bgp_ipv4_summary = _get_section(content, r"show\s+bgp\s+ipv4\s+unicast\s+summary")
+        if bgp_ipv4_summary and not bgp_summary:
+            header_m = re.search(
+                r"BGP\s+router\s+identifier\s+(\d+\.\d+\.\d+\.\d+),\s+local\s+AS\s+number\s+(\d+)",
+                bgp_ipv4_summary,
+                re.IGNORECASE,
+            )
+            if header_m:
+                if bgp.get("router_id") is None:
+                    bgp["router_id"] = header_m.group(1)
+                if bgp.get("local_as") is None:
+                    try:
+                        bgp["local_as"] = int(header_m.group(2))
+                    except ValueError:
+                        pass
+            for line in bgp_ipv4_summary.split("\n"):
+                line_strip = line.strip()
+                if not line_strip or line_strip.startswith("Neighbor") or line_strip.startswith("BGP"):
+                    continue
+                tokens = line_strip.split()
+                if len(tokens) >= 3 and re.match(r"^\d+\.\d+\.\d+\.\d+$", tokens[0]):
+                    neighbor_ip = tokens[0]
+                    remote_as = int(tokens[2]) if tokens[2].isdigit() else None
+                    state = None
+                    prefixes_received = None
+                    if len(tokens) >= 10:
+                        last1, last2 = tokens[-1], tokens[-2]
+                        if last1.isdigit():
+                            prefixes_received = int(last1)
+                            state = last2 if not last2.isdigit() else "Established"
+                        else:
+                            state = last1
+                            if last2.isdigit():
+                                prefixes_received = int(last2)
+                    elif len(tokens) >= 9:
+                        last = tokens[-1]
+                        if last.isdigit():
+                            prefixes_received = int(last)
+                            state = "Established"
+                        else:
+                            state = last
+
+                    existing = next((p for p in bgp["peers"] if p.get("neighbor_ip") == neighbor_ip or p.get("peer") == neighbor_ip), None)
+                    if existing:
+                        if state is not None:
+                            existing["state"] = state
+                        if prefixes_received is not None:
+                            existing["prefixes_received"] = prefixes_received
+                        if existing.get("remote_as") is None and remote_as is not None:
+                            existing["remote_as"] = remote_as
+                    else:
+                        bgp["peers"].append({"neighbor_ip": neighbor_ip, "remote_as": remote_as, "state": state or "Unknown", "prefixes_received": prefixes_received, "prefixes_advertised": None})
+
+        bgp_table = _get_section(content, r"show\s+ip\s+bgp\s*$")
+        if bgp_table and bgp.get("router_id") is None:
+            rid_m = re.search(r"local\s+router\s+ID\s+is\s+(\d+\.\d+\.\d+\.\d+)", bgp_table, re.IGNORECASE)
+            if rid_m:
+                bgp["router_id"] = rid_m.group(1)
+
+        bgp_neighbors = _get_section(content, r"show\s+ip\s+bgp\s+neighbors")
+        if bgp_neighbors:
+            blocks = re.split(r"(?=BGP\s+neighbor\s+is\s+\d+\.\d+\.\d+\.\d+)", bgp_neighbors, flags=re.IGNORECASE)
+            for b in blocks:
+                b = b.strip()
+                if not b:
+                    continue
+                head_m = re.search(r"BGP\s+neighbor\s+is\s+(\d+\.\d+\.\d+\.\d+),\s+\s*remote\s+AS\s+(\d+)", b, re.IGNORECASE)
+                if not head_m:
+                    continue
+                neighbor_ip = head_m.group(1)
+                remote_as = int(head_m.group(2)) if head_m.group(2).isdigit() else None
+
+                state_m = re.search(r"BGP\s+state\s*=\s*([^,\n]+)", b, re.IGNORECASE)
+                nbr_state = state_m.group(1).strip() if state_m else None
+
+                # Prefixes Current (Sent/Rcvd)
+                # Example: Prefixes Current:               2          7 (Consumes 560 bytes)
+                pc_m = re.search(r"Prefixes\s+Current:\s+(\d+)\s+(\d+)", b, re.IGNORECASE)
+                prefixes_advertised = int(pc_m.group(1)) if pc_m else None
+                prefixes_received = int(pc_m.group(2)) if pc_m else None
+
+                existing = next((p for p in bgp["peers"] if p.get("neighbor_ip") == neighbor_ip or p.get("peer") == neighbor_ip), None)
+                if existing:
+                    if existing.get("remote_as") is None and remote_as is not None:
+                        existing["remote_as"] = remote_as
+                    if nbr_state:
+                        existing["state"] = nbr_state
+                    if prefixes_received is not None:
+                        existing["prefixes_received"] = prefixes_received
+                    if prefixes_advertised is not None:
+                        existing["prefixes_advertised"] = prefixes_advertised
+                else:
+                    bgp["peers"].append({
+                        "neighbor_ip": neighbor_ip,
+                        "remote_as": remote_as,
+                        "state": nbr_state or "Unknown",
+                        "prefixes_received": prefixes_received,
+                        "prefixes_advertised": prefixes_advertised,
+                    })
         for p in bgp["peers"]:
             if "neighbor_ip" not in p and p.get("peer"):
                 p["neighbor_ip"] = p["peer"]
@@ -2129,7 +2296,7 @@ class CiscoIOSParser(BaseParser):
         audit: Dict[str, Any] = {
             "ssh": {"status": "Disabled", "version": "2"},
             "telnet": {"status": "Disabled"},
-            "aaa": {"status": "Disabled", "protocols": []},
+            "aaa": {"status": "Disabled", "protocols": [], "authentication": None, "authorization": None, "accounting": None},
             "snmp": {"status": "Disabled", "version": None, "communities": []},
             "ntp": {"servers": [], "status": "None"},
             "logging": {"syslog_servers": [], "console_logging": False},
@@ -2144,6 +2311,18 @@ class CiscoIOSParser(BaseParser):
                 audit["ssh"]["status"] = "Enabled"
                 if not audit["ssh"]["version"]:
                     audit["ssh"]["version"] = "2"
+            timeout_m = re.search(r"ip\s+ssh\s+time-out\s+(\d+)", content, re.IGNORECASE)
+            if timeout_m:
+                try:
+                    audit["ssh"]["connection_timeout"] = int(timeout_m.group(1))
+                except ValueError:
+                    pass
+            retries_m = re.search(r"ip\s+ssh\s+authentication-retries\s+(\d+)", content, re.IGNORECASE)
+            if retries_m:
+                try:
+                    audit["ssh"]["auth_retries"] = int(retries_m.group(1))
+                except ValueError:
+                    pass
         except Exception:
             pass
         # Telnet
@@ -2161,9 +2340,36 @@ class CiscoIOSParser(BaseParser):
                 audit["aaa"]["protocols"].append("radius")
             if "local" in cfg and ("aaa authentication" in cfg or "login local" in cfg):
                 audit["aaa"]["protocols"].append("local")
+            auth_lines = []
+            for m in re.finditer(r"^\s*aaa\s+authentication\s+\S+\s+\S+\s+(.+)$", content, re.IGNORECASE | re.MULTILINE):
+                auth_lines.append(m.group(1).strip())
+            if auth_lines:
+                audit["aaa"]["authentication"] = "; ".join(auth_lines)
+            author_lines = []
+            for m in re.finditer(r"^\s*aaa\s+authorization\s+\S+\s+\S+\s+(.+)$", content, re.IGNORECASE | re.MULTILINE):
+                author_lines.append(m.group(1).strip())
+            if author_lines:
+                audit["aaa"]["authorization"] = "; ".join(author_lines)
+            acct_lines = []
+            for m in re.finditer(r"^\s*aaa\s+accounting\s+\S+\s+\S+\s+(.+)$", content, re.IGNORECASE | re.MULTILINE):
+                acct_lines.append(m.group(1).strip())
+            if acct_lines:
+                audit["aaa"]["accounting"] = "; ".join(acct_lines)
         # SNMP: if snmp-server lines exist extract community; else Disabled
-        for m in re.finditer(r"snmp-server\s+community\s+(\S+)", content, re.IGNORECASE):
-            audit["snmp"]["communities"].append(m.group(1))
+        for m in re.finditer(r"snmp-server\s+community\s+(\S+)(?:\s+(RO|RW))?(?:\s+(\S+))?", content, re.IGNORECASE):
+            name = (m.group(1) or "").strip()
+            access = (m.group(2) or "").strip().upper() if m.group(2) else None
+            acl = (m.group(3) or "").strip() if m.group(3) else None
+            if not name:
+                continue
+            existing = next((c for c in audit["snmp"]["communities"] if isinstance(c, dict) and c.get("name") == name), None)
+            if existing:
+                if access and not existing.get("access"):
+                    existing["access"] = access
+                if acl and not existing.get("acl"):
+                    existing["acl"] = acl
+            else:
+                audit["snmp"]["communities"].append({"name": name, "access": access, "acl": acl})
         if audit["snmp"]["communities"] or "snmp-server" in cfg:
             audit["snmp"]["status"] = "Enabled"
             audit["snmp"]["version"] = "v3" if ("snmp-server group" in cfg and "v3" in cfg) else "v2c"

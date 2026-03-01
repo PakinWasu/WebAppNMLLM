@@ -1,0 +1,740 @@
+DIST2#! --- System Info ---
+DIST2#term len 0
+DIST2#show version
+Cisco IOS Software, Solaris Software (I86BI_LINUXL2-IPBASEK9-M), Experimental Ve                                                                                                                                                                             rsion 15.1(20130726:213425) [dstivers-july26-2013-team_track 105]
+Copyright (c) 1986-2013 by Cisco Systems, Inc.
+Compiled Fri 26-Jul-13 16:12 by dstivers
+
+ROM: Bootstrap program is Linux
+
+DIST2 uptime is 0 minutes
+System returned to ROM by reload at 0
+System image file is "unix:/opt/unetlab/addons/iol/bin/i86bi-linux-l2-ipbasek9-1                                                                                                                                                                             5.1g.bin"
+Last reload reason: Unknown reason
+
+
+
+This product contains cryptographic features and is subject to United
+States and local country laws governing import, export, transfer and
+use. Delivery of Cisco cryptographic products does not imply
+third-party authority to import, export, distribute or use encryption.
+Importers, exporters, distributors and users are responsible for
+compliance with U.S. and local country laws. By using this product you
+agree to comply with applicable laws and regulations. If you are unable
+to comply with U.S. and local laws, return this product immediately.
+
+A summary of U.S. laws governing Cisco cryptographic products may be found at:
+http://www.cisco.com/wwl/export/crypto/tool/stqrg.html
+
+If you require further assistance please contact us by sending email to
+export@cisco.com.
+
+Linux Unix (Intel-x86) processor with 985906K bytes of memory.
+Processor board ID 67108976
+8 Ethernet interfaces
+1 Virtual Ethernet interface
+1024K bytes of NVRAM.
+
+Configuration register is 0x0
+
+DIST2#show running-config
+Building configuration...
+
+Current configuration : 1984 bytes
+!
+version 15.1
+service timestamps debug datetime msec
+service timestamps log datetime msec
+no service password-encryption
+service compress-config
+!
+hostname DIST2
+!
+boot-start-marker
+boot-end-marker
+!
+!
+logging buffered 16384
+!
+username admin privilege 15 secret 4 tnhtc92DXBhelxjYk8LWJrPV36S2i4ntXrpb4RFmfqY
+aaa new-model
+!
+!
+aaa authentication login default local
+aaa authorization exec default local
+!
+!
+!
+!
+!
+aaa session-id common
+clock timezone ICT 7 0
+ipv6 unicast-routing
+ipv6 cef
+ipv6 multicast rpf use-bgp
+!
+ip domain-name lab.local
+ip cef
+!
+!
+!
+!
+spanning-tree mode pvst
+spanning-tree extend system-id
+!
+!
+!
+!
+vlan internal allocation policy ascending
+!
+ip ssh version 2
+!
+!
+!
+!
+!
+!
+!
+!
+!
+interface Ethernet0/0
+ switchport trunk encapsulation dot1q
+ switchport trunk native vlan 10
+ switchport mode trunk
+ duplex auto
+!
+interface Ethernet0/1
+ switchport trunk encapsulation dot1q
+ switchport trunk native vlan 10
+ switchport mode trunk
+ duplex auto
+!
+interface Ethernet0/2
+ switchport trunk encapsulation dot1q
+ switchport trunk native vlan 10
+ switchport mode trunk
+ duplex auto
+!
+interface Ethernet0/3
+ switchport trunk encapsulation dot1q
+ switchport trunk native vlan 10
+ switchport mode trunk
+ duplex auto
+!
+interface Ethernet1/0
+ shutdown
+ duplex auto
+!
+interface Ethernet1/1
+ no switchport
+ ip address 10.14.2.2 255.255.255.252
+!
+interface Ethernet1/2
+ switchport trunk encapsulation dot1q
+ switchport trunk native vlan 10
+ switchport mode trunk
+ duplex auto
+!
+interface Ethernet1/3
+ switchport trunk encapsulation dot1q
+ switchport trunk native vlan 10
+ switchport mode trunk
+ duplex auto
+!
+interface Vlan99
+ ip address 192.168.99.3 255.255.255.0
+ standby 1 ip 192.168.99.1
+ standby 1 preempt
+ ipv6 address 2001:DB8:99::3/64
+ ipv6 enable
+!
+!
+no ip http server
+!
+ip route 0.0.0.0 0.0.0.0 10.14.2.1
+!
+!
+!
+snmp-server community public RO
+!
+!
+!
+control-plane
+!
+!
+line con 0
+ logging synchronous
+line aux 0
+line vty 0 4
+ transport input ssh
+!
+ntp server 10.14.2.1
+end
+
+DIST2#show processes cpu sorted
+CPU utilization for five seconds: 2%/0%; one minute: 1%; five minutes: 0%
+ PID Runtime(ms)     Invoked      uSecs   5Sec   1Min   5Min TTY Process
+  35        2849       31926         89 45.75%  9.55%  2.10%   0 ARP Snoop                                                                                                                                                                                   
+ 132        1964       32311         60 31.51%  6.39%  1.40%   0 IGMPSN MRD                                                                                                                                                                                  
+ 107         413        8388         49  5.91%  1.13%  0.25%   0 HQF Input Shape                                                                                                                                                                             r
+ 106         442        8388         52  5.67%  1.25%  0.29%   0 HQF Shaper Back                                                                                                                                                                             g
+  50         260        5945         43  3.35%  0.63%  0.14%   0 Ethernet Msec T                                                                                                                                                                             i
+ 186         141        2428         58  1.51%  0.42%  0.09%   0 HSRP Common                                                                                                                                                                                 
+  91          70        1501         46  0.95%  0.17%  0.04%   0 IP ARP Retry Ag                                                                                                                                                                             e
+ 154          54        1644         32  0.39%  0.13%  0.03%   0 MMON MENG                                                                                                                                                                                   
+  49          10         300         33  0.15%  0.01%  0.00%   0 Ethernet Timer                                                                                                                                                                              C
+  94           6         104         57  0.15%  0.01%  0.00%   0 IP ARP Track                                                                                                                                                                                
+   2           1          12         83  0.07%  0.00%  0.00%   0 Load Meter                                                                                                                                                                                  
+  97          13         149         87  0.07%  0.02%  0.00%   0 Spanning Tree                                                                                                                                                                               
+ 116           1          53         18  0.07%  0.01%  0.00%   0 Socket Timers                                                                                                                                                                               
+ 128           6         106         56  0.07%  0.01%  0.00%   0 DHCPD Receive                                                                                                                                                                               
+  14           0           2          0  0.00%  0.00%  0.00%   0 ARP Input                                                                                                                                                                                   
+  15           6          79         75  0.00%  0.00%  0.00%   0 ARP Background                                                                                                                                                                              
+  16           0           1          0  0.00%  0.00%  0.00%   0 AAA_SERVER_DEAD                                                                                                                                                                             T
+  18           0           1          0  0.00%  0.00%  0.00%   0 Entity MIB API                                                                                                                                                                              
+  17           0           1          0  0.00%  0.00%  0.00%   0 Policy Manager                                                                                                                                                                              
+  20           2          52         38  0.00%  0.00%  0.00%   0 IPC Mcast Pendi                                                                                                                                                                             n
+  21           0           1          0  0.00%  0.00%  0.00%   0 IPC Dynamic Cac                                                                                                                                                                             h
+  19           1          11         90  0.00%  0.00%  0.00%   0 IPC Event Notif                                                                                                                                                                             i
+  23           0           1          0  0.00%  0.00%  0.00%   0 IPC Zone Manage                                                                                                                                                                             r
+  24           0          52          0  0.00%  0.00%  0.00%   0 IPC Periodic Ti                                                                                                                                                                             m
+  13           0           1          0  0.00%  0.00%  0.00%   0 IFS Agent Manag                                                                                                                                                                             e
+  26           0           1          0  0.00%  0.00%  0.00%   0 IPC Process lev                                                                                                                                                                             e
+  27           0           1          0  0.00%  0.00%  0.00%   0 IPC Seat Manage                                                                                                                                                                             r
+  28           0           4          0  0.00%  0.00%  0.00%   0 IPC Check Queue                                                                                                                                                                             
+  29           0           1          0  0.00%  0.00%  0.00%   0 IPC Seat RX Con                                                                                                                                                                             t
+  30           0           1          0  0.00%  0.00%  0.00%   0 IPC Seat TX Con                                                                                                                                                                             t
+  22           0           1          0  0.00%  0.00%  0.00%   0 IPC Session Ser                                                                                                                                                                             v
+  25           3          52         57  0.00%  0.00%  0.00%   0 IPC Deferred Po                                                                                                                                                                             r
+  33           1           3        333  0.00%  0.00%  0.00%   0 PrstVbl                                                                                                                                                                                     
+  34           0           1          0  0.00%  0.00%  0.00%   0 SERIAL A'detect                                                                                                                                                                             
+   9           0           1          0  0.00%  0.00%  0.00%   0 OIR Handler                                                                                                                                                                                 
+  36           1          54         18  0.00%  0.00%  0.00%   0 GraphIt                                                                                                                                                                                     
+  10           0           2          0  0.00%  0.00%  0.00%   0 DDR Timers                                                                                                                                                                                  
+  12           0           2          0  0.00%  0.00%  0.00%   0 Serial Backgrou                                                                                                                                                                             n
+  39           4          63         63  0.00%  0.04%  0.01%   0 Net Background                                                                                                                                                                              
+  40           0           2          0  0.00%  0.00%  0.00%   0 IDB Work                                                                                                                                                                                    
+  41           0          14          0  0.00%  0.00%  0.00%   0 Logger                                                                                                                                                                                      
+  42           3          50         60  0.00%  0.00%  0.00%   0 TTY Background                                                                                                                                                                              
+  43           0           3          0  0.00%  0.00%  0.00%   0 IF-MGR control                                                                                                                                                                              p
+  44           0          10          0  0.00%  0.00%  0.00%   0 IF-MGR event pr                                                                                                                                                                             o
+  45           0           1          0  0.00%  0.00%  0.00%   0 AggMgr Process                                                                                                                                                                              
+  46           0           1          0  0.00%  0.00%  0.00%   0 Transport Port                                                                                                                                                                              A
+  47           0          16          0  0.00%  0.00%  0.00%   0 HC Counter Time                                                                                                                                                                             r
+  48           0           2          0  0.00%  0.00%  0.00%   0 Ethernet CFM                                                                                                                                                                                
+   8           0           7          0  0.00%  0.00%  0.00%   0 WATCH_AFS                                                                                                                                                                                   
+  11           0           2          0  0.00%  0.00%  0.00%   0 Dialer event                                                                                                                                                                                
+  32           0          11          0  0.00%  0.00%  0.00%   0 IPC Loadometer                                                                                                                                                                              
+  31           0           6          0  0.00%  0.00%  0.00%   0 IPC Keep Alive                                                                                                                                                                              M
+  37           0           1          0  0.00%  0.00%  0.00%   0 Inode Table Des                                                                                                                                                                             t
+   6           0           1          0  0.00%  0.00%  0.00%   0 DiscardQ Backgr                                                                                                                                                                             o
+  55           0           1          0  0.00%  0.00%  0.00%   0 AAA System Acct                                                                                                                                                                             
+  56           0           1          0  0.00%  0.00%  0.00%   0 AUTH POLICY Fra                                                                                                                                                                             m
+  57           1          11         90  0.00%  0.00%  0.00%   0 Auth Manager                                                                                                                                                                                
+   5           0           1          0  0.00%  0.00%  0.00%   0 Pool Manager                                                                                                                                                                                
+  59           0           1          0  0.00%  0.00%  0.00%   0 EAP Framework                                                                                                                                                                               
+  60           0           1          0  0.00%  0.00%  0.00%   0 EAP Test                                                                                                                                                                                    
+  61           0           2          0  0.00%  0.00%  0.00%   0 EFP Errd                                                                                                                                                                                    
+  62           0           2          0  0.00%  0.00%  0.00%   0 Ethernet LMI                                                                                                                                                                                
+  63           0           1          0  0.00%  0.00%  0.00%   0 SSS Manager                                                                                                                                                                                 
+  38           0           1          0  0.00%  0.00%  0.00%   0 Critical Bkgnd                                                                                                                                                                              
+  65           8         206         38  0.00%  0.02%  0.00%   0 SSS Feature Tim                                                                                                                                                                             e
+  51           0           2          0  0.00%  0.00%  0.00%   0 Ethernet CFM IO                                                                                                                                                                             U
+  67           0           2          0  0.00%  0.00%  0.00%   0 ATM OAM Input                                                                                                                                                                               
+  68           0           2          0  0.00%  0.00%  0.00%   0 ATM OAM TIMER                                                                                                                                                                               
+  69           0           1          0  0.00%  0.00%  0.00%   0 IPv6 ping proce                                                                                                                                                                             s
+  70           0           1          0  0.00%  0.00%  0.00%   0 PPPATM Session                                                                                                                                                                              d
+  71           0           2          0  0.00%  0.00%  0.00%   0 PASVC create VA                                                                                                                                                                             
+  72           0           1          0  0.00%  0.00%  0.00%   0 DHCP Snooping                                                                                                                                                                               
+  73           0           6          0  0.00%  0.00%  0.00%   0 802.1x switch                                                                                                                                                                               
+  74           0           1          0  0.00%  0.00%  0.00%   0 802.1x Webauth                                                                                                                                                                              F
+  75           3          16        187  0.00%  0.00%  0.00%   0 DTP Protocol                                                                                                                                                                                
+  76           2          54         37  0.00%  0.00%  0.00%   0 PI MATM Aging P                                                                                                                                                                             r
+   4           8           3       2666  0.00%  0.01%  0.00%   0 Check heaps                                                                                                                                                                                 
+  78           0           2          0  0.00%  0.00%  0.00%   0 IP Host Track P                                                                                                                                                                             r
+  79           0           8          0  0.00%  0.00%  0.00%   0 Ethchnl                                                                                                                                                                                     
+  80           0           1          0  0.00%  0.00%  0.00%   0 UNIX IP Source                                                                                                                                                                              g
+  81           0           2          0  0.00%  0.00%  0.00%   0 process unix_l2                                                                                                                                                                             _
+  82           0           2          0  0.00%  0.00%  0.00%   0 CMD HANDLER                                                                                                                                                                                 
+  83           0           8          0  0.00%  0.00%  0.00%   0 VMATM Callback                                                                                                                                                                              
+  84           4          21        190  0.00%  0.01%  0.00%   0 CDP Protocol                                                                                                                                                                                
+  85           1          12         83  0.00%  0.00%  0.00%   0 SpanTree Helper                                                                                                                                                                             
+  86           0           3          0  0.00%  0.00%  0.00%   0 SSH Event handl                                                                                                                                                                             e
+  87           0           2          0  0.00%  0.00%  0.00%   0 AAA Dictionary                                                                                                                                                                              R
+  88           0           2          0  0.00%  0.00%  0.00%   0 CEF switching b                                                                                                                                                                             a
+  89           0           1          0  0.00%  0.00%  0.00%   0 ADJ NSF process                                                                                                                                                                             
+  90           0           2          0  0.00%  0.00%  0.00%   0 IP ARP Adjacenc                                                                                                                                                                             y
+   3           0           1          0  0.00%  0.00%  0.00%   0 DHCPD Timer                                                                                                                                                                                 
+  92           0         131          0  0.00%  0.00%  0.00%   0 IP Input                                                                                                                                                                                    
+  52           0           8          0  0.00%  0.00%  0.00%   0 AAA Server                                                                                                                                                                                  
+   7           0           2          0  0.00%  0.00%  0.00%   0 Timers                                                                                                                                                                                      
+  95           0           3          0  0.00%  0.00%  0.00%   0 PIM register as                                                                                                                                                                             y
+  96          10          55        181  0.00%  0.00%  0.00%   0 Exec                                                                                                                                                                                        
+   1           0           5          0  0.00%  0.25%  0.09%   0 Chunk Manager                                                                                                                                                                               
+  98           0           1          0  0.00%  0.00%  0.00%   0 PPP IP Add Rout                                                                                                                                                                             e
+  99           0           1          0  0.00%  0.00%  0.00%   0 Critical Auth                                                                                                                                                                               
+  53           0           1          0  0.00%  0.00%  0.00%   0 AAA ACCT Proc                                                                                                                                                                               
+ 101           0           2          0  0.00%  0.00%  0.00%   0 Dot1x Supplican                                                                                                                                                                             t
+ 102           0           2          0  0.00%  0.00%  0.00%   0 Dot1x Supplican                                                                                                                                                                             t
+ 103           0           3          0  0.00%  0.00%  0.00%   0 CEF background                                                                                                                                                                              p
+ 104           0           1          0  0.00%  0.00%  0.00%   0 fib_fib_bfd_sb                                                                                                                                                                              e
+ 105           0           1          0  0.00%  0.00%  0.00%   0 IP IRDP                                                                                                                                                                                     
+  54           0           1          0  0.00%  0.00%  0.00%   0 ACCT Periodic P                                                                                                                                                                             r
+  58           0           2          0  0.00%  0.00%  0.00%   0 Dot1x Mgr Proce                                                                                                                                                                             s
+ 108           0           1          0  0.00%  0.00%  0.00%   0 MAB Framework                                                                                                                                                                               
+ 109           0           2          0  0.00%  0.00%  0.00%   0 Routing Topolog                                                                                                                                                                             y
+ 110           1           5        200  0.00%  0.00%  0.00%   0 IP RIB Update                                                                                                                                                                               
+ 111           0          11          0  0.00%  0.00%  0.00%   0 IP Background                                                                                                                                                                               
+ 112           1          21         47  0.00%  0.00%  0.00%   0 IP Connected Ro                                                                                                                                                                             u
+ 113           0           1          0  0.00%  0.00%  0.00%   0 TCP Timer                                                                                                                                                                                   
+ 114           0           1          0  0.00%  0.00%  0.00%   0 TCP Protocols                                                                                                                                                                               
+ 115           0           1          0  0.00%  0.00%  0.00%   0 COPS                                                                                                                                                                                        
+  64           0           1          0  0.00%  0.00%  0.00%   0 SSS Feature Man                                                                                                                                                                             a
+ 117           0           1          0  0.00%  0.00%  0.00%   0 Probe Input                                                                                                                                                                                 
+ 118           0           1          0  0.00%  0.00%  0.00%   0 HTTP CORE                                                                                                                                                                                   
+ 119           0          28          0  0.00%  0.00%  0.00%   0 CEF: IPv6 proce                                                                                                                                                                             s
+ 120           0           4          0  0.00%  0.00%  0.00%   0 Collection proc                                                                                                                                                                             e
+ 121           2          82         24  0.00%  0.00%  0.00%   0 CEF: IPv4 proce                                                                                                                                                                             s
+ 122           0           2          0  0.00%  0.00%  0.00%   0 ADJ background                                                                                                                                                                              
+ 123           0           1          0  0.00%  0.00%  0.00%   0 IPv6 RIB Cleanu                                                                                                                                                                             p
+ 124           2           6        333  0.00%  0.00%  0.00%   0 IPv6 RIB Event                                                                                                                                                                              H
+ 125           0           1          0  0.00%  0.00%  0.00%   0 PAD InCall                                                                                                                                                                                  
+ 126           0           2          0  0.00%  0.00%  0.00%   0 X.25 Background                                                                                                                                                                             
+ 127           0           1          0  0.00%  0.00%  0.00%   0 X.25 Encaps Man                                                                                                                                                                             a
+  66           0           2          0  0.00%  0.00%  0.00%   0 SSM connection                                                                                                                                                                              m
+ 129           0           3          0  0.00%  0.00%  0.00%   0 Flow Exporter T                                                                                                                                                                             i
+ 130           0           1          0  0.00%  0.00%  0.00%   0 RARP Input                                                                                                                                                                                  
+ 131           1          11         90  0.00%  0.00%  0.00%   0 IGMPSN L2MCM                                                                                                                                                                                
+  77           0           1          0  0.00%  0.00%  0.00%   0 Port-Security                                                                                                                                                                               
+ 133           0           1          0  0.00%  0.00%  0.00%   0 IGMPSN                                                                                                                                                                                      
+ 134           0           3          0  0.00%  0.00%  0.00%   0 ADJ resolve pro                                                                                                                                                                             c
+ 135           0           3          0  0.00%  0.00%  0.00%   0 MFIB Master bac                                                                                                                                                                             k
+ 136           0           2          0  0.00%  0.00%  0.00%   0 Multicast Offlo                                                                                                                                                                             a
+ 137           0           2          0  0.00%  0.00%  0.00%   0 MVPN mgr Proces                                                                                                                                                                             s
+ 138           0           6          0  0.00%  0.00%  0.00%   0 static                                                                                                                                                                                      
+ 139           0           6          0  0.00%  0.00%  0.00%   0 QoS stats proce                                                                                                                                                                             s
+ 140           0           2          0  0.00%  0.00%  0.00%   0 SNMP Timers                                                                                                                                                                                 
+ 141           0           2          0  0.00%  0.00%  0.00%   0 AAA Cached Serv                                                                                                                                                                             e
+ 142           0           2          0  0.00%  0.00%  0.00%   0 LINE AAA                                                                                                                                                                                    
+ 143           0           2          0  0.00%  0.00%  0.00%   0 TPLUS                                                                                                                                                                                       
+ 144           0           2          0  0.00%  0.00%  0.00%   0 ENABLE AAA                                                                                                                                                                                  
+ 145           0           8          0  0.00%  0.00%  0.00%   0 LOCAL AAA                                                                                                                                                                                   
+ 146           7         104         67  0.00%  0.01%  0.00%   0 Timer Library                                                                                                                                                                               
+ 147           0           3          0  0.00%  0.00%  0.00%   0 NIST rng proc                                                                                                                                                                               
+ 148           0           2          0  0.00%  0.00%  0.00%   0 Crypto Support                                                                                                                                                                              
+ 149           0           1          0  0.00%  0.00%  0.00%   0 IPSECv6 PS Proc                                                                                                                                                                             
+ 150           0           1          0  0.00%  0.00%  0.00%   0 EM Background P                                                                                                                                                                             r
+ 151           0           3          0  0.00%  0.00%  0.00%   0 LDAP process                                                                                                                                                                                
+ 153           0           2          0  0.00%  0.00%  0.00%   0 MMON PROCESS                                                                                                                                                                                
+  93           0           1          0  0.00%  0.00%  0.00%   0 ICMP event hand                                                                                                                                                                             l
+ 155           7           9        777  0.00%  0.01%  0.00%   0 crypto engine p                                                                                                                                                                             r
+ 156           4          53         75  0.00%  0.01%  0.00%   0 Crypto IKEv2                                                                                                                                                                                
+ 157           0           1          0  0.00%  0.00%  0.00%   0 IKEv2 AAA handl                                                                                                                                                                             e
+ 158           1           3        333  0.00%  0.00%  0.00%   0 CRYPTO MAP FREE                                                                                                                                                                             
+ 159           0           1          0  0.00%  0.00%  0.00%   0 Crypto INT                                                                                                                                                                                  
+ 160           0           3          0  0.00%  0.00%  0.00%   0 Crypto IKE Disp                                                                                                                                                                             a
+ 161           0           3          0  0.00%  0.00%  0.00%   0 Crypto IKMP                                                                                                                                                                                 
+ 162           0           1          0  0.00%  0.00%  0.00%   0 IPSEC manual ke                                                                                                                                                                             y
+ 163           0           4          0  0.00%  0.00%  0.00%   0 IPSEC key engin                                                                                                                                                                             e
+ 164           0           1          0  0.00%  0.00%  0.00%   0 Crypto ACL                                                                                                                                                                                  
+ 165           0           1          0  0.00%  0.00%  0.00%   0 Crypto PAS Proc                                                                                                                                                                             
+ 166           0           1          0  0.00%  0.00%  0.00%   0 IPSec backgroun                                                                                                                                                                             d
+ 167           1           4        250  0.00%  0.00%  0.00%   0 Crypto CA                                                                                                                                                                                   
+ 168           0           1          0  0.00%  0.00%  0.00%   0 Crypto PKI-CRL                                                                                                                                                                              
+ 169           0           1          0  0.00%  0.00%  0.00%   0 encrypt proc                                                                                                                                                                                
+ 170          79          10       7900  0.00%  0.12%  0.04%   0 crypto sw pk pr                                                                                                                                                                             o
+ 171           0           2          0  0.00%  0.00%  0.00%   0 DHCP Security H                                                                                                                                                                             e
+ 172           0           3          0  0.00%  0.00%  0.00%   0 pm scp dummy pr                                                                                                                                                                             o
+ 173           3          39         76  0.00%  0.00%  0.00%   0 PM Callback                                                                                                                                                                                 
+ 174           0           6          0  0.00%  0.00%  0.00%   0 dhcp snooping s                                                                                                                                                                             w
+ 175           0           2          0  0.00%  0.00%  0.00%   0 AAA SEND STOP E                                                                                                                                                                             V
+ 176           0           1          0  0.00%  0.00%  0.00%   0 Test AAA Client                                                                                                                                                                             
+ 177           0           1          0  0.00%  0.00%  0.00%   0 Syslog Traps                                                                                                                                                                                
+ 178           0          11          0  0.00%  0.00%  0.00%   0 Syslog                                                                                                                                                                                      
+ 179           0           5          0  0.00%  0.00%  0.00%   0 VLAN Manager                                                                                                                                                                                
+ 180           0           1          0  0.00%  0.00%  0.00%   0 Rom Random Upda                                                                                                                                                                             t
+ 181           1          13         76  0.00%  0.00%  0.00%   0 Net Input                                                                                                                                                                                   
+ 182           0          13          0  0.00%  0.00%  0.00%   0 Compute load av                                                                                                                                                                             g
+ 183           0           1          0  0.00%  0.00%  0.00%   0 Per-minute Jobs                                                                                                                                                                             
+ 184           2          53         37  0.00%  0.00%  0.00%   0 Per-Second Jobs                                                                                                                                                                             
+ 185           0           2          0  0.00%  0.00%  0.00%   0 MRIB Process                                                                                                                                                                                
+ 100           0           2          0  0.00%  0.00%  0.00%   0 Dot1x Supplican                                                                                                                                                                             t
+ 187           0           3          0  0.00%  0.00%  0.00%   0 HSRP IPv4                                                                                                                                                                                   
+ 188           0           4          0  0.00%  0.00%  0.00%   0 IPv6 IDB                                                                                                                                                                                    
+ 189           0           3          0  0.00%  0.00%  0.00%   0 IPv6 background                                                                                                                                                                             
+ 190           0           1          0  0.00%  0.00%  0.00%   0 IPv6 Address                                                                                                                                                                                
+ 191           0           1          0  0.00%  0.00%  0.00%   0 IPv6 Input                                                                                                                                                                                  
+ 192           3           6        500  0.00%  0.00%  0.00%   0 IPv6 ND                                                                                                                                                                                     
+ 193           7         212         33  0.00%  0.00%  0.00%   0 MLD                                                                                                                                                                                         
+ 194           0           1          0  0.00%  0.00%  0.00%   0 IP SNMP                                                                                                                                                                                     
+ 195           0           1          0  0.00%  0.00%  0.00%   0 PDU DISPATCHER                                                                                                                                                                              
+ 196           0           1          0  0.00%  0.00%  0.00%   0 SNMP ENGINE                                                                                                                                                                                 
+ 197           0           1          0  0.00%  0.00%  0.00%   0 IP SNMPV6                                                                                                                                                                                   
+ 198           0           1          0  0.00%  0.00%  0.00%   0 SNMP Traps                                                                                                                                                                                  
+ 199           2          54         37  0.00%  0.00%  0.00%   0 NTP                                                                                                                                                                                         
+ 200           0           7          0  0.00%  0.00%  0.00%   0 DHCPD Database                                                                                                                                                                              
+DIST2#show memory statistics
+                Head    Total(b)     Used(b)     Free(b)   Lowest(b)  Largest(b)
+Processor   AFD0A010   1009568544    33187544   976381000   975791392   97501098                                                                                                                                                                             0
+DIST2#show logging
+Syslog logging: enabled (0 messages dropped, 0 messages rate-limited, 0 flushes,                                                                                                                                                                              0 overruns, xml disabled, filtering disabled)
+
+No Active Message Discriminator.
+
+
+
+No Inactive Message Discriminator.
+
+
+    Console logging: level debugging, 26 messages logged, xml disabled,
+                     filtering disabled
+    Monitor logging: level debugging, 0 messages logged, xml disabled,
+                     filtering disabled
+    Buffer logging:  level debugging, 26 messages logged, xml disabled,
+                    filtering disabled
+    Exception Logging: size (4096 bytes)
+    Count and timestamp logging messages: disabled
+    Persistent logging: disabled
+    Trap logging: level informational, 29 message lines logged
+        Logging Source-Interface:       VRF Name:
+
+Log Buffer (16384 bytes):
+
+*Mar  1 15:32:39.877: %SPANTREE-5-EXTENDED_SYSID: Extended SysId enabled for typ                                                                                                                                                                             e vlan
+*Mar  1 15:32:39.929: %SYS-6-CLOCKUPDATE: System clock has been updated from 15:                                                                                                                                                                             32:39 UTC Sun Mar 1 2026 to 22:32:39 ICT Sun Mar 1 2026, configured from console                                                                                                                                                                              by console.
+*Mar  1 15:32:39.964: %SYS-5-CONFIG_I: Configured from memory by console
+*Mar  1 15:32:40.005: %SYS-5-RESTART: System restarted --
+Cisco IOS Software, Solaris Software (I86BI_LINUXL2-IPBASEK9-M), Experimental Ve                                                                                                                                                                             rsion 15.1(20130726:213425) [dstivers-july26-2013-team_track 105]
+Copyright (c) 1986-2013 by Cisco Systems, Inc.
+Compiled Fri 26-Jul-13 16:12 by dstivers
+*Mar  1 15:32:40.012: %SSH-5-ENABLED: SSH 2.0 has been enabled
+*Mar  1 15:32:40.017: %CRYPTO-6-ISAKMP_ON_OFF: ISAKMP is OFF
+*Mar  1 15:32:40.017: %CRYPTO-6-ISAKMP_ON_OFF: ISAKMP is OFF
+*Mar  1 15:32:41.708: %LINK-3-UPDOWN: Interface Ethernet0/0, changed state to up
+*Mar  1 15:32:41.713: %LINK-3-UPDOWN: Interface Ethernet0/1, changed state to up
+*Mar  1 15:32:41.726: %LINK-3-UPDOWN: Interface Ethernet0/2, changed state to up
+*Mar  1 15:32:41.739: %LINK-3-UPDOWN: Interface Ethernet0/3, changed state to up
+*Mar  1 15:32:41.744: %LINK-5-CHANGED: Interface Ethernet1/0, changed state to a                                                                                                                                                                             dministratively down
+*Mar  1 15:32:41.769: %LINK-3-UPDOWN: Interface Ethernet1/2, changed state to up
+*Mar  1 15:32:41.781: %LINK-3-UPDOWN: Interface Ethernet1/3, changed state to up
+*Mar  1 15:32:41.939: %LINK-3-UPDOWN: Interface Ethernet1/1, changed state to up
+*Mar  1 15:32:42.709: %LINEPROTO-5-UPDOWN: Line protocol on Interface Ethernet0/                                                                                                                                                                             0, changed state to up
+*Mar  1 15:32:42.719: %LINEPROTO-5-UPDOWN: Line protocol on Interface Ethernet0/                                                                                                                                                                             1, changed state to up
+*Mar  1 15:32:42.727: %LINEPROTO-5-UPDOWN: Line protocol on Interface Ethernet0/                                                                                                                                                                             2, changed state to up
+*Mar  1 15:32:42.747: %LINEPROTO-5-UPDOWN: Line protocol on Interface Ethernet0/                                                                                                                                                                             3, changed state to up
+*Mar  1 15:32:42.747: %LINEPROTO-5-UPDOWN: Line protocol on Interface Ethernet1/                                                                                                                                                                             0, changed state to down
+*Mar  1 15:32:42.769: %LINEPROTO-5-UPDOWN: Line protocol on Interface Ethernet1/                                                                                                                                                                             2, changed state to up
+*Mar  1 15:32:42.786: %LINEPROTO-5-UPDOWN: Line protocol on Interface Ethernet1/                                                                                                                                                                             3, changed state to up
+*Mar  1 15:32:42.941: %LINEPROTO-5-UPDOWN: Line protocol on Interface Ethernet1/                                                                                                                                                                             1, changed state to up
+*Mar  1 15:33:14.939: %LINK-3-UPDOWN: Interface Vlan99, changed state to up
+*Mar  1 15:33:15.042: %AMDP2_FE-6-EXCESSCOLL: Ethernet1/3 TDR=0, TRC=0
+*Mar  1 15:33:15.938: %LINEPROTO-5-UPDOWN: Line protocol on Interface Vlan99, ch                                                                                                                                                                             anged state to up
+DIST2#show ntp status
+Clock is unsynchronized, stratum 16, no reference clock
+nominal freq is 250.0000 Hz, actual freq is 250.0000 Hz, precision is 2**10
+ntp uptime is 5400 (1/100 of seconds), resolution is 4000
+reference time is 00000000.00000000 (07:00:00.000 ICT Mon Jan 1 1900)
+clock offset is 0.0000 msec, root delay is 0.00 msec
+root dispersion is 0.82 msec, peer dispersion is 0.00 msec
+loopfilter state is 'FSET' (Drift set from file), drift is 0.000000000 s/s
+system poll interval is 8, never updated.
+DIST2#
+*Mar  1 15:33:40.941: %HSRP-5-STATECHANGE: Vlan99 Grp 1 state Standby -> Active
+DIST2#
+DIST2#! --- Interfaces & VLANs ---
+DIST2#show interfaces
+Ethernet0/0 is up, line protocol is up (connected)
+  Hardware is AmdP2, address is aabb.cc00.7000 (bia aabb.cc00.7000)
+  MTU 1500 bytes, BW 10000 Kbit/sec, DLY 1000 usec,
+     reliability 255/255, txload 1/255, rxload 1/255
+  Encapsulation ARPA, loopback not set
+  Keepalive set (10 sec)
+  Auto-duplex, Auto-speed, media type is unknown
+  input flow-control is off, output flow-control is unsupported
+  ARP type: ARPA, ARP Timeout 04:00:00
+  Last input 00:00:14, output 00:00:00, output hang never
+  Last clearing of "show interface" counters never
+  Input queue: 0/2000/0/0 (size/max/drops/flushes); Total output drops: 0
+  Queueing strategy: fifo
+  Output queue: 0/0 (size/max)
+  5 minute input rate 0 bits/sec, 0 packets/sec
+  5 minute output rate 2000 bits/sec, 2 packets/sec
+     6 packets input, 400 bytes, 0 no buffer
+     Received 6 broadcasts (0 multicasts)
+     0 runts, 0 giants, 0 throttles
+     0 input errors, 0 CRC, 0 frame, 0 overrun, 0 ignored
+     0 input packets with dribble condition detected
+     68 packets output, 7318 bytes, 0 underruns
+     0 output errors, 0 collisions, 0 interface resets
+
+DIST2#how interfaces switchport
+       ^
+% Invalid input detected at '^' marker.
+
+DIST2#show ip interface brief
+Interface              IP-Address      OK? Method Status                Protocol
+Ethernet0/0            unassigned      YES unset  up                    up
+Ethernet0/1            unassigned      YES unset  up                    up
+Ethernet0/2            unassigned      YES unset  up                    up
+Ethernet0/3            unassigned      YES unset  up                    up
+Ethernet1/0            unassigned      YES unset  administratively down down
+Ethernet1/1            10.14.2.2       YES NVRAM  up                    up
+Ethernet1/2            unassigned      YES unset  up                    up
+Ethernet1/3            unassigned      YES unset  up                    up
+Vlan99                 192.168.99.3    YES NVRAM  down                  down
+DIST2#show ipv6 interface brief
+Ethernet0/0            [up/up]
+    unassigned
+Ethernet0/1            [up/up]
+    unassigned
+Ethernet0/2            [up/up]
+    unassigned
+Ethernet0/3            [up/up]
+    unassigned
+Ethernet1/0            [administratively down/down]
+    unassigned
+Ethernet1/1            [up/up]
+    unassigned
+Ethernet1/2            [up/up]
+    unassigned
+Ethernet1/3            [up/up]
+    unassigned
+Vlan99                 [down/down]
+    FE80::A8BB:CCFF:FE80:7000
+    2001:DB8:99::3
+DIST2#show vlan brief
+
+VLAN Name                             Status    Ports
+---- -------------------------------- --------- -------------------------------
+1    default                          active    Et1/0
+10   VLAN0010                         active
+20   VLAN0020                         active
+99   VLAN0099                         active
+100  VLAN0100                         active
+1002 fddi-default                     act/unsup
+1003 token-ring-default               act/unsup
+1004 fddinet-default                  act/unsup
+1005 trnet-default                    act/unsup
+DIST2#show spanning-tree
+
+VLAN0001
+  Spanning tree enabled protocol ieee
+  Root ID    Priority    32769
+             Address     aabb.cc00.7000
+             This bridge is the root
+             Hello Time   2 sec  Max Age 20 sec  Forward Delay 15 sec
+
+  Bridge ID  Priority    32769  (priority 32768 sys-id-ext 1)
+             Address     aabb.cc00.7000
+             Hello Time   2 sec  Max Age 20 sec  Forward Delay 15 sec
+             Aging Time  300 sec
+
+Interface           Role Sts Cost      Prio.Nbr Type
+------------------- ---- --- --------- -------- --------------------------------
+Et0/0               Desg LRN 100       128.1    Shr
+Et0/1               Back BLK 100       128.2    Shr
+Et0/2               Desg LRN 100       128.3    Shr
+Et0/3               Desg LRN 100       128.4    Shr
+Et1/2               Desg LRN 100       128.7    Shr
+Et1/3               Desg LRN 100       128.8    Shr
+
+
+
+DIST2#how spanning-tree summary
+       ^
+% Invalid input detected at '^' marker.
+
+DIST2#show spanning-tree detail
+
+ VLAN0001 is executing the ieee compatible Spanning Tree protocol
+  Bridge Identifier has priority 32768, sysid 1, address aabb.cc00.7000
+  Configured hello time 2, max age 20, forward delay 15
+  We are the root of the spanning tree
+  Topology change flag not set, detected flag not set
+  Number of topology changes 0 last change occurred 00:00:17 ago
+  Times:  hold 1, topology change 35, notification 2
+          hello 2, max age 20, forward delay 15
+  Timers: hello 1, topology change 0, notification 0, aging 300
+
+ Port 1 (Ethernet0/0) of VLAN0001 is designated learning
+   Port path cost 100, Port priority 128, Port Identifier 128.1.
+   Designated root has priority 32769, address aabb.cc00.7000
+   Designated bridge has priority 32769, address aabb.cc00.7000
+   Designated port id is 128.1, designated path cost 0
+   Timers: message age 0, forward delay 13, hold 0
+   Number of transitions to forwarding state: 0
+   Link type is shared by default
+   BPDU: sent 9, received 1
+
+ Port 2 (Ethernet0/1) of VLAN0001 is backup blocking
+   Port path cost 100, Port priority 128, Port Identifier 128.2.
+
+DIST2# --- Routing & Neighbors ---
+       ^
+% Invalid input detected at '^' marker.
+
+DIST2#show ip protocols
+*** IP Routing is NSF aware ***
+
+DIST2#show ip route
+Codes: L - local, C - connected, S - static, R - RIP, M - mobile, B - BGP
+       D - EIGRP, EX - EIGRP external, O - OSPF, IA - OSPF inter area
+       N1 - OSPF NSSA external type 1, N2 - OSPF NSSA external type 2
+       E1 - OSPF external type 1, E2 - OSPF external type 2
+       i - IS-IS, su - IS-IS summary, L1 - IS-IS level-1, L2 - IS-IS level-2
+       ia - IS-IS inter area, * - candidate default, U - per-user static route
+       o - ODR, P - periodic downloaded static route, H - NHRP, l - LISP
+       + - replicated route, % - next hop override
+
+Gateway of last resort is 10.14.2.1 to network 0.0.0.0
+
+S*    0.0.0.0/0 [1/0] via 10.14.2.1
+      10.0.0.0/8 is variably subnetted, 2 subnets, 2 masks
+C        10.14.2.0/30 is directly connected, Ethernet1/1
+L        10.14.2.2/32 is directly connected, Ethernet1/1
+DIST2#show ipv6 route
+IPv6 Routing Table - default - 1 entries
+Codes: C - Connected, L - Local, S - Static, U - Per-user Static route
+       B - BGP, R - RIP, I1 - ISIS L1, I2 - ISIS L2
+       IA - ISIS interarea, IS - ISIS summary, D - EIGRP, EX - EIGRP external
+       ND - ND Default, NDp - ND Prefix, DCE - Destination, NDr - Redirect
+       O - OSPF Intra, OI - OSPF Inter, OE1 - OSPF ext 1, OE2 - OSPF ext 2
+       ON1 - OSPF NSSA ext 1, ON2 - OSPF NSSA ext 2
+L   FF00::/8 [0/0]
+     via Null0, receive
+DIST2#show ip ospf
+DIST2#show ip ospf neighbor
+DIST2#show ip eigrp neighbors
+DIST2#show ip rip database
+DIST2#show ip route rip
+DIST2#show ip bgp summary
+% BGP not active
+
+DIST2#show bgp ipv4 unicast summary
+% BGP not active
+
+DIST2#show ip bgp
+% BGP not active
+
+DIST2#show ip bgp neighbors
+% BGP not active
+
+DIST2#show cdp neighbors detail
+-------------------------
+Device ID: CORE2.lab.local
+Entry address(es):
+  IP address: 10.14.2.1
+Platform: Linux Unix,  Capabilities: Router Source-Route-Bridge
+Interface: Ethernet1/1,  Port ID (outgoing port): Ethernet1/1
+Holdtime : 178 sec
+
+Version :
+Cisco IOS Software, Linux Software (I86BI_LINUX-ADVENTERPRISEK9-M), Version 15.4(2)T, DEVELOPMENT TEST SOFTWARE
+Technical Support: http://www.cisco.com/techsupport
+Copyright (c) 1986-2014 by Cisco Systems, Inc.
+Compiled Thu 27-Mar-14 01:08 by prod_rel_team
+
+advertisement version: 2
+Duplex: half
+Management address(es):
+  IP address: 10.14.2.1
+
+DIST2#show lldp neighbors detail
+             ^
+% Invalid input detected at '^' marker.
+
+DIST2#! --- Tables ---
+DIST2#show mac address-table
+          Mac Address Table
+-------------------------------------------
+
+Vlan    Mac Address       Type        Ports
+----    -----------       --------    -----
+DIST2#show ip arp
+Protocol  Address          Age (min)  Hardware Addr   Type   Interface
+Internet  10.14.2.1               0   aabb.cc00.4011  ARPA   Ethernet1/1
+Internet  10.14.2.2               -   aabb.cc00.7011  ARPA   Ethernet1/1
+Internet  192.168.99.3            -   aabb.cc80.7000  ARPA   Vlan99
+DIST2#show ipv6 neighbors
+DIST2#! --- Security & Management ---
+DIST2#show ssh
+%No SSHv2 server connections running.
+%No SSHv1 server connections running.
+DIST2#show access-lists
+DIST2#show snmp
+Chassis: 67108976
+0 SNMP packets input
+    0 Bad SNMP version errors
+    0 Unknown community name
+    0 Illegal operation for community name supplied
+    0 Encoding errors
+    0 Number of requested variables
+    0 Number of altered variables
+    0 Get-request PDUs
+    0 Get-next PDUs
+    0 Set-request PDUs
+    0 Input queue packet drops (Maximum queue size 1000)
+0 SNMP packets output
+    0 Too big errors (Maximum packet size 1500)
+    0 No such name errors
+    0 Bad values errors
+    0 General errors
+    0 Response PDUs
+    0 Trap PDUs
+SNMP global trap: disabled
+
+SNMP logging: disabled
+DIST2#show snmp community
+
+Community name: public
+Community Index: public
+Community SecurityName: public
+storage-type: nonvolatile        active
+
+
+DIST2#show snmp host
+DIST2#show snmp user
+
+DIST2#show aaa sessions
+Total sessions since last reload: 1
+Session Id: 1
+   Unique Id: 11
+   User Name: admin
+   IP Address: 0.0.0.0
+   Idle Time: 0
+   CT Call Handle: 0
+DIST2#show aaa user
+% Incomplete command.
+
+DIST2#show aaa method-suite
+                      ^
+% Invalid input detected at '^' marker.
+
+DIST2#! --- HA ---
+DIST2#show etherchannel summary
+Flags:  D - down        P - bundled in port-channel
+        I - stand-alone s - suspended
+        H - Hot-standby (LACP only)
+        R - Layer3      S - Layer2
+        U - in use      f - failed to allocate aggregator
+
+        M - not in use, minimum links not met
+        u - unsuitable for bundling
+        w - waiting to be aggregated
+        d - default port
+
+
+Number of channel-groups in use: 0
+Number of aggregators:           0
+
+Group  Port-channel  Protocol    Ports
+------+-------------+-----------+-----------------------------------------------
+
+DIST2#show standby brief
+                     P indicates configured to preempt.
+                     |
+Interface   Grp  Pri P State   Active          Standby         Virtual IP
+Vl99        1    100 P Init    unknown         unknown         192.168.99.1
+DIST2#show vrrp brief
+Interface          Grp Pri Time  Own Pre State   Master addr     Group addr
+DIST2#

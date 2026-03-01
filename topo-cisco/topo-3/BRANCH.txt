@@ -1,0 +1,1070 @@
+BRANCH#! --- System Info ---
+BRANCH#term len 0
+BRANCH#show version
+Cisco IOS Software, IOSv Software (VIOS-ADVENTERPRISEK9-M), Version 15.6(2)T, RELEASE SOFTWARE (fc2)
+Technical Support: http://www.cisco.com/techsupport
+Copyright (c) 1986-2016 by Cisco Systems, Inc.
+Compiled Tue 22-Mar-16 16:19 by prod_rel_team
+
+
+ROM: Bootstrap program is IOSv
+
+BRANCH uptime is 15 minutes
+System returned to ROM by reload
+System image file is "flash0:/vios-adventerprisek9-m"
+Last reload reason: Unknown reason
+
+
+
+This product contains cryptographic features and is subject to United
+States and local country laws governing import, export, transfer and
+use. Delivery of Cisco cryptographic products does not imply
+third-party authority to import, export, distribute or use encryption.
+Importers, exporters, distributors and users are responsible for
+compliance with U.S. and local country laws. By using this product you
+agree to comply with applicable laws and regulations. If you are unable
+to comply with U.S. and local laws, return this product immediately.
+
+A summary of U.S. laws governing Cisco cryptographic products may be found at:
+http://www.cisco.com/wwl/export/crypto/tool/stqrg.html
+
+If you require further assistance please contact us by sending email to
+export@cisco.com.
+
+Cisco IOSv (revision 1.0) with  with 984321K/62464K bytes of memory.
+Processor board ID 9P3Q625XQVWU75MEHHGSR
+4 Gigabit Ethernet interfaces
+DRAM configuration is 72 bits wide with parity disabled.
+256K bytes of non-volatile configuration memory.
+2097152K bytes of ATA System CompactFlash 0 (Read/Write)
+0K bytes of ATA CompactFlash 1 (Read/Write)
+0K bytes of ATA CompactFlash 2 (Read/Write)
+0K bytes of ATA CompactFlash 3 (Read/Write)
+
+
+
+Configuration register is 0x0
+
+BRANCH#show running-config
+Building configuration...
+
+
+Current configuration : 3361 bytes
+!
+version 15.6
+service timestamps debug datetime msec
+service timestamps log datetime msec
+no service password-encryption
+!
+hostname BRANCH
+!
+boot-start-marker
+boot-end-marker
+!
+!
+!
+no aaa new-model
+ethernet lmi ce
+!
+!
+!
+clock timezone ICT 7 0
+mmi polling-interval 60
+no mmi auto-configure
+no mmi pvc
+mmi snmp-timeout 180
+!
+!
+!
+!
+!
+!
+!
+!
+!
+!
+!
+ip domain name lab.local
+ip cef
+no ipv6 cef
+!
+multilink bundle-name authenticated
+!
+!
+!
+!
+username admin privilege 15 secret 5 $1$Pk2k$jl5hp3ZrbSBDylCS2vp00/
+!
+redundancy
+!
+!
+!
+!
+!
+!
+!
+!
+!
+!
+!
+!
+!
+!
+!
+interface Loopback0
+ description BRANCH-LAN
+ ip address 172.16.1.1 255.255.255.0
+!
+interface GigabitEthernet0/0
+ description LINK-TO-CORE2
+ ip address 10.20.1.2 255.255.255.252
+ duplex full
+ speed auto
+ media-type rj45
+!
+interface GigabitEthernet0/1
+ no ip address
+ shutdown
+ duplex auto
+ speed auto
+ media-type rj45
+!
+interface GigabitEthernet0/2
+ no ip address
+ shutdown
+ duplex auto
+ speed auto
+ media-type rj45
+!
+interface GigabitEthernet0/3
+ no ip address
+ shutdown
+ duplex auto
+ speed auto
+ media-type rj45
+!
+router rip
+ version 2
+ network 10.0.0.0
+ network 172.16.0.0
+ no auto-summary
+!
+ip forward-protocol nd
+!
+!
+no ip http server
+no ip http secure-server
+ip ssh version 2
+!
+!
+snmp-server community public RO
+snmp-server community private RW
+snmp-server chassis-id
+!
+!
+control-plane
+!
+banner exec ^C
+**************************************************************************
+* IOSv is strictly limited to use for evaluation, demonstration and IOS  *
+* education. IOSv is provided as-is and is not supported by Cisco's      *
+* Technical Advisory Center. Any use or disclosure, in whole or in part, *
+* of the IOSv Software or Documentation to any third party for any       *
+* purposes is expressly prohibited except as otherwise authorized by     *
+* Cisco in writing.                                                      *
+**************************************************************************^C
+banner incoming ^C
+**************************************************************************
+* IOSv is strictly limited to use for evaluation, demonstration and IOS  *
+* education. IOSv is provided as-is and is not supported by Cisco's      *
+* Technical Advisory Center. Any use or disclosure, in whole or in part, *
+* of the IOSv Software or Documentation to any third party for any       *
+* purposes is expressly prohibited except as otherwise authorized by     *
+* Cisco in writing.                                                      *
+**************************************************************************^C
+banner login ^C
+**************************************************************************
+* IOSv is strictly limited to use for evaluation, demonstration and IOS  *
+* education. IOSv is provided as-is and is not supported by Cisco's      *
+* Technical Advisory Center. Any use or disclosure, in whole or in part, *
+* of the IOSv Software or Documentation to any third party for any       *
+* purposes is expressly prohibited except as otherwise authorized by     *
+* Cisco in writing.                                                      *
+**************************************************************************^C
+!
+line con 0
+line aux 0
+line vty 0 4
+ login local
+ transport input all
+line vty 5 15
+ login local
+ transport input all
+!
+no scheduler allocate
+ntp server 10.20.1.1
+!
+end
+
+BRANCH#show processes cpu sorted
+CPU utilization for five seconds: 0%/0%; one minute: 1%; five minutes: 1%
+ PID Runtime(ms)     Invoked      uSecs   5Sec   1Min   5Min TTY Process
+  81         124          46       2695  0.07%  0.01%  0.00%   0 Per-minute Jobs
+ 278         165         897        183  0.07%  0.02%  0.00%   0 Crypto IKEv2   
+ 211         126         895        140  0.07%  0.02%  0.00%   0 ADJ background 
+  48        1303         174       7488  0.07%  0.06%  0.01%   0 Exec           
+   5         670         130       5153  0.07%  0.07%  0.05%   0 Check heaps    
+   6          20          31        645  0.07%  0.00%  0.00%   0 Pool Manager   
+  82         608         902        674  0.07%  0.14%  0.16%   0 Per-Second Jobs
+  84        1524        8856        172  0.07%  0.18%  0.21%   0 IOSv e1000     
+   7           0           1          0  0.00%  0.00%  0.00%   0 DiscardQ Backgro
+   4           0           1          0  0.00%  0.00%  0.00%   0 RO Notify Timers
+  11           1           1       1000  0.00%  0.00%  0.00%   0 Exception contro
+   8           0           2          0  0.00%  0.00%  0.00%   0 Timers         
+   9           1          51         19  0.00%  0.00%  0.00%   0 WATCH_AFS      
+  10           0           1          0  0.00%  0.00%  0.00%   0 Crash writer   
+  15           0           1          0  0.00%  0.00%  0.00%   0 IPC Zone Manager
+  16          37         880         42  0.00%  0.00%  0.00%   0 IPC Periodic Tim
+  17          20         880         22  0.00%  0.00%  0.00%   0 IPC Deferred Por
+   3          15          76        197  0.00%  0.00%  0.00%   0 RIP Router     
+  19           0           1          0  0.00%  0.00%  0.00%   0 IPC Seat Manager
+  20           1          52         19  0.00%  0.00%  0.00%   0 IPC Check Queue
+   2          41         181        226  0.00%  0.00%  0.00%   0 Load Meter     
+  12           0         181          0  0.00%  0.00%  0.00%   0 IPC Event Notifi
+  13           0          16          0  0.00%  0.00%  0.00%   0 IPC Dynamic Cach
+  14           0           1          0  0.00%  0.00%  0.00%   0 IPC Session Serv
+  25           0           1          0  0.00%  0.00%  0.00%   0 IPC Session Deta
+  18           0           1          0  0.00%  0.00%  0.00%   0 IPC Process leve
+  27         106         945        112  0.00%  0.00%  0.00%   0 ARP Background 
+  28           0           2          0  0.00%  0.00%  0.00%   0 ATM Idle Timer 
+  29           0           1          0  0.00%  0.00%  0.00%   0 ATM ASYNC PROC 
+  30           0           1          0  0.00%  0.00%  0.00%   0 CEF MIB API    
+  31           0           1          0  0.00%  0.00%  0.00%   0 AAA_SERVER_DEADT
+  32           0           1          0  0.00%  0.00%  0.00%   0 Policy Manager 
+  33           1           2        500  0.00%  0.00%  0.00%   0 DDR Timers     
+  21           0           1          0  0.00%  0.00%  0.00%   0 IPC Seat RX Cont
+  35           1           3        333  0.00%  0.00%  0.00%   0 PrstVbl        
+  36           0           2          0  0.00%  0.00%  0.00%   0 Serial Backgroun
+  37           0           1          0  0.00%  0.00%  0.00%   0 RMI RM Notify Wa
+  38           4           1       4000  0.00%  0.00%  0.00%   0 RF SCTPthread  
+  39           1           1       1000  0.00%  0.00%  0.00%   0 CHKPT RG SCTPthr
+  40          12         898         13  0.00%  0.00%  0.00%   0 GraphIt        
+  22           1           1       1000  0.00%  0.00%  0.00%   0 IPC Seat TX Cont
+  23           5          91         54  0.00%  0.00%  0.00%   0 IPC Keep Alive M
+  43           0           2          0  0.00%  0.00%  0.00%   0 XML Proxy Client
+  44         221          26       8500  0.00%  0.00%  0.00%   0 crypto sw pk pro
+  24           9         181         49  0.00%  0.00%  0.00%   0 IPC Loadometer 
+  46           0           1          0  0.00%  0.00%  0.00%   0 dev_device_inser
+  47           1           1       1000  0.00%  0.00%  0.00%   0 dev_device_remov
+  26           1           2        500  0.00%  0.00%  0.00%   0 ARP Input      
+  49           0           1          0  0.00%  0.00%  0.00%   0 Async write proc
+  50           0           1          0  0.00%  0.00%  0.00%   0 Async write proc
+  51           0           1          0  0.00%  0.00%  0.00%   0 Async write proc
+  34           1           2        500  0.00%  0.00%  0.00%   0 Entity MIB API 
+  53           0           1          0  0.00%  0.00%  0.00%   0 Critical Bkgnd 
+  54          89         472        188  0.00%  0.00%  0.00%   0 Net Background 
+  55           2           2       1000  0.00%  0.00%  0.00%   0 IDB Work       
+  56           8          43        186  0.00%  0.00%  0.00%   0 Logger         
+  57         645         893        722  0.00%  0.02%  0.04%   0 TTY Background 
+  58           0           2          0  0.00%  0.00%  0.00%   0 CTS CORE       
+  59           0           3          0  0.00%  0.00%  0.00%   0 SXP CORE       
+  60           3          12        250  0.00%  0.00%  0.00%   0 RF Slave Main Th
+  61           2           3        666  0.00%  0.00%  0.00%   0 IF-MGR control p
+  62           1          11         90  0.00%  0.00%  0.00%   0 IF-MGR event pro
+  63           0           2          0  0.00%  0.00%  0.00%   0 cpf_msg_holdq_pr
+  64           0           1          0  0.00%  0.00%  0.00%   0 cpf_msg_rcvq_pro
+  65           0           1          0  0.00%  0.00%  0.00%   0 cpf_process_tpQ
+  66           0           1          0  0.00%  0.00%  0.00%   0 CHKPT Test clien
+  67           0           1          0  0.00%  0.00%  0.00%   0 CHKPT Test clien
+   1           1           7        142  0.00%  0.00%  0.00%   0 Chunk Manager  
+  69           0           1          0  0.00%  0.00%  0.00%   0 CHKPT Test clien
+  70           0           1          0  0.00%  0.00%  0.00%   0 CHKPT Test clien
+  71           0           1          0  0.00%  0.00%  0.00%   0 CHKPT Test clien
+  72           0           1          0  0.00%  0.00%  0.00%   0 CHKPT Test clien
+  73           0           1          0  0.00%  0.00%  0.00%   0 CHKPT Test clien
+  74           0           1          0  0.00%  0.00%  0.00%   0 CHKPT Test clien
+  75           1           1       1000  0.00%  0.00%  0.00%   0 CHKPT Test clien
+  76           0           1          0  0.00%  0.00%  0.00%   0 CHKPT Test clien
+  77           3          12        250  0.00%  0.00%  0.00%   0 RF Master Main T
+  78           1           7        142  0.00%  0.00%  0.00%   0 RF Master Status
+  79           3          32         93  0.00%  0.00%  0.00%   0 Net Input      
+  80          26         181        143  0.00%  0.00%  0.00%   0 Compute load avg
+  41           0           2          0  0.00%  0.00%  0.00%   0 Dialer event   
+  42           0           1          0  0.00%  0.00%  0.00%   0 SERIAL A'detect
+  83           0           1          0  0.00%  0.00%  0.00%   0 Transport Port A
+  45           0           1          0  0.00%  0.00%  0.00%   0 Inode Table Dest
+  85           0           1          0  0.00%  0.00%  0.00%   0 RF_INTERDEV_DELA
+  86           1           1       1000  0.00%  0.00%  0.00%   0 RF_INTERDEV_SCTP
+  87           0           2          0  0.00%  0.00%  0.00%   0 BMA Background 
+  88           1           2        500  0.00%  0.00%  0.00%   0 VMI Background 
+  89           3           4        750  0.00%  0.00%  0.00%   0 EEM ED Identity
+  52          12          17        705  0.00%  0.00%  0.00%   0 DFS flush period
+  91           0           1          0  0.00%  0.00%  0.00%   0 Src Fltr backgro
+  92           1           1       1000  0.00%  0.00%  0.00%   0 ETH_PLAT_SW_THRE
+  93           0           1          0  0.00%  0.00%  0.00%   0 CF_INTERDEV_SCTP
+  94           3         181         16  0.00%  0.00%  0.00%   0 Rate limit load
+  95           0           2          0  0.00%  0.00%  0.00%   0 IOSv out console
+  96         412        8856         46  0.00%  0.04%  0.04%   0 IOSv in console
+  97           0           2          0  0.00%  0.00%  0.00%   0 Ethernet CFM   
+  98           0           2          0  0.00%  0.00%  0.00%   0 Ethernet CFM IOU
+  99         151         899        167  0.00%  0.00%  0.00%   0 mDNS           
+ 101           1          30         33  0.00%  0.00%  0.00%   0 Bridge-domain MA
+ 102         135         898        150  0.00%  0.01%  0.00%   0 FHRP Main thread
+ 103           1           1       1000  0.00%  0.00%  0.00%   0 VRRP Main thread
+ 104        1545       13816        111  0.00%  0.14%  0.16%   0 VRRS Main thread
+  68           0           1          0  0.00%  0.00%  0.00%   0 CHKPT Test clien
+ 106           0           2          0  0.00%  0.00%  0.00%   0 RG Protocol Time
+ 107           0           2          0  0.00%  0.00%  0.00%   0 RG Transport Tim
+ 108           0           1          0  0.00%  0.00%  0.00%   0 RG VP          
+ 109           0           2          0  0.00%  0.00%  0.00%   0 RG AR          
+ 110           1           2        500  0.00%  0.00%  0.00%   0 IP NAT HA BGND P
+ 111           0           1          0  0.00%  0.00%  0.00%   0 EAP Framework  
+ 112           0           2          0  0.00%  0.00%  0.00%   0 Dot1x Mgr Proces
+ 113           1           2        500  0.00%  0.00%  0.00%   0 Auth Manager   
+ 114           0           1          0  0.00%  0.00%  0.00%   0 AUTH POLICY Fram
+ 115           1           2        500  0.00%  0.00%  0.00%   0 IP Host Track Pr
+ 116           0           2          0  0.00%  0.00%  0.00%   0 AAA Server     
+ 117           0           1          0  0.00%  0.00%  0.00%   0 AAA ACCT Proc  
+ 118           0           1          0  0.00%  0.00%  0.00%   0 ACCT Periodic Pr
+ 119           0           1          0  0.00%  0.00%  0.00%   0 AAA System Acct
+ 120         198         124       1596  0.00%  0.00%  0.00%   0 CDP Protocol   
+ 122           1           3        333  0.00%  0.00%  0.00%   0 SSH Event handle
+ 123           0           2          0  0.00%  0.00%  0.00%   0 AAA Dictionary R
+ 124           1           2        500  0.00%  0.00%  0.00%   0 Ethernet OAM Pro
+ 125           1           2        500  0.00%  0.00%  0.00%   0 Ethernet LMI   
+ 126           0           2          0  0.00%  0.00%  0.00%   0 CEF switching ba
+ 127           0           1          0  0.00%  0.00%  0.00%   0 ADJ NSF process
+ 128           0           1          0  0.00%  0.00%  0.00%   0 TRACK Main threa
+ 129           1           1       1000  0.00%  0.00%  0.00%   0 TRACK Client thr
+ 130           1           2        500  0.00%  0.00%  0.00%   0 ATM OAM Input  
+ 131           0           2          0  0.00%  0.00%  0.00%   0 ATM OAM TIMER  
+ 132           0           2          0  0.00%  0.00%  0.00%   0 IPAM/ODAP Events
+ 133         339       27457         12  0.00%  0.02%  0.03%   0 IPAM Manager   
+ 134           0           2          0  0.00%  0.00%  0.00%   0 IPAM Events    
+ 135           2           2       1000  0.00%  0.00%  0.00%   0 IP ARP Adjacency
+ 136           0           1          0  0.00%  0.00%  0.00%   0 IP ARP Retry Age
+ 137          39         107        364  0.00%  0.00%  0.00%   0 IP Input       
+  90          11          26        423  0.00%  0.00%  0.00%   0 EEM ED ND      
+ 139          34        1745         19  0.00%  0.00%  0.00%   0 NAT64 Bgnd Proce
+ 140           0           4          0  0.00%  0.00%  0.00%   0 TurboACL       
+ 141           2           2       1000  0.00%  0.00%  0.00%   0 TurboACL chunk 
+ 142           1           3        333  0.00%  0.00%  0.00%   0 PIM register asy
+ 143           1           1       1000  0.00%  0.00%  0.00%   0 IPv6 ping proces
+ 144           3           4        750  0.00%  0.00%  0.00%   0 MOP Protocols  
+ 145           0           2          0  0.00%  0.00%  0.00%   0 OCE punted Pkts
+ 146           0           1          0  0.00%  0.00%  0.00%   0 LSP Tunnel FRR 
+ 147           0           1          0  0.00%  0.00%  0.00%   0 MPLS Auto-Tunnel
+ 148           0           2          0  0.00%  0.00%  0.00%   0 PPP SIP        
+ 149           0           2          0  0.00%  0.00%  0.00%   0 PPP Bind       
+ 150           0           2          0  0.00%  0.00%  0.00%   0 PPP IP Route   
+ 151           0           1          0  0.00%  0.00%  0.00%   0 HQF TARGET DYNAM
+ 153           0           2          0  0.00%  0.00%  0.00%   0 RIB LM VALIDATE
+ 154           0           2          0  0.00%  0.00%  0.00%   0 Spanning Tree  
+ 155           0           1          0  0.00%  0.00%  0.00%   0 X.25 Encaps Mana
+ 156           2           6        333  0.00%  0.00%  0.00%   0 SSM connection m
+ 157           0           1          0  0.00%  0.00%  0.00%   0 AC Switch      
+ 158           0           1          0  0.00%  0.00%  0.00%   0 SSS Manager    
+ 159           0           1          0  0.00%  0.00%  0.00%   0 SSS Policy Manag
+ 160           0           1          0  0.00%  0.00%  0.00%   0 SSS Feature Mana
+ 161          47        3507         13  0.00%  0.00%  0.00%   0 SSS Feature Time
+ 162           0           1          0  0.00%  0.00%  0.00%   0 WAAS Process   
+ 163           0           1          0  0.00%  0.00%  0.00%   0 Auth-proxy AAA B
+ 164           6         300         20  0.00%  0.00%  0.00%   0 Auth-proxy HTTP
+ 165           0           1          0  0.00%  0.00%  0.00%   0 IP Admin SM Proc
+ 166           0           2          0  0.00%  0.00%  0.00%   0 EAPoUDP Process
+ 167           0           2          0  0.00%  0.00%  0.00%   0 KRB5 AAA       
+ 168           2           4        500  0.00%  0.00%  0.00%   0 Flow Exporter Ti
+ 169           0           2          0  0.00%  0.00%  0.00%   0 Flow Exporter Pa
+ 170           0           3          0  0.00%  0.00%  0.00%   0 Service Routing
+ 171           0          15          0  0.00%  0.00%  0.00%   0 FRR Background P
+ 172          18          75        240  0.00%  0.00%  0.00%   0 CEF background p
+ 173           0           1          0  0.00%  0.00%  0.00%   0 fib_fib_bfd_sb e
+ 174           0           1          0  0.00%  0.00%  0.00%   0 Tunnel FIB     
+ 175           1           2        500  0.00%  0.00%  0.00%   0 VPWS Thread    
+ 176           8          31        258  0.00%  0.00%  0.00%   0 NGCP SCHEDULER P
+ 177          27         897         30  0.00%  0.00%  0.00%   0 STILE PERIODIC T
+ 178           1          16         62  0.00%  0.00%  0.00%   0 UV AUTO CUSTOM P
+ 179           0           2          0  0.00%  0.00%  0.00%   0 EFP Errd       
+ 180           0           2          0  0.00%  0.00%  0.00%   0 Ether EFP Proces
+ 181           0           2          0  0.00%  0.00%  0.00%   0 L2X Switching Ev
+ 182           1           1       1000  0.00%  0.00%  0.00%   0 Ethernet Datapla
+ 105           2           2       1000  0.00%  0.00%  0.00%   0 RG Faults Timer
+ 184           2           2       1000  0.00%  0.00%  0.00%   0 Ethernet PM Soft
+ 185          32         271        118  0.00%  0.00%  0.00%   0 Ethernet PM Moni
+ 186           0           2          0  0.00%  0.00%  0.00%   0 SNMP Timers    
+ 187           2           2       1000  0.00%  0.00%  0.00%   0 SCTP Main Proces
+ 188           0           2          0  0.00%  0.00%  0.00%   0 RG Media Timer 
+ 189           0           1          0  0.00%  0.00%  0.00%   0 RG If-Mgr Timer
+ 190           0           1          0  0.00%  0.00%  0.00%   0 IP Traceroute  
+ 191           1           2        500  0.00%  0.00%  0.00%   0 IPMUXv4        
+ 192           0           2          0  0.00%  0.00%  0.00%   0 IPMUXv6        
+ 193           0           1          0  0.00%  0.00%  0.00%   0 Critical Auth  
+ 194           0           1          0  0.00%  0.00%  0.00%   0 MAB Framework  
+ 195         116         897        129  0.00%  0.01%  0.00%   0 RUDPV1 Main Proc
+ 196           1           1       1000  0.00%  0.00%  0.00%   0 bsm_timers     
+ 197          22         898         24  0.00%  0.00%  0.00%   0 bsm_xmt_proc   
+ 198           0           2          0  0.00%  0.00%  0.00%   0 Routing Topology
+ 199           8          40        200  0.00%  0.00%  0.00%   0 IP RIB Update  
+ 200           4          17        235  0.00%  0.00%  0.00%   0 IP Background  
+ 201           5           7        714  0.00%  0.00%  0.00%   0 IP Connected Rou
+ 202           0           2          0  0.00%  0.00%  0.00%   0 PPP Compress Inp
+ 203           0           2          0  0.00%  0.00%  0.00%   0 PPP Compress Res
+ 204           0           1          0  0.00%  0.00%  0.00%   0 Socket Timers  
+ 205           0           1          0  0.00%  0.00%  0.00%   0 TCP Timer      
+ 206           0           1          0  0.00%  0.00%  0.00%   0 TCP Protocols  
+ 207           1           1       1000  0.00%  0.00%  0.00%   0 COPS           
+ 208           0           2          0  0.00%  0.00%  0.00%   0 Dialer Forwarder
+ 209           0           4          0  0.00%  0.00%  0.00%   0 SR CapMan Proces
+ 210          45         449        100  0.00%  0.00%  0.00%   0 CEF: IPv4 proces
+ 138           0           1          0  0.00%  0.00%  0.00%   0 ICMP event handl
+ 212           1           4        250  0.00%  0.00%  0.00%   0 Collection proce
+ 213           0           2          0  0.00%  0.00%  0.00%   0 ADJ resolve proc
+ 214           1           3        333  0.00%  0.00%  0.00%   0 HTTP CORE      
+ 215           2           2       1000  0.00%  0.00%  0.00%   0 MVPN Mgr Process
+ 216           0           2          0  0.00%  0.00%  0.00%   0 Multicast Offloa
+ 217           0           1          0  0.00%  0.00%  0.00%   0 RARP Input     
+ 218           2           3        666  0.00%  0.00%  0.00%   0 static         
+ 219           0           2          0  0.00%  0.00%  0.00%   0 App Route Proces
+ 220           0           1          0  0.00%  0.00%  0.00%   0 IPv6 RIB Cleanup
+ 221           0           1          0  0.00%  0.00%  0.00%   0 IPv6 RIB Event H
+ 222           1           2        500  0.00%  0.00%  0.00%   0 Tunnel         
+ 223           1           3        333  0.00%  0.00%  0.00%   0 MFIB Master back
+ 225           2           2       1000  0.00%  0.00%  0.00%   0 IP SNMP        
+ 226           0           1          0  0.00%  0.00%  0.00%   0 IPv6 Static Hand
+ 227           1           1       1000  0.00%  0.00%  0.00%   0 IPv6 Inspect Tim
+ 228           0           1          0  0.00%  0.00%  0.00%   0 PDU DISPATCHER 
+ 229           0           1          0  0.00%  0.00%  0.00%   0 IP IRDP        
+ 230           0           1          0  0.00%  0.00%  0.00%   0 LAPB Process   
+ 231           0           2          0  0.00%  0.00%  0.00%   0 LFDp Input Proc
+ 232           1           1       1000  0.00%  0.00%  0.00%   0 PAD InCall     
+ 233           1           2        500  0.00%  0.00%  0.00%   0 X.25 Background
+ 234          21         894         23  0.00%  0.00%  0.00%   0 PfR BR Learn   
+ 235           2          86         23  0.00%  0.00%  0.00%   0 QoS stats proces
+ 236           0           2          0  0.00%  0.00%  0.00%   0 HQF Output Shape
+ 237           0           2          0  0.00%  0.00%  0.00%   0 HQF Input Shaper
+ 238           1           3        333  0.00%  0.00%  0.00%   0 RBSCP Background
+ 239           1           3        333  0.00%  0.00%  0.00%   0 Media Services P
+ 240           0           1          0  0.00%  0.00%  0.00%   0 VPDN call manage
+ 241           1           1       1000  0.00%  0.00%  0.00%   0 IPS Process    
+ 242           0           2          0  0.00%  0.00%  0.00%   0 IPS Auto Update
+ 243           1           2        500  0.00%  0.00%  0.00%   0 SDEE Management
+ 244          67        1745         38  0.00%  0.00%  0.00%   0 Inspect process
+ 246           9          59        152  0.00%  0.00%  0.00%   0 FW DP Inspect pr
+ 247          69        1745         39  0.00%  0.00%  0.00%   0 CCE DP URLF cach
+ 248           0           2          0  0.00%  0.00%  0.00%   0 URL filter proc
+ 249           0           1          0  0.00%  0.00%  0.00%   0 Select Timers  
+ 250           3           2       1500  0.00%  0.00%  0.00%   0 HTTP Process   
+ 251           1           2        500  0.00%  0.00%  0.00%   0 CIFS API Process
+ 252           1           2        500  0.00%  0.00%  0.00%   0 CIFS Proxy Proce
+ 253           0           2          0  0.00%  0.00%  0.00%   0 Diameter Base pr
+ 254           5          38        131  0.00%  0.00%  0.00%   0 CRM_CALL_UPDATE_
+ 255           0           1          0  0.00%  0.00%  0.00%   0 EAP Process    
+ 257           0           2          0  0.00%  0.00%  0.00%   0 AAA Cached Serve
+ 258           0           2          0  0.00%  0.00%  0.00%   0 ENABLE AAA     
+ 259           1           1       1000  0.00%  0.00%  0.00%   0 EM Background Pr
+ 260           0           1          0  0.00%  0.00%  0.00%   0 IDMGR CORE     
+ 261           1           3        333  0.00%  0.00%  0.00%   0 LDAP process   
+ 262           0           1          0  0.00%  0.00%  0.00%   0 Opaque Database
+ 263           0           1          0  0.00%  0.00%  0.00%   0 Key chain liveke
+ 264           0           2          0  0.00%  0.00%  0.00%   0 LINE AAA       
+ 265           1           3        333  0.00%  0.00%  0.00%   0 LOCAL AAA      
+ 266           0           2          0  0.00%  0.00%  0.00%   0 MPLS Auto Mesh P
+ 267           0           2          0  0.00%  0.00%  0.00%   0 TPLUS          
+ 268           0           2          0  0.00%  0.00%  0.00%   0 VSP_MGR        
+ 269        1444       13817        104  0.00%  0.21%  0.21%   0 MMA DB TIMER   
+ 270           0           1          0  0.00%  0.00%  0.00%   0 FW_TEST_TRP    
+ 271           1           1       1000  0.00%  0.00%  0.00%   0 EPM MAIN PROCESS
+ 272           1           3        333  0.00%  0.00%  0.00%   0 Crypto WUI     
+ 273           1           3        333  0.00%  0.00%  0.00%   0 EST Client     
+ 274           1           1       1000  0.00%  0.00%  0.00%   0 NIST rng proc  
+ 275          31        1745         17  0.00%  0.00%  0.00%   0 Timer Library  
+ 276           2           2       1000  0.00%  0.00%  0.00%   0 Crypto Support 
+ 277           1           1       1000  0.00%  0.00%  0.00%   0 IPSECv6 PS Proc
+ 183           0           1          0  0.00%  0.00%  0.00%   0 Ethernet PM Proc
+ 279           0           1          0  0.00%  0.00%  0.00%   0 IKEv2 AAA handle
+ 280           0           1          0  0.00%  0.00%  0.00%   0 http client proc
+ 281        1394       13816        100  0.00%  0.22%  0.21%   0 MMA DP TIMER   
+ 282           0           2          0  0.00%  0.00%  0.00%   0 CSDB Timer proce
+ 283           1           1       1000  0.00%  0.00%  0.00%   0 RPMS_PROC_MAIN 
+ 284           7          11        636  0.00%  0.00%  0.00%   0 crypto engine pr
+ 285           0           1          0  0.00%  0.00%  0.00%   0 RSA background p
+ 286         858           4     214500  0.00%  0.00%  0.00%   0 Crypto CA      
+ 287           1           3        333  0.00%  0.00%  0.00%   0 Crypto PKI-CRL 
+ 288           0           1          0  0.00%  0.00%  0.00%   0 Crypto PKI-Rev-P
+ 289           1           1       1000  0.00%  0.00%  0.00%   0 PKI OCSP       
+ 290           0           1          0  0.00%  0.00%  0.00%   0 PKI Revocation 
+ 291           0           1          0  0.00%  0.00%  0.00%   0 encrypt proc   
+ 292           1           3        333  0.00%  0.00%  0.00%   0 CRYPTO MAP FREE
+ 293           0           1          0  0.00%  0.00%  0.00%   0 Crypto INT     
+ 294           0           3          0  0.00%  0.00%  0.00%   0 Crypto IKE Dispa
+ 295           2           3        666  0.00%  0.00%  0.00%   0 Crypto IKMP    
+ 296           0           1          0  0.00%  0.00%  0.00%   0 IPSEC manual key
+ 297          12          46        260  0.00%  0.00%  0.00%   0 IPSEC key engine
+ 298           0           1          0  0.00%  0.00%  0.00%   0 CRYPTO QoS proce
+ 299           0           1          0  0.00%  0.00%  0.00%   0 Crypto ACL     
+ 300           0           1          0  0.00%  0.00%  0.00%   0 Crypto PAS Proc
+ 301           1           1       1000  0.00%  0.00%  0.00%   0 IPSec background
+ 302           2           2       1000  0.00%  0.00%  0.00%   0 GKM GM Process 
+ 303           0           1          0  0.00%  0.00%  0.00%   0 GKM KS PROCESS 
+ 304           0           2          0  0.00%  0.00%  0.00%   0 Control-plane ho
+ 305           0           1          0  0.00%  0.00%  0.00%   0 IKEv2 FlexVPN Pr
+ 306           1           1       1000  0.00%  0.00%  0.00%   0 IKEv2 Cluster Lo
+ 308           0           2          0  0.00%  0.00%  0.00%   0 AAA SEND STOP EV
+ 309           0           1          0  0.00%  0.00%  0.00%   0 Test AAA Client
+ 311           1           1       1000  0.00%  0.00%  0.00%   0 dcm_cli_engine 
+ 312           1           3        333  0.00%  0.00%  0.00%   0 dcm_cli_provider
+ 313           3           5        600  0.00%  0.00%  0.00%   0 DCM Core Thread
+ 314           2          91         21  0.00%  0.00%  0.00%   0 RMON Recycle Pro
+ 315           0           2          0  0.00%  0.00%  0.00%   0 RMON Deferred Se
+ 316           1           4        250  0.00%  0.00%  0.00%   0 EEM ED Media Ser
+ 317           0           1          0  0.00%  0.00%  0.00%   0 Syslog Traps   
+ 318           0           1          0  0.00%  0.00%  0.00%   0 WAN Optimization
+ 319           1           4        250  0.00%  0.00%  0.00%   0 EEM ED Routing 
+ 320          32          31       1032  0.00%  0.00%  0.00%   0 EEM ED Syslog  
+ 321          10           4       2500  0.00%  0.00%  0.00%   0 EEM ED Generic 
+ 322           0           4          0  0.00%  0.00%  0.00%   0 EEM ED NHRP    
+ 323           1           4        250  0.00%  0.00%  0.00%   0 EEM ED Track   
+ 324           1           4        250  0.00%  0.00%  0.00%   0 EEM ED Resource
+ 325           7          29        241  0.00%  0.00%  0.00%   0 Crypto cTCP proc
+ 326           1           1       1000  0.00%  0.00%  0.00%   0 RMON Packets   
+ 327           0           3          0  0.00%  0.00%  0.00%   0 RBM CORE       
+ 328           0           3          0  0.00%  0.00%  0.00%   0 CTS credentials
+ 329           3           6        500  0.00%  0.00%  0.00%   0 DCM snmp dp Thre
+ 330           1           3        333  0.00%  0.00%  0.00%   0 snmp dcm ma shim
+ 331          14          93        150  0.00%  0.00%  0.00%   0 Bulkstat-Client
+ 332           0           3          0  0.00%  0.00%  0.00%   0 dcm_expression_p
+ 333          10          23        434  0.00%  0.00%  0.00%   0 Syslog         
+ 334           2           2       1000  0.00%  0.00%  0.00%   0 SNMP ENGINE    
+ 335           0           1          0  0.00%  0.00%  0.00%   0 udp_transport Se
+ 336          13          90        144  0.00%  0.00%  0.00%   0 qos_mon_periodic
+ 337           0           1          0  0.00%  0.00%  0.00%   0 IP SLAs Ethernet
+ 338          15          60        250  0.00%  0.00%  0.00%   0 EEM Server     
+ 339           2           3        666  0.00%  0.00%  0.00%   0 EEM Policy Direc
+ 340           1           2        500  0.00%  0.00%  0.00%   0 IP SNMPV6      
+ 341           0           4          0  0.00%  0.00%  0.00%   0 EEM ED CLI     
+ 342           1           4        250  0.00%  0.00%  0.00%   0 EEM ED Counter 
+ 343           0           4          0  0.00%  0.00%  0.00%   0 EEM ED Interface
+ 344           0           4          0  0.00%  0.00%  0.00%   0 EEM ED IOSWD   
+ 345           2           4        500  0.00%  0.00%  0.00%   0 EEM ED None    
+ 346           0           4          0  0.00%  0.00%  0.00%   0 EEM ED OIR     
+ 347           2           9        222  0.00%  0.00%  0.00%   0 EEM ED RF      
+ 348           1           4        250  0.00%  0.00%  0.00%   0 EEM ED SNMP    
+ 349           0           4          0  0.00%  0.00%  0.00%   0 EEM ED SNMP Obje
+ 350           1           4        250  0.00%  0.00%  0.00%   0 EEM ED Ipsla   
+ 351           1           4        250  0.00%  0.00%  0.00%   0 EEM ED SNMP Noti
+ 352           2          19        105  0.00%  0.00%  0.00%   0 EEM ED Timer   
+ 353           3           4        750  0.00%  0.00%  0.00%   0 EEM ED Test    
+ 354           1           4        250  0.00%  0.00%  0.00%   0 EEM ED Config  
+ 355           0           4          0  0.00%  0.00%  0.00%   0 EEM ED Env     
+ 356           0           4          0  0.00%  0.00%  0.00%   0 EEM ED DS      
+ 357           3           4        750  0.00%  0.00%  0.00%   0 EEM ED CRASH   
+ 358           0           1          0  0.00%  0.00%  0.00%   0 SNMP ConfCopyPro
+ 359           1           4        250  0.00%  0.00%  0.00%   0 EEM ED Nf      
+ 360           0           4          0  0.00%  0.00%  0.00%   0 EEM ED RPC     
+ 361          17          55        309  0.00%  0.00%  0.00%   0 mdns Timer Proce
+ 362           0           2          0  0.00%  0.00%  0.00%   0 MRIB Process   
+ 363           1           7        142  0.00%  0.00%  0.00%   0 EEM Helper Threa
+ 365           0           2          0  0.00%  0.00%  0.00%   0 SNMP Traps     
+ 366          38         920         41  0.00%  0.00%  0.00%   0 NTP            
+ 368          28          68        411  0.00%  0.00%  0.00%   0 RIP Send       
+ 369          29         157        184  0.00%  0.00%  0.00%   0 RIP Timers     
+BRANCH#show memory statistics
+                Head    Total(b)     Used(b)     Free(b)   Lowest(b)  Largest(b)
+Processor    CAAE880   859380608    63964668   795415940   777201676   776412444
+      I/O    8DAE880    63963136    52718488    11244648    11212064    11090812
+BRANCH#show logging
+Syslog logging: enabled (0 messages dropped, 4 messages rate-limited, 0 flushes, 0 overruns, xml disabled, filtering disabled)
+
+No Active Message Discriminator.
+
+
+
+No Inactive Message Discriminator.
+
+
+    Console logging: level debugging, 42 messages logged, xml disabled,
+                     filtering disabled
+    Monitor logging: level debugging, 0 messages logged, xml disabled,
+                     filtering disabled
+    Buffer logging:  level debugging, 43 messages logged, xml disabled,
+                    filtering disabled
+    Exception Logging: size (8192 bytes)
+    Count and timestamp logging messages: disabled
+    Persistent logging: disabled
+
+No active filter modules.
+
+    Trap logging: level informational, 47 message lines logged
+        Logging Source-Interface:       VRF Name:
+
+Log Buffer (8192 bytes):
+
+*Mar  1 00:00:00.540: %ATA-6-DEV_FOUND: device 0x1F0
+*Mar  1 00:00:09.634: %NVRAM-5-CONFIG_NVRAM_READ_OK: NVRAM configuration 'flash:/nvram' was read from disk.
+*Mar  1 15:21:05.293: %PA-3-PA_INIT_FAILED: Performance Agent failed to initialize (Missing Data License)
+*Mar  1 15:21:07.011: %LINK-3-UPDOWN: Interface GigabitEthernet0/0, changed state to up
+*Mar  1 15:21:07.012: %LINK-3-UPDOWN: Interface GigabitEthernet0/1, changed state to up
+*Mar  1 15:21:07.013: %LINK-3-UPDOWN: Interface GigabitEthernet0/2, changed state to up
+*Mar  1 15:21:07.013: %LINK-3-UPDOWN: Interface GigabitEthernet0/3, changed state to up
+*Mar  1 15:21:07.471: %CVAC-4-FILE_IGNORED: Configuration file flash0:/ios_config.txt is ignored : empty file
+*Mar  1 15:21:07.507: %SYS-6-CLOCKUPDATE: System clock has been updated from 15:21:07 UTC Sun Mar 1 2026 to 22:21:07 ICT Sun Mar 1 2026, configured from console by console.
+*Mar  1 15:21:07.878: %SYS-5-CONFIG_I: Configured from memory by console
+*Mar  1 15:21:08.136: %LINEPROTO-5-UPDOWN: Line protocol on Interface GigabitEthernet0/0, changed state to down
+*Mar  1 15:21:08.136: %LINEPROTO-5-UPDOWN: Line protocol on Interface GigabitEthernet0/1, changed state to down
+*Mar  1 15:21:08.136: %LINEPROTO-5-UPDOWN: Line protocol on Interface GigabitEthernet0/2, changed state to down
+*Mar  1 15:21:08.137: %LINEPROTO-5-UPDOWN: Line protocol on Interface GigabitEthernet0/3, changed state to down
+*Mar  1 15:21:08.152: %CVAC-4-FILE_IGNORED: Configuration file flash0:/ios_config.txt is ignored : empty file
+*Mar  1 15:21:08.526: %LINEPROTO-5-UPDOWN: Line protocol on Interface Loopback0, changed state to up
+*Mar  1 15:21:08.582: %SYS-5-RESTART: System restarted --
+Cisco IOS Software, IOSv Software (VIOS-ADVENTERPRISEK9-M), Version 15.6(2)T, RELEASE SOFTWARE (fc2)
+Technical Support: http://www.cisco.com/techsupport
+Copyright (c) 1986-2016 by Cisco Systems, Inc.
+Compiled Tue 22-Mar-16 16:19 by prod_rel_team
+*Mar  1 15:21:08.583: %SNMP-5-COLDSTART: SNMP agent on host BRANCH is undergoing a cold start
+*Mar  1 15:21:08.608: %SSH-5-ENABLED: SSH 2.0 has been enabled
+*Mar  1 15:21:08.623: %CRYPTO-6-ISAKMP_ON_OFF: ISAKMP is OFF
+*Mar  1 15:21:08.623: %CRYPTO-6-GDOI_ON_OFF: GDOI is OFF
+*Mar  1 15:21:09.901: %LINK-5-CHANGED: Interface GigabitEthernet0/1, changed state to administratively down
+*Mar  1 15:21:09.902: %LINK-5-CHANGED: Interface GigabitEthernet0/2, changed state to administratively down
+*Mar  1 15:21:09.902: %LINK-5-CHANGED: Interface GigabitEthernet0/3, changed state to administratively down
+*Mar  1 15:21:10.766: %LINEPROTO-5-UPDOWN: Line protocol on Interface GigabitEthernet0/0, changed state to up
+*Mar  1 15:21:26.686: %PLATFORM-5-SIGNATURE_VERIFIED: Image 'flash0:/vios-adventerprisek9-m' passed code signing verification
+*Mar  1 15:21:32.488: %CDP-4-DUPLEX_MISMATCH: duplex mismatch discovered on GigabitEthernet0/0 (not half duplex), with CORE2.lab.local Ethernet0/3 (half duplex).
+*Mar  1 15:22:24.572: %CDP-4-DUPLEX_MISMATCH: duplex mismatch discovered on GigabitEthernet0/0 (not half duplex), with CORE2.lab.local Ethernet0/3 (half duplex).
+*Mar  1 15:23:22.241: %CDP-4-DUPLEX_MISMATCH: duplex mismatch discovered on GigabitEthernet0/0 (not half duplex), with CORE2.lab.local Ethernet0/3 (half duplex).
+*Mar  1 15:24:09.740: %CDP-4-DUPLEX_MISMATCH: duplex mismatch discovered on GigabitEthernet0/0 (not half duplex), with CORE2.lab.local Ethernet0/3 (half duplex).
+*Mar  1 15:25:02.217: %CDP-4-DUPLEX_MISMATCH: duplex mismatch discovered on GigabitEthernet0/0 (not half duplex), with CORE2.lab.local Ethernet0/3 (half duplex).
+*Mar  1 15:25:51.590: %CDP-4-DUPLEX_MISMATCH: duplex mismatch discovered on GigabitEthernet0/0 (not half duplex), with CORE2.lab.local Ethernet0/3 (half duplex).
+*Mar  1 15:26:45.769: %CDP-4-DUPLEX_MISMATCH: duplex mismatch discovered on GigabitEthernet0/0 (not half duplex), with CORE2.lab.local Ethernet0/3 (half duplex).
+*Mar  1 15:27:36.892: %CDP-4-DUPLEX_MISMATCH: duplex mismatch discovered on GigabitEthernet0/0 (not half duplex), with CORE2.lab.local Ethernet0/3 (half duplex).
+*Mar  1 15:28:29.361: %CDP-4-DUPLEX_MISMATCH: duplex mismatch discovered on GigabitEthernet0/0 (not half duplex), with CORE2.lab.local Ethernet0/3 (half duplex).
+*Mar  1 15:29:22.817: %CDP-4-DUPLEX_MISMATCH: duplex mismatch discovered on GigabitEthernet0/0 (not half duplex), with CORE2.lab.local Ethernet0/3 (half duplex).
+*Mar  1 15:30:16.838: %CDP-4-DUPLEX_MISMATCH: duplex mismatch discovered on GigabitEthernet0/0 (not half duplex), with CORE2.lab.local Ethernet0/3 (half duplex).
+*Mar  1 15:31:05.648: %CDP-4-DUPLEX_MISMATCH: duplex mismatch discovered on GigabitEthernet0/0 (not half duplex), with CORE2.lab.local Ethernet0/3 (half duplex).
+*Mar  1 15:31:56.801: %CDP-4-DUPLEX_MISMATCH: duplex mismatch discovered on GigabitEthernet0/0 (not half duplex), with CORE2.lab.local Ethernet0/3 (half duplex).
+*Mar  1 15:32:48.127: %CDP-4-DUPLEX_MISMATCH: duplex mismatch discovered on GigabitEthernet0/0 (not half duplex), with CORE2.lab.local Ethernet0/3 (half duplex).
+*Mar  1 15:33:43.768: %CDP-4-DUPLEX_MISMATCH: duplex mismatch discovered on GigabitEthernet0/0 (not half duplex), with CORE2.lab.local Ethernet0/3 (half duplex).
+*Mar  1 15:34:33.374: %CDP-4-DUPLEX_MISMATCH: duplex mismatch discovered on GigabitEthernet0/0 (not half duplex), with CORE2.lab.local Ethernet0/3 (half duplex).
+*Mar  1 15:35:22.824: %CDP-4-DUPLEX_MISMATCH: duplex mismatch discovered on GigabitEthernet0/0 (not half duplex), with CORE2.lab.local Ethernet0/3 (half duplex).
+BRANCH#show ntp status
+Clock is unsynchronized, stratum 16, no reference clock
+nominal freq is 1000.0003 Hz, actual freq is 1000.0003 Hz, precision is 2**15
+ntp uptime is 90000 (1/100 of seconds), resolution is 1000
+reference time is 00000000.00000000 (07:00:00.000 ICT Mon Jan 1 1900)
+clock offset is 0.0000 msec, root delay is 0.00 msec
+root dispersion is 13.49 msec, peer dispersion is 0.00 msec
+loopfilter state is 'FSET' (Drift set from file), drift is 0.000000000 s/s
+system poll interval is 8, never updated.
+BRANCH#! --- Interfaces & VLANs ---
+BRANCH#show interfaces
+GigabitEthernet0/0 is up, line protocol is up
+  Hardware is iGbE, address is 5000.0005.0000 (bia 5000.0005.0000)
+  Description: LINK-TO-CORE2
+  Internet address is 10.20.1.2/30
+  MTU 1500 bytes, BW 1000000 Kbit/sec, DLY 10 usec,
+     reliability 255/255, txload 1/255, rxload 1/255
+  Encapsulation ARPA, loopback not set
+  Keepalive set (10 sec)
+  Full Duplex, Unknown, link type is auto, media type is RJ45
+  output flow-control is unsupported, input flow-control is unsupported
+  ARP type: ARPA, ARP Timeout 04:00:00
+  Last input 00:00:11, output 00:00:05, output hang never
+  Last clearing of "show interface" counters never
+  Input queue: 0/75/0/0 (size/max/drops/flushes); Total output drops: 0
+  Queueing strategy: fifo
+  Output queue: 0/40 (size/max)
+  5 minute input rate 0 bits/sec, 0 packets/sec
+  5 minute output rate 0 bits/sec, 0 packets/sec
+     105 packets input, 28087 bytes, 0 no buffer
+     Received 0 broadcasts (35 IP multicasts)
+     0 runts, 0 giants, 0 throttles
+     0 input errors, 0 CRC, 0 frame, 0 overrun, 0 ignored
+     0 watchdog, 0 multicast, 0 pause input
+     172 packets output, 19015 bytes, 0 underruns
+     0 output errors, 0 collisions, 2 interface resets
+     31 unknown protocol drops
+     0 babbles, 0 late collision, 0 deferred
+     1 lost carrier, 0 no carrier, 0 pause output
+     0 output buffer failures, 0 output buffers swapped out
+GigabitEthernet0/1 is administratively down, line protocol is down
+  Hardware is iGbE, address is 5000.0005.0001 (bia 5000.0005.0001)
+  MTU 1500 bytes, BW 1000000 Kbit/sec, DLY 10 usec,
+     reliability 255/255, txload 1/255, rxload 1/255
+  Encapsulation ARPA, loopback not set
+  Keepalive set (10 sec)
+  Auto Duplex, Auto Speed, link type is auto, media type is RJ45
+  output flow-control is unsupported, input flow-control is unsupported
+  ARP type: ARPA, ARP Timeout 04:00:00
+  Last input never, output never, output hang never
+  Last clearing of "show interface" counters never
+  Input queue: 0/75/0/0 (size/max/drops/flushes); Total output drops: 0
+  Queueing strategy: fifo
+  Output queue: 0/40 (size/max)
+  5 minute input rate 0 bits/sec, 0 packets/sec
+  5 minute output rate 0 bits/sec, 0 packets/sec
+     0 packets input, 0 bytes, 0 no buffer
+     Received 0 broadcasts (0 IP multicasts)
+     0 runts, 0 giants, 0 throttles
+     0 input errors, 0 CRC, 0 frame, 0 overrun, 0 ignored
+     0 watchdog, 0 multicast, 0 pause input
+     0 packets output, 0 bytes, 0 underruns
+     0 output errors, 0 collisions, 1 interface resets
+     0 unknown protocol drops
+     0 babbles, 0 late collision, 0 deferred
+     0 lost carrier, 0 no carrier, 0 pause output
+     0 output buffer failures, 0 output buffers swapped out
+GigabitEthernet0/2 is administratively down, line protocol is down
+  Hardware is iGbE, address is 5000.0005.0002 (bia 5000.0005.0002)
+  MTU 1500 bytes, BW 1000000 Kbit/sec, DLY 10 usec,
+     reliability 255/255, txload 1/255, rxload 1/255
+  Encapsulation ARPA, loopback not set
+  Keepalive set (10 sec)
+  Auto Duplex, Auto Speed, link type is auto, media type is RJ45
+  output flow-control is unsupported, input flow-control is unsupported
+  ARP type: ARPA, ARP Timeout 04:00:00
+  Last input never, output never, output hang never
+  Last clearing of "show interface" counters never
+  Input queue: 0/75/0/0 (size/max/drops/flushes); Total output drops: 0
+  Queueing strategy: fifo
+  Output queue: 0/40 (size/max)
+  5 minute input rate 0 bits/sec, 0 packets/sec
+  5 minute output rate 0 bits/sec, 0 packets/sec
+     0 packets input, 0 bytes, 0 no buffer
+     Received 0 broadcasts (0 IP multicasts)
+     0 runts, 0 giants, 0 throttles
+     0 input errors, 0 CRC, 0 frame, 0 overrun, 0 ignored
+     0 watchdog, 0 multicast, 0 pause input
+     0 packets output, 0 bytes, 0 underruns
+     0 output errors, 0 collisions, 1 interface resets
+     0 unknown protocol drops
+     0 babbles, 0 late collision, 0 deferred
+     0 lost carrier, 0 no carrier, 0 pause output
+     0 output buffer failures, 0 output buffers swapped out
+GigabitEthernet0/3 is administratively down, line protocol is down
+  Hardware is iGbE, address is 5000.0005.0003 (bia 5000.0005.0003)
+  MTU 1500 bytes, BW 1000000 Kbit/sec, DLY 10 usec,
+     reliability 255/255, txload 1/255, rxload 1/255
+  Encapsulation ARPA, loopback not set
+  Keepalive set (10 sec)
+  Auto Duplex, Auto Speed, link type is auto, media type is RJ45
+  output flow-control is unsupported, input flow-control is unsupported
+  ARP type: ARPA, ARP Timeout 04:00:00
+  Last input never, output never, output hang never
+  Last clearing of "show interface" counters never
+  Input queue: 0/75/0/0 (size/max/drops/flushes); Total output drops: 0
+  Queueing strategy: fifo
+  Output queue: 0/40 (size/max)
+  5 minute input rate 0 bits/sec, 0 packets/sec
+  5 minute output rate 0 bits/sec, 0 packets/sec
+     0 packets input, 0 bytes, 0 no buffer
+     Received 0 broadcasts (0 IP multicasts)
+     0 runts, 0 giants, 0 throttles
+     0 input errors, 0 CRC, 0 frame, 0 overrun, 0 ignored
+     0 watchdog, 0 multicast, 0 pause input
+     0 packets output, 0 bytes, 0 underruns
+     0 output errors, 0 collisions, 1 interface resets
+     0 unknown protocol drops
+     0 babbles, 0 late collision, 0 deferred
+     0 lost carrier, 0 no carrier, 0 pause output
+     0 output buffer failures, 0 output buffers swapped out
+Loopback0 is up, line protocol is up
+  Hardware is Loopback
+  Description: BRANCH-LAN
+  Internet address is 172.16.1.1/24
+  MTU 1514 bytes, BW 8000000 Kbit/sec, DLY 5000 usec,
+     reliability 255/255, txload 1/255, rxload 1/255
+  Encapsulation LOOPBACK, loopback not set
+  Keepalive set (10 sec)
+  Last input 00:00:26, output never, output hang never
+  Last clearing of "show interface" counters never
+  Input queue: 0/75/0/0 (size/max/drops/flushes); Total output drops: 0
+  Queueing strategy: fifo
+  Output queue: 0/0 (size/max)
+  5 minute input rate 0 bits/sec, 0 packets/sec
+  5 minute output rate 0 bits/sec, 0 packets/sec
+     0 packets input, 0 bytes, 0 no buffer
+     Received 0 broadcasts (36 IP multicasts)
+     0 runts, 0 giants, 0 throttles
+     0 input errors, 0 CRC, 0 frame, 0 overrun, 0 ignored, 0 abort
+     36 packets output, 8192 bytes, 0 underruns
+     0 output errors, 0 collisions, 0 interface resets
+     0 unknown protocol drops
+     0 output buffer failures, 0 output buffers swapped out
+BRANCH#show interfaces switchport
+                             ^
+% Invalid input detected at '^' marker.
+
+BRANCH#show ip interface brief
+Interface                  IP-Address      OK? Method Status                Protocol
+GigabitEthernet0/0         10.20.1.2       YES NVRAM  up                    up  
+GigabitEthernet0/1         unassigned      YES NVRAM  administratively down down
+GigabitEthernet0/2         unassigned      YES NVRAM  administratively down down
+GigabitEthernet0/3         unassigned      YES NVRAM  administratively down down
+Loopback0                  172.16.1.1      YES NVRAM  up                    up  
+BRANCH#show ipv6 interface brief
+GigabitEthernet0/0     [up/up]
+    unassigned
+GigabitEthernet0/1     [administratively down/down]
+    unassigned
+GigabitEthernet0/2     [administratively down/down]
+    unassigned
+GigabitEthernet0/3     [administratively down/down]
+    unassigned
+Loopback0              [up/up]
+    unassigned
+BRANCH#show vlan brief
+                 ^
+% Invalid input detected at '^' marker.
+
+BRANCH#show spanning-tree
+
+No spanning tree instances exist.
+
+BRANCH#show spanning-tree summary
+Root bridge for: none.
+PortFast BPDU Guard is disabled
+UplinkFast is disabled
+BackboneFast is disabled
+
+Name                 Blocking Listening Learning Forwarding STP Active
+-------------------- -------- --------- -------- ---------- ----------
+               Total 0        0         0        0          0
+BRANCH#show spanning-tree detail
+                          ^
+% Invalid input detected at '^' marker.
+
+BRANCH#! --- Routing & Neighbors ---
+BRANCH#show ip protocols
+*** IP Routing is NSF aware ***
+
+Routing Protocol is "application"
+  Sending updates every 0 seconds
+  Invalid after 0 seconds, hold down 0, flushed after 0
+  Outgoing update filter list for all interfaces is not set
+  Incoming update filter list for all interfaces is not set
+  Maximum path: 32
+  Routing for Networks:
+  Routing Information Sources:
+    Gateway         Distance      Last Update
+  Distance: (default is 4)
+
+Routing Protocol is "rip"
+  Outgoing update filter list for all interfaces is not set
+  Incoming update filter list for all interfaces is not set
+  Sending updates every 30 seconds, next due in 15 seconds
+  Invalid after 180 seconds, hold down 180, flushed after 240
+  Redistributing: rip
+  Default version control: send version 2, receive version 2
+    Interface             Send  Recv  Triggered RIP  Key-chain
+    GigabitEthernet0/0    2     2
+    Loopback0             2     2
+  Automatic network summarization is not in effect
+  Maximum path: 4
+  Routing for Networks:
+    10.0.0.0
+    172.16.0.0
+  Routing Information Sources:
+    Gateway         Distance      Last Update
+    10.20.1.1            120      00:00:21
+  Distance: (default is 120)
+
+BRANCH#show ip route
+Codes: L - local, C - connected, S - static, R - RIP, M - mobile, B - BGP
+       D - EIGRP, EX - EIGRP external, O - OSPF, IA - OSPF inter area
+       N1 - OSPF NSSA external type 1, N2 - OSPF NSSA external type 2
+       E1 - OSPF external type 1, E2 - OSPF external type 2
+       i - IS-IS, su - IS-IS summary, L1 - IS-IS level-1, L2 - IS-IS level-2
+       ia - IS-IS inter area, * - candidate default, U - per-user static route
+       o - ODR, P - periodic downloaded static route, H - NHRP, l - LISP
+       a - application route
+       + - replicated route, % - next hop override, p - overrides from PfR
+
+Gateway of last resort is 10.20.1.1 to network 0.0.0.0
+
+R*    0.0.0.0/0 [120/2] via 10.20.1.1, 00:00:22, GigabitEthernet0/0
+      10.0.0.0/8 is variably subnetted, 11 subnets, 3 masks
+R        10.10.1.0/30 [120/2] via 10.20.1.1, 00:00:22, GigabitEthernet0/0
+R        10.10.2.0/30 [120/1] via 10.20.1.1, 00:00:22, GigabitEthernet0/0
+R        10.12.1.0/30 [120/1] via 10.20.1.1, 00:00:22, GigabitEthernet0/0
+R        10.12.2.0/30 [120/1] via 10.20.1.1, 00:00:22, GigabitEthernet0/0
+R        10.13.1.0/30 [120/2] via 10.20.1.1, 00:00:22, GigabitEthernet0/0
+R        10.13.2.0/30 [120/2] via 10.20.1.1, 00:00:22, GigabitEthernet0/0
+R        10.14.1.0/30 [120/1] via 10.20.1.1, 00:00:22, GigabitEthernet0/0
+R        10.14.2.0/30 [120/1] via 10.20.1.1, 00:00:22, GigabitEthernet0/0
+C        10.20.1.0/30 is directly connected, GigabitEthernet0/0
+L        10.20.1.2/32 is directly connected, GigabitEthernet0/0
+R        10.30.30.0/24 [120/1] via 10.20.1.1, 00:00:22, GigabitEthernet0/0
+      172.16.0.0/16 is variably subnetted, 2 subnets, 2 masks
+C        172.16.1.0/24 is directly connected, Loopback0
+L        172.16.1.1/32 is directly connected, Loopback0
+BRANCH#show ipv6 route
+BRANCH#show ip ospf
+BRANCH#show ip ospf neighbor
+BRANCH#show ip eigrp neighbors
+BRANCH#show ip rip database
+0.0.0.0/0    auto-summary
+0.0.0.0/0
+    [2] via 10.20.1.1, 00:00:22, GigabitEthernet0/0
+10.0.0.0/8    auto-summary
+10.10.1.0/30
+    [2] via 10.20.1.1, 00:00:22, GigabitEthernet0/0
+10.10.2.0/30
+    [1] via 10.20.1.1, 00:00:22, GigabitEthernet0/0
+10.12.1.0/30
+    [1] via 10.20.1.1, 00:00:22, GigabitEthernet0/0
+10.12.2.0/30
+    [1] via 10.20.1.1, 00:00:22, GigabitEthernet0/0
+10.13.1.0/30
+    [2] via 10.20.1.1, 00:00:22, GigabitEthernet0/0
+10.13.2.0/30
+    [2] via 10.20.1.1, 00:00:22, GigabitEthernet0/0
+10.14.1.0/30
+    [1] via 10.20.1.1, 00:00:22, GigabitEthernet0/0
+10.14.2.0/30
+    [1] via 10.20.1.1, 00:00:22, GigabitEthernet0/0
+10.20.1.0/30    directly connected, GigabitEthernet0/0
+10.30.30.0/24
+    [1] via 10.20.1.1, 00:00:22, GigabitEthernet0/0
+172.16.0.0/16    auto-summary
+172.16.1.0/24    directly connected, Loopback0
+BRANCH#show ip route rip
+Codes: L - local, C - connected, S - static, R - RIP, M - mobile, B - BGP
+       D - EIGRP, EX - EIGRP external, O - OSPF, IA - OSPF inter area
+       N1 - OSPF NSSA external type 1, N2 - OSPF NSSA external type 2
+       E1 - OSPF external type 1, E2 - OSPF external type 2
+       i - IS-IS, su - IS-IS summary, L1 - IS-IS level-1, L2 - IS-IS level-2
+       ia - IS-IS inter area, * - candidate default, U - per-user static route
+       o - ODR, P - periodic downloaded static route, H - NHRP, l - LISP
+       a - application route
+       + - replicated route, % - next hop override, p - overrides from PfR
+
+Gateway of last resort is 10.20.1.1 to network 0.0.0.0
+
+R*    0.0.0.0/0 [120/2] via 10.20.1.1, 00:00:22, GigabitEthernet0/0
+      10.0.0.0/8 is variably subnetted, 11 subnets, 3 masks
+R        10.10.1.0/30 [120/2] via 10.20.1.1, 00:00:22, GigabitEthernet0/0
+R        10.10.2.0/30 [120/1] via 10.20.1.1, 00:00:22, GigabitEthernet0/0
+R        10.12.1.0/30 [120/1] via 10.20.1.1, 00:00:22, GigabitEthernet0/0
+R        10.12.2.0/30 [120/1] via 10.20.1.1, 00:00:22, GigabitEthernet0/0
+R        10.13.1.0/30 [120/2] via 10.20.1.1, 00:00:22, GigabitEthernet0/0
+R        10.13.2.0/30 [120/2] via 10.20.1.1, 00:00:22, GigabitEthernet0/0
+R        10.14.1.0/30 [120/1] via 10.20.1.1, 00:00:22, GigabitEthernet0/0
+R        10.14.2.0/30 [120/1] via 10.20.1.1, 00:00:22, GigabitEthernet0/0
+R        10.30.30.0/24 [120/1] via 10.20.1.1, 00:00:22, GigabitEthernet0/0
+BRANCH#show ip bgp summary
+% BGP not active
+
+BRANCH#show bgp ipv4 unicast summary
+% BGP not active
+
+BRANCH#show ip bgp
+% BGP not active
+
+BRANCH#show ip bgp neighbors
+% BGP not active
+
+BRANCH#show cdp neighbors detail
+-------------------------
+Device ID: CORE2.lab.local
+Entry address(es):
+  IP address: 10.20.1.1
+Platform: Linux Unix,  Capabilities: Router Source-Route-Bridge
+Interface: GigabitEthernet0/0,  Port ID (outgoing port): Ethernet0/3
+Holdtime : 133 sec
+
+Version :
+Cisco IOS Software, Linux Software (I86BI_LINUX-ADVENTERPRISEK9-M), Version 15.4(2)T, DEVELOPMENT TEST SOFTWARE
+Technical Support: http://www.cisco.com/techsupport
+Copyright (c) 1986-2014 by Cisco Systems, Inc.
+Compiled Thu 27-Mar-14 01:08 by prod_rel_team
+
+advertisement version: 2
+Duplex: half (Mismatch)
+Management address(es):
+  IP address: 10.20.1.1
+
+
+Total cdp entries displayed : 1
+BRANCH#show lldp neighbors detail
+% LLDP is not enabled
+BRANCH#! --- Tables ---
+BRANCH#show mac address-table
+               ^
+% Invalid input detected at '^' marker.
+
+BRANCH#show ip arp
+Protocol  Address          Age (min)  Hardware Addr   Type   Interface
+Internet  10.20.1.1              14   aabb.cc00.4030  ARPA   GigabitEthernet0/0
+Internet  10.20.1.2               -   5000.0005.0000  ARPA   GigabitEthernet0/0
+BRANCH#show ipv6 neighbors
+BRANCH#! --- Security & Management ---
+BRANCH#show ssh
+%No SSHv2 server connections running.
+%No SSHv1 server connections running.
+BRANCH#show access-lists
+BRANCH#show snmp
+0 SNMP packets input
+    0 Bad SNMP version errors
+    0 Unknown community name
+    0 Illegal operation for community name supplied
+    0 Encoding errors
+    0 Number of requested variables
+    0 Number of altered variables
+    0 Get-request PDUs
+    0 Get-next PDUs
+    0 Set-request PDUs
+    0 Input queue packet drops (Maximum queue size 1000)
+0 SNMP packets output
+    0 Too big errors (Maximum packet size 1500)
+    0 No such name errors
+    0 Bad values errors
+    0 General errors
+    0 Response PDUs
+    0 Trap PDUs
+SNMP Dispatcher:
+   queue 0/75 (current/max), 0 dropped
+SNMP Engine:
+   queue 0/1000 (current/max), 0 dropped
+
+SNMP logging: disabled
+BRANCH#show snmp community
+
+Community name: ILMI
+Community Index: ILMI
+Community SecurityName: ILMI
+storage-type: read-only  active
+
+
+Community name: private
+Community Index: private
+Community SecurityName: private
+storage-type: nonvolatile        active
+
+
+Community name: public
+Community Index: public
+Community SecurityName: public
+storage-type: nonvolatile        active
+
+
+BRANCH#show snmp host
+BRANCH#show snmp user
+
+BRANCH#show aaa sessions
+Total sessions since last reload: 0
+BRANCH#show aaa user
+% Incomplete command.
+
+BRANCH#show aaa method-suite
+                       ^
+% Invalid input detected at '^' marker.
+
+BRANCH#! --- HA ---
+BRANCH#show etherchannel summary
+                 ^
+% Invalid input detected at '^' marker.
+
+BRANCH#show standby brief
+BRANCH#show vrrp brief
+Interface          Grp Pri Time  Own Pre State   Master addr     Group addr
+BRANCH#

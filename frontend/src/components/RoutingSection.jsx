@@ -329,12 +329,12 @@ function BGPSection({ data }) {
           <div>
             <span className="font-medium text-slate-700 dark:text-slate-300">Local AS: </span>
             <span className="font-mono text-slate-800 dark:text-slate-200">
-              {data.local_as || data.as_number || '—'}
+              {data.local_as ?? data.as_number ?? '—'}
             </span>
           </div>
           <div>
             <span className="font-medium text-slate-700 dark:text-slate-300">Router ID: </span>
-            <span className="font-mono text-slate-800 dark:text-slate-200">{data.router_id || '—'}</span>
+            <span className="font-mono text-slate-800 dark:text-slate-200">{data.router_id ?? '—'}</span>
           </div>
         </div>
 
@@ -343,9 +343,11 @@ function BGPSection({ data }) {
             <h3 className="text-sm font-semibold mb-2 text-slate-800 dark:text-slate-200">BGP Peers</h3>
             <div className="h-[300px] overflow-auto border border-slate-200 dark:border-slate-700 rounded-lg">
               <Table
+                searchable
+                searchPlaceholder="Search peer, state, ASN..."
                 columns={[
-                  { header: "Peer IP", key: "peer_ip", cell: (r) => <span className="font-medium text-slate-800 dark:text-slate-200">{r.peer_ip || r.ip || r.address || "—"}</span> },
-                  { header: "Remote AS", key: "remote_as", cell: (r) => r.remote_as || r.as || "—" },
+                  { header: "Peer", key: "peer", cell: (r) => <span className="font-medium text-slate-800 dark:text-slate-200">{r.neighbor_ip || r.peer_ip || r.peer || r.ip || r.address || "—"}</span> },
+                  { header: "Remote AS", key: "remote_as", cell: (r) => r.remote_as ?? r.as ?? "—" },
                   { 
                     header: "State", 
                     key: "state", 
@@ -359,11 +361,12 @@ function BGPSection({ data }) {
                       </Badge>
                     )
                   },
-                  { header: "Prefixes", key: "prefixes", cell: (r) => r.prefixes_received || r.prefixes || "—" }
+                  { header: "Received", key: "prefixes_received", cell: (r) => (r.prefixes_received ?? r.prefixes ?? "—") },
+                  { header: "Advertised", key: "prefixes_advertised", cell: (r) => (r.prefixes_advertised ?? "—") },
                 ]}
                 data={data.peers}
                 empty="No BGP peers"
-                minWidthClass="min-w-[700px]"
+                minWidthClass="min-w-[900px]"
                 containerClassName="h-full"
               />
             </div>
