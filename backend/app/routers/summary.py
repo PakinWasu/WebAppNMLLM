@@ -15,6 +15,35 @@ router = APIRouter(prefix="/projects/{project_id}/summary", tags=["summary"])
 device_router = APIRouter(prefix="/projects/{project_id}/devices", tags=["devices"])
 
 
+def _iso_utc(dt):
+    if dt is None:
+        return None
+    if isinstance(dt, datetime):
+        if dt.tzinfo is None:
+            dt = dt.replace(tzinfo=timezone.utc)
+        return dt.isoformat()
+    if isinstance(dt, str):
+        # Normalize legacy ISO strings without timezone (assume UTC)
+        try:
+            s = dt.strip()
+            if "T" not in s:
+                return dt
+            # Skip if timezone already present
+            if s.endswith("Z") or "+" in s[10:] or "-" in s[10:]:
+                parsed = datetime.fromisoformat(s.replace("Z", "+00:00"))
+                if parsed.tzinfo is None:
+                    parsed = parsed.replace(tzinfo=timezone.utc)
+                return parsed.isoformat()
+
+            parsed = datetime.fromisoformat(s)
+            if parsed.tzinfo is None:
+                parsed = parsed.replace(tzinfo=timezone.utc)
+            return parsed.isoformat()
+        except Exception:
+            return dt
+    return str(dt)
+
+
 @device_router.post("/{device_name}/image")
 async def upload_device_image(
     project_id: str,
@@ -294,7 +323,7 @@ async def list_device_configs(
                 "document_id": document_id,
                 "version": v["version"],
                 "filename": v.get("filename", doc.get("filename", "")),
-                "created_at": created.isoformat() if isinstance(created, datetime) else (created or ""),
+                "created_at": _iso_utc(created) or "",
             })
     configs.sort(key=lambda x: (x["filename"], -(x["version"])))
     return {"configs": configs}
@@ -520,8 +549,7 @@ async def get_summary(
                 
                 # Format datetime
                 upload_ts = latest.get("upload_timestamp")
-                if isinstance(upload_ts, datetime):
-                    upload_ts = upload_ts.isoformat()
+                upload_ts = _iso_utc(upload_ts)
                 
                 devices.append({
                     "device": latest.get("device_name", "-"),
@@ -683,8 +711,7 @@ async def get_summary(
                 
                 # Format datetime
                 upload_ts = parsed_config.get("upload_timestamp")
-                if isinstance(upload_ts, datetime):
-                    upload_ts = upload_ts.isoformat()
+                upload_ts = _iso_utc(upload_ts)
                 
                 devices.append({
                     "device": parsed_config.get("device_name", "-"),
@@ -722,12 +749,20 @@ async def get_device_details(
     """Get detailed parsed config for a specific device"""
     await check_project_access(project_id, user)
     
-    # Get latest parsed config for this device (versioning system - get latest version)
-    # Try parsed_configs collection first, then fallback to documents collection
+    # Prefer parsed config derived from the latest document version.
+    # IMPORTANT: parsed_configs.version is an internal counter and may not correspond to document version history
+    # (e.g., uploading historical files can create newer parsed_configs versions).
     device = await db()["parsed_configs"].find_one(
-        {"project_id": project_id, "device_name": device_name},
-        sort=[("version", -1)]  # Get latest version
+        {"project_id": project_id, "device_name": device_name, "is_latest_config": True},
+        sort=[("upload_timestamp", -1)]
     )
+
+    # Fallback: If no latest marker exists, use newest parsed_configs entry
+    if not device:
+        device = await db()["parsed_configs"].find_one(
+            {"project_id": project_id, "device_name": device_name},
+            sort=[("version", -1)]
+        )
     
     # Debug: Log what we found
     if device:
@@ -784,8 +819,8 @@ async def get_device_details(
     
     # Convert datetime to ISO string
     for key in ["upload_timestamp", "created_at", "updated_at"]:
-        if key in device and isinstance(device[key], datetime):
-            device[key] = device[key].isoformat()
+        if key in device:
+            device[key] = _iso_utc(device.get(key))
     
     # Debug: Log what we're returning
     neighbors_count = len(device.get("neighbors", []))

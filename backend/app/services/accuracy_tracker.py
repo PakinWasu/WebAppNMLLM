@@ -1,7 +1,7 @@
 """Accuracy Tracking Service - Compares AI Output vs Human Final Version"""
 
 from typing import Dict, Any, List
-from datetime import datetime
+from datetime import datetime, timezone
 import json
 
 
@@ -81,7 +81,7 @@ class AccuracyTracker:
             "corrected_fields": corrected_fields,
             "accuracy_score": round(accuracy_score, 2),
             "field_changes": field_changes,
-            "verified_at": datetime.utcnow(),
+            "verified_at": datetime.now(timezone.utc),
             "verified_by": reviewer
         }
     

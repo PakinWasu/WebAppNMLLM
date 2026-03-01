@@ -12,7 +12,28 @@ def _iso_generated_at(dt) -> Optional[str]:
     if dt is None:
         return None
     if isinstance(dt, datetime):
+        if dt.tzinfo is None:
+            dt = dt.replace(tzinfo=timezone.utc)
         return dt.isoformat()
+    if isinstance(dt, str):
+        # Normalize legacy ISO strings without timezone (assume UTC)
+        try:
+            s = dt.strip()
+            if "T" not in s:
+                return dt
+            # Skip if timezone already present
+            if s.endswith("Z") or "+" in s[10:] or "-" in s[10:]:
+                parsed = datetime.fromisoformat(s.replace("Z", "+00:00"))
+                if parsed.tzinfo is None:
+                    parsed = parsed.replace(tzinfo=timezone.utc)
+                return parsed.isoformat()
+
+            parsed = datetime.fromisoformat(s)
+            if parsed.tzinfo is None:
+                parsed = parsed.replace(tzinfo=timezone.utc)
+            return parsed.isoformat()
+        except Exception:
+            return dt
     return str(dt)
 from ..dependencies.auth import get_current_user, check_project_access, check_project_manager_or_admin, check_project_editor_or_admin, check_project_llm_permission
 from ..services.topology_service import topology_service

@@ -5,7 +5,7 @@ import json
 import time
 import logging
 from typing import Dict, Any, Optional, List
-from datetime import datetime
+from datetime import datetime, timezone
 import difflib
 
 import httpx
@@ -328,7 +328,7 @@ class LLMService:
                     "inference_time_ms": inference_time_ms,
                     "token_usage": token_usage,
                     "model_name": self.model_name,
-                    "timestamp": datetime.utcnow(),
+                    "timestamp": datetime.now(timezone.utc),
                 },
             }
 
@@ -625,7 +625,7 @@ Be specific: use actual device names, VLAN IDs, IP addresses, protocol parameter
                     "inference_time_ms": inference_time_ms,
                     "token_usage": token_usage,
                     "model_name": self.model_name,
-                    "timestamp": datetime.utcnow(),
+                    "timestamp": datetime.now(timezone.utc),
                 },
             }
 
@@ -852,7 +852,7 @@ Provide detailed analysis for each section. Be specific with actual values from 
                     "inference_time_ms": inference_time_ms,
                     "token_usage": token_usage,
                     "model_name": self.model_name,
-                    "timestamp": datetime.utcnow(),
+                    "timestamp": datetime.now(timezone.utc),
                 },
             }
         except Exception as e:
@@ -980,7 +980,7 @@ Give a NETWORK-WIDE gap and improvement list: what is missing or should be added
                     "inference_time_ms": inference_time_ms,
                     "token_usage": token_usage,
                     "model_name": self.model_name,
-                    "timestamp": datetime.utcnow(),
+                    "timestamp": datetime.now(timezone.utc),
                 },
             }
 
@@ -1122,7 +1122,7 @@ List issues and actionable recommendations for this device only. Return ONLY val
                     "inference_time_ms": inference_time_ms,
                     "token_usage": token_usage,
                     "model_name": self.model_name,
-                    "timestamp": datetime.utcnow(),
+                    "timestamp": datetime.now(timezone.utc),
                 },
             }
         except httpx.ReadTimeout:
@@ -1268,7 +1268,7 @@ List issues and actionable recommendations for this device only. Return ONLY val
                         "total_tokens": 0,
                     },
                     "model_name": self.model_name,
-                    "timestamp": datetime.utcnow(),
+                    "timestamp": datetime.now(timezone.utc),
                 },
             }
 
@@ -1364,7 +1364,7 @@ Return ONLY valid JSON."""
                     "inference_time_ms": inference_time_ms,
                     "token_usage": token_usage,
                     "model_name": self.model_name,
-                    "timestamp": datetime.utcnow(),
+                    "timestamp": datetime.now(timezone.utc),
                 },
             }
         except httpx.ReadTimeout:
@@ -1498,7 +1498,7 @@ Return ONLY valid JSON with 'network_overview' and 'gap_analysis' keys as specif
                     "inference_time_ms": inference_time_ms,
                     "token_usage": token_usage,
                     "model_name": self.model_name,
-                    "timestamp": datetime.utcnow(),
+                    "timestamp": datetime.now(timezone.utc),
                 },
             }
 
@@ -1738,7 +1738,7 @@ Return ONLY valid JSON with 'network_overview' and 'gap_analysis' keys as specif
                 "inference_time_ms": inference_time_ms,
                 "token_usage": {"prompt_tokens": 0, "completion_tokens": 0, "total_tokens": 0},
                 "model_name": self.model_name,
-                "timestamp": datetime.utcnow(),
+                "timestamp": datetime.now(timezone.utc),
             },
         }
 

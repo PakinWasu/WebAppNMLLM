@@ -6,7 +6,7 @@ import httpx
 import json
 import time
 from typing import Dict, List, Any, Optional
-from datetime import datetime
+from datetime import datetime, timezone
 
 from ..db.mongo import db
 
@@ -47,7 +47,13 @@ def _resolve_neighbor_name_to_device(neighbor_name: Any, known_device_names: set
         return hostname
     hostname_lower = hostname.lower()
     for d in known_device_names:
-        if d.lower() == hostname_lower:
+        dl = d.lower()
+        if dl == hostname_lower:
+            return d
+        # Also match when known devices are stored as FQDN but neighbor provides only hostname (or vice versa)
+        if "." in dl and dl.split(".")[0] == hostname_lower:
+            return d
+        if "." in hostname_lower and dl == hostname_lower.split(".")[0]:
             return d
     return None
 
@@ -192,12 +198,14 @@ Project: {project_id} ({device_count} devices)"""
         device_names = set()
 
         # 1) Try parsed_configs collection first
+        # Prefer records that are explicitly marked as derived from the latest document version.
+        # parsed_configs.upload_timestamp/version can be newer due to uploading historical configs.
         try:
-            cursor = db()["parsed_configs"].find(
-                {"project_id": project_id},
-                sort=[("device_name", 1), ("upload_timestamp", -1)]
+            cursor_latest = db()["parsed_configs"].find(
+                {"project_id": project_id, "is_latest_config": True},
+                sort=[("device_name", 1), ("upload_timestamp", -1)],
             )
-            async for device_doc in cursor:
+            async for device_doc in cursor_latest:
                 device_doc.pop("_id", None)
                 device_name = device_doc.get("device_name")
                 if not device_name or device_name in device_names:
@@ -205,11 +213,43 @@ Project: {project_id} ({device_count} devices)"""
                 device_names.add(device_name)
                 devices_data.append({
                     "device_name": device_name,
+                    "_topology_source": "parsed_configs",
+                    "document_id": device_doc.get("document_id"),
+                    "source_filename": device_doc.get("source_filename"),
+                    "upload_timestamp": device_doc.get("upload_timestamp"),
+                    "version": device_doc.get("version"),
+                    "is_latest_config": device_doc.get("is_latest_config"),
                     "device_overview": device_doc.get("device_overview", {}),
                     "interfaces": device_doc.get("interfaces", []),
                     "neighbors": device_doc.get("neighbors", []),
                     "routing": device_doc.get("routing", {}),
                 })
+
+            # Fallback: if no latest markers exist, keep prior behavior (newest by upload_timestamp per device)
+            if not devices_data:
+                cursor = db()["parsed_configs"].find(
+                    {"project_id": project_id},
+                    sort=[("device_name", 1), ("upload_timestamp", -1)],
+                )
+                async for device_doc in cursor:
+                    device_doc.pop("_id", None)
+                    device_name = device_doc.get("device_name")
+                    if not device_name or device_name in device_names:
+                        continue
+                    device_names.add(device_name)
+                    devices_data.append({
+                        "device_name": device_name,
+                        "_topology_source": "parsed_configs_fallback",
+                        "document_id": device_doc.get("document_id"),
+                        "source_filename": device_doc.get("source_filename"),
+                        "upload_timestamp": device_doc.get("upload_timestamp"),
+                        "version": device_doc.get("version"),
+                        "is_latest_config": device_doc.get("is_latest_config"),
+                        "device_overview": device_doc.get("device_overview", {}),
+                        "interfaces": device_doc.get("interfaces", []),
+                        "neighbors": device_doc.get("neighbors", []),
+                        "routing": device_doc.get("routing", {}),
+                    })
         except Exception as e:
             print(f"[Topology] parsed_configs read failed: {e}")
 
@@ -224,7 +264,7 @@ Project: {project_id} ({device_count} devices)"""
                         "parsed_config": {"$exists": True},
                     },
                     sort=[("created_at", -1)],
-                    projection={"parsed_config": 1, "filename": 1},
+                    projection={"parsed_config": 1, "filename": 1, "_id": 1, "created_at": 1},
                 )
                 async for doc in cursor:
                     pc = doc.get("parsed_config") or {}
@@ -239,6 +279,12 @@ Project: {project_id} ({device_count} devices)"""
                     device_names.add(device_name)
                     devices_data.append({
                         "device_name": device_name,
+                        "_topology_source": "documents_parsed_config",
+                        "document_id": str(doc.get("_id")) if doc.get("_id") is not None else None,
+                        "source_filename": doc.get("filename"),
+                        "upload_timestamp": doc.get("created_at"),
+                        "version": None,
+                        "is_latest_config": True,
                         "device_overview": pc.get("device_overview") if isinstance(pc.get("device_overview"), dict) else {},
                         "interfaces": pc.get("interfaces") if isinstance(pc.get("interfaces"), list) else [],
                         "neighbors": pc.get("neighbors") if isinstance(pc.get("neighbors"), list) else [],
@@ -347,16 +393,15 @@ Project: {project_id} ({device_count} devices)"""
                 
                 local_port = neighbor.get("local_port") or neighbor.get("local_interface")
                 remote_port = neighbor.get("remote_port") or neighbor.get("remote_interface")
-                if not local_port and not remote_port:
-                    continue
-                
+                label = f"{local_port}-{remote_port}" if local_port and remote_port else ""
+
                 edge_key = tuple(sorted([device_name, neighbor_name]))
                 if edge_key not in edge_set:
                     edge_set.add(edge_key)
                     edges.append({
                         "from": device_name,
                         "to": neighbor_name,
-                        "label": f"{local_port}-{remote_port}" if local_port and remote_port else "",
+                        "label": label,
                         "evidence": f"CDP/LLDP neighbor: {device_name} sees {neighbor_name}"
                     })
         
@@ -393,7 +438,7 @@ Project: {project_id} ({device_count} devices)"""
                     "inference_time_ms": 0,
                     "devices_processed": 0,
                     "model_name": self.model_name,
-                    "timestamp": datetime.utcnow()
+                    "timestamp": datetime.now(timezone.utc)
                 }
             }
         
@@ -576,7 +621,7 @@ Project: {project_id} ({device_count} devices)"""
             "devices_processed": len(devices_data),
             "token_usage": token_usage,
             "model_name": self.model_name,
-            "timestamp": datetime.utcnow()
+            "timestamp": datetime.now(timezone.utc)
         }
         
         # Save LLM result to database (persistent storage) - metrics included in result
@@ -708,8 +753,28 @@ Project: {project_id} ({device_count} devices)"""
                 },
                 "generated_at": None,
                 "llm_used": False,
+                "debug": {
+                    "devices_loaded": 0,
+                    "sources": {},
+                },
             }
         topology_data = self._generate_rule_based_topology(devices_data)
+
+        sources = {}
+        devices_meta = []
+        for d in devices_data:
+            src = d.get("_topology_source") or "unknown"
+            sources[src] = sources.get(src, 0) + 1
+            devices_meta.append({
+                "device_name": d.get("device_name"),
+                "source": src,
+                "document_id": d.get("document_id"),
+                "source_filename": d.get("source_filename"),
+                "upload_timestamp": d.get("upload_timestamp"),
+                "version": d.get("version"),
+                "is_latest_config": d.get("is_latest_config"),
+            })
+
         return {
             "topology": topology_data,
             "layout": {
@@ -721,6 +786,11 @@ Project: {project_id} ({device_count} devices)"""
             },
             "generated_at": None,
             "llm_used": False,
+            "debug": {
+                "devices_loaded": len(devices_data),
+                "sources": sources,
+                "devices": devices_meta,
+            },
         }
     
     async def _save_llm_result(
@@ -752,7 +822,7 @@ Project: {project_id} ({device_count} devices)"""
                 "analysis_summary": analysis_summary,
                 "metrics": metrics,  # All LLM metrics stored here (no separate performance_logs)
                 "llm_used": llm_used,
-                "generated_at": datetime.utcnow(),
+                "generated_at": datetime.now(timezone.utc),
                 "version": 1  # For future versioning
             }
             

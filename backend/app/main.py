@@ -130,7 +130,7 @@ async def root():
             "name": settings.AI_MODEL_NAME,
             "version": settings.AI_MODEL_VERSION,
         },
-        "timestamp": datetime.utcnow().isoformat()
+        "timestamp": datetime.now(timezone.utc).isoformat()
     }
 
 @app.get("/ai/test")

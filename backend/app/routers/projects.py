@@ -8,6 +8,38 @@ from ..models.membership import MemberAdd
 
 router = APIRouter(prefix="/projects", tags=["projects"])
 
+
+def _iso_utc(dt):
+    if dt is None:
+        return None
+    if isinstance(dt, datetime):
+        if dt.tzinfo is None:
+            dt = dt.replace(tzinfo=timezone.utc)
+        return dt.isoformat()
+    if isinstance(dt, str):
+        # Normalize legacy ISO strings without timezone (assume UTC)
+        # Examples to normalize:
+        # - 2026-03-01T18:47:08
+        # - 2026-03-01T18:47:08.123456
+        try:
+            s = dt.strip()
+            if "T" not in s:
+                return dt
+            # Skip if timezone already present
+            if s.endswith("Z") or "+" in s[10:] or "-" in s[10:]:
+                parsed = datetime.fromisoformat(s.replace("Z", "+00:00"))
+                if parsed.tzinfo is None:
+                    parsed = parsed.replace(tzinfo=timezone.utc)
+                return parsed.isoformat()
+
+            parsed = datetime.fromisoformat(s)
+            if parsed.tzinfo is None:
+                parsed = parsed.replace(tzinfo=timezone.utc)
+            return parsed.isoformat()
+        except Exception:
+            return dt
+    return dt
+
 @router.get("")
 async def list_projects(user=Depends(get_current_user)):
     """List projects.
@@ -35,12 +67,12 @@ async def list_projects(user=Depends(get_current_user)):
                 projects.append(p)
                 seen.add(p["project_id"])
     
-    # Convert datetime objects to ISO strings
+    # Convert datetime objects to ISO strings (ensure timezone-aware UTC)
     for p in projects:
-        if "created_at" in p and isinstance(p["created_at"], datetime):
-            p["created_at"] = p["created_at"].isoformat()
-        if "updated_at" in p and isinstance(p["updated_at"], datetime):
-            p["updated_at"] = p["updated_at"].isoformat()
+        if "created_at" in p:
+            p["created_at"] = _iso_utc(p["created_at"])
+        if "updated_at" in p:
+            p["updated_at"] = _iso_utc(p["updated_at"])
     
     return projects
 
@@ -102,11 +134,11 @@ async def get_project(project_id: str, user=Depends(get_current_user)):
         if not membership:
             raise HTTPException(status_code=403, detail="Not a member of this project")
     
-    # Convert datetime objects to ISO strings
-    if "created_at" in project and isinstance(project["created_at"], datetime):
-        project["created_at"] = project["created_at"].isoformat()
-    if "updated_at" in project and isinstance(project["updated_at"], datetime):
-        project["updated_at"] = project["updated_at"].isoformat()
+    # Convert datetime objects to ISO strings (ensure timezone-aware UTC)
+    if "created_at" in project:
+        project["created_at"] = _iso_utc(project["created_at"])
+    if "updated_at" in project:
+        project["updated_at"] = _iso_utc(project["updated_at"])
     
     return project
 
@@ -124,8 +156,8 @@ async def list_project_members(project_id: str, user=Depends(get_current_user)):
     members = []
     async for m in db()["project_members"].find({"project_id": project_id}, {"_id": 0}):
         # Convert datetime objects to ISO strings
-        if "joined_at" in m and isinstance(m["joined_at"], datetime):
-            m["joined_at"] = m["joined_at"].isoformat()
+        if "joined_at" in m:
+            m["joined_at"] = _iso_utc(m["joined_at"])
         members.append(m)
     return members
 
@@ -271,10 +303,10 @@ async def update_project(project_id: str, body: ProjectUpdate, user=Depends(get_
     updated = await db()["projects"].find_one({"project_id": project_id}, {"_id": 0})
     # Convert datetime objects to ISO strings
     if updated:
-        if "created_at" in updated and isinstance(updated["created_at"], datetime):
-            updated["created_at"] = updated["created_at"].isoformat()
-        if "updated_at" in updated and isinstance(updated["updated_at"], datetime):
-            updated["updated_at"] = updated["updated_at"].isoformat()
+        if "created_at" in updated:
+            updated["created_at"] = _iso_utc(updated["created_at"])
+        if "updated_at" in updated:
+            updated["updated_at"] = _iso_utc(updated["updated_at"])
     return updated
 
 @router.delete("/{project_id}")

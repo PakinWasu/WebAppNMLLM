@@ -23,6 +23,35 @@ from ..services.config_parser import ConfigParser
 router = APIRouter(prefix="/projects/{project_id}/documents", tags=["documents"])
 
 
+def _iso_utc(dt):
+    if dt is None:
+        return None
+    if isinstance(dt, datetime):
+        if dt.tzinfo is None:
+            dt = dt.replace(tzinfo=timezone.utc)
+        return dt.isoformat()
+    if isinstance(dt, str):
+        # Normalize legacy ISO strings without timezone (assume UTC)
+        try:
+            s = dt.strip()
+            if "T" not in s:
+                return dt
+            # Skip if timezone already present
+            if s.endswith("Z") or "+" in s[10:] or "-" in s[10:]:
+                parsed = datetime.fromisoformat(s.replace("Z", "+00:00"))
+                if parsed.tzinfo is None:
+                    parsed = parsed.replace(tzinfo=timezone.utc)
+                return parsed.isoformat()
+
+            parsed = datetime.fromisoformat(s)
+            if parsed.tzinfo is None:
+                parsed = parsed.replace(tzinfo=timezone.utc)
+            return parsed.isoformat()
+        except Exception:
+            return dt
+    return str(dt)
+
+
 # check_project_access is now imported from dependencies.auth
 
 
@@ -301,6 +330,25 @@ async def upload_documents_endpoint(
                                     if existing_doc:
                                         print(f"⚠️ Duplicate config detected for {device_name} (hash: {config_hash[:8]}...). Skipping insert (strict duplicate check).")
                                         print(f"   Existing version: {existing_doc.get('version', 'N/A')}, timestamp: {existing_doc.get('upload_timestamp', 'N/A')}")
+                                        if is_latest_version:
+                                            now_ts = datetime.now(timezone.utc)
+                                            await collection.update_many(
+                                                {"project_id": project_id, "device_name": device_name, "is_latest_config": True},
+                                                {"$set": {"is_latest_config": False}},
+                                            )
+                                            await collection.update_one(
+                                                {"_id": existing_doc.get("_id")},
+                                                {
+                                                    "$set": {
+                                                        "document_id": parsed_doc.get("document_id"),
+                                                        "source_filename": parsed_doc.get("source_filename"),
+                                                        "upload_timestamp": now_ts,
+                                                        "extracted_date": parsed_doc.get("extracted_date"),
+                                                        "is_latest_config": True,
+                                                        "updated_at": now_ts,
+                                                    }
+                                                },
+                                            )
                                         save_success = True  # Consider duplicate detection as success
                                     else:
                                         # If this is the latest config, mark previous ones as not latest
@@ -356,6 +404,11 @@ async def upload_documents_endpoint(
                                             
                                             if existing_doc:
                                                 print(f"⚠️ Duplicate config detected for {device_name} in documents collection (hash: {config_hash[:8]}...). Skipping insert (strict duplicate check).")
+                                                if is_latest_version:
+                                                    await db()["documents"].update_many(
+                                                        {"document_id": doc["document_id"], "project_id": project_id, "is_latest": True},
+                                                        {"$set": {"parsed_config": parsed_doc}},
+                                                    )
                                                 save_success = True
                                             else:
                                                 # Store as metadata with version info
@@ -517,10 +570,10 @@ async def list_documents(
     documents = []
     async for doc in db()["documents"].find(query, sort=[("created_at", -1)]):
         # Convert datetime objects to ISO strings
-        if "created_at" in doc and isinstance(doc["created_at"], datetime):
-            doc["created_at"] = doc["created_at"].isoformat()
-        if "updated_at" in doc and isinstance(doc["updated_at"], datetime):
-            doc["updated_at"] = doc["updated_at"].isoformat()
+        if "created_at" in doc:
+            doc["created_at"] = _iso_utc(doc.get("created_at"))
+        if "updated_at" in doc:
+            doc["updated_at"] = _iso_utc(doc.get("updated_at"))
         
         # Remove _id and convert any ObjectId fields to strings
         doc.pop("_id", None)
@@ -529,15 +582,14 @@ async def list_documents(
         if "parsed_config" in doc and isinstance(doc["parsed_config"], dict):
             # Recursively clean ObjectId from parsed_config
             def clean_objectid(obj):
-                from bson import ObjectId
-                if isinstance(obj, ObjectId):
+                if hasattr(obj, '__str__') and obj.__class__.__name__ == 'ObjectId':
                     return str(obj)
                 elif isinstance(obj, dict):
                     return {k: clean_objectid(v) for k, v in obj.items()}
                 elif isinstance(obj, list):
                     return [clean_objectid(item) for item in obj]
                 elif isinstance(obj, datetime):
-                    return obj.isoformat()
+                    return _iso_utc(obj)
                 return obj
             doc["parsed_config"] = clean_objectid(doc["parsed_config"])
         
@@ -564,10 +616,10 @@ async def get_document(
         raise HTTPException(status_code=404, detail="Document not found")
     
     # Convert datetime objects to ISO strings
-    if "created_at" in doc and isinstance(doc["created_at"], datetime):
-        doc["created_at"] = doc["created_at"].isoformat()
-    if "updated_at" in doc and isinstance(doc["updated_at"], datetime):
-        doc["updated_at"] = doc["updated_at"].isoformat()
+    if "created_at" in doc:
+        doc["created_at"] = _iso_utc(doc.get("created_at"))
+    if "updated_at" in doc:
+        doc["updated_at"] = _iso_utc(doc.get("updated_at"))
     
     return doc
 
@@ -698,10 +750,7 @@ async def list_document_versions(
         sort=[("created_at", -1)]
     ):
         extracted = doc.get("extracted_date")
-        if isinstance(extracted, datetime):
-            extracted_serialized = extracted.isoformat()
-        else:
-            extracted_serialized = extracted
+        extracted_serialized = _iso_utc(extracted)
         
         versions.append({
             "document_id": doc["document_id"],
@@ -709,7 +758,7 @@ async def list_document_versions(
             "filename": doc["filename"],
             "size": doc.get("size"),
             "uploader": doc.get("uploader"),
-            "created_at": doc["created_at"].isoformat() if isinstance(doc.get("created_at"), datetime) else doc.get("created_at"),
+            "created_at": _iso_utc(doc.get("created_at")),
             "is_latest": bool(doc.get("is_latest")),
             "file_hash": doc.get("file_hash"),
             "extracted_date": extracted_serialized,

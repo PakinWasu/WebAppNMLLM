@@ -8,8 +8,6 @@ services:
       - "8001:8000"   # 8001 บน host (ถ้า 8000 ถูกใช้แล้ว)
     env_file:
       - ./backend/.env
-    environment:
-      - TZ=Asia/Bangkok
     volumes:
       - ./storage:/app/storage
       - /etc/localtime:/etc/localtime:ro
@@ -45,8 +43,6 @@ services:
     container_name: mnp-frontend-prod
     ports:
       - "8080:80"  # Changed to 8080 to avoid conflict with host nginx
-    environment:
-      - TZ=Asia/Bangkok
     volumes:
       - /etc/localtime:/etc/localtime:ro
     depends_on:
@@ -73,7 +69,6 @@ services:
       - /etc/localtime:/etc/localtime:ro
     environment:
       MONGO_INITDB_DATABASE: manage_network_projects
-      TZ: Asia/Bangkok
     healthcheck:
       test: [ "CMD-SHELL", "mongo --eval 'db.runCommand(\"ping\").ok' || exit 1" ]
       interval: 10s
@@ -90,8 +85,6 @@ services:
     restart: unless-stopped
     ports:
       - "11434:11434"
-    environment:
-      - TZ=Asia/Bangkok
     volumes:
       - ollama-data:/root/.ollama
       - /etc/localtime:/etc/localtime:ro

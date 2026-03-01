@@ -543,6 +543,9 @@ export default function App() {
     if (perm === "project-setting-edit") {
       return userRole === "admin" || projectRole === "manager";
     }
+    if (perm === "manage-folders") {
+      return userRole === "admin" || ["manager", "engineer"].includes(projectRole);
+    }
     if (perm === "upload-config") {
       return userRole === "admin" || ["manager", "engineer"].includes(projectRole);
     }
@@ -9017,13 +9020,12 @@ const DocumentsPage = ({ project, can, authedUser, uploadHistory, setUploadHisto
               Upload Document
             </Button>
           )}
-          {can("project-setting-edit", project) && (
+          {can("manage-folders", project) && (
             <>
               <Button variant="secondary" onClick={handleNewFolder}>New Folder</Button>
               {selectedFolder && (
                 <>
                   <Button variant="secondary" onClick={() => handleEditFolder(selectedFolder)}>Rename</Button>
-                  <Button variant="secondary" onClick={() => handleDownloadFolder(selectedFolder)}>Download</Button>
                   <Button variant="danger" onClick={() => handleDeleteFolder(selectedFolder)}>Delete</Button>
                 </>
               )}
@@ -11536,8 +11538,23 @@ const TopologyGraph = ({ project, projectId, routeToHash, handleNavClick, onOpen
             evidence: e.evidence || "",
             type: "trunk",
           }));
-          // Prefer saved layout links when present so display matches saved state
-          const linksToUse = layout.links && layout.links.length > 0 ? layout.links : newLinks;
+          // Merge saved layout links with newly generated links so refresh doesn't lose new connections
+          const savedLinks = Array.isArray(layout.links) ? layout.links : [];
+          const linkKey = (l) => {
+            const a = String(l?.a ?? "").trim();
+            const b = String(l?.b ?? "").trim();
+            return [a, b].sort().join("|");
+          };
+          const mergedMap = new Map();
+          savedLinks.forEach(l => {
+            if (l?.a && l?.b) mergedMap.set(linkKey(l), l);
+          });
+          newLinks.forEach(l => {
+            if (!l?.a || !l?.b) return;
+            const k = linkKey(l);
+            if (!mergedMap.has(k)) mergedMap.set(k, l);
+          });
+          const linksToUse = Array.from(mergedMap.values());
           setTopologyNodes(newNodes);
           setLinks(linksToUse);
 
@@ -11969,7 +11986,7 @@ const TopologyGraph = ({ project, projectId, routeToHash, handleNavClick, onOpen
     if (!dateStr) return null;
     try {
       const date = new Date(dateStr);
-      return date.toLocaleDateString('en-US', { timeZone: 'Asia/Bangkok', month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' });
+      return date.toLocaleDateString('en-US', { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' });
     } catch {
       return dateStr.split(' ')[0] || dateStr;
     }

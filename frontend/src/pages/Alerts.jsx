@@ -5,9 +5,10 @@ import Badge from "../components/ui/Badge";
 function formatTime(iso) {
   try {
     const d = new Date(iso);
-    return d.toLocaleString("en-US", { timeZone: "Asia/Bangkok", hour12: false });
+    return d.toLocaleString("en-US", { hour12: false });
+  } catch {
+    return iso;
   }
-  return iso;
 }
 
 export default function Alerts({ project, alerts = [] }) {

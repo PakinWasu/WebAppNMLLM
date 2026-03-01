@@ -2,7 +2,7 @@
 
 from fastapi import APIRouter, Depends, HTTPException, Body
 from typing import List, Optional
-from datetime import datetime
+from datetime import datetime, timezone
 import uuid
 import logging
 
@@ -20,6 +20,8 @@ def _iso_generated_at(dt) -> Optional[str]:
     if dt is None:
         return None
     if isinstance(dt, datetime):
+        if dt.tzinfo is None:
+            dt = dt.replace(tzinfo=timezone.utc)
         return dt.isoformat()
     return str(dt)
 
@@ -266,7 +268,7 @@ async def analyze_device_overview(
                     "analysis_summary": summary_str,
                     "metrics": metrics,
                     "llm_used": True,
-                    "generated_at": datetime.utcnow(),
+                    "generated_at": datetime.now(timezone.utc),
                 }
             },
             upsert=True,
@@ -402,7 +404,7 @@ async def analyze_device_recommendations(
                     "analysis_summary": f"{len(validated)} recommendations",
                     "metrics": metrics,
                     "llm_used": True,
-                    "generated_at": datetime.utcnow(),
+                    "generated_at": datetime.now(timezone.utc),
                 }
             },
             upsert=True,
@@ -585,7 +587,7 @@ async def analyze_device_config_drift(
                     + (f" (~{difference_percent:.1f}% different)" if isinstance(difference_percent, (int, float)) else ""),
                     "metrics": metrics,
                     "llm_used": True,
-                    "generated_at": datetime.utcnow(),
+                    "generated_at": datetime.now(timezone.utc),
                 }
             },
             upsert=True,
@@ -933,7 +935,7 @@ async def create_analysis(
     
     # Create analysis document
     analysis_id = str(uuid.uuid4())
-    now = datetime.utcnow()
+    now = datetime.now(timezone.utc)
     
     llm_metrics = LLMMetrics(
         inference_time_ms=result["metrics"]["inference_time_ms"],
@@ -1024,7 +1026,7 @@ async def verify_analysis(
     # Create human review
     human_review = HumanReview(
         reviewer=user["username"],
-        reviewed_at=datetime.utcnow(),
+        reviewed_at=datetime.now(timezone.utc),
         comments=request.comments,
         changes_made=diff_summary,
         status=request.status
@@ -1036,7 +1038,7 @@ async def verify_analysis(
         "human_review": human_review.dict(),
         "verified_version": request.verified_content,
         "accuracy_metrics": AccuracyMetrics(**accuracy_data).dict(),
-        "updated_at": datetime.utcnow()
+        "updated_at": datetime.now(timezone.utc)
     }
     
     await db()["analyses"].update_one(

@@ -118,10 +118,23 @@ async def get_script_settings(project_id: str, user=Depends(get_current_user)):
             updated_by=None
         )
     
-    # Convert datetime to ISO string
+    # Convert datetime to ISO string (ensure timezone-aware UTC)
     last_updated = settings_doc.get("last_updated")
     if isinstance(last_updated, datetime):
+        if last_updated.tzinfo is None:
+            last_updated = last_updated.replace(tzinfo=timezone.utc)
         last_updated = last_updated.isoformat()
+    elif isinstance(last_updated, str):
+        # Normalize legacy ISO strings without timezone (assume UTC)
+        try:
+            s = last_updated.strip()
+            if "T" in s and not (s.endswith("Z") or "+" in s[10:] or "-" in s[10:]):
+                parsed = datetime.fromisoformat(s)
+                if parsed.tzinfo is None:
+                    parsed = parsed.replace(tzinfo=timezone.utc)
+                last_updated = parsed.isoformat()
+        except Exception:
+            pass
     
     return ScriptSettingsResponse(
         device_inventory=settings_doc.get("device_inventory", []),
