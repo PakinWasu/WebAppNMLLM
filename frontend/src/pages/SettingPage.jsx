@@ -26,6 +26,10 @@ export default function SettingPage({ project, setProjects, authedUser, goIndex 
   
   const isProjectAdmin = useMemo(() => currentUserProjectRole === "admin", [currentUserProjectRole]);
   const isProjectManager = useMemo(() => currentUserProjectRole === "manager", [currentUserProjectRole]);
+
+  const canEditSettings = useMemo(() => {
+    return authedUser?.role === "admin" || isProjectAdmin || isProjectManager;
+  }, [authedUser?.role, isProjectAdmin, isProjectManager]);
   
   // When platform admin opens settings, they have full control (treat as project admin for UI)
   const canManageManagers = useMemo(() => {
@@ -56,11 +60,12 @@ export default function SettingPage({ project, setProjects, authedUser, goIndex 
   // Can delete/edit this member: not project admin; and if manager viewing, cannot touch other managers
   const canEditMember = useMemo(() => {
     return (member) => {
+      if (!canEditSettings) return false;
       if (member.role === "admin") return false;
       if (isProjectManager && member.role === "manager") return false;
       return true;
     };
-  }, [isProjectManager]);
+  }, [isProjectManager, canEditSettings]);
 
   const refetchUsers = async () => {
     try {
@@ -223,13 +228,15 @@ export default function SettingPage({ project, setProjects, authedUser, goIndex 
       <div className="sticky top-0 z-10 flex-shrink-0 flex items-center justify-between py-3 px-1 mb-4 bg-slate-50 dark:bg-slate-950 border-b border-slate-200 dark:border-slate-800 shadow-sm dark:shadow-none">
         <h2 className="text-xl font-semibold text-gray-900 dark:text-gray-100">Project Settings</h2>
         <div className="flex items-center gap-2 flex-wrap justify-end">
-          <Button 
-            onClick={save} 
-            className="bg-green-600 hover:bg-green-700 text-white border-green-600 focus:ring-green-500"
-          >
-            Save Changes
-          </Button>
-          {authedUser?.role === "admin" && (
+          {canEditSettings && (
+            <Button 
+              onClick={save} 
+              className="bg-green-600 hover:bg-green-700 text-white border-green-600 focus:ring-green-500"
+            >
+              Save Changes
+            </Button>
+          )}
+          {canEditSettings && authedUser?.role === "admin" && (
             <Button variant="danger" onClick={() => setShowDeleteModal(true)}>
               Delete Project
             </Button>
@@ -246,12 +253,14 @@ export default function SettingPage({ project, setProjects, authedUser, goIndex 
                 value={name} 
                 onChange={(e) => setName(e.target.value)} 
                 placeholder="Enter project name" 
+                disabled={!canEditSettings}
               />
             </Field>
             <Field label="Status">
               <Select
                 value={status}
                 onChange={setStatus}
+                disabled={!canEditSettings}
                 options={[
                   { value: "Planning", label: "Planning" },
                   { value: "Design", label: "Design" },
@@ -280,6 +289,7 @@ export default function SettingPage({ project, setProjects, authedUser, goIndex 
                 <Select
                   value={visibility}
                   onChange={setVisibility}
+                  disabled={!canEditSettings}
                   options={[
                     { value: "Private", label: "Private" },
                     { value: "Shared", label: "Shared" },
@@ -297,6 +307,7 @@ export default function SettingPage({ project, setProjects, authedUser, goIndex 
                 onChange={(e) => setDesc(e.target.value)}
                 placeholder="Enter project description..."
                 rows={6}
+                disabled={!canEditSettings}
                 className="w-full px-3 py-2 text-sm rounded-lg border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-800 dark:text-slate-200 placeholder-slate-500 dark:placeholder-slate-400 focus:border-blue-500 dark:focus:border-blue-400 focus:outline-none focus:ring-1 focus:ring-blue-500 dark:focus:ring-blue-400 transition-colors resize-y"
               />
             </Field>
@@ -307,16 +318,18 @@ export default function SettingPage({ project, setProjects, authedUser, goIndex 
             <Field label="Topology Image">
               <div className="space-y-4">
                 <div className="flex items-center gap-3">
-                  <label className="flex items-center justify-center px-4 py-2.5 text-sm font-medium rounded-lg border border-slate-300 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 text-slate-700 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-700 cursor-pointer transition-colors">
-                    <span className="mr-2">📷</span>
-                    Choose Image
-                    <input
-                      type="file"
-                      accept="image/*"
-                      onChange={(e) => handleFile(e.target.files?.[0])}
-                      className="hidden"
-                    />
-                  </label>
+                  {canEditSettings && (
+                    <label className="flex items-center justify-center px-4 py-2.5 text-sm font-medium rounded-lg border border-slate-300 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 text-slate-700 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-700 cursor-pointer transition-colors">
+                      <span className="mr-2">📷</span>
+                      Choose Image
+                      <input
+                        type="file"
+                        accept="image/*"
+                        onChange={(e) => handleFile(e.target.files?.[0])}
+                        className="hidden"
+                      />
+                    </label>
+                  )}
                   {topoUrl && (
                     <span className="text-sm text-green-600 dark:text-green-400 flex items-center gap-1">
                       ✓ Image uploaded
@@ -350,47 +363,49 @@ export default function SettingPage({ project, setProjects, authedUser, goIndex 
           title="Team Members"
           className="flex-shrink-0"
           actions={
-            <div className="flex flex-wrap items-center gap-2 w-full sm:w-auto sm:min-w-[280px]">
-              <div className="flex-1 min-w-[180px] max-w-[280px]">
-                <Select
-                  value={newMemberUsername}
-                  onChange={setNewMemberUsername}
-                  onFocus={refetchUsers}
-                  options={[
-                    { value: "", label: "Add member..." },
-                    ...usersAvailableToAdd.map((u) => ({ value: u.username, label: u.username })),
-                  ]}
-                  className="w-full text-sm"
-                />
+            canEditSettings ? (
+              <div className="flex flex-wrap items-center gap-2 w-full sm:w-auto sm:min-w-[280px]">
+                <div className="flex-1 min-w-[180px] max-w-[280px]">
+                  <Select
+                    value={newMemberUsername}
+                    onChange={setNewMemberUsername}
+                    onFocus={refetchUsers}
+                    options={[
+                      { value: "", label: "Add member..." },
+                      ...usersAvailableToAdd.map((u) => ({ value: u.username, label: u.username })),
+                    ]}
+                    className="w-full text-sm"
+                  />
+                </div>
+                <div className="w-[100px] min-w-[90px] flex-shrink-0">
+                  <Select
+                    value={addMemberRoleOptions.some((o) => o.value === newMemberRole) ? newMemberRole : "viewer"}
+                    onChange={setNewMemberRole}
+                    options={addMemberRoleOptions}
+                    className="w-full text-sm"
+                  />
+                </div>
+                <Button
+                  onClick={async () => {
+                    if (!newMemberUsername) return;
+                    const role = addMemberRoleOptions.some((o) => o.value === newMemberRole) ? newMemberRole : "viewer";
+                    try {
+                      await api.addProjectMember(project.project_id || project.id, newMemberUsername, role);
+                      setMembers([...members, { username: newMemberUsername, role }]);
+                      setNewMemberUsername("");
+                      setNewMemberRole("viewer");
+                      setError("");
+                    } catch (e) {
+                      setError("Failed to add member: " + formatError(e));
+                    }
+                  }}
+                  disabled={!newMemberUsername}
+                  className="text-xs px-3 flex-shrink-0"
+                >
+                  Add
+                </Button>
               </div>
-              <div className="w-[100px] min-w-[90px] flex-shrink-0">
-                <Select
-                  value={addMemberRoleOptions.some((o) => o.value === newMemberRole) ? newMemberRole : "viewer"}
-                  onChange={setNewMemberRole}
-                  options={addMemberRoleOptions}
-                  className="w-full text-sm"
-                />
-              </div>
-              <Button
-                onClick={async () => {
-                  if (!newMemberUsername) return;
-                  const role = addMemberRoleOptions.some((o) => o.value === newMemberRole) ? newMemberRole : "viewer";
-                  try {
-                    await api.addProjectMember(project.project_id || project.id, newMemberUsername, role);
-                    setMembers([...members, { username: newMemberUsername, role }]);
-                    setNewMemberUsername("");
-                    setNewMemberRole("viewer");
-                    setError("");
-                  } catch (e) {
-                    setError("Failed to add member: " + formatError(e));
-                  }
-                }}
-                disabled={!newMemberUsername}
-                className="text-xs px-3 flex-shrink-0"
-              >
-                Add
-              </Button>
-            </div>
+            ) : null
           }
         >
           <div className="space-y-4">

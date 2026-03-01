@@ -11,7 +11,7 @@ import hashlib
 from pydantic import BaseModel
 
 from ..db.mongo import db
-from ..dependencies.auth import get_current_user, check_project_access
+from ..dependencies.auth import get_current_user, check_project_access, check_project_download_permission, check_project_delete_permission
 from ..models.document import DocumentCreate, DocumentMetadata, DocumentPublic, DocumentVersionInfo
 from ..services.document_storage import (
     upload_documents, get_document_file_path, read_document_file,
@@ -581,6 +581,7 @@ async def download_document(
 ):
     """Download document file"""
     await check_project_access(project_id, user)
+    await check_project_download_permission(project_id, user)
     
     file_path = await get_document_file_path(project_id, document_id, version)
     if not file_path:
@@ -886,9 +887,7 @@ async def delete_document(
     if doc.get("folder_id") == "Config":
         raise HTTPException(status_code=403, detail="Cannot delete files from Config folder")
     
-    # Only admin or project manager can delete
-    from ..dependencies.auth import check_project_manager_or_admin
-    await check_project_manager_or_admin(project_id, user)
+    await check_project_delete_permission(project_id, user)
     
     if delete_all_versions:
         # Delete all versions

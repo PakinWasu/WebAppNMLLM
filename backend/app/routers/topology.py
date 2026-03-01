@@ -14,7 +14,7 @@ def _iso_generated_at(dt) -> Optional[str]:
     if isinstance(dt, datetime):
         return dt.isoformat()
     return str(dt)
-from ..dependencies.auth import get_current_user, check_project_access, check_project_manager_or_admin
+from ..dependencies.auth import get_current_user, check_project_access, check_project_manager_or_admin, check_project_editor_or_admin, check_project_llm_permission
 from ..services.topology_service import topology_service
 from ..services.llm_lock import acquire_llm_lock, release_llm_lock
 from ..models.topology import TopologyLayoutUpdate
@@ -62,6 +62,7 @@ async def generate_topology(
         - metrics: Performance metrics
     """
     await check_project_access(project_id, user)
+    await check_project_llm_permission(project_id, user)
     if not await acquire_llm_lock(project_id, user.get("username"), "topology"):
         raise HTTPException(
             status_code=409,
@@ -376,7 +377,7 @@ async def save_topology_layout(
     """
     Save topology layout (positions, links, labels, roles).
     
-    Only project managers or admins can save layout.
+    Only project editors, managers or admins can save layout.
     
     This endpoint saves:
     - Node positions (topoPositions)
@@ -384,7 +385,7 @@ async def save_topology_layout(
     - Node labels (topoNodeLabels)
     - Node roles (topoNodeRoles)
     """
-    await check_project_manager_or_admin(project_id, user)
+    await check_project_editor_or_admin(project_id, user)
     
     # Verify project exists
     project = await db()["projects"].find_one({"project_id": project_id})

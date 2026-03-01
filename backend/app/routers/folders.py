@@ -8,7 +8,7 @@ import io
 import os
 
 from ..db.mongo import db
-from ..dependencies.auth import get_current_user, check_project_access, check_project_editor_or_admin
+from ..dependencies.auth import get_current_user, check_project_access, check_project_editor_or_admin, check_project_download_permission
 
 router = APIRouter(prefix="/projects/{project_id}/folders", tags=["folders"])
 
@@ -27,10 +27,17 @@ class FolderUpdate(BaseModel):
 async def get_folders(project_id: str, user=Depends(get_current_user)):
     """Get all custom folders for a project"""
     await check_project_access(project_id, user)
+
+    config_folder = {
+        "id": "Config",
+        "name": "Config",
+        "parent_id": None,
+        "system": True,
+    }
     
     folders_doc = await db()["project_folders"].find_one({"project_id": project_id})
     if not folders_doc:
-        return {"folders": []}
+        return {"folders": [config_folder]}
     
     # Return folders list, exclude deleted ones; normalize parent_id "root" -> null
     folders = folders_doc.get("folders", [])
@@ -42,7 +49,7 @@ async def get_folders(project_id: str, user=Depends(get_current_user)):
         if fcopy.get("parent_id") == "root":
             fcopy["parent_id"] = None
         active_folders.append(fcopy)
-    return {"folders": active_folders}
+    return {"folders": [config_folder] + active_folders}
 
 
 @router.post("")
@@ -233,6 +240,7 @@ async def download_folder(
 ):
     """Download folder and all its contents as ZIP file"""
     await check_project_access(project_id, user)
+    await check_project_download_permission(project_id, user)
     
     # Prevent downloading Config folder
     if folder_id == "Config":

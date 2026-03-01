@@ -7,7 +7,7 @@ import uuid
 import logging
 
 from ..db.mongo import db
-from ..dependencies.auth import get_current_user, check_project_access
+from ..dependencies.auth import get_current_user, check_project_access, check_project_llm_permission
 
 logger = logging.getLogger(__name__)
 
@@ -58,6 +58,8 @@ async def _get_latest_config_for_device(project_id: str, device_name: str):
         doc.pop("_id", None)
         return doc
     return None
+
+
 from ..models.analysis import (
     AnalysisCreate,
     AnalysisInDB,
@@ -200,6 +202,7 @@ async def analyze_device_overview(
     if not device_name:
         raise HTTPException(status_code=400, detail="device_name (or device_id) required in body.")
     await check_project_access(project_id, user)
+    await check_project_llm_permission(project_id, user)
     if not await acquire_llm_lock(project_id, user.get("username"), "device_overview"):
         raise HTTPException(
             status_code=409,
@@ -336,6 +339,7 @@ async def analyze_device_recommendations(
     if not device_name:
         raise HTTPException(status_code=400, detail="device_name (or device_id) required in body.")
     await check_project_access(project_id, user)
+    await check_project_llm_permission(project_id, user)
     if not await acquire_llm_lock(project_id, user.get("username"), "device_recommendations"):
         raise HTTPException(
             status_code=409,
@@ -446,7 +450,7 @@ async def get_device_config_drift(
             "from_filename": result_data.get("from_filename"),
             "to_filename": result_data.get("to_filename"),
             "changes": result_data.get("changes", []),
-             "difference_percent": result_data.get("difference_percent"),
+            "difference_percent": result_data.get("difference_percent"),
             "metrics": saved_result.get("metrics", {}),
             "project_id": project_id,
             "generated_at": _iso_generated_at(saved_result.get("generated_at")),
@@ -478,6 +482,7 @@ async def analyze_device_config_drift(
     if not device_name:
         raise HTTPException(status_code=400, detail="device_name (or device_id) required in body.")
     await check_project_access(project_id, user)
+    await check_project_llm_permission(project_id, user)
     if not await acquire_llm_lock(project_id, user.get("username"), "device_config_drift"):
         raise HTTPException(
             status_code=409,
@@ -661,6 +666,7 @@ async def analyze_project_overview(
     logger = logging.getLogger(__name__)
     
     await check_project_access(project_id, user)
+    await check_project_llm_permission(project_id, user)
     if not await acquire_llm_lock(project_id, user.get("username"), "project_overview"):
         raise HTTPException(
             status_code=409,
@@ -769,6 +775,7 @@ async def analyze_project_recommendations(
     logger = logging.getLogger(__name__)
     
     await check_project_access(project_id, user)
+    await check_project_llm_permission(project_id, user)
     if not await acquire_llm_lock(project_id, user.get("username"), "project_recommendations"):
         raise HTTPException(
             status_code=409,
@@ -890,6 +897,7 @@ async def create_analysis(
     Implements context isolation - only analyzes data from the specified device.
     """
     await check_project_access(project_id, user)
+    await check_project_llm_permission(project_id, user)
     
     # Get device configuration data (strict context isolation)
     device_config = await db()["parsed_configs"].find_one(
@@ -982,6 +990,7 @@ async def verify_analysis(
     Calculates accuracy metrics comparing AI draft vs human final version.
     """
     await check_project_access(project_id, user)
+    await check_project_llm_permission(project_id, user)
     
     # Get analysis
     analysis = await db()["analyses"].find_one({

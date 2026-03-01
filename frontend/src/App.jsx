@@ -537,14 +537,28 @@ export default function App() {
     if (perm === "user-management") return userRole === "admin";
 
     // Project-level permissions
-    if (perm === "project-setting") {
-      // Admin or project manager can access project settings
+    if (perm === "project-setting-view") {
+      return userRole === "admin" || ["manager", "engineer", "viewer", "admin"].includes(projectRole);
+    }
+    if (perm === "project-setting-edit") {
       return userRole === "admin" || projectRole === "manager";
     }
     if (perm === "upload-config") {
       return userRole === "admin" || ["manager", "engineer"].includes(projectRole);
     }
     if (perm === "upload-document") {
+      return userRole === "admin" || ["manager", "engineer"].includes(projectRole);
+    }
+    if (perm === "download-document") {
+      return userRole === "admin" || ["manager", "engineer"].includes(projectRole);
+    }
+    if (perm === "delete-document") {
+      return userRole === "admin" || ["manager", "engineer"].includes(projectRole);
+    }
+    if (perm === "run-llm") {
+      return userRole === "admin" || ["manager", "engineer"].includes(projectRole);
+    }
+    if (perm === "edit-topology") {
       return userRole === "admin" || ["manager", "engineer"].includes(projectRole);
     }
     if (perm === "view-documents") {
@@ -597,7 +611,7 @@ export default function App() {
       if (can("upload-config", project)) {
         projectTabs.push({ id: "script-generator", label: "Command Template", icon: "⚡" });
       }
-      if (can("project-setting", project)) {
+      if (can("project-setting-view", project)) {
         projectTabs.push({ id: "setting", label: "Setting", icon: "⚙️" });
       }
     }
@@ -1011,7 +1025,7 @@ const ProjectView = ({
   if (can("upload-config", project)) {
     tabs.push({ id: "script-generator", label: "Command Template", icon: "⚡" });
   }
-  if (can("project-setting", project)) {
+  if (can("project-setting-view", project)) {
     tabs.push({ id: "setting", label: "Setting", icon: "⚙️" });
   }
 
@@ -1031,7 +1045,7 @@ const ProjectView = ({
       )}
       {/* Main content - full width (header is now in MainLayout topBar) */}
       <main className="flex-1 min-h-0 overflow-y-auto flex flex-col gap-3 px-4 py-3">
-        {tab === "setting" && can("project-setting", project) && (
+        {tab === "setting" && can("project-setting-view", project) && (
           <SettingPage
             project={project}
             setProjects={setProjects}
@@ -6808,19 +6822,21 @@ const HistoryPage = ({ project, can, authedUser }) => {
                         </td>
                         <td className="px-3 py-2.5">
                           <div className="flex gap-1">
-                            <button
-                              onClick={async () => {
-                                try {
-                                  const projectId = project.project_id || project.id;
-                                  await api.downloadDocument(projectId, r.document_id);
-                                } catch (error) {
-                                  alert('Download failed: ' + formatError(error));
-                                }
-                              }}
-                              className="px-2 py-1 text-xs rounded bg-slate-200 hover:bg-slate-300 text-slate-800 dark:bg-slate-700 dark:hover:bg-slate-600 dark:text-slate-200 transition-colors"
-                            >
-                              Download
-                            </button>
+                            {can("download-document", project) && (
+                              <button
+                                onClick={async () => {
+                                  try {
+                                    const projectId = project.project_id || project.id;
+                                    await api.downloadDocument(projectId, r.document_id);
+                                  } catch (error) {
+                                    alert('Download failed: ' + formatError(error));
+                                  }
+                                }}
+                                className="px-2 py-1 text-xs rounded bg-slate-200 hover:bg-slate-300 text-slate-800 dark:bg-slate-700 dark:hover:bg-slate-600 dark:text-slate-200 transition-colors"
+                              >
+                                Download
+                              </button>
+                            )}
                             <button
                               onClick={async (e) => {
                                 e.stopPropagation();
@@ -6965,21 +6981,23 @@ const HistoryPage = ({ project, can, authedUser }) => {
                         key: "actions",
                         cell: (v) => (
                           <div className="flex gap-2">
-                            <Button
-                              variant="secondary"
-                              size="sm"
-                              onClick={async () => {
-                                try {
-                                  const projectId = project.project_id || project.id;
-                                  const docId = versionDocument?.document_id;
-                                  await api.downloadDocument(projectId, docId, v.version);
-                                } catch (error) {
-                                  alert('Download failed: ' + formatError(error));
-                                }
-                              }}
-                            >
-                              Download
-                            </Button>
+                            {can("download-document", project) && (
+                              <Button
+                                variant="secondary"
+                                size="sm"
+                                onClick={async () => {
+                                  try {
+                                    const projectId = project.project_id || project.id;
+                                    const docId = versionDocument?.document_id;
+                                    await api.downloadDocument(projectId, docId, v.version);
+                                  } catch (error) {
+                                    alert('Download failed: ' + formatError(error));
+                                  }
+                                }}
+                              >
+                                Download
+                              </Button>
+                            )}
                           </div>
                         )
                       },
@@ -8793,19 +8811,21 @@ const DocumentsPage = ({ project, can, authedUser, uploadHistory, setUploadHisto
           if (!selectedFile || !doc) return null;
           return (
             <div className="flex gap-2 flex-wrap">
-              <Button
-                variant="secondary"
-                onClick={async () => {
-                  try {
-                    const projectId = project.project_id || project.id;
-                    await api.downloadDocument(projectId, doc.document_id);
-                  } catch (error) {
-                    alert('Download failed: ' + formatError(error));
-                  }
-                }}
-              >
-                ⬇ Download
-              </Button>
+              {can("download-document", project) && (
+                <Button
+                  variant="secondary"
+                  onClick={async () => {
+                    try {
+                      const projectId = project.project_id || project.id;
+                      await api.downloadDocument(projectId, doc.document_id);
+                    } catch (error) {
+                      alert('Download failed: ' + formatError(error));
+                    }
+                  }}
+                >
+                  ⬇ Download
+                </Button>
+              )}
               <Button
                 variant="secondary"
                 onClick={(e) => {
@@ -8839,7 +8859,7 @@ const DocumentsPage = ({ project, can, authedUser, uploadHistory, setUploadHisto
                   📁 Move
                 </Button>
               )}
-              {doc.folder_id !== "Config" && can("project-setting", project) && (
+              {doc.folder_id !== "Config" && can("delete-document", project) && (
                 <Button
                   variant="danger"
                   onClick={(e) => {
@@ -8997,7 +9017,7 @@ const DocumentsPage = ({ project, can, authedUser, uploadHistory, setUploadHisto
               Upload Document
             </Button>
           )}
-          {can("project-setting", project) && (
+          {can("project-setting-edit", project) && (
             <>
               <Button variant="secondary" onClick={handleNewFolder}>New Folder</Button>
               {selectedFolder && (
@@ -10887,9 +10907,11 @@ const TopologyGraph = ({ project, projectId, routeToHash, handleNavClick, onOpen
               // Auto-save layout so nodes don't overlap; user can rearrange later
               const labels = Object.fromEntries(updatedNodes.map(n => [n.id, n.label || n.id]));
               const roles = Object.fromEntries(updatedNodes.map(n => [n.id, n.role || "access"]));
-              api.saveTopologyLayout(projectId, nudgedPositions, convertedEdges, labels, roles).then(() => {
-                setProjects(prev => prev.map(p => (p.project_id || p.id) === projectId ? { ...p, topoPositions: nudgedPositions, topoLinks: convertedEdges, topoNodeLabels: labels, topoNodeRoles: roles, topoUpdatedAt: new Date().toISOString() } : p));
-              }).catch(err => console.warn("Failed to auto-save topology layout:", err));
+              if (can("edit-topology", project)) {
+                api.saveTopologyLayout(projectId, nudgedPositions, convertedEdges, labels, roles).then(() => {
+                  setProjects(prev => prev.map(p => (p.project_id || p.id) === projectId ? { ...p, topoPositions: nudgedPositions, topoLinks: convertedEdges, topoNodeLabels: labels, topoNodeRoles: roles, topoUpdatedAt: new Date().toISOString() } : p));
+                }).catch(err => console.warn("Failed to auto-save topology layout:", err));
+              }
             }
 
             setGeneratingTopology(false);
@@ -11001,9 +11023,11 @@ const TopologyGraph = ({ project, projectId, routeToHash, handleNavClick, onOpen
               }
               const labels = Object.fromEntries(updatedNodes.map(n => [n.id, n.label || n.id]));
               const roles = Object.fromEntries(updatedNodes.map(n => [n.id, n.role || "access"]));
-              api.saveTopologyLayout(projectId, nudgedPositions, convertedEdges, labels, roles).then(() => {
-                setProjects(prev => prev.map(p => (p.project_id || p.id) === projectId ? { ...p, topoPositions: nudgedPositions, topoLinks: convertedEdges, topoNodeLabels: labels, topoNodeRoles: roles, topoUpdatedAt: new Date().toISOString() } : p));
-              }).catch(err => console.warn("Failed to auto-save topology layout:", err));
+              if (can("edit-topology", project)) {
+                api.saveTopologyLayout(projectId, nudgedPositions, convertedEdges, labels, roles).then(() => {
+                  setProjects(prev => prev.map(p => (p.project_id || p.id) === projectId ? { ...p, topoPositions: nudgedPositions, topoLinks: convertedEdges, topoNodeLabels: labels, topoNodeRoles: roles, topoUpdatedAt: new Date().toISOString() } : p));
+                }).catch(err => console.warn("Failed to auto-save topology layout:", err));
+              }
             }
 
             setGeneratingTopology(false);
@@ -11191,9 +11215,11 @@ const TopologyGraph = ({ project, projectId, routeToHash, handleNavClick, onOpen
             }
             const labels = Object.fromEntries(updatedNodes.map(n => [n.id, n.label || n.id]));
             const roles = Object.fromEntries(updatedNodes.map(n => [n.id, n.role || "access"]));
-            api.saveTopologyLayout(projectId, nudgedPositions, convertedEdges, labels, roles).then(() => {
-              setProjects(prev => prev.map(p => (p.project_id || p.id) === projectId ? { ...p, topoPositions: nudgedPositions, topoLinks: convertedEdges, topoNodeLabels: labels, topoNodeRoles: roles, topoUpdatedAt: new Date().toISOString() } : p));
-            }).catch(err => console.warn("Failed to auto-save topology layout:", err));
+            if (can("edit-topology", project)) {
+              api.saveTopologyLayout(projectId, nudgedPositions, convertedEdges, labels, roles).then(() => {
+                setProjects(prev => prev.map(p => (p.project_id || p.id) === projectId ? { ...p, topoPositions: nudgedPositions, topoLinks: convertedEdges, topoNodeLabels: labels, topoNodeRoles: roles, topoUpdatedAt: new Date().toISOString() } : p));
+              }).catch(err => console.warn("Failed to auto-save topology layout:", err));
+            }
           }
 
           setGeneratingTopology(false);
@@ -11310,9 +11336,11 @@ const TopologyGraph = ({ project, projectId, routeToHash, handleNavClick, onOpen
             }
             const labels = Object.fromEntries(updatedNodes.map(n => [n.id, n.label || n.id]));
             const roles = Object.fromEntries(updatedNodes.map(n => [n.id, n.role || "access"]));
-            api.saveTopologyLayout(projectId, nudgedPositions, convertedEdges, labels, roles).then(() => {
-              setProjects(prev => prev.map(p => (p.project_id || p.id) === projectId ? { ...p, topoPositions: nudgedPositions, topoLinks: convertedEdges, topoNodeLabels: labels, topoNodeRoles: roles, topoUpdatedAt: new Date().toISOString() } : p));
-            }).catch(err => console.warn("Failed to auto-save topology layout:", err));
+            if (can("edit-topology", project)) {
+              api.saveTopologyLayout(projectId, nudgedPositions, convertedEdges, labels, roles).then(() => {
+                setProjects(prev => prev.map(p => (p.project_id || p.id) === projectId ? { ...p, topoPositions: nudgedPositions, topoLinks: convertedEdges, topoNodeLabels: labels, topoNodeRoles: roles, topoUpdatedAt: new Date().toISOString() } : p));
+              }).catch(err => console.warn("Failed to auto-save topology layout:", err));
+            }
           }
 
           setGeneratingTopology(false);
@@ -11354,6 +11382,10 @@ const TopologyGraph = ({ project, projectId, routeToHash, handleNavClick, onOpen
     const projectId = project.project_id || project.id;
     if (!projectId) {
       setTopologyError("Project ID not found");
+      return;
+    }
+    if (!can("run-llm", project)) {
+      setTopologyError("You do not have permission to run AI/LLM tasks in this project");
       return;
     }
     // If we already have a result (from this session or loaded from API), show popup only; do not send to LLM until user clicks Regenerate
@@ -11820,6 +11852,10 @@ const TopologyGraph = ({ project, projectId, routeToHash, handleNavClick, onOpen
 
     try {
       // Save to backend
+      if (!can("edit-topology", project)) {
+        setTopologyError("You do not have permission to edit topology in this project");
+        return;
+      }
       await api.saveTopologyLayout(projectId, positions, links, nodeLabels, nodeRoles, hiddenNodeIds);
 
       // Update "last saved" snapshot so Cancel restores to this state
