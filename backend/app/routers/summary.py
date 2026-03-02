@@ -53,17 +53,11 @@ async def upload_device_image(
 ):
     """Upload device image - stores as base64 in project metadata"""
     await check_project_access(project_id, user)
+    await check_project_editor_or_admin(project_id, user)
     
-    # Check if user can edit project
     project = await db()["projects"].find_one({"project_id": project_id})
     if not project:
         raise HTTPException(status_code=404, detail="Project not found")
-    
-    # Check permissions
-    project_member = next((m for m in project.get("members", []) if m.get("username") == user["username"]), None)
-    is_manager = user["role"] == "admin" or (project_member and project_member.get("role") == "manager")
-    if not is_manager:
-        raise HTTPException(status_code=403, detail="Only managers can upload device images")
     
     # Validate file type
     if not file.content_type or not file.content_type.startswith("image/"):
@@ -157,16 +151,11 @@ async def delete_device_image(
 ):
     """Delete device image"""
     await check_project_access(project_id, user)
+    await check_project_editor_or_admin(project_id, user)
     
     project = await db()["projects"].find_one({"project_id": project_id})
     if not project:
         raise HTTPException(status_code=404, detail="Project not found")
-    
-    # Check permissions
-    project_member = next((m for m in project.get("members", []) if m.get("username") == user["username"]), None)
-    is_manager = user["role"] == "admin" or (project_member and project_member.get("role") == "manager")
-    if not is_manager:
-        raise HTTPException(status_code=403, detail="Only managers can delete device images")
     
     device_images = project.get("device_images", {})
     if device_name in device_images:
