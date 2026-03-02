@@ -2933,24 +2933,8 @@ const DeviceDetailsView = ({ project, deviceId, goBack, goBackHref, goIndex, goI
   }, [project?.project_id || project?.id, deviceId, deviceBackups]);
 
   // default: 2 most recent files
-  const [compareOpen, setCompareOpen] = React.useState(false);
-  const [leftFileName, setLeftFileName] = React.useState("");
-  const [rightFileName, setRightFileName] = React.useState("");
 
-  // Update default file names when deviceBackups change
-  React.useEffect(() => {
-    if (deviceBackups.length >= 2) {
-      setLeftFileName(deviceBackups[1]?.filename || deviceBackups[0]?.filename || "");
-      setRightFileName(deviceBackups[0]?.filename || deviceBackups[1]?.filename || "");
-    } else if (deviceBackups.length === 1) {
-      setLeftFileName(deviceBackups[0]?.filename || "");
-      setRightFileName("");
-    }
-  }, [deviceBackups]);
-
-  const leftFile = deviceBackups.find((f) => f.filename === leftFileName);
-  const rightFile = deviceBackups.find((f) => f.filename === rightFileName);
-
+  
   // simple line-by-line diff
   const simpleDiff = React.useCallback((aText = "", bText = "") => {
     const a = (aText || "").split(/\r?\n/);
@@ -3650,7 +3634,7 @@ const DeviceDetailsView = ({ project, deviceId, goBack, goBackHref, goIndex, goI
                 { id: "macarp", label: "MAC/ARP" },
                 { id: "security", label: "Security" },
                 { id: "ha", label: "HA" },
-                { id: "raw", label: "Raw" }
+                { id: "raw", label: "Config Difference" }
               ].map((t) => (
                 <button
                   key={t.id}
@@ -3763,7 +3747,7 @@ const DeviceDetailsView = ({ project, deviceId, goBack, goBackHref, goIndex, goI
                       : "border-transparent text-slate-700 dark:text-slate-400 hover:bg-slate-100/80 dark:hover:bg-slate-800/40 hover:text-slate-900 dark:hover:text-slate-300"
                       }`}
                   >
-                    Config Drift
+                    Config Difference
                   </button>
                 </div>
                 <button
@@ -3983,8 +3967,7 @@ const DeviceDetailsView = ({ project, deviceId, goBack, goBackHref, goIndex, goI
                             <div className="text-xs text-slate-500 dark:text-slate-400">
                               Click the AI button above to compare configuration (running-config / current-configuration style) between the 2 latest versions.
                             </div>
-                            <Button variant="secondary" onClick={() => setCompareOpen(true)} className="text-xs py-1.5 px-2">Compare Backups</Button>
-                          </div>
+                                                      </div>
                         )}
                       </>
                     )}
@@ -4911,71 +4894,7 @@ const DeviceDetailsView = ({ project, deviceId, goBack, goBackHref, goIndex, goI
         </div>
       )}
 
-      {/* Modal: Compare Backups */}
-      {compareOpen && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
-          <div className="absolute inset-0 bg-black/50" onClick={() => setCompareOpen(false)} />
-          <div className="relative z-10 w-full max-w-5xl">
-            <Card
-              title={`Compare Backups — ${facts.device}`}
-              actions={<Button variant="secondary" onClick={() => setCompareOpen(false)}>Close</Button>}
-            >
-              <div className="grid gap-3">
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-                  <Field label="Left (older)">
-                    <Select
-                      value={leftFileName}
-                      onChange={setLeftFileName}
-                      options={deviceBackups.map(f => ({ value: f.name, label: f.name }))}
-                    />
-                  </Field>
-                  <Field label="Right (newer)">
-                    <Select
-                      value={rightFileName}
-                      onChange={setRightFileName}
-                      options={deviceBackups.map(f => ({ value: f.name, label: f.name }))}
-                    />
-                  </Field>
-                </div>
-
-                <div className="rounded-xl border border-slate-300 dark:border-[#1F2937] overflow-hidden">
-                  <div className="grid grid-cols-1 md:grid-cols-2">
-                    <div className="border-b md:border-b-0 md:border-r border-[#1F2937] p-3">
-                      <div className="text-xs text-gray-400 mb-2 truncate">{leftFile?.name || "—"}</div>
-                      <div className="text-xs text-gray-400 mb-2">vs</div>
-                      <div className="text-xs text-gray-400 mb-2 truncate">{rightFile?.name || "—"}</div>
-                    </div>
-                    <div className="p-3">
-                      <div className="text-xs text-gray-400 mb-2">Diff (line by line)</div>
-                      <div className="bg-[#0D1422] rounded-lg p-3 h-[60vh] overflow-auto text-sm">
-                        {leftFile && rightFile ? (
-                          simpleDiff(leftFile.content || "", rightFile.content || "").map((d, i) => (
-                            <div key={i} className={
-                              d.t === "+" ? "text-emerald-400" :
-                                d.t === "-" ? "text-rose-400" : "text-gray-300"
-                            }>
-                              {d.t} {d.l}
-                            </div>
-                          ))
-                        ) : (
-                          <div className="text-gray-400">Select both files to compare.</div>
-                        )}
-                      </div>
-                    </div>
-                  </div>
-                </div>
-
-                {rightFile && (
-                  <div className="flex gap-2">
-                    {/* Download buttons removed - only available in Documents page */}
-                  </div>
-                )}
-              </div>
-            </Card>
-          </div>
-        </div>
-      )}
-
+      
     </div>
   );
 };
