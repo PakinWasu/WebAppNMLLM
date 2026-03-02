@@ -1242,29 +1242,14 @@ const OverviewPage = ({ project, uploadHistory }) => {
       </Card>
 
       {/* Combined Logs and Upload History */}
-      <Card
-        title={
-          <div className="flex items-center justify-between w-full">
-            <span className="text-sm font-semibold text-gray-700 dark:text-gray-200">History</span>
-            <div className="relative">
-              <input
-                type="text"
-                placeholder="Search (filename, user, description...)"
-                value={searchActivity}
-                onChange={(e) => setSearchActivity(e.target.value)}
-                className="w-64 pl-8 pr-3 py-1.5 text-xs rounded-lg bg-slate-800/80 border border-slate-600 text-slate-200 placeholder-slate-500 focus:outline-none focus:ring-1 focus:ring-sky-500 focus:border-sky-500"
-              />
-              <svg className="absolute left-2.5 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-slate-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
-              </svg>
-            </div>
-          </div>
-        }
-        className="overflow-hidden"
-      >
-        <div className="h-[50vh] overflow-hidden rounded-xl border border-slate-300 dark:border-slate-700">
+      <Card className="overflow-hidden">
+        <div className="h-[50vh] overflow-hidden rounded-xl border border-slate-300 dark:border-slate-700 flex flex-col">
           <Table
-            showToolbar={false}
+            title="History"
+            searchable
+            searchPlaceholder="Search (filename, user, description...)"
+            searchValue={searchActivity}
+            onSearchChange={setSearchActivity}
             columns={[
               { header: "Time", key: "time" },
               { header: "Name", key: "files" },
@@ -2714,7 +2699,15 @@ const SummaryPage = ({ project, projectId: projectIdProp, routeToHash, handleNav
       ) : (
         <div className="flex-[0_0_45%] min-h-0 flex flex-col rounded-xl border border-slate-300 dark:border-slate-800 bg-white dark:bg-slate-900/50 shadow-sm dark:shadow-none my-3 overflow-hidden">
           <div className="flex-1 min-h-0 overflow-auto p-1">
-            <Table columns={columns} data={filtered} empty="No devices yet. Upload config files to see summary." minWidthClass="min-w-full" containerClassName="text-xs" />
+            <Table
+              title="Device Summary"
+              searchable
+              columns={columns}
+              data={filtered}
+              empty="No devices yet. Upload config files to see summary."
+              minWidthClass="min-w-full"
+              containerClassName="text-xs"
+            />
           </div>
         </div>
       )}
@@ -2934,7 +2927,7 @@ const DeviceDetailsView = ({ project, deviceId, goBack, goBackHref, goIndex, goI
 
   // default: 2 most recent files
 
-  
+
   // simple line-by-line diff
   const simpleDiff = React.useCallback((aText = "", bText = "") => {
     const a = (aText || "").split(/\r?\n/);
@@ -3967,7 +3960,7 @@ const DeviceDetailsView = ({ project, deviceId, goBack, goBackHref, goIndex, goI
                             <div className="text-xs text-slate-500 dark:text-slate-400">
                               Click the AI button above to compare configuration (running-config / current-configuration style) between the 2 latest versions.
                             </div>
-                                                      </div>
+                          </div>
                         )}
                       </>
                     )}
@@ -3994,21 +3987,17 @@ const DeviceDetailsView = ({ project, deviceId, goBack, goBackHref, goIndex, goI
       {!loading && !error && tab === "interfaces" && (
         <div className="flex-1 min-h-0 overflow-auto">
           <div className="max-h-[80vh] overflow-hidden rounded-2xl border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-900/30 flex flex-col">
-            <div className="flex items-center justify-between gap-2 px-4 py-2.5 border-b border-slate-200 dark:border-slate-700 bg-slate-50/70 dark:bg-slate-800/30">
-              <h3 className="text-sm font-semibold text-slate-800 dark:text-slate-200">Interfaces</h3>
-              <Button variant="secondary" onClick={onExportIfaces}>Export CSV</Button>
-            </div>
-            <div className="flex-1 min-h-0">
-              <Table
-                searchable
-                searchPlaceholder="Search interface name, IP, description..."
-                columns={ifaceColumns}
-                data={ifaces}
-                empty="No interfaces"
-                minWidthClass="min-w-[1400px]"
-                containerClassName="h-full"
-              />
-            </div>
+            <Table
+              title="Interfaces"
+              actions={<Button variant="secondary" onClick={onExportIfaces} disabled={!ifaces || ifaces.length === 0}>Export CSV</Button>}
+              searchable
+              searchPlaceholder="Search interface name, IP, description..."
+              columns={ifaceColumns}
+              data={ifaces}
+              empty="No interfaces"
+              minWidthClass="min-w-[1400px]"
+              containerClassName="flex-1"
+            />
           </div>
         </div>
       )}
@@ -4016,21 +4005,17 @@ const DeviceDetailsView = ({ project, deviceId, goBack, goBackHref, goIndex, goI
       {/* VLANS */}
       {!loading && !error && tab === "vlans" && (
         <div className="max-h-[80vh] overflow-hidden rounded-2xl border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-900/30 flex flex-col">
-          <div className="flex items-center justify-between gap-2 px-4 py-2.5 border-b border-slate-200 dark:border-slate-700 bg-slate-50/70 dark:bg-slate-800/30">
-            <h3 className="text-sm font-semibold text-slate-800 dark:text-slate-200">VLANs</h3>
-            <Button variant="secondary" onClick={exportVlans}>Export CSV</Button>
-          </div>
-          <div className="flex-1 min-h-0">
-            <Table
-              searchable
-              searchPlaceholder="Search VLAN ID, name, status..."
-              columns={vlanColumns}
-              data={vlans}
-              empty="No VLANs parsed"
-              minWidthClass="min-w-[900px]"
-              containerClassName="h-full"
-            />
-          </div>
+          <Table
+            title="VLANs"
+            actions={<Button variant="secondary" onClick={exportVlans} disabled={!vlans || vlans.length === 0}>Export CSV</Button>}
+            searchable
+            searchPlaceholder="Search VLAN ID, name, status..."
+            columns={vlanColumns}
+            data={vlans}
+            empty="No VLANs parsed"
+            minWidthClass="min-w-[900px]"
+            containerClassName="flex-1"
+          />
         </div>
       )}
 
@@ -4055,49 +4040,45 @@ const DeviceDetailsView = ({ project, deviceId, goBack, goBackHref, goIndex, goI
             {/* STP Interfaces from parser - with full details */}
             {stpData.interfaces && Array.isArray(stpData.interfaces) && stpData.interfaces.length > 0 && (
               <div className="mt-4 max-h-[60vh] overflow-hidden rounded-2xl border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-900/30 flex flex-col">
-                <div className="flex items-center justify-between gap-2 px-4 py-2.5 border-b border-slate-200 dark:border-slate-700 bg-slate-50/70 dark:bg-slate-800/30">
-                  <h3 className="text-sm font-semibold text-slate-800 dark:text-slate-200">STP Ports</h3>
-                </div>
-                <div className="flex-1 min-h-0">
-                  <Table
-                    searchable
-                    searchPlaceholder="Search port name..."
-                    columns={[
-                      { header: "Port", key: "port", cell: (r) => <span className="font-medium text-slate-800 dark:text-slate-200">{r.port}</span> },
-                      {
-                        header: "Role", key: "role", cell: (r) => {
-                          const role = r.role || "—";
-                          const colorClass = role === "Root" ? "text-emerald-600 dark:text-emerald-500" : role === "Designated" ? "text-blue-600 dark:text-blue-500" : role === "Alternate" ? "text-amber-600 dark:text-amber-500" : "";
-                          return <span className={colorClass}>{role}</span>;
-                        }
-                      },
-                      {
-                        header: "State", key: "state", cell: (r) => {
-                          const state = r.state || "—";
-                          const colorClass = state === "Forwarding" ? "text-emerald-600 dark:text-emerald-500" : state === "Blocking" ? "text-rose-600 dark:text-rose-500" : state === "Learning" ? "text-amber-600 dark:text-amber-500" : "";
-                          return <span className={colorClass}>{state}</span>;
-                        }
-                      },
-                      { header: "Cost", key: "cost", cell: (r) => r.cost ?? "—" },
-                      {
-                        header: "PortFast", key: "portfast_enabled", cell: (r) => {
-                          const enabled = r.portfast_enabled;
-                          return <span className={enabled ? "text-emerald-600 dark:text-emerald-500" : "text-slate-500 dark:text-slate-400"}>{enabled ? "Enabled" : "Disabled"}</span>;
-                        }
-                      },
-                      {
-                        header: "BPDU Guard", key: "bpduguard_enabled", cell: (r) => {
-                          const enabled = r.bpduguard_enabled;
-                          return <span className={enabled ? "text-emerald-600 dark:text-emerald-500" : "text-slate-500 dark:text-slate-400"}>{enabled ? "Enabled" : "Disabled"}</span>;
-                        }
+                <Table
+                  title="STP Ports"
+                  searchable
+                  searchPlaceholder="Search port name..."
+                  columns={[
+                    { header: "Port", key: "port", cell: (r) => <span className="font-medium text-slate-800 dark:text-slate-200">{r.port}</span> },
+                    {
+                      header: "Role", key: "role", cell: (r) => {
+                        const role = r.role || "—";
+                        const colorClass = role === "Root" ? "text-emerald-600 dark:text-emerald-500" : role === "Designated" ? "text-blue-600 dark:text-blue-500" : role === "Alternate" ? "text-amber-600 dark:text-amber-500" : "";
+                        return <span className={colorClass}>{role}</span>;
                       }
-                    ]}
-                    data={stpData.interfaces}
-                    empty="No STP port information available"
-                    minWidthClass="min-w-[800px]"
-                    containerClassName="h-full"
-                  />
-                </div>
+                    },
+                    {
+                      header: "State", key: "state", cell: (r) => {
+                        const state = r.state || "—";
+                        const colorClass = state === "Forwarding" ? "text-emerald-600 dark:text-emerald-500" : state === "Blocking" ? "text-rose-600 dark:text-rose-500" : state === "Learning" ? "text-amber-600 dark:text-amber-500" : "";
+                        return <span className={colorClass}>{state}</span>;
+                      }
+                    },
+                    { header: "Cost", key: "cost", cell: (r) => r.cost ?? "—" },
+                    {
+                      header: "PortFast", key: "portfast_enabled", cell: (r) => {
+                        const enabled = r.portfast_enabled;
+                        return <span className={enabled ? "text-emerald-600 dark:text-emerald-500" : "text-slate-500 dark:text-slate-400"}>{enabled ? "Enabled" : "Disabled"}</span>;
+                      }
+                    },
+                    {
+                      header: "BPDU Guard", key: "bpduguard_enabled", cell: (r) => {
+                        const enabled = r.bpduguard_enabled;
+                        return <span className={enabled ? "text-emerald-600 dark:text-emerald-500" : "text-slate-500 dark:text-slate-400"}>{enabled ? "Enabled" : "Disabled"}</span>;
+                      }
+                    }
+                  ]}
+                  data={stpData.interfaces}
+                  empty="No STP port information available"
+                  minWidthClass="min-w-[800px]"
+                  containerClassName="h-full"
+                />
               </div>
             )}
 
@@ -4189,44 +4170,44 @@ const DeviceDetailsView = ({ project, deviceId, goBack, goBackHref, goIndex, goI
               <div className="text-sm text-gray-500 dark:text-gray-400 mt-4">No STP port information available</div>
             )}
           </Card>
-        </div>
+        </div >
       )}
 
       {/* ROUTING */}
-      {!loading && !error && tab === "routing" && (
-        <RoutingSection routingData={routingData} />
-      )}
+      {
+        !loading && !error && tab === "routing" && (
+          <RoutingSection routingData={routingData} />
+        )
+      }
 
       {/* NEIGHBORS */}
-      {!loading && !error && tab === "neighbors" && (
-        <div className="grid gap-6">
-          {/* Summary stats */}
-          <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
-            <div className="p-3 rounded-xl border border-slate-300 dark:border-slate-700 bg-slate-50 dark:bg-slate-800/50">
-              <div className="text-xs text-slate-500 dark:text-slate-400">Total Neighbors</div>
-              <div className="text-xl font-semibold text-slate-800 dark:text-slate-200">{neighborsData.length}</div>
-            </div>
-            <div className="p-3 rounded-xl border border-slate-300 dark:border-slate-700 bg-slate-50 dark:bg-slate-800/50">
-              <div className="text-xs text-slate-500 dark:text-slate-400">CDP Neighbors</div>
-              <div className="text-xl font-semibold text-emerald-600 dark:text-emerald-400">{neighborsData.filter(n => n.discovery_protocol === "CDP" || n.protocol === "CDP").length}</div>
-            </div>
-            <div className="p-3 rounded-xl border border-slate-300 dark:border-slate-700 bg-slate-50 dark:bg-slate-800/50">
-              <div className="text-xs text-slate-500 dark:text-slate-400">LLDP Neighbors</div>
-              <div className="text-xl font-semibold text-blue-600 dark:text-blue-400">{neighborsData.filter(n => n.discovery_protocol === "LLDP" || n.protocol === "LLDP").length}</div>
-            </div>
-            <div className="p-3 rounded-xl border border-slate-300 dark:border-slate-700 bg-slate-50 dark:bg-slate-800/50">
-              <div className="text-xs text-slate-500 dark:text-slate-400">Unique Devices</div>
-              <div className="text-xl font-semibold text-slate-800 dark:text-slate-200">{[...new Set(neighborsData.map(n => n.device_name || n.neighbor_device_name))].length}</div>
-            </div>
-          </div>
-
-          {neighborsData.length > 0 ? (
-            <div className="max-h-[70vh] overflow-hidden rounded-2xl border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-900/30 flex flex-col">
-              <div className="flex items-center justify-between gap-2 px-4 py-2.5 border-b border-slate-200 dark:border-slate-700 bg-slate-50/70 dark:bg-slate-800/30">
-                <h3 className="text-sm font-semibold text-slate-800 dark:text-slate-200">Neighbor Discovery</h3>
+      {
+        !loading && !error && tab === "neighbors" && (
+          <div className="grid gap-6">
+            {/* Summary stats */}
+            <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+              <div className="p-3 rounded-xl border border-slate-300 dark:border-slate-700 bg-slate-50 dark:bg-slate-800/50">
+                <div className="text-xs text-slate-500 dark:text-slate-400">Total Neighbors</div>
+                <div className="text-xl font-semibold text-slate-800 dark:text-slate-200">{neighborsData.length}</div>
               </div>
-              <div className="flex-1 min-h-0">
+              <div className="p-3 rounded-xl border border-slate-300 dark:border-slate-700 bg-slate-50 dark:bg-slate-800/50">
+                <div className="text-xs text-slate-500 dark:text-slate-400">CDP Neighbors</div>
+                <div className="text-xl font-semibold text-emerald-600 dark:text-emerald-400">{neighborsData.filter(n => n.discovery_protocol === "CDP" || n.protocol === "CDP").length}</div>
+              </div>
+              <div className="p-3 rounded-xl border border-slate-300 dark:border-slate-700 bg-slate-50 dark:bg-slate-800/50">
+                <div className="text-xs text-slate-500 dark:text-slate-400">LLDP Neighbors</div>
+                <div className="text-xl font-semibold text-blue-600 dark:text-blue-400">{neighborsData.filter(n => n.discovery_protocol === "LLDP" || n.protocol === "LLDP").length}</div>
+              </div>
+              <div className="p-3 rounded-xl border border-slate-300 dark:border-slate-700 bg-slate-50 dark:bg-slate-800/50">
+                <div className="text-xs text-slate-500 dark:text-slate-400">Unique Devices</div>
+                <div className="text-xl font-semibold text-slate-800 dark:text-slate-200">{[...new Set(neighborsData.map(n => n.device_name || n.neighbor_device_name))].length}</div>
+              </div>
+            </div>
+
+            {neighborsData.length > 0 ? (
+              <div className="max-h-[70vh] overflow-hidden rounded-2xl border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-900/30 flex flex-col">
                 <Table
+                  title="Neighbor Discovery"
                   searchable
                   searchPlaceholder="Search device name, IP, port..."
                   columns={[
@@ -4250,59 +4231,57 @@ const DeviceDetailsView = ({ project, deviceId, goBack, goBackHref, goIndex, goI
                   containerClassName="h-full"
                 />
               </div>
-            </div>
-          ) : (
-            <Card title="Neighbor Discovery Table">
-              <div className="p-4 rounded-xl border border-slate-300 dark:border-slate-700 bg-slate-50 dark:bg-slate-800/50">
-                <div className="flex items-center gap-3 mb-3">
-                  <span className="text-2xl">🔗</span>
-                  <span className="text-sm font-medium text-slate-700 dark:text-slate-300">No neighbor information detected</span>
+            ) : (
+              <Card title="Neighbor Discovery Table">
+                <div className="p-4 rounded-xl border border-slate-300 dark:border-slate-700 bg-slate-50 dark:bg-slate-800/50">
+                  <div className="flex items-center gap-3 mb-3">
+                    <span className="text-2xl">🔗</span>
+                    <span className="text-sm font-medium text-slate-700 dark:text-slate-300">No neighbor information detected</span>
+                  </div>
+                  <div className="text-sm text-gray-500 dark:text-gray-400">
+                    <p>No CDP/LLDP neighbors were found. This could be because:</p>
+                    <ul className="list-disc list-inside mt-2 ml-2 text-xs space-y-1">
+                      <li>CDP/LLDP neighbor discovery is not enabled on this device</li>
+                      <li>The uploaded configuration does not include neighbor output</li>
+                      <li>Include "show cdp neighbors detail" or "show lldp neighbors detail" output</li>
+                    </ul>
+                  </div>
                 </div>
-                <div className="text-sm text-gray-500 dark:text-gray-400">
-                  <p>No CDP/LLDP neighbors were found. This could be because:</p>
-                  <ul className="list-disc list-inside mt-2 ml-2 text-xs space-y-1">
-                    <li>CDP/LLDP neighbor discovery is not enabled on this device</li>
-                    <li>The uploaded configuration does not include neighbor output</li>
-                    <li>Include "show cdp neighbors detail" or "show lldp neighbors detail" output</li>
-                  </ul>
-                </div>
-              </div>
-            </Card>
-          )}
-        </div>
-      )}
+              </Card>
+            )}
+          </div>
+        )
+      }
 
       {/* MAC/ARP */}
-      {!loading && !error && tab === "macarp" && (
-        <div className="grid gap-6">
-          {/* Summary stats */}
-          <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
-            <div className="p-3 rounded-xl border border-slate-300 dark:border-slate-700 bg-slate-50 dark:bg-slate-800/50">
-              <div className="text-xs text-slate-500 dark:text-slate-400">Total MAC Entries</div>
-              <div className="text-xl font-semibold text-slate-800 dark:text-slate-200">{macArpData.mac_table?.length || 0}</div>
-            </div>
-            <div className="p-3 rounded-xl border border-slate-300 dark:border-slate-700 bg-slate-50 dark:bg-slate-800/50">
-              <div className="text-xs text-slate-500 dark:text-slate-400">Dynamic MACs</div>
-              <div className="text-xl font-semibold text-blue-600 dark:text-blue-400">{(macArpData.mac_table || []).filter(m => m.type === "DYNAMIC" || m.type === "dynamic").length}</div>
-            </div>
-            <div className="p-3 rounded-xl border border-slate-300 dark:border-slate-700 bg-slate-50 dark:bg-slate-800/50">
-              <div className="text-xs text-slate-500 dark:text-slate-400">ARP Entries</div>
-              <div className="text-xl font-semibold text-emerald-600 dark:text-emerald-400">{macArpData.arp_table?.length || 0}</div>
-            </div>
-            <div className="p-3 rounded-xl border border-slate-300 dark:border-slate-700 bg-slate-50 dark:bg-slate-800/50">
-              <div className="text-xs text-slate-500 dark:text-slate-400">VLANs with MACs</div>
-              <div className="text-xl font-semibold text-slate-800 dark:text-slate-200">{[...new Set((macArpData.mac_table || []).map(m => m.vlan))].length}</div>
-            </div>
-          </div>
-
-          {/* MAC Address Table */}
-          {macArpData.mac_table && macArpData.mac_table.length > 0 ? (
-            <div className="max-h-[55vh] overflow-hidden rounded-2xl border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-900/30 flex flex-col">
-              <div className="flex items-center justify-between gap-2 px-4 py-2.5 border-b border-slate-200 dark:border-slate-700 bg-slate-50/70 dark:bg-slate-800/30">
-                <h3 className="text-sm font-semibold text-slate-800 dark:text-slate-200">MAC Address Table</h3>
+      {
+        !loading && !error && tab === "macarp" && (
+          <div className="grid gap-6">
+            {/* Summary stats */}
+            <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+              <div className="p-3 rounded-xl border border-slate-300 dark:border-slate-700 bg-slate-50 dark:bg-slate-800/50">
+                <div className="text-xs text-slate-500 dark:text-slate-400">Total MAC Entries</div>
+                <div className="text-xl font-semibold text-slate-800 dark:text-slate-200">{macArpData.mac_table?.length || 0}</div>
               </div>
-              <div className="flex-1 min-h-0">
+              <div className="p-3 rounded-xl border border-slate-300 dark:border-slate-700 bg-slate-50 dark:bg-slate-800/50">
+                <div className="text-xs text-slate-500 dark:text-slate-400">Dynamic MACs</div>
+                <div className="text-xl font-semibold text-blue-600 dark:text-blue-400">{(macArpData.mac_table || []).filter(m => m.type === "DYNAMIC" || m.type === "dynamic").length}</div>
+              </div>
+              <div className="p-3 rounded-xl border border-slate-300 dark:border-slate-700 bg-slate-50 dark:bg-slate-800/50">
+                <div className="text-xs text-slate-500 dark:text-slate-400">ARP Entries</div>
+                <div className="text-xl font-semibold text-emerald-600 dark:text-emerald-400">{macArpData.arp_table?.length || 0}</div>
+              </div>
+              <div className="p-3 rounded-xl border border-slate-300 dark:border-slate-700 bg-slate-50 dark:bg-slate-800/50">
+                <div className="text-xs text-slate-500 dark:text-slate-400">VLANs with MACs</div>
+                <div className="text-xl font-semibold text-slate-800 dark:text-slate-200">{[...new Set((macArpData.mac_table || []).map(m => m.vlan))].length}</div>
+              </div>
+            </div>
+
+            {/* MAC Address Table */}
+            {macArpData.mac_table && macArpData.mac_table.length > 0 ? (
+              <div className="max-h-[55vh] overflow-hidden rounded-2xl border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-900/30 flex flex-col">
                 <Table
+                  title="MAC Address Table"
                   searchable
                   searchPlaceholder="Search MAC address, VLAN, port..."
                   columns={[
@@ -4323,25 +4302,21 @@ const DeviceDetailsView = ({ project, deviceId, goBack, goBackHref, goIndex, goI
                   containerClassName="h-full"
                 />
               </div>
-            </div>
-          ) : (
-            <Card title="MAC Address Table">
-              <div className="p-4 rounded-xl border border-slate-300 dark:border-slate-700 bg-slate-50 dark:bg-slate-800/50">
-                <div className="text-sm text-gray-500 dark:text-gray-400">
-                  No MAC address table entries. Include "show mac address-table" output to populate this table.
+            ) : (
+              <Card title="MAC Address Table">
+                <div className="p-4 rounded-xl border border-slate-300 dark:border-slate-700 bg-slate-50 dark:bg-slate-800/50">
+                  <div className="text-sm text-gray-500 dark:text-gray-400">
+                    No MAC address table entries. Include "show mac address-table" output to populate this table.
+                  </div>
                 </div>
-              </div>
-            </Card>
-          )}
+              </Card>
+            )}
 
-          {/* ARP Table */}
-          {macArpData.arp_table && macArpData.arp_table.length > 0 ? (
-            <div className="max-h-[55vh] overflow-hidden rounded-2xl border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-900/30 flex flex-col">
-              <div className="flex items-center justify-between gap-2 px-4 py-2.5 border-b border-slate-200 dark:border-slate-700 bg-slate-50/70 dark:bg-slate-800/30">
-                <h3 className="text-sm font-semibold text-slate-800 dark:text-slate-200">ARP Table</h3>
-              </div>
-              <div className="flex-1 min-h-0">
+            {/* ARP Table */}
+            {macArpData.arp_table && macArpData.arp_table.length > 0 ? (
+              <div className="max-h-[55vh] overflow-hidden rounded-2xl border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-900/30 flex flex-col">
                 <Table
+                  title="ARP Table"
                   searchable
                   searchPlaceholder="Search IP, MAC, interface..."
                   columns={[
@@ -4354,59 +4329,57 @@ const DeviceDetailsView = ({ project, deviceId, goBack, goBackHref, goIndex, goI
                   data={macArpData.arp_table}
                   empty="No ARP table entries"
                   minWidthClass="min-w-[800px]"
-                  containerClassName="h-full"
+                  containerClassName="flex-1"
                 />
               </div>
-            </div>
-          ) : (
-            <Card title="ARP Table">
-              <div className="p-4 rounded-xl border border-slate-300 dark:border-slate-700 bg-slate-50 dark:bg-slate-800/50">
-                <div className="text-sm text-gray-500 dark:text-gray-400">
-                  No ARP table entries. Include "show ip arp" output to populate this table.
+            ) : (
+              <Card title="ARP Table">
+                <div className="p-4 rounded-xl border border-slate-300 dark:border-slate-700 bg-slate-50 dark:bg-slate-800/50">
+                  <div className="text-sm text-gray-500 dark:text-gray-400">
+                    No ARP table entries. Include "show ip arp" output to populate this table.
+                  </div>
                 </div>
-              </div>
-            </Card>
-          )}
-        </div>
-      )}
+              </Card>
+            )}
+          </div>
+        )
+      }
 
       {/* SECURITY */}
-      {!loading && !error && tab === "security" && (
-        <div className="grid gap-6">
-          {/* Security Summary Cards */}
-          <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
-            <div className="p-3 rounded-xl border border-slate-300 dark:border-slate-700 bg-slate-50 dark:bg-slate-800/50">
-              <div className="text-xs text-slate-500 dark:text-slate-400">Local Users</div>
-              <div className="text-xl font-semibold text-slate-800 dark:text-slate-200">{(securityData.users || securityData.user_accounts || []).length}</div>
-            </div>
-            <div className="p-3 rounded-xl border border-slate-300 dark:border-slate-700 bg-slate-50 dark:bg-slate-800/50">
-              <div className="text-xs text-slate-500 dark:text-slate-400">SSH</div>
-              <div className={`text-xl font-semibold ${securityData.ssh?.enabled ? "text-emerald-600 dark:text-emerald-400" : "text-slate-400"}`}>
-                {securityData.ssh?.enabled ? `v${securityData.ssh.version || "2"}` : "Disabled"}
+      {
+        !loading && !error && tab === "security" && (
+          <div className="grid gap-6">
+            {/* Security Summary Cards */}
+            <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+              <div className="p-3 rounded-xl border border-slate-300 dark:border-slate-700 bg-slate-50 dark:bg-slate-800/50">
+                <div className="text-xs text-slate-500 dark:text-slate-400">Local Users</div>
+                <div className="text-xl font-semibold text-slate-800 dark:text-slate-200">{(securityData.users || securityData.user_accounts || []).length}</div>
+              </div>
+              <div className="p-3 rounded-xl border border-slate-300 dark:border-slate-700 bg-slate-50 dark:bg-slate-800/50">
+                <div className="text-xs text-slate-500 dark:text-slate-400">SSH</div>
+                <div className={`text-xl font-semibold ${securityData.ssh?.enabled ? "text-emerald-600 dark:text-emerald-400" : "text-slate-400"}`}>
+                  {securityData.ssh?.enabled ? `v${securityData.ssh.version || "2"}` : "Disabled"}
+                </div>
+              </div>
+              <div className="p-3 rounded-xl border border-slate-300 dark:border-slate-700 bg-slate-50 dark:bg-slate-800/50">
+                <div className="text-xs text-slate-500 dark:text-slate-400">NTP Status</div>
+                <div className={`text-xl font-semibold ${securityData.ntp?.sync_status === "synchronized" ? "text-emerald-600 dark:text-emerald-400" : "text-amber-600 dark:text-amber-400"}`}>
+                  {securityData.ntp?.sync_status || (securityData.ntp?.enabled ? "Enabled" : "—")}
+                </div>
+              </div>
+              <div className="p-3 rounded-xl border border-slate-300 dark:border-slate-700 bg-slate-50 dark:bg-slate-800/50">
+                <div className="text-xs text-slate-500 dark:text-slate-400">Logging</div>
+                <div className={`text-xl font-semibold ${securityData.logging?.enabled ? "text-emerald-600 dark:text-emerald-400" : "text-slate-400"}`}>
+                  {securityData.logging?.enabled ? "Enabled" : "—"}
+                </div>
               </div>
             </div>
-            <div className="p-3 rounded-xl border border-slate-300 dark:border-slate-700 bg-slate-50 dark:bg-slate-800/50">
-              <div className="text-xs text-slate-500 dark:text-slate-400">NTP Status</div>
-              <div className={`text-xl font-semibold ${securityData.ntp?.sync_status === "synchronized" ? "text-emerald-600 dark:text-emerald-400" : "text-amber-600 dark:text-amber-400"}`}>
-                {securityData.ntp?.sync_status || (securityData.ntp?.enabled ? "Enabled" : "—")}
-              </div>
-            </div>
-            <div className="p-3 rounded-xl border border-slate-300 dark:border-slate-700 bg-slate-50 dark:bg-slate-800/50">
-              <div className="text-xs text-slate-500 dark:text-slate-400">Logging</div>
-              <div className={`text-xl font-semibold ${securityData.logging?.enabled ? "text-emerald-600 dark:text-emerald-400" : "text-slate-400"}`}>
-                {securityData.logging?.enabled ? "Enabled" : "—"}
-              </div>
-            </div>
-          </div>
 
-          {/* User Accounts - handle both user_accounts and users structures */}
-          {((securityData.user_accounts && securityData.user_accounts.length > 0) || (securityData.users && securityData.users.length > 0)) && (
-            <div className="max-h-[40vh] overflow-hidden rounded-2xl border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-900/30 flex flex-col">
-              <div className="flex items-center justify-between gap-2 px-4 py-2.5 border-b border-slate-200 dark:border-slate-700 bg-slate-50/70 dark:bg-slate-800/30">
-                <h3 className="text-sm font-semibold text-slate-800 dark:text-slate-200">Local User Accounts</h3>
-              </div>
-              <div className="flex-1 min-h-0">
+            {/* User Accounts - handle both user_accounts and users structures */}
+            {((securityData.user_accounts && securityData.user_accounts.length > 0) || (securityData.users && securityData.users.length > 0)) && (
+              <div className="max-h-[40vh] overflow-hidden rounded-2xl border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-900/30 flex flex-col">
                 <Table
+                  title="Local User Accounts"
                   searchable
                   searchPlaceholder="Search username..."
                   columns={[
@@ -4437,126 +4410,119 @@ const DeviceDetailsView = ({ project, deviceId, goBack, goBackHref, goIndex, goI
                   data={securityData.user_accounts || securityData.users || []}
                   empty="No user accounts"
                   minWidthClass="min-w-[300px]"
-                  containerClassName="h-full"
+                  containerClassName="flex-1"
                 />
               </div>
-            </div>
-          )}
+            )}
 
-          {/* AAA Configuration - only show if has meaningful data */}
-          {securityData.aaa && (securityData.aaa.authentication || securityData.aaa.authorization || securityData.aaa.accounting || (securityData.aaa.protocols && securityData.aaa.protocols.length > 0)) && (
-            <Card title="AAA Configuration">
-              <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3 text-sm">
-                {securityData.aaa.authentication && <Metric k="Authentication" v={securityData.aaa.authentication} />}
-                {securityData.aaa.authorization && <Metric k="Authorization" v={securityData.aaa.authorization} />}
-                {securityData.aaa.accounting && <Metric k="Accounting" v={securityData.aaa.accounting} />}
-                {securityData.aaa.protocols && securityData.aaa.protocols.length > 0 && (
-                  <Metric k="Protocols" v={Array.isArray(securityData.aaa.protocols) ? securityData.aaa.protocols.join(", ") : securityData.aaa.protocols} />
-                )}
-              </div>
-            </Card>
-          )}
-
-          {/* SSH Configuration */}
-          {securityData.ssh && (
-            <Card title="SSH Configuration">
-              <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4 text-sm">
-                <Metric k="Status" v={securityData.ssh.enabled ? <span className="text-emerald-500">Enabled</span> : <span className="text-rose-500">Disabled</span>} />
-                <Metric k="Version" v={securityData.ssh.version || "—"} />
-                <Metric k="Connection Timeout" v={securityData.ssh.connection_timeout ? `${securityData.ssh.connection_timeout}s` : "—"} />
-                <Metric k="Auth Retries" v={securityData.ssh.auth_retries || "—"} />
-              </div>
-            </Card>
-          )}
-
-          {/* SNMP Configuration - only show if enabled or has communities */}
-          {securityData.snmp && (securityData.snmp.enabled || (securityData.snmp.communities && securityData.snmp.communities.length > 0)) && (
-            <Card title="SNMP Configuration">
-              <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3 text-sm mb-4">
-                <Metric k="Status" v={securityData.snmp.enabled ? <span className="text-emerald-500">Enabled</span> : <span className="text-slate-400">Disabled</span>} />
-                <Metric k="Version" v={securityData.snmp.version || "—"} />
-                {securityData.snmp.communities && securityData.snmp.communities.length > 0 && (
-                  <Metric k="Communities" v={securityData.snmp.communities.length} />
-                )}
-              </div>
-              {securityData.snmp.communities && securityData.snmp.communities.length > 0 && (
-                <div>
-                  <h4 className="text-sm font-semibold mb-2 text-slate-700 dark:text-slate-300">SNMP Communities</h4>
-                  <div className="max-h-[25vh] overflow-hidden rounded-xl border border-slate-300 dark:border-[#1F2937] bg-white dark:bg-slate-900/30 flex flex-col">
-                    <div className="flex-1 min-h-0">
-                      <Table
-                        columns={[
-                          { header: "Name", key: "name", cell: (r) => (typeof r === "string" ? r : (r?.name || r?.community || "—")) },
-                          { header: "Group", key: "group", cell: (r) => (typeof r === "object" && r ? (r.group || "—") : "—") },
-                          { header: "Access", key: "access", cell: (r) => (typeof r === "object" && r ? (r.access || r.mode || "—") : "—") },
-                        ]}
-                        data={securityData.snmp.communities}
-                        empty="No SNMP communities"
-                        minWidthClass="min-w-[500px]"
-                        containerClassName="h-full"
-                        showToolbar={false}
-                      />
-                    </div>
-                  </div>
+            {/* AAA Configuration - only show if has meaningful data */}
+            {securityData.aaa && (securityData.aaa.authentication || securityData.aaa.authorization || securityData.aaa.accounting || (securityData.aaa.protocols && securityData.aaa.protocols.length > 0)) && (
+              <Card title="AAA Configuration">
+                <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3 text-sm">
+                  {securityData.aaa.authentication && <Metric k="Authentication" v={securityData.aaa.authentication} />}
+                  {securityData.aaa.authorization && <Metric k="Authorization" v={securityData.aaa.authorization} />}
+                  {securityData.aaa.accounting && <Metric k="Accounting" v={securityData.aaa.accounting} />}
+                  {securityData.aaa.protocols && securityData.aaa.protocols.length > 0 && (
+                    <Metric k="Protocols" v={Array.isArray(securityData.aaa.protocols) ? securityData.aaa.protocols.join(", ") : securityData.aaa.protocols} />
+                  )}
                 </div>
-              )}
-            </Card>
-          )}
+              </Card>
+            )}
 
-          {/* NTP Configuration */}
-          {securityData.ntp && (
-            <Card title="NTP Configuration">
-              <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4 text-sm">
-                <Metric k="Enabled" v={securityData.ntp.enabled ? <span className="text-emerald-500">Yes</span> : "No"} />
-                <Metric k="Sync Status" v={
-                  securityData.ntp.sync_status === "synchronized"
-                    ? <span className="text-emerald-500">Synchronized</span>
-                    : <span className="text-amber-500">{securityData.ntp.sync_status || "Unknown"}</span>
-                } />
-                <Metric k="Stratum" v={securityData.ntp.stratum || "—"} />
-                <Metric k="NTP Servers" v={securityData.ntp.servers?.join(", ") || "—"} />
-              </div>
-            </Card>
-          )}
+            {/* SSH Configuration */}
+            {securityData.ssh && (
+              <Card title="SSH Configuration">
+                <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4 text-sm">
+                  <Metric k="Status" v={securityData.ssh.enabled ? <span className="text-emerald-500">Enabled</span> : <span className="text-rose-500">Disabled</span>} />
+                  <Metric k="Version" v={securityData.ssh.version || "—"} />
+                  <Metric k="Connection Timeout" v={securityData.ssh.connection_timeout ? `${securityData.ssh.connection_timeout}s` : "—"} />
+                  <Metric k="Auth Retries" v={securityData.ssh.auth_retries || "—"} />
+                </div>
+              </Card>
+            )}
 
-          {/* Logging / Syslog Configuration */}
-          {(securityData.logging || securityData.syslog) && (
-            <Card title="Logging Configuration">
-              <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4 text-sm">
-                <Metric k="Enabled" v={(securityData.logging?.enabled || securityData.syslog?.enabled) ? <span className="text-emerald-500">Yes</span> : "No"} />
-                <Metric k="Console Level" v={securityData.logging?.console_level || "—"} />
-                <Metric k="Log Hosts" v={securityData.logging?.log_hosts?.join(", ") || securityData.syslog?.servers?.join(", ") || "None"} />
-                {securityData.logging?.log_buffer && (
-                  <Metric k="Buffer Size" v={securityData.logging.log_buffer.max_size ? `${securityData.logging.log_buffer.max_size} bytes` : "—"} />
+            {/* SNMP Configuration - only show if enabled or has communities */}
+            {securityData.snmp && (securityData.snmp.enabled || (securityData.snmp.communities && securityData.snmp.communities.length > 0)) && (
+              <Card title="SNMP Configuration">
+                <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3 text-sm mb-4">
+                  <Metric k="Status" v={securityData.snmp.enabled ? <span className="text-emerald-500">Enabled</span> : <span className="text-slate-400">Disabled</span>} />
+                  <Metric k="Version" v={securityData.snmp.version || "—"} />
+                  {securityData.snmp.communities && securityData.snmp.communities.length > 0 && (
+                    <Metric k="Communities" v={securityData.snmp.communities.length} />
+                  )}
+                </div>
+                {securityData.snmp.communities && securityData.snmp.communities.length > 0 && (
+                  <Table
+                    title="SNMP Communities"
+                    columns={[
+                      { header: "Name", key: "name", cell: (r) => (typeof r === "string" ? r : (r?.name || r?.community || "—")) },
+                      { header: "Group", key: "group", cell: (r) => (typeof r === "object" && r ? (r.group || "—") : "—") },
+                      { header: "Access", key: "access", cell: (r) => (typeof r === "object" && r ? (r.access || r.mode || "—") : "—") },
+                    ]}
+                    data={securityData.snmp.communities}
+                    empty="No SNMP communities"
+                    minWidthClass="min-w-[500px]"
+                    containerClassName="flex-1"
+                  />
                 )}
-              </div>
-            </Card>
-          )}
+              </Card>
+            )}
 
-          {/* ACLs */}
-          {(securityData.acls && Array.isArray(securityData.acls) && securityData.acls.length > 0) && (
-            <Card title="Access Control Lists (ACLs)">
-              <div className="grid gap-4">
-                {securityData.acls.map((acl, idx) => (
-                  <Card key={idx} title={`ACL ${acl.acl_number || acl.name || `#${idx + 1}`}`} className="border border-slate-300 dark:border-gray-700">
-                    {acl.rules && Array.isArray(acl.rules) && acl.rules.length > 0 ? (
-                      <div className="max-h-[45vh] overflow-hidden rounded-xl border border-slate-300 dark:border-[#1F2937] bg-white dark:bg-slate-900/30 flex flex-col">
-                        <div className="flex items-center justify-between gap-2 px-3 py-2 border-b border-slate-200 dark:border-slate-700 bg-slate-50/70 dark:bg-slate-800/30">
-                          <span className="text-xs font-semibold text-slate-800 dark:text-slate-200">ACL Rules</span>
-                        </div>
-                        <div className="flex-1 min-h-0">
-                          {(() => {
-                            const rules = acl.rules;
-                            const hasStringRules = rules.some(r => typeof r === "string");
-                            const data = hasStringRules
-                              ? rules.map((r, i) => (typeof r === "string" ? { id: i + 1, rule: r } : { id: r.id ?? i + 1, ...r }))
-                              : rules;
-                            const columns = hasStringRules
-                              ? [
+            {/* NTP Configuration */}
+            {
+              securityData.ntp && (
+                <Card title="NTP Configuration">
+                  <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4 text-sm">
+                    <Metric k="Enabled" v={securityData.ntp.enabled ? <span className="text-emerald-500">Yes</span> : "No"} />
+                    <Metric k="Sync Status" v={
+                      securityData.ntp.sync_status === "synchronized"
+                        ? <span className="text-emerald-500">Synchronized</span>
+                        : <span className="text-amber-500">{securityData.ntp.sync_status || "Unknown"}</span>
+                    } />
+                    <Metric k="Stratum" v={securityData.ntp.stratum || "—"} />
+                    <Metric k="NTP Servers" v={securityData.ntp.servers?.join(", ") || "—"} />
+                  </div>
+                </Card>
+              )
+            }
+
+            {/* Logging / Syslog Configuration */}
+            {
+              (securityData.logging || securityData.syslog) && (
+                <Card title="Logging Configuration">
+                  <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4 text-sm">
+                    <Metric k="Enabled" v={(securityData.logging?.enabled || securityData.syslog?.enabled) ? <span className="text-emerald-500">Yes</span> : "No"} />
+                    <Metric k="Console Level" v={securityData.logging?.console_level || "—"} />
+                    <Metric k="Log Hosts" v={securityData.logging?.log_hosts?.join(", ") || securityData.syslog?.servers?.join(", ") || "None"} />
+                    {securityData.logging?.log_buffer && (
+                      <Metric k="Buffer Size" v={securityData.logging.log_buffer.max_size ? `${securityData.logging.log_buffer.max_size} bytes` : "—"} />
+                    )}
+                  </div>
+                </Card>
+              )
+            }
+
+            {/* ACLs */}
+            {
+              (securityData.acls && Array.isArray(securityData.acls) && securityData.acls.length > 0) && (
+                <Card title="Access Control Lists (ACLs)">
+                  <div className="grid gap-4">
+                    {securityData.acls.map((acl, idx) => (
+                      <Card key={idx} title={`ACL ${acl.acl_number || acl.name || `#${idx + 1}`}`} className="border border-slate-300 dark:border-gray-700">
+                        {acl.rules && Array.isArray(acl.rules) && acl.rules.length > 0 ? (
+                          <div className="max-h-[45vh] overflow-hidden rounded-xl border border-slate-300 dark:border-[#1F2937] bg-white dark:bg-slate-900/30 flex flex-col">
+                            {(() => {
+                              const rules = acl.rules;
+                              const hasStringRules = rules.some(r => typeof r === "string");
+                              const data = hasStringRules
+                                ? rules.map((r, i) => (typeof r === "string" ? { id: i + 1, rule: r } : { id: r.id ?? i + 1, ...r }))
+                                : rules;
+                              const columns = hasStringRules
+                                ? [
                                   { header: "Rule ID", key: "id" },
                                   { header: "Rule", key: "rule", cell: (r) => r.rule || "—" },
                                 ]
-                              : [
+                                : [
                                   { header: "Rule ID", key: "id" },
                                   { header: "Action", key: "action", cell: (r) => r.action?.toUpperCase() || "—" },
                                   { header: "Protocol", key: "protocol", cell: (r) => r.protocol || "—" },
@@ -4565,77 +4531,78 @@ const DeviceDetailsView = ({ project, deviceId, goBack, goBackHref, goIndex, goI
                                   { header: "Destination", key: "destination", cell: (r) => r.destination || r.destination_ip || "—" },
                                   { header: "Destination Mask", key: "destination_mask", cell: (r) => r.destination_mask || "—" }
                                 ];
-                            return (
-                              <Table
-                                columns={columns}
-                                data={data}
-                                empty="No rules in this ACL"
-                                minWidthClass={hasStringRules ? "min-w-[700px]" : "min-w-[1200px]"}
-                                containerClassName="h-full"
-                                showToolbar={false}
-                              />
-                            );
-                          })()}
-                        </div>
-                      </div>
-                    ) : (
-                      <div className="text-sm text-gray-500 dark:text-gray-400">No rules defined for this ACL</div>
-                    )}
-                  </Card>
-                ))}
-              </div>
-            </Card>
-          )}
+                              return (
+                                <Table
+                                  title="ACL Rules"
+                                  columns={columns}
+                                  data={data}
+                                  empty="No rules in this ACL"
+                                  minWidthClass={hasStringRules ? "min-w-[700px]" : "min-w-[1200px]"}
+                                  containerClassName="flex-1"
+                                />
+                              );
+                            })()}
+                          </div>
+                        ) : (
+                          <div className="text-sm text-gray-500 dark:text-gray-400">No rules defined for this ACL</div>
+                        )}
+                      </Card>
+                    ))}
+                  </div>
+                </Card>
+              )
+            }
+          </div>
+        )
+      }
 
-          {(!securityData.user_accounts || securityData.user_accounts.length === 0) && (!securityData.users || securityData.users.length === 0) && !securityData.aaa && !securityData.ssh && !securityData.snmp && !securityData.ntp && !securityData.syslog && !(securityData.logging && (securityData.logging.enabled || (securityData.logging.log_hosts && securityData.logging.log_hosts.length))) && (!securityData.acls || securityData.acls.length === 0) && (
-            <Card title="Security">
-              <div className="text-sm text-gray-500 dark:text-gray-400">No security information available</div>
-            </Card>
-          )}
-        </div>
-      )}
+      {
+        !loading && !error && tab === "security" && (!securityData.user_accounts || securityData.user_accounts.length === 0) && (!securityData.users || securityData.users.length === 0) && !securityData.aaa && !securityData.ssh && !securityData.snmp && !securityData.ntp && !securityData.syslog && !(securityData.logging && (securityData.logging.enabled || (securityData.logging.log_hosts && securityData.logging.log_hosts.length))) && (!securityData.acls || securityData.acls.length === 0) && (
+          <Card title="Security">
+            <div className="text-sm text-gray-500 dark:text-gray-400">No security information available</div>
+          </Card>
+        )
+      }
 
       {/* HA */}
-      {!loading && !error && tab === "ha" && (
-        <div className="grid gap-6">
-          {/* HA Summary */}
-          {(() => {
-            const etherchannelCount = (haData.etherchannel?.length || 0) + (haData.port_channels?.length || 0) + (haData.etherchannels?.length || 0);
-            const hsrpCount = (Array.isArray(haData.hsrp) ? haData.hsrp : (haData.hsrp?.groups || [])).length;
-            const vrrpCount = (Array.isArray(haData.vrrp) ? haData.vrrp : (haData.vrrp?.groups || [])).length;
+      {
+        !loading && !error && tab === "ha" && (
+          <div className="grid gap-6">
+            {/* HA Summary */}
+            {(() => {
+              const etherchannelCount = (haData.etherchannel?.length || 0) + (haData.port_channels?.length || 0) + (haData.etherchannels?.length || 0);
+              const hsrpCount = (Array.isArray(haData.hsrp) ? haData.hsrp : (haData.hsrp?.groups || [])).length;
+              const vrrpCount = (Array.isArray(haData.vrrp) ? haData.vrrp : (haData.vrrp?.groups || [])).length;
 
-            return (
-              <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
-                <div className="p-3 rounded-xl border border-slate-300 dark:border-slate-700 bg-slate-50 dark:bg-slate-800/50">
-                  <div className="text-xs text-slate-500 dark:text-slate-400">EtherChannel/LAG</div>
-                  <div className={`text-xl font-semibold ${etherchannelCount > 0 ? "text-blue-600 dark:text-blue-400" : "text-slate-400"}`}>{etherchannelCount}</div>
+              return (
+                <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+                  <div className="p-3 rounded-xl border border-slate-300 dark:border-slate-700 bg-slate-50 dark:bg-slate-800/50">
+                    <div className="text-xs text-slate-500 dark:text-slate-400">EtherChannel/LAG</div>
+                    <div className={`text-xl font-semibold ${etherchannelCount > 0 ? "text-blue-600 dark:text-blue-400" : "text-slate-400"}`}>{etherchannelCount}</div>
+                  </div>
+                  <div className="p-3 rounded-xl border border-slate-300 dark:border-slate-700 bg-slate-50 dark:bg-slate-800/50">
+                    <div className="text-xs text-slate-500 dark:text-slate-400">HSRP Groups</div>
+                    <div className={`text-xl font-semibold ${hsrpCount > 0 ? "text-emerald-600 dark:text-emerald-400" : "text-slate-400"}`}>{hsrpCount}</div>
+                  </div>
+                  <div className="p-3 rounded-xl border border-slate-300 dark:border-slate-700 bg-slate-50 dark:bg-slate-800/50">
+                    <div className="text-xs text-slate-500 dark:text-slate-400">VRRP Groups</div>
+                    <div className={`text-xl font-semibold ${vrrpCount > 0 ? "text-amber-600 dark:text-amber-400" : "text-slate-400"}`}>{vrrpCount}</div>
+                  </div>
+                  <div className="p-3 rounded-xl border border-slate-300 dark:border-slate-700 bg-slate-50 dark:bg-slate-800/50">
+                    <div className="text-xs text-slate-500 dark:text-slate-400">Total HA Features</div>
+                    <div className="text-xl font-semibold text-slate-800 dark:text-slate-200">{etherchannelCount + hsrpCount + vrrpCount}</div>
+                  </div>
                 </div>
-                <div className="p-3 rounded-xl border border-slate-300 dark:border-slate-700 bg-slate-50 dark:bg-slate-800/50">
-                  <div className="text-xs text-slate-500 dark:text-slate-400">HSRP Groups</div>
-                  <div className={`text-xl font-semibold ${hsrpCount > 0 ? "text-emerald-600 dark:text-emerald-400" : "text-slate-400"}`}>{hsrpCount}</div>
-                </div>
-                <div className="p-3 rounded-xl border border-slate-300 dark:border-slate-700 bg-slate-50 dark:bg-slate-800/50">
-                  <div className="text-xs text-slate-500 dark:text-slate-400">VRRP Groups</div>
-                  <div className={`text-xl font-semibold ${vrrpCount > 0 ? "text-amber-600 dark:text-amber-400" : "text-slate-400"}`}>{vrrpCount}</div>
-                </div>
-                <div className="p-3 rounded-xl border border-slate-300 dark:border-slate-700 bg-slate-50 dark:bg-slate-800/50">
-                  <div className="text-xs text-slate-500 dark:text-slate-400">Total HA Features</div>
-                  <div className="text-xl font-semibold text-slate-800 dark:text-slate-200">{etherchannelCount + hsrpCount + vrrpCount}</div>
-                </div>
-              </div>
-            );
-          })()}
+              );
+            })()}
 
-          {/* EtherChannel / Port-Channel: support multiple field names */}
-          {(() => {
-            const ethChannels = haData.etherchannel?.length ? haData.etherchannel : (haData.etherchannels?.length ? haData.etherchannels : (haData.port_channels || []));
-            return ethChannels.length > 0 ? (
-              <div className="max-h-[55vh] overflow-hidden rounded-2xl border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-900/30 flex flex-col">
-                <div className="px-4 pt-3 pb-1 flex items-center justify-between">
-                  <h3 className="text-sm font-semibold text-slate-800 dark:text-slate-200">EtherChannel / Port-Channel</h3>
-                </div>
-                <div className="flex-1 min-h-0">
+            {/* EtherChannel / Port-Channel: support multiple field names */}
+            {(() => {
+              const ethChannels = haData.etherchannel?.length ? haData.etherchannel : (haData.etherchannels?.length ? haData.etherchannels : (haData.port_channels || []));
+              return ethChannels.length > 0 ? (
+                <div className="max-h-[55vh] overflow-hidden rounded-2xl border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-900/30 flex flex-col">
                   <Table
+                    title="EtherChannel / Port-Channel"
                     searchable
                     searchPlaceholder="Search port-channel, protocol..."
                     columns={[
@@ -4665,24 +4632,19 @@ const DeviceDetailsView = ({ project, deviceId, goBack, goBackHref, goIndex, goI
                       status: p.status || p.state
                     }))}
                     empty="No Port-Channel information"
-                    minWidthClass="min-w-[800px]"
-                    containerClassName="h-full"
+                    containerClassName="flex-1"
                   />
                 </div>
-              </div>
-            ) : null;
-          })()}
+              ) : null;
+            })()}
 
-          {/* HSRP */}
-          {(() => {
-            const hsrpList = Array.isArray(haData.hsrp) ? haData.hsrp : (haData.hsrp?.groups || []);
-            return hsrpList.length > 0 ? (
-              <div className="max-h-[55vh] overflow-hidden rounded-2xl border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-900/30 flex flex-col">
-                <div className="px-4 pt-3 pb-1 flex items-center justify-between">
-                  <h3 className="text-sm font-semibold text-slate-800 dark:text-slate-200">HSRP Groups</h3>
-                </div>
-                <div className="flex-1 min-h-0">
+            {/* HSRP */}
+            {(() => {
+              const hsrpList = Array.isArray(haData.hsrp) ? haData.hsrp : (haData.hsrp?.groups || []);
+              return hsrpList.length > 0 ? (
+                <div className="max-h-[55vh] overflow-hidden rounded-2xl border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-900/30 flex flex-col">
                   <Table
+                    title="HSRP Groups"
                     searchable
                     searchPlaceholder="Search interface, virtual IP..."
                     columns={[
@@ -4702,23 +4664,20 @@ const DeviceDetailsView = ({ project, deviceId, goBack, goBackHref, goIndex, goI
                     data={hsrpList}
                     empty="No HSRP groups"
                     minWidthClass="min-w-[800px]"
-                    containerClassName="h-full"
+                    containerClassName="flex-1"
                   />
                 </div>
-              </div>
-            ) : null;
-          })()}
+              ) : null;
+            })()
+            }
 
-          {/* VRRP */}
-          {(() => {
-            const vrrpList = Array.isArray(haData.vrrp) ? haData.vrrp : (haData.vrrp?.groups || []);
-            return vrrpList.length > 0 ? (
-              <div className="max-h-[55vh] overflow-hidden rounded-2xl border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-900/30 flex flex-col">
-                <div className="px-4 pt-3 pb-1 flex items-center justify-between">
-                  <h3 className="text-sm font-semibold text-slate-800 dark:text-slate-200">VRRP Groups</h3>
-                </div>
-                <div className="flex-1 min-h-0">
+            {/* VRRP */}
+            {(() => {
+              const vrrpList = Array.isArray(haData.vrrp) ? haData.vrrp : (haData.vrrp?.groups || []);
+              return vrrpList.length > 0 ? (
+                <div className="max-h-[55vh] overflow-hidden rounded-2xl border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-900/30 flex flex-col">
                   <Table
+                    title="VRRP Groups"
                     searchable
                     searchPlaceholder="Search interface, virtual IP..."
                     columns={[
@@ -4738,163 +4697,164 @@ const DeviceDetailsView = ({ project, deviceId, goBack, goBackHref, goIndex, goI
                     data={vrrpList}
                     empty="No VRRP groups"
                     minWidthClass="min-w-[800px]"
-                    containerClassName="h-full"
+                    containerClassName="flex-1"
                   />
                 </div>
-              </div>
-            ) : null;
-          })()}
-
-          {/* No HA data message */}
-          {(() => {
-            const etherchannelCount = (haData.etherchannel?.length || 0) + (haData.port_channels?.length || 0) + (haData.etherchannels?.length || 0);
-            const hsrpCount = (Array.isArray(haData.hsrp) ? haData.hsrp : (haData.hsrp?.groups || [])).length;
-            const vrrpCount = (Array.isArray(haData.vrrp) ? haData.vrrp : (haData.vrrp?.groups || [])).length;
-
-            if (etherchannelCount === 0 && hsrpCount === 0 && vrrpCount === 0) {
-              return (
-                <Card title="High Availability">
-                  <div className="p-4 rounded-xl border border-slate-300 dark:border-slate-700 bg-slate-50 dark:bg-slate-800/50">
-                    <div className="flex items-center gap-3 mb-3">
-                      <span className="text-2xl">🔄</span>
-                      <span className="text-sm font-medium text-slate-700 dark:text-slate-300">No High Availability features configured</span>
-                    </div>
-                    <div className="text-sm text-gray-500 dark:text-gray-400 space-y-1">
-                      <p>This device does not have HA features configured. Common HA features include:</p>
-                      <ul className="list-disc list-inside mt-2 ml-2 text-xs">
-                        <li><strong>EtherChannel/Port-Channel/LAG:</strong> Link aggregation for redundancy</li>
-                        <li><strong>HSRP:</strong> Hot Standby Router Protocol for gateway redundancy</li>
-                        <li><strong>VRRP:</strong> Virtual Router Redundancy Protocol</li>
-                      </ul>
-                      <p className="mt-2 text-xs">Include "show etherchannel summary", "show standby brief", or "show vrrp brief" output to view HA information.</p>
-                    </div>
-                  </div>
-                </Card>
-              );
+              ) : null;
+            })()
             }
-            return null;
-          })()}
-        </div>
-      )}
+
+            {/* No HA data message */}
+            {(() => {
+              const etherchannelCount = (haData.etherchannel?.length || 0) + (haData.port_channels?.length || 0) + (haData.etherchannels?.length || 0);
+              const hsrpCount = (Array.isArray(haData.hsrp) ? haData.hsrp : (haData.hsrp?.groups || [])).length;
+              const vrrpCount = (Array.isArray(haData.vrrp) ? haData.vrrp : (haData.vrrp?.groups || [])).length;
+
+              if (etherchannelCount === 0 && hsrpCount === 0 && vrrpCount === 0) {
+                return (
+                  <Card title="High Availability" className="border border-slate-300 dark:border-gray-700">
+                    <div className="p-4 rounded-xl border border-slate-300 dark:border-slate-700 bg-slate-50 dark:bg-slate-800/50">
+                      <div className="flex items-center gap-3 mb-3">
+                        <span className="text-2xl">🔄</span>
+                        <span className="text-sm font-medium text-slate-700 dark:text-slate-300">No High Availability features configured</span>
+                      </div>
+                      <div className="text-sm text-gray-500 dark:text-gray-400 space-y-1">
+                        <p>This device does not have HA features configured. Common HA features include:</p>
+                        <ul className="list-disc list-inside mt-2 ml-2 text-xs">
+                          <li><strong>EtherChannel/Port-Channel/LAG:</strong> Link aggregation for redundancy</li>
+                          <li><strong>HSRP:</strong> Hot Standby Router Protocol for gateway redundancy</li>
+                          <li><strong>VRRP:</strong> Virtual Router Redundancy Protocol</li>
+                        </ul>
+                        <p className="mt-2 text-xs">Include "show etherchannel summary", "show standby brief", or "show vrrp brief" output to view HA information.</p>
+                      </div>
+                    </div>
+                  </Card>
+                );
+              }
+              return null;
+            })()}
+          </div>
+        )
+      }
 
       {/* RAW */}
-      {!loading && !error && tab === "raw" && (
-        <div className="grid gap-6">
-          {/* Tabs for Raw view */}
-          <div className="flex gap-2 flex-wrap">
-            {[
-              { id: "original", label: "Original File Content" },
-              { id: "parsed", label: "Parsed Data (JSON)" }
-            ].map((t) => (
-              <button
-                key={t.id}
-                onClick={() => setRawSubTab(t.id)}
-                className={`px-4 py-2 rounded-xl text-sm font-semibold border transition-all ${rawSubTab === t.id
-                  ? "bg-white/90 dark:bg-white/10 backdrop-blur-sm border-slate-300/80 dark:border-slate-600/80 text-slate-800 dark:text-slate-100 shadow-sm"
-                  : "bg-slate-100/80 dark:bg-slate-800/50 border-slate-300 dark:border-slate-700/60 text-slate-600 dark:text-slate-400 hover:bg-slate-200/80 dark:hover:bg-slate-700/50"
-                  }`}
+      {
+        !loading && !error && tab === "raw" && (
+          <div className="grid gap-6">
+            {/* Tabs for Raw view */}
+            <div className="flex gap-2 flex-wrap">
+              {[
+                { id: "original", label: "Original File Content" },
+                { id: "parsed", label: "Parsed Data (JSON)" }
+              ].map((t) => (
+                <button
+                  key={t.id}
+                  onClick={() => setRawSubTab(t.id)}
+                  className={`px-4 py-2 rounded-xl text-sm font-semibold border transition-all ${rawSubTab === t.id
+                    ? "bg-white/90 dark:bg-white/10 backdrop-blur-sm border-slate-300/80 dark:border-slate-600/80 text-slate-800 dark:text-slate-100 shadow-sm"
+                    : "bg-slate-100/80 dark:bg-slate-800/50 border-slate-300 dark:border-slate-700/60 text-slate-600 dark:text-slate-400 hover:bg-slate-200/80 dark:hover:bg-slate-700/50"
+                    }`}
+                >
+                  {t.label}
+                </button>
+              ))}
+            </div>
+
+            {/* Parsed Data (JSON) */}
+            {rawSubTab === "parsed" && (
+              <Card
+                title="Parsed Data from Database (JSON Structure)"
+                actions={
+                  <button
+                    onClick={() => {
+                      // Create download link for JSON
+                      if (!deviceData) {
+                        alert('No data available to download');
+                        return;
+                      }
+                      const jsonContent = JSON.stringify(deviceData, null, 2);
+                      const blob = new Blob([jsonContent], { type: 'application/json' });
+                      const url = URL.createObjectURL(blob);
+                      const a = document.createElement('a');
+                      a.href = url;
+                      const deviceName = deviceData.device_name || deviceId || 'config';
+                      a.download = `${deviceName}_parsed.json`;
+                      document.body.appendChild(a);
+                      a.click();
+                      document.body.removeChild(a);
+                      URL.revokeObjectURL(url);
+                    }}
+                    disabled={!deviceData}
+                    className="inline-flex items-center gap-2 px-3 py-1.5 text-xs font-semibold rounded-xl bg-white/90 dark:bg-white/10 backdrop-blur-sm border border-slate-300/80 dark:border-slate-600/80 text-slate-800 dark:text-slate-100 shadow-sm hover:bg-white dark:hover:bg-white/15 transition focus:outline-none focus:ring-2 focus:ring-slate-400 dark:focus:ring-slate-500 disabled:opacity-50 disabled:cursor-not-allowed"
+                    title="Download as JSON file"
+                  >
+                    <span>⬇</span>
+                    <span>Download JSON</span>
+                  </button>
+                }
               >
-                {t.label}
-              </button>
-            ))}
+                <div className="rounded-xl border border-slate-300 dark:border-[#1F2937] p-3 bg-gray-50 dark:bg-[#0F172A] text-sm overflow-auto max-h-[70vh]">
+                  {deviceData ? (
+                    <pre className="whitespace-pre-wrap">{JSON.stringify(deviceData, null, 2)}</pre>
+                  ) : (
+                    <div className="text-sm text-gray-500 dark:text-gray-400">No parsed data available</div>
+                  )}
+                </div>
+              </Card>
+            )}
+
+            {/* Original File Content */}
+            {rawSubTab === "original" && (
+              <Card
+                title="Original File Content"
+                actions={
+                  <button
+                    onClick={() => {
+                      // Create download link
+                      const content = deviceData?.original_content || '';
+                      if (!content) {
+                        alert('No content available to download');
+                        return;
+                      }
+                      const blob = new Blob([content], { type: 'text/plain' });
+                      const url = URL.createObjectURL(blob);
+                      const a = document.createElement('a');
+                      a.href = url;
+                      const deviceName = deviceData?.device_name || deviceId || 'config';
+                      a.download = `${deviceName}_original.txt`;
+                      document.body.appendChild(a);
+                      a.click();
+                      document.body.removeChild(a);
+                      URL.revokeObjectURL(url);
+                    }}
+                    disabled={!deviceData?.original_content}
+                    className="inline-flex items-center gap-2 px-3 py-1.5 text-xs font-semibold rounded-xl bg-white/90 dark:bg-white/10 backdrop-blur-sm border border-slate-300/80 dark:border-slate-600/80 text-slate-800 dark:text-slate-100 shadow-sm hover:bg-white dark:hover:bg-white/15 transition focus:outline-none focus:ring-2 focus:ring-slate-400 dark:focus:ring-slate-500 disabled:opacity-50 disabled:cursor-not-allowed"
+                    title="Download as TXT file"
+                  >
+                    <span>⬇</span>
+                    <span>Download TXT</span>
+                  </button>
+                }
+              >
+                <div className="rounded-xl border border-slate-300 dark:border-[#1F2937] p-3 bg-gray-50 dark:bg-[#0F172A] text-sm overflow-auto max-h-[70vh]">
+                  {deviceData?.original_content ? (
+                    <pre className="whitespace-pre-wrap">{deviceData.original_content}</pre>
+                  ) : (
+                    <div className="text-sm text-gray-500 dark:text-gray-400">
+                      Original file content not available. This may be because:
+                      <ul className="list-disc list-inside mt-2 ml-4">
+                        <li>The file was not uploaded with the configuration</li>
+                        <li>The original content was not stored in the database</li>
+                        <li>Please re-upload the configuration file</li>
+                      </ul>
+                    </div>
+                  )}
+                </div>
+              </Card>
+            )}
           </div>
-
-          {/* Parsed Data (JSON) */}
-          {rawSubTab === "parsed" && (
-            <Card
-              title="Parsed Data from Database (JSON Structure)"
-              actions={
-                <button
-                  onClick={() => {
-                    // Create download link for JSON
-                    if (!deviceData) {
-                      alert('No data available to download');
-                      return;
-                    }
-                    const jsonContent = JSON.stringify(deviceData, null, 2);
-                    const blob = new Blob([jsonContent], { type: 'application/json' });
-                    const url = URL.createObjectURL(blob);
-                    const a = document.createElement('a');
-                    a.href = url;
-                    const deviceName = deviceData.device_name || deviceId || 'config';
-                    a.download = `${deviceName}_parsed.json`;
-                    document.body.appendChild(a);
-                    a.click();
-                    document.body.removeChild(a);
-                    URL.revokeObjectURL(url);
-                  }}
-                  disabled={!deviceData}
-                  className="inline-flex items-center gap-2 px-3 py-1.5 text-xs font-semibold rounded-xl bg-white/90 dark:bg-white/10 backdrop-blur-sm border border-slate-300/80 dark:border-slate-600/80 text-slate-800 dark:text-slate-100 shadow-sm hover:bg-white dark:hover:bg-white/15 transition focus:outline-none focus:ring-2 focus:ring-slate-400 dark:focus:ring-slate-500 disabled:opacity-50 disabled:cursor-not-allowed"
-                  title="Download as JSON file"
-                >
-                  <span>⬇</span>
-                  <span>Download JSON</span>
-                </button>
-              }
-            >
-              <div className="rounded-xl border border-slate-300 dark:border-[#1F2937] p-3 bg-gray-50 dark:bg-[#0F172A] text-sm overflow-auto max-h-[70vh]">
-                {deviceData ? (
-                  <pre className="whitespace-pre-wrap">{JSON.stringify(deviceData, null, 2)}</pre>
-                ) : (
-                  <div className="text-sm text-gray-500 dark:text-gray-400">No parsed data available</div>
-                )}
-              </div>
-            </Card>
-          )}
-
-          {/* Original File Content */}
-          {rawSubTab === "original" && (
-            <Card
-              title="Original File Content"
-              actions={
-                <button
-                  onClick={() => {
-                    // Create download link
-                    const content = deviceData?.original_content || '';
-                    if (!content) {
-                      alert('No content available to download');
-                      return;
-                    }
-                    const blob = new Blob([content], { type: 'text/plain' });
-                    const url = URL.createObjectURL(blob);
-                    const a = document.createElement('a');
-                    a.href = url;
-                    const deviceName = deviceData?.device_name || deviceId || 'config';
-                    a.download = `${deviceName}_original.txt`;
-                    document.body.appendChild(a);
-                    a.click();
-                    document.body.removeChild(a);
-                    URL.revokeObjectURL(url);
-                  }}
-                  disabled={!deviceData?.original_content}
-                  className="inline-flex items-center gap-2 px-3 py-1.5 text-xs font-semibold rounded-xl bg-white/90 dark:bg-white/10 backdrop-blur-sm border border-slate-300/80 dark:border-slate-600/80 text-slate-800 dark:text-slate-100 shadow-sm hover:bg-white dark:hover:bg-white/15 transition focus:outline-none focus:ring-2 focus:ring-slate-400 dark:focus:ring-slate-500 disabled:opacity-50 disabled:cursor-not-allowed"
-                  title="Download as TXT file"
-                >
-                  <span>⬇</span>
-                  <span>Download TXT</span>
-                </button>
-              }
-            >
-              <div className="rounded-xl border border-slate-300 dark:border-[#1F2937] p-3 bg-gray-50 dark:bg-[#0F172A] text-sm overflow-auto max-h-[70vh]">
-                {deviceData?.original_content ? (
-                  <pre className="whitespace-pre-wrap">{deviceData.original_content}</pre>
-                ) : (
-                  <div className="text-sm text-gray-500 dark:text-gray-400">
-                    Original file content not available. This may be because:
-                    <ul className="list-disc list-inside mt-2 ml-4">
-                      <li>The file was not uploaded with the configuration</li>
-                      <li>The original content was not stored in the database</li>
-                      <li>Please re-upload the configuration file</li>
-                    </ul>
-                  </div>
-                )}
-              </div>
-            </Card>
-          )}
-        </div>
-      )}
-
-      
+        )
+      }
     </div>
   );
 };
@@ -8215,7 +8175,7 @@ const DocumentsPage = ({ project, can, authedUser, uploadHistory, setUploadHisto
               }
             }
           }
-          return false;
+          return null;
         }
       } else {
         // Add to root (parentId === null)
@@ -9114,6 +9074,8 @@ const DocumentsPage = ({ project, can, authedUser, uploadHistory, setUploadHisto
                   </div>
                 ) : (
                   <Table
+                    title="Version History"
+                    searchable
                     columns={[
                       { header: "Version", key: "version", cell: (v) => `${v.displayVersion || `v${v.version}`} ${v.is_latest_display ? '(Latest)' : ''}` },
                       { header: "Filename", key: "filename", cell: (v) => safeDisplay(v.filename) },
@@ -10029,24 +9991,16 @@ const LogsPage = ({ project, uploadHistory }) => {
           <Button variant="secondary" onClick={exportCSV}>Export CSV</Button>
         </div>
       </div>
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-2">
-        <Input
-          placeholder="Search (filename, user, description...)"
-          value={searchLog}
-          onChange={(e) => setSearchLog(e.target.value)}
-        />
-        <Select
-          value={filterLogWho}
-          onChange={setFilterLogWho}
-          options={[{ value: "all", label: "All (Responsible User)" }, ...uniqueLogWhos.map(w => ({ value: w, label: w }))]}
-        />
-        <Select
-          value={filterLogWhat}
-          onChange={setFilterLogWhat}
-          options={[{ value: "all", label: "All (Activity Type)" }, ...uniqueLogWhats.map(w => ({ value: w, label: w }))]}
-        />
-      </div>
       <Table
+        title="Activity Log"
+        searchable
+        searchPlaceholder="Search (filename, user, description...)"
+        searchValue={searchLog}
+        onSearchChange={setSearchLog}
+        globalFilters={[
+          { key: 'who', label: 'Responsible User' },
+          { key: 'what', label: 'Activity Type' }
+        ]}
         columns={[
           { header: "Time", key: "time" },
           { header: "Name", key: "files" },

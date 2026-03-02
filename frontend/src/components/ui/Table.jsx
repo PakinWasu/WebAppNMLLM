@@ -14,7 +14,7 @@ const SortIcon = ({ direction }) => (
 const HeaderFilterDropdown = ({ column, data, filterValue, onFilterChange, onClose, position = "left" }) => {
   const dropdownRef = useRef(null);
   const [searchTerm, setSearchTerm] = useState("");
-  
+
   // Get unique values for this column
   const uniqueValues = useMemo(() => {
     const values = new Set();
@@ -65,7 +65,7 @@ const HeaderFilterDropdown = ({ column, data, filterValue, onFilterChange, onClo
   const positionClass = position === "right" ? "right-0" : "left-0";
 
   return (
-    <div 
+    <div
       ref={dropdownRef}
       className={`absolute top-full ${positionClass} mt-1 z-50 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-lg shadow-xl min-w-[200px] max-w-[280px]`}
       onClick={(e) => e.stopPropagation()}
@@ -84,16 +84,15 @@ const HeaderFilterDropdown = ({ column, data, filterValue, onFilterChange, onClo
           />
         </div>
       </div>
-      
+
       {/* Options list */}
       <div className="max-h-[200px] overflow-y-auto">
         <button
           onClick={() => { onFilterChange(null); onClose(); }}
-          className={`w-full px-3 py-2 text-left text-xs hover:bg-slate-100 dark:hover:bg-slate-800 flex items-center gap-2 transition-colors ${
-            !filterValue 
-              ? 'text-sky-700 bg-sky-100 dark:text-sky-400 dark:bg-sky-800/50' 
+          className={`w-full px-3 py-2 text-left text-xs hover:bg-slate-100 dark:hover:bg-slate-800 flex items-center gap-2 transition-colors ${!filterValue
+              ? 'text-sky-700 bg-sky-100 dark:text-sky-400 dark:bg-sky-800/50'
               : 'text-slate-700 dark:text-slate-300'
-          }`}
+            }`}
         >
           <span className="w-4 flex justify-center">{!filterValue && "✓"}</span>
           <span>All</span>
@@ -102,11 +101,10 @@ const HeaderFilterDropdown = ({ column, data, filterValue, onFilterChange, onClo
           <button
             key={i}
             onClick={() => { onFilterChange(val); onClose(); }}
-            className={`w-full px-3 py-2 text-left text-xs hover:bg-slate-100 dark:hover:bg-slate-800 flex items-center gap-2 truncate transition-colors ${
-              filterValue === val 
-                ? 'text-sky-700 bg-sky-100 dark:text-sky-400 dark:bg-sky-800/50' 
+            className={`w-full px-3 py-2 text-left text-xs hover:bg-slate-100 dark:hover:bg-slate-800 flex items-center gap-2 truncate transition-colors ${filterValue === val
+                ? 'text-sky-700 bg-sky-100 dark:text-sky-400 dark:bg-sky-800/50'
                 : 'text-slate-700 dark:text-slate-300'
-            }`}
+              }`}
           >
             <span className="w-4 flex justify-center">{filterValue === val && "✓"}</span>
             <span className="truncate">{val}</span>
@@ -121,11 +119,11 @@ const HeaderFilterDropdown = ({ column, data, filterValue, onFilterChange, onClo
 };
 
 // Global filter dropdown (for top bar)
-const GlobalFilterDropdown = ({ 
-  label, 
-  column, 
-  data, 
-  filterValue, 
+const GlobalFilterDropdown = ({
+  label,
+  column,
+  data,
+  filterValue,
   onFilterChange,
   columns
 }) => {
@@ -134,7 +132,7 @@ const GlobalFilterDropdown = ({
   const [searchTerm, setSearchTerm] = useState("");
 
   const col = columns.find(c => c.key === column);
-  
+
   const uniqueValues = useMemo(() => {
     if (!col) return [];
     const values = new Set();
@@ -189,16 +187,15 @@ const GlobalFilterDropdown = ({
     <div className="relative" ref={dropdownRef}>
       <button
         onClick={() => setIsOpen(!isOpen)}
-        className={`flex items-center gap-2 px-3 py-2 text-xs rounded-lg border transition-colors min-w-[140px] justify-between ${
-          filterValue 
-            ? 'bg-sky-100 border-sky-300 text-sky-700 dark:bg-sky-900/30 dark:border-sky-600 dark:text-sky-400' 
+        className={`flex items-center gap-2 px-3 py-2 text-xs rounded-lg border transition-colors min-w-[140px] justify-between ${filterValue
+            ? 'bg-sky-100 border-sky-300 text-sky-700 dark:bg-sky-900/30 dark:border-sky-600 dark:text-sky-400'
             : 'bg-white border-slate-300 text-slate-700 hover:bg-slate-50 hover:border-slate-400 dark:bg-slate-800 dark:border-slate-600 dark:text-slate-300 dark:hover:bg-slate-700 dark:hover:border-slate-500'
-        }`}
+          }`}
       >
         <span className="truncate max-w-[150px]">{displayValue}</span>
         <ChevronDown className={`w-3.5 h-3.5 transition-transform ${isOpen ? 'rotate-180' : ''}`} />
       </button>
-      
+
       {isOpen && (
         <div className="absolute top-full left-0 mt-1 z-50 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-lg shadow-xl min-w-[200px] max-w-[280px]">
           <div className="p-2 border-b border-slate-700">
@@ -217,11 +214,10 @@ const GlobalFilterDropdown = ({
           <div className="max-h-[200px] overflow-y-auto">
             <button
               onClick={() => { onFilterChange(null); setIsOpen(false); setSearchTerm(""); }}
-              className={`w-full px-3 py-2 text-left text-xs hover:bg-slate-100 dark:hover:bg-slate-800 flex items-center gap-2 transition-colors ${
-                !filterValue 
-                  ? 'text-sky-700 bg-sky-100 dark:text-sky-400 dark:bg-sky-800/50' 
+              className={`w-full px-3 py-2 text-left text-xs hover:bg-slate-100 dark:hover:bg-slate-800 flex items-center gap-2 transition-colors ${!filterValue
+                  ? 'text-sky-700 bg-sky-100 dark:text-sky-400 dark:bg-sky-800/50'
                   : 'text-slate-700 dark:text-slate-300'
-              }`}
+                }`}
             >
               <span className="w-4 flex justify-center">{!filterValue && "✓"}</span>
               <span>All ({label})</span>
@@ -230,11 +226,10 @@ const GlobalFilterDropdown = ({
               <button
                 key={i}
                 onClick={() => { onFilterChange(val); setIsOpen(false); setSearchTerm(""); }}
-                className={`w-full px-3 py-2 text-left text-xs hover:bg-slate-100 dark:hover:bg-slate-800 flex items-center gap-2 truncate transition-colors ${
-                  filterValue === val 
-                    ? 'text-sky-700 bg-sky-100 dark:text-sky-400 dark:bg-sky-800/50' 
+                className={`w-full px-3 py-2 text-left text-xs hover:bg-slate-100 dark:hover:bg-slate-800 flex items-center gap-2 truncate transition-colors ${filterValue === val
+                    ? 'text-sky-700 bg-sky-100 dark:text-sky-400 dark:bg-sky-800/50'
                     : 'text-slate-700 dark:text-slate-300'
-                }`}
+                  }`}
               >
                 <span className="w-4 flex justify-center">{filterValue === val && "✓"}</span>
                 <span className="truncate">{val}</span>
@@ -289,8 +284,8 @@ export default function Table({
   const headerAtLeastXs = headerTextSize === "text-[10px]" ? "text-xs" : headerTextSize;
 
   // Determine if we should show the toolbar
-  const shouldShowToolbar = showToolbar !== null 
-    ? showToolbar 
+  const shouldShowToolbar = showToolbar !== null
+    ? showToolbar
     : (searchable || globalFilters.length > 0 || title);
 
   // Filter and sort data
@@ -386,18 +381,18 @@ export default function Table({
           aVal = a[sortConfig.key];
           bVal = b[sortConfig.key];
         }
-        
+
         // Handle nulls
         if (aVal == null || aVal === "—") aVal = "";
         if (bVal == null || bVal === "—") bVal = "";
-        
+
         // Numeric comparison if both are numbers
         const aNum = parseFloat(aVal);
         const bNum = parseFloat(bVal);
         if (!isNaN(aNum) && !isNaN(bNum)) {
           return sortConfig.direction === 'asc' ? aNum - bNum : bNum - aNum;
         }
-        
+
         // String comparison
         const aStr = String(aVal).toLowerCase();
         const bStr = String(bVal).toLowerCase();
@@ -443,28 +438,52 @@ export default function Table({
 
   return (
     <div className={`overflow-hidden w-full flex flex-col ${containerClassName}`}>
-      {/* Toolbar - Search only (title and global filters removed) */}
+      {/* Toolbar */}
       {shouldShowToolbar && (
-        <div className="flex flex-wrap items-center gap-3 px-3 py-2.5 bg-slate-50 border-b border-slate-200 dark:bg-slate-800/50 dark:border-slate-700">
-          {/* Search Box - takes full width */}
+        <div className="flex flex-wrap items-center gap-4 px-4 py-2.5 bg-slate-50 border-b border-slate-200 dark:bg-slate-800/50 dark:border-slate-700">
+          {/* Title */}
+          {title && (
+            <h3 className="text-sm font-semibold text-slate-800 dark:text-slate-200 flex-shrink-0">
+              {title}
+            </h3>
+          )}
+
+          {/* Search Box */}
           {searchable && (
-            <div className="relative flex-1 min-w-[200px] max-w-[400px]">
+            <div className={`relative ${title ? 'min-w-[200px]' : 'flex-1'} max-w-[400px]`}>
               <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-500" />
               <input
                 type="text"
                 placeholder={searchPlaceholder}
                 value={searchTerm}
                 onChange={(e) => handleSearchChange(e.target.value)}
-                className="w-full pl-9 pr-3 py-2 text-xs rounded-lg bg-white dark:bg-slate-900/80 border border-slate-300 dark:border-slate-600 text-slate-900 dark:text-slate-200 placeholder-slate-400 dark:placeholder-slate-500 focus:outline-none focus:ring-1 focus:ring-sky-500 focus:border-sky-500"
+                className="w-full pl-9 pr-8 py-1.5 text-xs rounded-lg bg-white dark:bg-slate-900/80 border border-slate-300 dark:border-slate-600 text-slate-900 dark:text-slate-200 placeholder-slate-400 dark:placeholder-slate-500 focus:outline-none focus:ring-1 focus:ring-sky-500 focus:border-sky-500 transition-all"
               />
               {searchTerm && (
                 <button
                   onClick={() => handleSearchChange("")}
-                  className="absolute right-2 top-1/2 -translate-y-1/2 p-0.5 text-slate-500 hover:text-slate-300"
+                  className="absolute right-2 top-1/2 -translate-y-1/2 p-0.5 text-slate-500 hover:text-slate-700 dark:hover:text-slate-300"
                 >
                   <X className="w-3.5 h-3.5" />
                 </button>
               )}
+            </div>
+          )}
+
+          {/* Global Filters */}
+          {globalFilters.length > 0 && (
+            <div className="flex flex-wrap gap-2">
+              {globalFilters.map((f) => (
+                <GlobalFilterDropdown
+                  key={f.key}
+                  label={f.label}
+                  column={f.key}
+                  data={data}
+                  columns={columns}
+                  filterValue={filters[f.key]}
+                  onFilterChange={(v) => handleFilterChange(f.key, v)}
+                />
+              ))}
             </div>
           )}
 
@@ -486,7 +505,7 @@ export default function Table({
               <span className="inline-flex items-center gap-1 px-2 py-0.5 text-xs bg-sky-100 text-sky-700 dark:bg-sky-800/50 dark:text-sky-300 rounded-full">
                 <span className="font-medium">Search:</span>
                 <span className="max-w-[100px] truncate">{searchTerm}</span>
-                <button 
+                <button
                   onClick={() => handleSearchChange("")}
                   className="ml-0.5 hover:text-sky-100"
                 >
@@ -497,13 +516,13 @@ export default function Table({
             {Object.entries(filters).map(([key, value]) => {
               const col = columns.find(c => c.key === key);
               return (
-                <span 
-                  key={key} 
+                <span
+                  key={key}
                   className="inline-flex items-center gap-1 px-2 py-0.5 text-xs bg-sky-800/50 text-sky-300 rounded-full"
                 >
                   <span className="font-medium">{col?.header || key}:</span>
                   <span className="max-w-[100px] truncate">{value}</span>
-                  <button 
+                  <button
                     onClick={() => handleFilterChange(key, null)}
                     className="ml-0.5 hover:text-sky-100"
                   >
@@ -513,7 +532,7 @@ export default function Table({
               );
             })}
           </div>
-          <button 
+          <button
             onClick={clearAllFilters}
             className="ml-auto text-xs text-sky-400 hover:text-sky-200 font-medium"
           >
@@ -521,7 +540,7 @@ export default function Table({
           </button>
         </div>
       )}
-      
+
       {/* Table */}
       <div className="overflow-auto flex-1">
         <table
@@ -536,7 +555,7 @@ export default function Table({
                 const hasFilter = filters[c.key] != null;
                 const sortDirection = sortConfig.key === c.key ? sortConfig.direction : null;
                 const isLastColumn = colIndex === columns.length - 1;
-                
+
                 return (
                   <th
                     key={c.key || c.header}
@@ -554,23 +573,22 @@ export default function Table({
                         {safeDisplay(c.header)}
                         {isSortable && <SortIcon direction={sortDirection} />}
                       </button>
-                      
+
                       {/* Filter dropdown trigger - modern style */}
                       {isFilterable && (
                         <button
                           onClick={(e) => { e.stopPropagation(); setOpenFilter(openFilter === c.key ? null : c.key); }}
-                          className={`p-1 rounded transition-all ${
-                            hasFilter 
-                              ? 'text-sky-700 bg-sky-100 dark:text-sky-400 dark:bg-sky-900/30' 
+                          className={`p-1 rounded transition-all ${hasFilter
+                              ? 'text-sky-700 bg-sky-100 dark:text-sky-400 dark:bg-sky-900/30'
                               : 'text-slate-500 opacity-0 group-hover:opacity-100 hover:text-slate-700 hover:bg-slate-200 dark:hover:text-slate-300 dark:hover:bg-slate-700'
-                          }`}
+                            }`}
                           title="Filter"
                         >
                           <ChevronDown className={`w-3.5 h-3.5 transition-transform ${openFilter === c.key ? 'rotate-180' : ''}`} />
                         </button>
                       )}
                     </div>
-                    
+
                     {/* Filter dropdown */}
                     {openFilter === c.key && isFilterable && (
                       <HeaderFilterDropdown
@@ -605,11 +623,10 @@ export default function Table({
                 tabIndex={onRowClick ? 0 : undefined}
                 onClick={onRowClick ? () => onRowClick(row, i) : undefined}
                 onKeyDown={onRowClick ? (e) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); onRowClick(row, i); } } : undefined}
-                className={`transition-colors ${onRowClick ? "cursor-pointer" : ""} ${
-                  selectedIndex === i 
-                    ? "bg-sky-50 dark:bg-sky-900/30 ring-inset ring-1 ring-sky-500 dark:ring-sky-600" 
+                className={`transition-colors ${onRowClick ? "cursor-pointer" : ""} ${selectedIndex === i
+                    ? "bg-sky-50 dark:bg-sky-900/30 ring-inset ring-1 ring-sky-500 dark:ring-sky-600"
                     : "hover:bg-slate-50 dark:hover:bg-slate-800/50"
-                }`}
+                  }`}
               >
                 {columns.map((c) => {
                   let cellContent;
@@ -660,11 +677,11 @@ export default function Table({
           </tbody>
         </table>
       </div>
-      
+
       {/* Footer with row count */}
       {data.length > 0 && (
         <div className="px-3 py-2 bg-slate-50 border-t border-slate-200 text-xs text-slate-600 dark:bg-slate-800/50 dark:border-slate-700 dark:text-slate-500">
-          {processedData.length === data.length 
+          {processedData.length === data.length
             ? `${data.length} row${data.length !== 1 ? 's' : ''}`
             : `Showing ${processedData.length} of ${data.length} row${data.length !== 1 ? 's' : ''}`
           }
