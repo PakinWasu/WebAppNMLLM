@@ -1,5 +1,6 @@
 import React from "react";
 import { Button } from "../ui";
+import logo from "../../logo.jpg";
 import { safeDisplay } from "../../utils/format";
 
 export default function Header({
@@ -23,7 +24,11 @@ export default function Header({
         }}
         className="flex items-center gap-3 hover:opacity-85 transition-opacity cursor-pointer min-w-0 flex-shrink-0"
       >
-        <div className="h-8 w-8 sm:h-9 sm:w-9 rounded-xl bg-white/90 dark:bg-white/10 backdrop-blur-sm border border-slate-300/80 dark:border-slate-600/80 flex-shrink-0 shadow-sm" />
+        <img 
+          src={logo} 
+          alt="Network Project Platform Logo" 
+          className="h-8 w-8 sm:h-9 sm:w-9 flex-shrink-0"
+        />
         <span className="text-base sm:text-lg font-semibold text-slate-800 dark:text-slate-100 truncate">
           Network Project Platform
         </span>

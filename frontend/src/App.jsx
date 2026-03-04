@@ -1,5 +1,6 @@
 // src/App.jsx
 import React, { useMemo, useState, useEffect, useRef } from "react";
+import logo from "./logo.jpg";
 import { flushSync } from "react-dom";
 import * as api from "./api";
 import MainLayout from "./components/layout/MainLayout";
@@ -658,7 +659,11 @@ export default function App() {
                   onClick={(e) => handleNavClick(e, () => setRoute({ name: "index" }))}
                   className="flex items-center gap-2 sm:gap-3 hover:opacity-85 transition-opacity cursor-pointer flex-shrink-0"
                 >
-                  <div className="h-7 w-7 rounded-xl bg-white/90 dark:bg-white/10 backdrop-blur-sm border border-slate-300/80 dark:border-slate-600/80 flex-shrink-0 shadow-sm" />
+                  <img 
+                  src={logo} 
+                  alt="Network Project Platform Logo" 
+                  className="h-7 w-7 flex-shrink-0"
+                />
                   <span className="text-xs sm:text-sm font-semibold text-slate-800 dark:text-slate-200 whitespace-nowrap truncate">Network Project Platform</span>
                 </a>
                 {/* Breadcrumb and Tabs (show when in project or device) - hide tabs on mobile/tablet, show on desktop */}
@@ -6853,7 +6858,15 @@ const HistoryPage = ({ project, can, authedUser }) => {
                 ) : (
                   <Table
                     columns={[
-                      { header: "Version", key: "version", cell: (v) => `${v.displayVersion || `v${v.version}`} ${v.is_latest_display ? '(Latest)' : ''}` },
+                      { 
+                        header: "Version", 
+                        key: "version", 
+                        cell: (v) => (
+                          <span className={`${v.is_latest_display ? 'bg-emerald-500 text-white px-3 py-1 rounded-lg font-bold shadow-md' : ''}`}>
+                            {v.displayVersion || `v${v.version}`} {v.is_latest_display ? '(Latest)' : ''}
+                          </span>
+                        )
+                      },
                       { header: "Filename", key: "filename", cell: (v) => safeDisplay(v.filename) },
                       { header: "Uploaded By", key: "uploader", cell: (v) => v.uploader },
                       { header: "Uploaded At", key: "created_at", cell: (v) => formatDateTime(v.created_at) },
@@ -9077,7 +9090,15 @@ const DocumentsPage = ({ project, can, authedUser, uploadHistory, setUploadHisto
                     title="Version History"
                     searchable
                     columns={[
-                      { header: "Version", key: "version", cell: (v) => `${v.displayVersion || `v${v.version}`} ${v.is_latest_display ? '(Latest)' : ''}` },
+                      { 
+                        header: "Version", 
+                        key: "version", 
+                        cell: (v) => (
+                          <span className={`${v.is_latest_display ? 'bg-emerald-500 text-white px-3 py-1 rounded-lg font-bold shadow-md' : ''}`}>
+                            {v.displayVersion || `v${v.version}`} {v.is_latest_display ? '(Latest)' : ''}
+                          </span>
+                        )
+                      },
                       { header: "Filename", key: "filename", cell: (v) => safeDisplay(v.filename) },
                       { header: "Uploaded By", key: "uploader", cell: (v) => v.uploader },
                       { header: "Uploaded At", key: "created_at", cell: (v) => formatDateTime(v.created_at) },

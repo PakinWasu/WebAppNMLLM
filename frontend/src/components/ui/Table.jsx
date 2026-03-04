@@ -625,7 +625,9 @@ export default function Table({
                 onKeyDown={onRowClick ? (e) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); onRowClick(row, i); } } : undefined}
                 className={`transition-colors ${onRowClick ? "cursor-pointer" : ""} ${selectedIndex === i
                     ? "bg-sky-50 dark:bg-sky-900/30 ring-inset ring-1 ring-sky-500 dark:ring-sky-600"
-                    : "hover:bg-slate-50 dark:hover:bg-slate-800/50"
+                    : row.is_latest_display 
+                      ? "bg-gradient-to-r from-emerald-100 to-emerald-50 dark:from-emerald-900/40 dark:to-emerald-900/20 border-l-4 border-emerald-600 shadow-md"
+                      : "hover:bg-slate-50 dark:hover:bg-slate-800/50"
                   }`}
               >
                 {columns.map((c) => {
