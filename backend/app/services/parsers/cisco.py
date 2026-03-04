@@ -2541,13 +2541,13 @@ class CiscoIOSParser(BaseParser):
                     protocol = (ec_m.group(4) or "").strip()
                     rest = (ec_m.group(5) or "").strip()
                     status = self._decode_etherchannel_flags(flags)
-                    member_entries = re.findall(r"(Gi\d+/\d+|Fa\d+/\d+|Te\d+/\d+|Ethernet\d+/\d+)(?:\(([^)]*)\))?", rest, re.IGNORECASE)
+                    member_entries = re.findall(r"(Gi\d+/\d+|Fa\d+/\d+|Te\d+/\d+|Et\d+/\d+|Ethernet\d+/\d+)(?:\(([^)]*)\))?", rest, re.IGNORECASE)
                     members = []
                     for port_part, mflags in member_entries:
                         iface_short = port_part
                         members.append({"interface": iface_short, "status": self._decode_member_port_status(mflags)})
                     if not members:
-                        raw = re.findall(r"(Gi\d+/\d+|Fa\d+/\d+|Te\d+/\d+)(?:\([^)]*\))?", rest, re.IGNORECASE)
+                        raw = re.findall(r"(Gi\d+/\d+|Fa\d+/\d+|Te\d+/\d+|Et\d+/\d+)(?:\([^)]*\))?", rest, re.IGNORECASE)
                         members = [{"interface": p, "status": "Bundled"} for p in raw]
                     ha["etherchannels"].append({
                         "group": grp_id,

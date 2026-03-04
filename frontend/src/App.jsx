@@ -3580,17 +3580,36 @@ const DeviceDetailsView = ({ project, deviceId, goBack, goBackHref, goIndex, goI
     });
   }, [routingData.routes, routeTableSearch]);
 
-  // Config drift: compare two latest versions from version history (raw config files)
+  // Config drift: compare latest version with next latest based on is_latest and extracted_date
   const driftSummary = React.useMemo(() => {
     const v = deviceConfigVersions?.versions;
     if (!v || v.length < 2) return null;
-    const older = v[1];
-    const newer = v[0];
+    
+    // Find latest version (is_latest = true) and next latest by extracted_date
+    const latest = v.find(version => version.is_latest === true);
+    const others = v.filter(version => version.is_latest !== true);
+    
+    // Sort others by extracted_date (newest first)
+    others.sort((a, b) => {
+      const dateA = extractDateFromFile(a.filename);
+      const dateB = extractDateFromFile(b.filename);
+      return new Date(dateB) - new Date(dateA);
+    });
+    
+    if (!latest || others.length === 0) return null;
+    
+    const nextLatest = others[0];
     const fn = deviceConfigVersions.filename || "config";
+    
     return {
       device: facts.device,
-      from: `${fn} (v${older.version})`,
-      to: `${fn} (v${newer.version})`,
+      from: `${fn} (${extractDateFromFile(nextLatest.filename)})`,
+      to: `${fn} (${extractDateFromFile(latest.filename)}) - Latest`,
+      fromDate: extractDateFromFile(nextLatest.filename),
+      toDate: extractDateFromFile(latest.filename),
+      fromVersion: nextLatest.version,
+      toVersion: latest.version,
+      isLatestComparison: true,
     };
   }, [facts.device, deviceConfigVersions]);
   const hasEnoughVersionsForDrift = (deviceConfigVersions?.versions?.length ?? 0) >= 2;
@@ -3632,7 +3651,7 @@ const DeviceDetailsView = ({ project, deviceId, goBack, goBackHref, goIndex, goI
                 { id: "macarp", label: "MAC/ARP" },
                 { id: "security", label: "Security" },
                 { id: "ha", label: "HA" },
-                { id: "raw", label: "Config Difference" }
+                { id: "raw", label: "RAW" }
               ].map((t) => (
                 <button
                   key={t.id}
@@ -3958,12 +3977,17 @@ const DeviceDetailsView = ({ project, deviceId, goBack, goBackHref, goIndex, goI
                               <b>Device:</b> {safeDisplay(facts?.device)} <br />
                               <b>Version history:</b> {deviceConfigVersions.versions?.length ?? 0} version(s) (raw config) <br />
                               <b>Compare:</b>{" "}
-                              <span className="text-slate-600 dark:text-slate-400 font-medium">{safeDisplay(driftSummary?.from)}</span>
+                              <span className="text-orange-600 dark:text-orange-400 font-medium">{safeDisplay(driftSummary?.from)}</span>
                               <span className="mx-1">→</span>
-                              <span className="text-slate-600 dark:text-slate-400 font-medium">{safeDisplay(driftSummary?.to)}</span>
+                              <span className="text-emerald-600 dark:text-emerald-400 font-bold">{safeDisplay(driftSummary?.to)}</span>
+                              {driftSummary?.isLatestComparison && (
+                                <span className="ml-2 text-emerald-600 dark:text-emerald-400 text-xs font-medium">
+                                  (Latest vs Previous)
+                                </span>
+                              )}
                             </div>
                             <div className="text-xs text-slate-500 dark:text-slate-400">
-                              Click the AI button above to compare configuration (running-config / current-configuration style) between the 2 latest versions.
+                              Comparing latest configuration with previous version by date. Click the AI button to analyze differences.
                             </div>
                           </div>
                         )}
