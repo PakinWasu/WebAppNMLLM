@@ -8,7 +8,7 @@ import Header from "./components/layout/Header";
 import { Badge, Button, Card, CodeBlock, ConfirmationModal, Field, Input, NotificationModal, PasswordInput, Select, SelectWithOther, Table, ToastContainer } from "./components/ui";
 import { RoutingSection } from "./components/RoutingSection";
 import { parseHash } from "./utils/routing";
-import { formatDateTime, formatDate, formatFilenameDate, safeDisplay, safeChild, formatError } from "./utils/format";
+import { safeDisplay, formatError, formatDateTime, formatSubnetMask, formatDate, formatFilenameDate } from "./utils/format";
 import { CMDSET, SAMPLE_CORE_SW1, SAMPLE_DIST_SW2, createUploadRecord } from "./utils/constants";
 import { globalPollingService, notifyLLMResultReady } from "./services/llmPolling";
 import { useHashRoute, useLLMQueue } from "./hooks";
@@ -2851,6 +2851,10 @@ const DeviceDetailsView = ({ project, deviceId, goBack, goBackHref, goIndex, goI
   // Version history for Config Drift: one document's versions (raw config files, 2 latest compared)
   const [deviceConfigVersions, setDeviceConfigVersions] = React.useState(null);
   const [loadingVersions, setLoadingVersions] = React.useState(false);
+  
+  // Dropdown selection states
+  const [selectedFromVersion, setSelectedFromVersion] = React.useState(null);
+  const [selectedToVersion, setSelectedToVersion] = React.useState(null);
 
   // Fetch device config documents (Config folder, filename matches device)
   React.useEffect(() => {
@@ -2929,6 +2933,35 @@ const DeviceDetailsView = ({ project, deviceId, goBack, goBackHref, goIndex, goI
       });
     return () => { cancelled = true; };
   }, [project?.project_id || project?.id, deviceId, deviceBackups]);
+
+  // Set default selections when versions load
+  React.useEffect(() => {
+    if (!deviceConfigVersions?.versions || deviceConfigVersions.versions.length < 2) return;
+    
+    const versions = deviceConfigVersions.versions;
+    
+    // Find latest version (is_latest = true)
+    const latest = versions.find(v => v.is_latest === true);
+    
+    // Find previous versions (is_latest = false)
+    const previous = versions.filter(v => v.is_latest !== true);
+    
+    // Sort previous by extracted_date (newest first)
+    previous.sort((a, b) => {
+      const dateA = a.extracted_date ? new Date(a.extracted_date) : new Date(0);
+      const dateB = b.extracted_date ? new Date(b.extracted_date) : new Date(0);
+      return dateB - dateA;
+    });
+    
+    // If no extracted_date, sort by version (highest first)
+    if (previous.some(v => !v.extracted_date)) {
+      previous.sort((a, b) => (b.version || 0) - (a.version || 0));
+    }
+    
+    // Set defaults
+    setSelectedFromVersion(previous[0]?.version || null);
+    setSelectedToVersion(latest?.version || null);
+  }, [deviceConfigVersions]);
 
   // default: 2 most recent files
 
@@ -3480,6 +3513,7 @@ const DeviceDetailsView = ({ project, deviceId, goBack, goBackHref, goIndex, goI
       lineProto: iface.line_protocol || iface.protocol || "—",
       desc: iface.description || "—",
       ipv4: iface.ipv4_address || "—",
+      subnetMask: iface.subnet_mask || "—",
       ipv6: iface.ipv6_address || "—",
       mac: iface.mac_address || "—",
       speed: iface.speed || "—",
@@ -3495,7 +3529,7 @@ const DeviceDetailsView = ({ project, deviceId, goBack, goBackHref, goIndex, goI
       poeW: iface.poe_power ?? "—",
     }));
   }, [interfaces, stpData]);
-  // Columns per 2.3.2.2: Name, Type, Admin, Oper, Line Proto, Desc, IPv4, IPv6, MAC, Speed, Duplex, MTU, Mode, Access VLAN, Native, Allowed
+  // Columns per 2.3.2.2: Name, Type, Admin, Oper, Line Proto, Desc, IPv4, Mask, IPv6, MAC, Speed, Duplex, MTU, Mode, Access VLAN, Native, Allowed
   const ifaceColumns = [
     { header: "Name", key: "port", title: "2.3.2.2.1 Interface Name", cell: (r) => <span className="font-medium text-slate-800 dark:text-slate-200">{r.port}</span> },
     { header: "Type", key: "type", title: "2.3.2.2.2 Interface Type", cell: (r) => r.type || "—" },
@@ -3504,6 +3538,7 @@ const DeviceDetailsView = ({ project, deviceId, goBack, goBackHref, goIndex, goI
     { header: "Line", key: "lineProto", title: "2.3.2.2.5 Line Protocol Status", cell: (r) => r.lineProto || "—" },
     { header: "Description", key: "desc", title: "2.3.2.2.6 Description", cell: (r) => (r.desc && r.desc !== "—" ? <span className="max-w-[200px] truncate block" title={r.desc}>{r.desc}</span> : "—") },
     { header: "IPv4", key: "ipv4", title: "2.3.2.2.7 IPv4 Address", cell: (r) => r.ipv4 || "—" },
+    { header: "Mask", key: "subnetMask", title: "2.3.2.2.7.1 IPv4 Subnet Mask", cell: (r) => formatSubnetMask(r.subnetMask) },
     { header: "IPv6", key: "ipv6", title: "2.3.2.2.8 IPv6 Address", cell: (r) => r.ipv6 || "—" },
     { header: "MAC", key: "mac", title: "2.3.2.2.9 MAC Address", cell: (r) => r.mac || "—" },
     { header: "Speed", key: "speed", title: "2.3.2.2.10 Speed", cell: (r) => r.speed || "—" },
@@ -3580,38 +3615,55 @@ const DeviceDetailsView = ({ project, deviceId, goBack, goBackHref, goIndex, goI
     });
   }, [routingData.routes, routeTableSearch]);
 
-  // Config drift: compare latest version with next latest based on is_latest and extracted_date
+  // Config drift: compare selected versions from dropdown
   const driftSummary = React.useMemo(() => {
     const v = deviceConfigVersions?.versions;
     if (!v || v.length < 2) return null;
     
-    // Find latest version (is_latest = true) and next latest by extracted_date
+    // If user has selected both files, use their selection
+    if (selectedFromVersion && selectedToVersion) {
+      const fromVersion = v.find(version => version.version === selectedFromVersion);
+      const toVersion = v.find(version => version.version === selectedToVersion);
+      
+      if (fromVersion && toVersion) {
+        return {
+          device: facts.device,
+          from: fromVersion.filename,
+          to: toVersion.filename,
+          fromDate: fromVersion.extracted_date,
+          toDate: toVersion.extracted_date,
+          fromVersion: fromVersion.version,
+          toVersion: toVersion.version,
+          isLatestComparison: toVersion.is_latest === true,
+        };
+      }
+    }
+    
+    // Fallback to automatic selection (latest vs previous)
     const latest = v.find(version => version.is_latest === true);
     const others = v.filter(version => version.is_latest !== true);
     
-    // Sort others by extracted_date (newest first)
     others.sort((a, b) => {
-      const dateA = extractDateFromFile(a.filename);
-      const dateB = extractDateFromFile(b.filename);
-      return new Date(dateB) - new Date(dateA);
+      const dateA = a.extracted_date ? new Date(a.extracted_date) : new Date(0);
+      const dateB = b.extracted_date ? new Date(b.extracted_date) : new Date(0);
+      return dateB - dateA;
     });
     
     if (!latest || others.length === 0) return null;
     
     const nextLatest = others[0];
-    const fn = deviceConfigVersions.filename || "config";
     
     return {
       device: facts.device,
-      from: `${fn} (${extractDateFromFile(nextLatest.filename)})`,
-      to: `${fn} (${extractDateFromFile(latest.filename)}) - Latest`,
-      fromDate: extractDateFromFile(nextLatest.filename),
-      toDate: extractDateFromFile(latest.filename),
+      from: nextLatest.filename,
+      to: latest.filename,
+      fromDate: nextLatest.extracted_date,
+      toDate: latest.extracted_date,
       fromVersion: nextLatest.version,
       toVersion: latest.version,
       isLatestComparison: true,
     };
-  }, [facts.device, deviceConfigVersions]);
+  }, [facts.device, deviceConfigVersions, selectedFromVersion, selectedToVersion]);
   const hasEnoughVersionsForDrift = (deviceConfigVersions?.versions?.length ?? 0) >= 2;
 
   return (
@@ -3867,9 +3919,6 @@ const DeviceDetailsView = ({ project, deviceId, goBack, goBackHref, goIndex, goI
                 )}
                 {llmPanelTab === "drift" && (
                   <div>
-                    {!deviceDriftData && (
-                      <div className="text-xs font-semibold text-slate-800 dark:text-slate-400 uppercase tracking-wide mb-2">Configuration drift (raw config — 2 latest versions)</div>
-                    )}
                     {loadingBackups || loadingVersions ? (
                       <div className="text-xs text-slate-500 dark:text-slate-400">Loading version history...</div>
                     ) : !deviceConfigVersions ? (
@@ -3897,9 +3946,9 @@ const DeviceDetailsView = ({ project, deviceId, goBack, goBackHref, goIndex, goI
                               </div>
                             </div>
                             <div className="text-slate-600 dark:text-slate-400 text-xs bg-slate-100 dark:bg-slate-800/50 px-2 py-1 rounded">
-                              Compare: <span className="font-medium">{safeDisplay(deviceDriftData.from_filename)}</span>
+                              Compare: <span className="font-medium">{driftSummary?.from || safeDisplay(deviceDriftData.from_filename)}</span>
                               <span className="mx-2">→</span>
-                              <span className="font-medium">{safeDisplay(deviceDriftData.to_filename)}</span>
+                              <span className="font-medium">{driftSummary?.to || safeDisplay(deviceDriftData.to_filename)}</span>
                             </div>
                             {deviceDriftData.difference_percent != null && (
                               <div className="text-slate-600 dark:text-slate-400 text-xs">
@@ -3974,20 +4023,43 @@ const DeviceDetailsView = ({ project, deviceId, goBack, goBackHref, goIndex, goI
                         ) : (
                           <div className="grid gap-2">
                             <div className="text-xs text-slate-700 dark:text-slate-300">
-                              <b>Device:</b> {safeDisplay(facts?.device)} <br />
-                              <b>Version history:</b> {deviceConfigVersions.versions?.length ?? 0} version(s) (raw config) <br />
-                              <b>Compare:</b>{" "}
-                              <span className="text-orange-600 dark:text-orange-400 font-medium">{safeDisplay(driftSummary?.from)}</span>
-                              <span className="mx-1">→</span>
-                              <span className="text-emerald-600 dark:text-emerald-400 font-bold">{safeDisplay(driftSummary?.to)}</span>
-                              {driftSummary?.isLatestComparison && (
-                                <span className="ml-2 text-emerald-600 dark:text-emerald-400 text-xs font-medium">
-                                  (Latest vs Previous)
-                                </span>
-                              )}
+                              <b>Device:</b> {safeDisplay(facts?.device)}
                             </div>
-                            <div className="text-xs text-slate-500 dark:text-slate-400">
-                              Comparing latest configuration with previous version by date. Click the AI button to analyze differences.
+                            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                              <div>
+                                <label className="block text-xs font-medium text-slate-700 dark:text-slate-300 mb-1">
+                                  Select old version (From):
+                                </label>
+                                <select
+                                  value={selectedFromVersion || ""}
+                                  onChange={(e) => setSelectedFromVersion(e.target.value ? parseInt(e.target.value) : null)}
+                                  className="w-full text-xs border border-slate-300 dark:border-slate-600 rounded px-2 py-1 bg-white dark:bg-slate-800 text-slate-900 dark:text-slate-100"
+                                >
+                                  <option value="">-- Select file --</option>
+                                  {deviceConfigVersions.versions.map(v => (
+                                    <option key={v.version} value={v.version}>
+                                      {v.filename} {v.is_latest ? '(Latest)' : `(v${v.version} - ${formatDateTime(v.extracted_date)})`}
+                                    </option>
+                                  ))}
+                                </select>
+                              </div>
+                              <div>
+                                <label className="block text-xs font-medium text-slate-700 dark:text-slate-300 mb-1">
+                                  Select new version (To):
+                                </label>
+                                <select
+                                  value={selectedToVersion || ""}
+                                  onChange={(e) => setSelectedToVersion(e.target.value ? parseInt(e.target.value) : null)}
+                                  className="w-full text-xs border border-slate-300 dark:border-slate-600 rounded px-2 py-1 bg-white dark:bg-slate-800 text-slate-900 dark:text-slate-100"
+                                >
+                                  <option value="">-- Select file --</option>
+                                  {deviceConfigVersions.versions.map(v => (
+                                    <option key={v.version} value={v.version}>
+                                      {v.filename} {v.is_latest ? '(Latest)' : `(v${v.version} - ${formatDateTime(v.extracted_date)})`}
+                                    </option>
+                                  ))}
+                                </select>
+                              </div>
                             </div>
                           </div>
                         )}

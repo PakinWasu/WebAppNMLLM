@@ -28,6 +28,78 @@ export function formatDateTime(dateString) {
 }
 
 /**
+ * Convert dotted decimal mask to CIDR prefix
+ */
+export function dottedToCidr(dottedMask) {
+  if (!dottedMask) return null;
+  
+  // If it's already a number (CIDR), return as is
+  if (/^\d+$/.test(dottedMask)) {
+    const cidr = parseInt(dottedMask);
+    return cidr >= 0 && cidr <= 32 ? cidr : null;
+  }
+  
+  // Convert dotted decimal to CIDR
+  const parts = dottedMask.split('.');
+  if (parts.length !== 4) return null;
+  
+  let cidr = 0;
+  for (const part of parts) {
+    const num = parseInt(part);
+    if (isNaN(num) || num < 0 || num > 255) return null;
+    cidr += num.toString(2).padStart(8, '0').split('1').length - 1;
+  }
+  
+  return cidr <= 32 ? cidr : null;
+}
+
+/**
+ * Convert CIDR prefix to dotted decimal mask
+ */
+export function cidrToDotted(cidr) {
+  if (!cidr) return null;
+  
+  // If it's already dotted decimal, return as is
+  if (/^\d+\.\d+\.\d+\.\d+$/.test(cidr)) {
+    return cidr;
+  }
+  
+  // Convert CIDR to dotted decimal
+  const prefix = parseInt(cidr);
+  if (isNaN(prefix) || prefix < 0 || prefix > 32) return null;
+  
+  const mask = [];
+  for (let i = 0; i < 4; i++) {
+    const octet = Math.min(8, Math.max(0, prefix - (i * 8)));
+    mask.push((255 << (8 - octet)) & 255);
+  }
+  
+  return mask.join('.');
+}
+
+/**
+ * Format subnet mask to show both dotted decimal and CIDR
+ */
+export function formatSubnetMask(mask) {
+  if (!mask || mask === "—") return "—";
+  
+  const cidr = dottedToCidr(mask);
+  const dotted = cidrToDotted(mask);
+  
+  if (cidr !== null && dotted !== null) {
+    // If both formats are valid and different, show both
+    if (mask !== dotted && mask !== cidr.toString()) {
+      return `${dotted} (${cidr})`;
+    }
+    // If input is already in one format, show both
+    return `${dotted} (${cidr})`;
+  }
+  
+  // Fallback to original value
+  return mask;
+}
+
+/**
  * Format date for filename (Thailand YYYY-MM-DD).
  */
 export function formatFilenameDate(dateInput) {

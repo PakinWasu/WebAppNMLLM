@@ -229,9 +229,9 @@ export default function SettingPage({ project, setProjects, authedUser, goIndex 
         <h2 className="text-xl font-semibold text-gray-900 dark:text-gray-100">Project Settings</h2>
         <div className="flex items-center gap-2 flex-wrap justify-end">
           {canEditSettings && (
-            <Button 
+            <Button
               onClick={save} 
-              className="bg-green-600 hover:bg-green-700 text-white border-green-600 focus:ring-green-500"
+              variant="success"
             >
               Save Changes
             </Button>

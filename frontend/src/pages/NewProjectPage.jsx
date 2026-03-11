@@ -137,7 +137,7 @@ export default function NewProjectPage({
           <Button
             onClick={save}
             disabled={!name.trim() || loading}
-            className="bg-green-600 hover:bg-green-700 text-white border-green-600 focus:ring-green-500"
+            variant="success"
           >
             {loading ? "Creating..." : "Create Project"}
           </Button>
