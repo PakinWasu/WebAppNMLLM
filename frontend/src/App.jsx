@@ -8,7 +8,7 @@ import Header from "./components/layout/Header";
 import { Badge, Button, Card, CodeBlock, ConfirmationModal, Field, Input, NotificationModal, PasswordInput, Select, SelectWithOther, Table, ToastContainer } from "./components/ui";
 import { RoutingSection } from "./components/RoutingSection";
 import { parseHash } from "./utils/routing";
-import { safeDisplay, formatError, formatDateTime, formatSubnetMask, formatDate, formatFilenameDate } from "./utils/format";
+import { safeDisplay, safeChild, formatError, formatDateTime, formatSubnetMask, formatDate, formatFilenameDate } from "./utils/format";
 import { CMDSET, SAMPLE_CORE_SW1, SAMPLE_DIST_SW2, createUploadRecord } from "./utils/constants";
 import { globalPollingService, notifyLLMResultReady } from "./services/llmPolling";
 import { useHashRoute, useLLMQueue } from "./hooks";
@@ -2504,6 +2504,11 @@ const SummaryPage = ({ project, projectId: projectIdProp, routeToHash, handleNav
   };
 
   const filtered = useMemo(() => {
+    console.log('SummaryPage Debug:', { 
+      summaryRowsLength: summaryRows?.length, 
+      summaryRows: summaryRows?.slice(0, 2),
+      query: q 
+    });
     if (!q.trim()) return summaryRows;
     return summaryRows.filter((r) =>
       [r.device, r.model, r.mgmt_ip, r.serial].some((v) =>
@@ -2524,14 +2529,14 @@ const SummaryPage = ({ project, projectId: projectIdProp, routeToHash, handleNav
     { header: "UNUSED", key: "unused", width: "70px" },
     { header: "VLANS", key: "vlans", width: "60px" },
     { header: "NATIVE VLAN", key: "native_vlan", width: "90px" },
-    { header: "TRUNK ALLOWED", key: "trunk_allowed", width: "100px", cell: (r) => r.trunk_allowed || "—" },
+    { header: "TRUNK ALLOWED", key: "allowedShort", width: "100px", cell: (r) => r.allowedShort || "—" },
     { header: "STP", key: "stp", width: "70px" },
     { header: "STP ROLE", key: "stp_role", width: "80px" },
     { header: "OSPF NEIGH", key: "ospf_neigh", width: "90px" },
     { header: "BGP ASN/NEIGH", key: "bgp_asn_neigh", width: "110px" },
     { header: "RT-PROTO", key: "rt_proto", width: "80px", cell: (r) => r.rt_proto || "—" },
-    { header: "CPU%", key: "cpu", width: "60px" },
-    { header: "MEM%", key: "mem", width: "60px" },
+    { header: "CPU%", key: "cpu", width: "60px", cell: (r) => r.cpu != null ? `${r.cpu}%` : "0" },
+    { header: "MEM%", key: "mem", width: "60px", cell: (r) => r.mem != null ? `${r.mem}%` : "0" },
     {
       header: "STATUS", key: "status", cell: (r) => {
         const raw = r.status;
@@ -3001,8 +3006,14 @@ const DeviceDetailsView = ({ project, deviceId, goBack, goBackHref, goIndex, goI
   const upIfaces = interfaces.filter(i => i.oper_status === "up").length;
   const downIfaces = interfaces.filter(i => i.oper_status === "down").length;
   const adminDown = interfaces.filter(i => i.admin_status === "down").length;
-  const accessPorts = interfaces.filter(i => i.port_mode === "access").length;
-  const trunkPorts = interfaces.filter(i => i.port_mode === "trunk").length;
+  const accessPorts = interfaces.filter(i => 
+    i.port_mode === "access" || 
+    (i.port_mode === null && i.access_vlan && i.access_vlan > 1 && !i.allowed_vlans)
+  ).length;
+  const trunkPorts = interfaces.filter(i => 
+    i.port_mode === "trunk" || 
+    (i.port_mode === null && i.allowed_vlans)
+  ).length;
   const vlanList = vlansData.vlan_list || [];
   const vlanCount = vlanList.length;
 
@@ -3021,6 +3032,7 @@ const DeviceDetailsView = ({ project, deviceId, goBack, goBackHref, goIndex, goI
     stpRoot: stpData.root_bridge_id || "—",
     trunkCount: trunkPorts || 0,
     accessCount: accessPorts || 0,
+    trunkAllowedCount: interfaces.filter(i => i.allowed_vlans && i.allowed_vlans !== "—").length || 0,
     sviCount: interfaces.filter(i => i.type === "Vlan" || i.name?.startsWith("Vlan")).length || 0,
     hsrpGroups: (Array.isArray(haData.hsrp) ? haData.hsrp : (haData.hsrp?.groups || [])).length || 0,
     vrrpGroups: (Array.isArray(haData.vrrp) ? haData.vrrp : (haData.vrrp?.groups || [])).length || 0,
@@ -3033,8 +3045,8 @@ const DeviceDetailsView = ({ project, deviceId, goBack, goBackHref, goIndex, goI
     ntpStatus: securityData.ntp?.status || securityData.ntp?.synchronized ? "Synchronized" : "—",
     snmp: securityData.snmp?.enabled ? "Enabled" : "—",
     syslog: securityData.logging?.enabled || securityData.syslog?.enabled ? "Enabled" : "—",
-    cpu: overview.cpu_utilization ?? overview.cpu_util ?? "—",
-    mem: overview.memory_usage ?? overview.mem_util ?? "—",
+    cpu: overview.cpu_utilization != null ? overview.cpu_utilization : (overview.cpu_util != null ? overview.cpu_util : null),
+    mem: overview.memory_usage != null ? overview.memory_usage : (overview.mem_util != null ? overview.mem_util : null),
     uptime: overview.uptime || "—",
     ifaces: {
       total: totalIfaces,
@@ -3056,9 +3068,9 @@ const DeviceDetailsView = ({ project, deviceId, goBack, goBackHref, goIndex, goI
     const serial = ov.serial_number || "—";
     const mgmtIp = ov.management_ip || ov.mgmt_ip || "—";
     const uptime = ov.uptime || "—";
-    const cpuVal = ov.cpu_utilization ?? ov.cpu_util;
-    const memVal = ov.memory_usage ?? ov.mem_util;
-    const cpuMem = [cpuVal != null ? `${cpuVal}%` : "", memVal != null ? `${memVal}%` : ""].filter(Boolean).join(" / ") || "—";
+    const cpuVal = ov.cpu_utilization != null ? ov.cpu_utilization : (ov.cpu_util != null ? ov.cpu_util : null);
+    const memVal = ov.memory_usage != null ? ov.memory_usage : (ov.mem_util != null ? ov.mem_util : null);
+    const cpuMem = [cpuVal != null ? `${cpuVal}%` : null, memVal != null ? `${memVal}%` : null].filter(v => v !== null).join(" / ") || "—";
     const lastUpload = lastConfigUpload ? formatDateTime(lastConfigUpload) : "—";
     return [
       { key: "hostname", label: "Hostname", value: hostname },
@@ -3087,7 +3099,7 @@ const DeviceDetailsView = ({ project, deviceId, goBack, goBackHref, goIndex, goI
 
     if (facts.ifaces) {
       parts.push(`• Ports total ${facts.ifaces.total} (Up ${facts.ifaces.up}, Down ${facts.ifaces.down}, AdminDown ${facts.ifaces.adminDown})`);
-      parts.push(`• Access ≈ ${facts.accessCount}  |  Trunk ≈ ${facts.trunkCount}`);
+      parts.push(`• Access ≈ ${facts.accessCount}  |  Trunk ≈ ${facts.trunkCount}  |  Trunk Allowed ≈ ${facts.trunkAllowedCount}`);
     }
     parts.push(`• VLANs: ${facts.vlanCount}  |  STP: ${facts.stpMode}${facts.stpRoot && facts.stpRoot !== "—" ? ` (Root: ${facts.stpRoot})` : ""}`);
 
@@ -3104,7 +3116,7 @@ const DeviceDetailsView = ({ project, deviceId, goBack, goBackHref, goIndex, goI
     }
 
     // Mgmt/Health
-    parts.push(`• NTP: ${facts.ntpStatus}  |  SNMP: ${facts.snmp}  |  Syslog: ${facts.syslog}  |  CPU ${facts.cpu}% / MEM ${facts.mem}%`);
+    parts.push(`• NTP: ${facts.ntpStatus}  |  SNMP: ${facts.snmp}  |  Syslog: ${facts.syslog}  |  CPU ${facts.cpu != null ? facts.cpu + '%' : '—'} / MEM ${facts.mem != null ? facts.mem + '%' : '—'}`);
 
     // HA
     if (facts.hsrpGroups > 0 || facts.vrrpGroups > 0) {
@@ -3522,7 +3534,7 @@ const DeviceDetailsView = ({ project, deviceId, goBack, goBackHref, goIndex, goI
       mode: iface.port_mode || "—",
       accessVlan: iface.access_vlan ?? "—",
       nativeVlan: iface.native_vlan ?? "—",
-      allowedShort: (Array.isArray(iface.allowed_vlans) ? iface.allowed_vlans.join(", ") : (typeof iface.allowed_vlans === "string" ? iface.allowed_vlans : null)) || "—",
+      allowedShort: (Array.isArray(iface.allowed_vlans) ? iface.allowed_vlans.join(", ") : (iface.allowed_vlans != null ? String(iface.allowed_vlans) : null)) || "—",
       stpRole: iface.stp_role || "—",
       stpState: iface.stp_state || "—",
       stpEdgedPort: iface.stp_edged_port !== undefined ? (iface.stp_edged_port ? "Yes" : "No") : "—",
@@ -3588,10 +3600,9 @@ const DeviceDetailsView = ({ project, deviceId, goBack, goBackHref, goIndex, goI
     { header: "Access Ports", key: "accessPorts", cell: (r) => r.accessPorts || "—" },
     { header: "Trunk Ports", key: "trunkPorts", cell: (r) => r.trunkPorts || "—" },
     { header: "SVI IP", key: "sviIp", cell: (r) => r.sviIp || "—" },
-    { header: "HSRP VIP", key: "hsrpVip", cell: (r) => r.hsrpVip || "—" },
   ];
   const exportVlans = () => {
-    const headers = ["vlanId", "name", "status", "accessPorts", "trunkPorts", "sviIp", "hsrpVip"];
+    const headers = ["vlanId", "name", "status", "accessPorts", "trunkPorts", "sviIp"];
     const rows = vlans.map((v) => headers.map((h) => `"${String(v[h] ?? "").replaceAll('"', '""')}"`).join(","));
     downloadCSV([headers.join(","), ...rows].join("\n"), `${facts.device}_vlans.csv`);
   };
@@ -4105,18 +4116,98 @@ const DeviceDetailsView = ({ project, deviceId, goBack, goBackHref, goIndex, goI
 
       {/* VLANS */}
       {!loading && !error && tab === "vlans" && (
-        <div className="max-h-[80vh] overflow-hidden rounded-2xl border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-900/30 flex flex-col">
-          <Table
-            title="VLANs"
-            actions={<Button variant="secondary" onClick={exportVlans} disabled={!vlans || vlans.length === 0}>Export CSV</Button>}
-            searchable
-            searchPlaceholder="Search VLAN ID, name, status..."
-            columns={vlanColumns}
-            data={vlans}
-            empty="No VLANs parsed"
-            minWidthClass="min-w-[900px]"
-            containerClassName="flex-1"
-          />
+        <div className="grid gap-6">
+          {/* VLANs Table */}
+          <div className="max-h-[40vh] overflow-hidden rounded-2xl border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-900/30 flex flex-col">
+            <Table
+              title="VLANs"
+              actions={<Button variant="secondary" onClick={exportVlans} disabled={!vlans || vlans.length === 0}>Export CSV</Button>}
+              searchable
+              searchPlaceholder="Search VLAN ID, name, status..."
+              columns={vlanColumns}
+              data={vlans}
+              empty="No VLANs parsed"
+              minWidthClass="min-w-[900px]"
+              containerClassName="flex-1"
+            />
+          </div>
+
+          {/* DHCP Pools */}
+          {deviceData?.dhcp_pools && deviceData.dhcp_pools.length > 0 && (
+            <div className="max-h-[40vh] overflow-hidden rounded-2xl border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-900/30 flex flex-col">
+              <Table
+                title="DHCP Pools"
+                searchable
+                searchPlaceholder="Search DHCP pool name..."
+                columns={[
+                  { header: "Pool Name", key: "name", cell: (r) => r.name },
+                  { header: "Network", key: "network", cell: (r) => r.network || "—" },
+                  { header: "Subnet Mask", key: "mask", cell: (r) => r.mask || "—" },
+                  { header: "Gateway", key: "gateway", cell: (r) => r.gateway || "—" },
+                  { header: "DNS Servers", key: "dns_servers", cell: (r) => 
+                    r.dns_servers?.length > 0 ? r.dns_servers.join(", ") : "—"
+                  },
+                  { header: "Lease Time", key: "lease_time", cell: (r) => r.lease_time || "—" },
+                  { header: "Excluded", key: "excluded", cell: (r) => 
+                    r.excluded_addresses?.length > 0 ? `${r.excluded_addresses.length} addresses` : "—"
+                  },
+                ]}
+                data={deviceData.dhcp_pools}
+                empty="No DHCP pools"
+                minWidthClass="min-w-[800px]"
+                containerClassName="flex-1"
+                expandable
+                expandableContent={(pool) => (
+                  <div className="p-4 bg-slate-50 dark:bg-slate-800/50 border-t border-slate-200 dark:border-slate-700">
+                    <div className="grid grid-cols-2 gap-4 text-sm">
+                      <div>
+                        <span className="font-medium text-slate-700 dark:text-slate-300">Pool Name:</span>
+                        <span className="ml-2 text-slate-600 dark:text-slate-400">{pool.name}</span>
+                      </div>
+                      {pool.network && (
+                        <div>
+                          <span className="font-medium text-slate-700 dark:text-slate-300">Network:</span>
+                          <span className="ml-2 text-slate-600 dark:text-slate-400">{pool.network}</span>
+                        </div>
+                      )}
+                      {pool.mask && (
+                        <div>
+                          <span className="font-medium text-slate-700 dark:text-slate-300">Subnet Mask:</span>
+                          <span className="ml-2 text-slate-600 dark:text-slate-400">{pool.mask}</span>
+                        </div>
+                      )}
+                      {pool.gateway && (
+                        <div>
+                          <span className="font-medium text-slate-700 dark:text-slate-300">Gateway:</span>
+                          <span className="ml-2 text-slate-600 dark:text-slate-400">{pool.gateway}</span>
+                        </div>
+                      )}
+                      {pool.dns_servers && pool.dns_servers.length > 0 && (
+                        <div className="col-span-2">
+                          <span className="font-medium text-slate-700 dark:text-slate-300">DNS Servers:</span>
+                          <span className="ml-2 text-slate-600 dark:text-slate-400">{pool.dns_servers.join(", ")}</span>
+                        </div>
+                      )}
+                      {pool.lease_time && (
+                        <div>
+                          <span className="font-medium text-slate-700 dark:text-slate-300">Lease Time:</span>
+                          <span className="ml-2 text-slate-600 dark:text-slate-400">{pool.lease_time}</span>
+                        </div>
+                      )}
+                      {pool.excluded_addresses && pool.excluded_addresses.length > 0 && (
+                        <div className="col-span-2">
+                          <span className="font-medium text-slate-700 dark:text-slate-300">Excluded Addresses:</span>
+                          <div className="mt-1 text-slate-600 dark:text-slate-400">
+                            {pool.excluded_addresses.join(", ")}
+                          </div>
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                )}
+              />
+            </div>
+          )}
         </div>
       )}
 
@@ -4475,6 +4566,34 @@ const DeviceDetailsView = ({ project, deviceId, goBack, goBackHref, goIndex, goI
                 </div>
               </div>
             </div>
+            
+            {/* ACL & NAT Summary Cards */}
+            <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+              <div className="p-3 rounded-xl border border-slate-300 dark:border-slate-700 bg-slate-50 dark:bg-slate-800/50">
+                <div className="text-xs text-slate-500 dark:text-slate-400">Standard ACLs</div>
+                <div className="text-xl font-semibold text-slate-800 dark:text-slate-200">
+                  {(deviceData?.acls?.standard || []).length}
+                </div>
+              </div>
+              <div className="p-3 rounded-xl border border-slate-300 dark:border-slate-700 bg-slate-50 dark:bg-slate-800/50">
+                <div className="text-xs text-slate-500 dark:text-slate-400">Extended ACLs</div>
+                <div className="text-xl font-semibold text-slate-800 dark:text-slate-200">
+                  {(deviceData?.acls?.extended || []).length}
+                </div>
+              </div>
+              <div className="p-3 rounded-xl border border-slate-300 dark:border-slate-700 bg-slate-50 dark:bg-slate-800/50">
+                <div className="text-xs text-slate-500 dark:text-slate-400">NAT Policies</div>
+                <div className="text-xl font-semibold text-slate-800 dark:text-slate-200">
+                  {(deviceData?.nat_policies || []).length}
+                </div>
+              </div>
+              <div className="p-3 rounded-xl border border-slate-300 dark:border-slate-700 bg-slate-50 dark:bg-slate-800/50">
+                <div className="text-xs text-slate-500 dark:text-slate-400">DHCP Pools</div>
+                <div className="text-xl font-semibold text-slate-800 dark:text-slate-200">
+                  {(deviceData?.dhcp_pools || []).length}
+                </div>
+              </div>
+            </div>
 
             {/* User Accounts - handle both user_accounts and users structures */}
             {((securityData.user_accounts && securityData.user_accounts.length > 0) || (securityData.users && securityData.users.length > 0)) && (
@@ -4657,8 +4776,200 @@ const DeviceDetailsView = ({ project, deviceId, goBack, goBackHref, goIndex, goI
         )
       }
 
+      {/* ACLs - New Implementation */}
+      {deviceData?.acls && (
+        <div className="grid gap-6">
+          {/* Standard ACLs */}
+          {deviceData.acls.standard && deviceData.acls.standard.length > 0 && (
+            <div className="max-h-[40vh] overflow-hidden rounded-2xl border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-900/30 flex flex-col">
+              <Table
+                title="Standard ACLs"
+                searchable
+                searchPlaceholder="Search ACL name or rule..."
+                columns={[
+                  { header: "ACL Name", key: "name", cell: (r) => r.name || r.number || "—" },
+                  { header: "Type", key: "type", cell: (r) => r.type || "standard" },
+                  { header: "Rules", key: "rules", cell: (r) => r.rules?.length || 0 },
+                  { header: "Applied On", key: "applied_interfaces", cell: (r) => 
+                    r.applied_interfaces?.length > 0 ? r.applied_interfaces.join(", ") : "—"
+                  },
+                ]}
+                data={deviceData.acls.standard}
+                empty="No standard ACLs"
+                minWidthClass="min-w-[600px]"
+                containerClassName="flex-1"
+                expandable
+                expandableContent={(acl) => (
+                  <div className="p-4 bg-slate-50 dark:bg-slate-800/50 border-t border-slate-200 dark:border-slate-700">
+                    <h4 className="font-semibold text-sm mb-2 text-slate-700 dark:text-slate-300">Rules:</h4>
+                    <div className="space-y-1">
+                      {acl.rules?.map((rule, idx) => (
+                        <div key={idx} className="text-xs p-2 bg-white dark:bg-slate-800 rounded border border-slate-200 dark:border-slate-700">
+                          <div className="flex items-center gap-2">
+                            <span className={`font-medium ${rule.action === "permit" ? "text-green-600" : "text-red-600"}`}>
+                              {rule.action}
+                            </span>
+                            <span className="text-slate-600 dark:text-slate-400">{rule.source}</span>
+                          </div>
+                          {rule.access_interfaces?.length > 0 && (
+                            <div className="text-xs text-slate-500 dark:text-slate-400 mt-1">
+                              Applied: {rule.access_interfaces.join(", ")}
+                            </div>
+                          )}
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
+              />
+            </div>
+          )}
+
+          {/* Extended ACLs */}
+          {deviceData.acls.extended && deviceData.acls.extended.length > 0 && (
+            <div className="max-h-[40vh] overflow-hidden rounded-2xl border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-900/30 flex flex-col">
+              <Table
+                title="Extended ACLs"
+                searchable
+                searchPlaceholder="Search ACL name or rule..."
+                columns={[
+                  { header: "ACL Name", key: "name", cell: (r) => r.name || r.number || "—" },
+                  { header: "Type", key: "type", cell: (r) => r.type || "extended" },
+                  { header: "Rules", key: "rules", cell: (r) => r.rules?.length || 0 },
+                  { header: "Applied On", key: "applied_interfaces", cell: (r) => 
+                    r.applied_interfaces?.length > 0 ? r.applied_interfaces.join(", ") : "—"
+                  },
+                ]}
+                data={deviceData.acls.extended}
+                empty="No extended ACLs"
+                minWidthClass="min-w-[600px]"
+                containerClassName="flex-1"
+                expandable
+                expandableContent={(acl) => (
+                  <div className="p-4 bg-slate-50 dark:bg-slate-800/50 border-t border-slate-200 dark:border-slate-700">
+                    <h4 className="font-semibold text-sm mb-2 text-slate-700 dark:text-slate-300">Rules:</h4>
+                    <div className="space-y-1">
+                      {acl.rules?.map((rule, idx) => (
+                        <div key={idx} className="text-xs p-2 bg-white dark:bg-slate-800 rounded border border-slate-200 dark:border-slate-700">
+                          <div className="flex items-center gap-2">
+                            <span className={`font-medium ${rule.action === "permit" ? "text-green-600" : "text-red-600"}`}>
+                              {rule.action}
+                            </span>
+                            <span className="text-slate-600 dark:text-slate-400">{rule.protocol || "—"}</span>
+                            <span className="text-slate-600 dark:text-slate-400">{rule.source}</span>
+                            <span className="text-slate-600 dark:text-slate-400">{rule.destination}</span>
+                            {rule.port && (
+                              <span className="text-slate-600 dark:text-slate-400">port {rule.port}</span>
+                            )}
+                          </div>
+                          {rule.access_interfaces?.length > 0 && (
+                            <div className="text-xs text-slate-500 dark:text-slate-400 mt-1">
+                              Applied: {rule.access_interfaces.join(", ")}
+                            </div>
+                          )}
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
+              />
+            </div>
+          )}
+
+          {/* NAT Policies */}
+          {deviceData.nat_policies && deviceData.nat_policies.length > 0 && (
+            <div className="max-h-[40vh] overflow-hidden rounded-2xl border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-900/30 flex flex-col">
+              <Table
+                title="NAT Policies"
+                searchable
+                searchPlaceholder="Search NAT policies..."
+                columns={[
+                  { header: "Type", key: "type", cell: (r) => (
+                    <span className={`px-2 py-1 rounded text-xs font-medium ${
+                      r.type === "static" 
+                        ? "bg-blue-100 text-blue-800 dark:bg-blue-800/30 dark:text-blue-300"
+                        : "bg-green-100 text-green-800 dark:bg-green-800/30 dark:text-green-300"
+                    }`}>
+                      {r.type}
+                    </span>
+                  )},
+                  { header: "ACL", key: "acl", cell: (r) => r.acl || "—" },
+                  { header: "Interface", key: "interface", cell: (r) => r.interface || "—" },
+                  { header: "Overload", key: "overload", cell: (r) => r.overload ? "Yes" : "No" },
+                  { header: "Details", key: "details", cell: (r) => {
+                    if (r.inside_local && r.outside_global) {
+                      return `${r.inside_local} → ${r.outside_global}`;
+                    }
+                    if (r.address_range) {
+                      return `Range: ${r.address_range}`;
+                    }
+                    if (r.address_group) {
+                      return `Group: ${r.address_group}`;
+                    }
+                    return "—";
+                  }},
+                ]}
+                data={deviceData.nat_policies}
+                empty="No NAT policies"
+                minWidthClass="min-w-[700px]"
+                containerClassName="flex-1"
+                expandable
+                expandableContent={(policy) => (
+                  <div className="p-4 bg-slate-50 dark:bg-slate-800/50 border-t border-slate-200 dark:border-slate-700">
+                    <div className="grid grid-cols-2 gap-4 text-sm">
+                      <div>
+                        <span className="font-medium text-slate-700 dark:text-slate-300">Type:</span>
+                        <span className="ml-2 text-slate-600 dark:text-slate-400">{policy.type}</span>
+                      </div>
+                      {policy.acl && (
+                        <div>
+                          <span className="font-medium text-slate-700 dark:text-slate-300">ACL:</span>
+                          <span className="ml-2 text-slate-600 dark:text-slate-400">{policy.acl}</span>
+                        </div>
+                      )}
+                      {policy.interface && (
+                        <div>
+                          <span className="font-medium text-slate-700 dark:text-slate-300">Interface:</span>
+                          <span className="ml-2 text-slate-600 dark:text-slate-400">{policy.interface}</span>
+                        </div>
+                      )}
+                      {policy.protocol && (
+                        <div>
+                          <span className="font-medium text-slate-700 dark:text-slate-300">Protocol:</span>
+                          <span className="ml-2 text-slate-600 dark:text-slate-400">{policy.protocol}</span>
+                        </div>
+                      )}
+                      {policy.inside_local && (
+                        <div>
+                          <span className="font-medium text-slate-700 dark:text-slate-300">Inside Local:</span>
+                          <span className="ml-2 text-slate-600 dark:text-slate-400">{policy.inside_local}</span>
+                        </div>
+                      )}
+                      {policy.outside_global && (
+                        <div>
+                          <span className="font-medium text-slate-700 dark:text-slate-300">Outside Global:</span>
+                          <span className="ml-2 text-slate-600 dark:text-slate-400">{policy.outside_global}</span>
+                        </div>
+                      )}
+                      {policy.ports && (
+                        <div className="col-span-2">
+                          <span className="font-medium text-slate-700 dark:text-slate-300">Port Mapping:</span>
+                          <span className="ml-2 text-slate-600 dark:text-slate-400">
+                            {policy.ports.inside} → {policy.ports.outside}
+                          </span>
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                )}
+              />
+            </div>
+          )}
+        </div>
+      )}
+
       {
-        !loading && !error && tab === "security" && (!securityData.user_accounts || securityData.user_accounts.length === 0) && (!securityData.users || securityData.users.length === 0) && !securityData.aaa && !securityData.ssh && !securityData.snmp && !securityData.ntp && !securityData.syslog && !(securityData.logging && (securityData.logging.enabled || (securityData.logging.log_hosts && securityData.logging.log_hosts.length))) && (!securityData.acls || securityData.acls.length === 0) && (
+        !loading && !error && tab === "security" && (!securityData.user_accounts || securityData.user_accounts.length === 0) && (!securityData.users || securityData.users.length === 0) && !securityData.aaa && !securityData.ssh && !securityData.snmp && !securityData.ntp && !securityData.syslog && !(securityData.logging && (securityData.logging.enabled || (securityData.logging.log_hosts && securityData.logging.log_hosts.length))) && (!securityData.acls || securityData.acls.length === 0) && (!deviceData?.acls || (!deviceData.acls.standard?.length && !deviceData.acls.extended?.length)) && (!deviceData?.nat_policies || deviceData.nat_policies.length === 0) && (
           <Card title="Security">
             <div className="text-sm text-gray-500 dark:text-gray-400">No security information available</div>
           </Card>
@@ -6353,7 +6664,8 @@ const HistoryPage = ({ project, can, authedUser }) => {
       setLoading(true);
       try {
         const projectId = project.project_id || project.id;
-        const docs = await api.getDocuments(projectId);
+        const response = await api.getDocuments(projectId);
+        const docs = response.documents || response || [];
         setDocuments(Array.isArray(docs) ? docs : []);
       } catch (error) {
         console.error('Failed to load documents:', error);
@@ -7958,8 +8270,9 @@ const DocumentsPage = ({ project, can, authedUser, uploadHistory, setUploadHisto
       setLoading(true);
       try {
         const projectId = project.project_id || project.id;
-        const docs = await api.getDocuments(projectId);
-        // Ensure docs is an array
+        const response = await api.getDocuments(projectId);
+        // API returns {documents: [...], count: ...}, extract documents array
+        const docs = response.documents || response || [];
         setDocuments(Array.isArray(docs) ? docs : []);
       } catch (error) {
         console.error('Failed to load documents:', error);
@@ -7984,8 +8297,8 @@ const DocumentsPage = ({ project, can, authedUser, uploadHistory, setUploadHisto
       await new Promise(resolve => setTimeout(resolve, 500));
 
       // Reload all documents (frontend will filter by folder in UI)
-      const docs = await api.getDocuments(projectId);
-      // Ensure docs is an array
+      const response = await api.getDocuments(projectId);
+      const docs = response.documents || response || [];
       setDocuments(Array.isArray(docs) ? docs : []);
 
       console.log('Documents reloaded after upload:', docs.length, 'documents');
@@ -10168,7 +10481,10 @@ const LogsPage = ({ project, uploadHistory }) => {
 
 /* ========= HELPERS ========= */
 function downloadCSV(csv, filename) {
-  const blob = new Blob([csv], { type: "text/csv;charset=utf-8;" });
+  // Add BOM for proper Thai/Unicode character display in Excel
+  const BOM = "\uFEFF";
+  const csvWithBOM = BOM + csv;
+  const blob = new Blob([csvWithBOM], { type: "text/csv;charset=utf-8;" });
   const url = URL.createObjectURL(blob);
   const a = document.createElement("a");
   a.href = url;
@@ -12572,7 +12888,7 @@ function buildDeviceNarrative(project, row) {
   if (l3.length) parts.push(`• Routing: ${l3.join(" | ")}`);
 
   // Mgmt/Health
-  parts.push(`• NTP: ${row.ntpStatus || "—"}  |  SNMP: ${row.snmp || "—"}  |  Syslog: ${row.syslog || "—"}  |  CPU ${row.cpu ?? "—"}% / MEM ${row.mem ?? "—"}%`);
+  parts.push(`• NTP: ${row.ntpStatus || "—"}  |  SNMP: ${row.snmp || "—"}  |  Syslog: ${row.syslog || "—"}  |  CPU ${row.cpu != null ? row.cpu + '%' : '—'} / MEM ${row.mem != null ? row.mem + '%' : '—'}`);
 
   // Relationships from graph
   if (uniqNeigh.length) {

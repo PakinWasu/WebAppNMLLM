@@ -8,6 +8,57 @@ from .base import BaseParser
 
 
 # ============================================================================
+# ACL, DHCP, NAT Models for Huawei
+# ============================================================================
+
+class DHCPPool(BaseModel):
+    """DHCP Pool Configuration"""
+    name: str
+    network: Optional[str] = None
+    mask: Optional[str] = None
+    gateway: Optional[str] = None
+    dns_servers: List[str] = []
+    lease_time: Optional[str] = None
+    excluded_addresses: List[str] = []
+
+class ACLRule(BaseModel):
+    """ACL Rule with access information"""
+    rule_id: Optional[str] = None
+    action: str  # permit/deny
+    protocol: Optional[str] = None
+    source: Optional[str] = None
+    source_wildcard: Optional[str] = None
+    destination: Optional[str] = None
+    destination_wildcard: Optional[str] = None
+    port: Optional[str] = None
+    port_operator: Optional[str] = None
+    access_interfaces: List[str] = []  # Interfaces where this ACL is applied
+
+class ACLInfo(BaseModel):
+    """ACL Configuration"""
+    name: Optional[str] = None
+    number: Optional[str] = None
+    type: str  # basic/advanced/l2
+    rules: List[ACLRule] = []
+    applied_interfaces: List[str] = []
+
+class NATPolicy(BaseModel):
+    """NAT Policy Configuration"""
+    type: str  # static/dynamic
+    acl: Optional[str] = None
+    interface: Optional[str] = None
+    overload: bool = False
+    address_group: Optional[str] = None
+    address_range: Optional[str] = None
+    inside_local: Optional[str] = None
+    inside_global: Optional[str] = None
+    outside_local: Optional[str] = None
+    outside_global: Optional[str] = None
+    protocol: Optional[str] = None
+    ports: Optional[Dict[str, int]] = None
+
+
+# ============================================================================
 # Pydantic Models for Strict Data Structure
 # ============================================================================
 
@@ -480,6 +531,25 @@ class HuaweiParser(BaseParser):
                 import traceback
                 traceback.print_exc()
             
+            # Parse ACL, DHCP, NAT
+            try:
+                dhcp_pools = self.extract_dhcp_pools(full)
+            except Exception as e:
+                print(f"⚠️ Error extracting DHCP pools from {filename}: {e}")
+                dhcp_pools = []
+            
+            try:
+                acls = self.extract_acls(full)
+            except Exception as e:
+                print(f"⚠️ Error extracting ACLs from {filename}: {e}")
+                acls = {"basic": [], "advanced": [], "l2": []}
+            
+            try:
+                nat_policies = self.extract_nat_policies(full)
+            except Exception as e:
+                print(f"⚠️ Error extracting NAT policies from {filename}: {e}")
+                nat_policies = []
+            
             # Management IP: first-available from interfaces (Loopback > Vlanif > Management > first physical)
             mgmt_ip = None
             try:
@@ -508,6 +578,29 @@ class HuaweiParser(BaseParser):
             except Exception:
                 pass
             
+            # Merge VLAN trunk information into interfaces
+            try:
+                trunk_ports = vlans.get("trunk_ports", [])
+                if trunk_ports:
+                    # Create a mapping of trunk port names to their VLAN info
+                    trunk_vlan_map = {tp["port"]: tp for tp in trunk_ports}
+                    
+                    # Update interfaces with VLAN information from trunk_ports
+                    for interface in interfaces:
+                        if interface["name"] in trunk_vlan_map:
+                            trunk_info = trunk_vlan_map[interface["name"]]
+                            # Only update if allowed_vlans is not already set from interface config
+                            if not interface.get("allowed_vlans"):
+                                interface["allowed_vlans"] = trunk_info.get("allowed_vlans")
+                            # Update native VLAN if not already set
+                            if not interface.get("native_vlan") and trunk_info.get("native_vlan"):
+                                try:
+                                    interface["native_vlan"] = int(trunk_info["native_vlan"])
+                                except (ValueError, TypeError):
+                                    pass
+            except Exception as e:
+                print(f"⚠️ Error merging VLAN trunk information: {e}")
+
             # Build config object
             try:
                 # VlanL2Switching expects vlan_list: List[int]; extract_vlans returns vlan_list as list of {id,name,status}
@@ -533,6 +626,9 @@ class HuaweiParser(BaseParser):
                 out["device_info"] = device_info
                 out["security_audit"] = security_audit
                 out["high_availability"] = high_availability
+                out["dhcp_pools"] = dhcp_pools
+                out["acls"] = acls
+                out["nat_policies"] = nat_policies
                 
                 # Standardize main structure keys to match Cisco
                 out["arp_mac_table"] = out.get("mac_arp", {})
@@ -1574,10 +1670,13 @@ class HuaweiParser(BaseParser):
             except ValueError:
                 pass
         
-        # Extract allowed VLANs
+        # Extract allowed VLANs from interface config
         allowed_vlans_match = re.search(r'port\s+trunk\s+allow-pass\s+vlan\s+(.+)', iface_config, re.IGNORECASE)
         if allowed_vlans_match:
             iface["allowed_vlans"] = allowed_vlans_match.group(1).strip()
+        
+        # If not found in interface config, try to get from VLAN display section later
+        # This handles cases where trunk VLANs are defined in display vlan output
         
         # Extract speed
         speed_match = re.search(r'speed\s+(\d+)', iface_config, re.IGNORECASE)
@@ -3535,3 +3634,235 @@ class HuaweiParser(BaseParser):
         ha["vrrp"] = [v for v in vrrp_map.values() if v.get("virtual_ip") and is_valid_ipv4(str(v["virtual_ip"]))]
         
         return ha
+    
+    def extract_dhcp_pools(self, content: str) -> List[Dict[str, Any]]:
+        """Extract DHCP pool configurations from Huawei"""
+        pools = []
+        
+        # Extract DHCP pools from Huawei configuration
+        pool_pattern = r'ip pool\s+(\S+).*?(?=ip pool|\n\S|\Z)'
+        for match in re.finditer(pool_pattern, content, re.DOTALL | re.IGNORECASE):
+            pool_name = match.group(1)
+            pool_content = match.group(0)
+            
+            pool = {"name": pool_name}
+            
+            # Extract network
+            net_match = re.search(r'network\s+(\S+)\s+mask\s+(\S+)', pool_content, re.IGNORECASE)
+            if net_match:
+                pool["network"] = net_match.group(1)
+                pool["mask"] = net_match.group(2)
+            
+            # Extract gateway
+            gw_match = re.search(r'gateway-list\s+(\S+)', pool_content, re.IGNORECASE)
+            if gw_match:
+                pool["gateway"] = gw_match.group(1)
+            
+            # Extract DNS servers
+            dns_match = re.search(r'dns-list\s+([^\r\n]+)', pool_content, re.IGNORECASE)
+            if dns_match:
+                pool["dns_servers"] = dns_match.group(1).split()
+            
+            # Extract excluded addresses
+            excluded_match = re.search(r'excluded-ip-address\s+([^\r\n]+)', pool_content, re.IGNORECASE)
+            if excluded_match:
+                excluded_text = excluded_match.group(1).strip()
+                # Parse excluded addresses (could be range or list)
+                if '-' in excluded_text:
+                    # Range like "10.10.10.175 10.10.10.254"
+                    pool["excluded_addresses"] = [excluded_text]
+                else:
+                    # List of individual addresses
+                    pool["excluded_addresses"] = [addr.strip() for addr in excluded_text.split() if addr.strip()]
+            
+            # Extract lease time
+            lease_match = re.search(r'lease\s+day\s+(\d+)\s+hour\s+(\d+)\s+minute\s+(\d+)', pool_content, re.IGNORECASE)
+            if lease_match:
+                days = lease_match.group(1)
+                hours = lease_match.group(2)
+                minutes = lease_match.group(3)
+                if int(days) > 0:
+                    pool["lease_time"] = f"{days} Days"
+                else:
+                    pool["lease_time"] = f"{hours}h {minutes}m"
+            
+            pools.append(pool)
+        
+        return pools
+    
+    def extract_acls(self, content: str) -> Dict[str, List[Dict[str, Any]]]:
+        """Extract ACL configurations from Huawei"""
+        acls = {"basic": [], "advanced": [], "l2": []}
+        
+        # Find interface applications first
+        interface_acls = {}
+        interface_pattern = r'interface\s+(\S+).*?(?=interface\s+|\n\S|\Z)'
+        for match in re.finditer(interface_pattern, content, re.DOTALL | re.IGNORECASE):
+            interface_name = match.group(1)
+            interface_content = match.group(0)
+            
+            # Find ACL applications on this interface
+            acl_matches = re.findall(r'traffic-filter\s+(inbound|outbound)\s+(?:acl\s+name\s+)?(\S+)', interface_content, re.IGNORECASE)
+            for direction, acl_name in acl_matches:
+                if acl_name not in interface_acls:
+                    interface_acls[acl_name] = []
+                interface_acls[acl_name].append(f"{interface_name}({direction})")
+        
+        # Also check VTY lines for ACL applications
+        vty_pattern = r'acl\s+name\s+(\S+)\s+(inbound|outbound)'
+        for match in re.finditer(vty_pattern, content, re.IGNORECASE):
+            acl_name = match.group(1)
+            direction = match.group(2)
+            if acl_name not in interface_acls:
+                interface_acls[acl_name] = []
+            interface_acls[acl_name].append(f"vty({direction})")
+        
+        # Extract basic ACLs (numbered 2000-2999)
+        basic_pattern = r'acl number\s+(2\d{3})(.*?)(?=acl\s|\n\S|\Z)'
+        for match in re.finditer(basic_pattern, content, re.DOTALL | re.IGNORECASE):
+            acl_num = match.group(1)
+            acl_content = match.group(2)
+            
+            acl = {"number": acl_num, "type": "basic", "rules": [], "applied_interfaces": interface_acls.get(acl_num, [])}
+            
+            # Extract rules
+            rule_pattern = r'rule\s+(\d+)\s+(permit|deny)\s+(.*)'
+            for rule_match in re.finditer(rule_pattern, acl_content, re.IGNORECASE):
+                rule = {
+                    "rule_id": rule_match.group(1),
+                    "action": rule_match.group(2),
+                    "source": rule_match.group(3).strip(),
+                    "access_interfaces": interface_acls.get(acl_num, [])
+                }
+                acl["rules"].append(rule)
+            
+            acls["basic"].append(acl)
+        
+        # Extract advanced ACLs (numbered 3000-3999)
+        advanced_pattern = r'acl number\s+(3\d{3})(.*?)(?=acl\s|\n\S|\Z)'
+        for match in re.finditer(advanced_pattern, content, re.DOTALL | re.IGNORECASE):
+            acl_num = match.group(1)
+            acl_content = match.group(2)
+            
+            acl = {"number": acl_num, "type": "advanced", "rules": [], "applied_interfaces": interface_acls.get(acl_num, [])}
+            
+            # Extract rules
+            rule_pattern = r'rule\s+(\d+)\s+(permit|deny)\s+([a-z]+)\s+(.*)'
+            for rule_match in re.finditer(rule_pattern, acl_content, re.IGNORECASE):
+                rule = {
+                    "rule_id": rule_match.group(1),
+                    "action": rule_match.group(2),
+                    "protocol": rule_match.group(3),
+                    "access_interfaces": interface_acls.get(acl_num, [])
+                }
+                
+                # Parse source and destination
+                rest = rule_match.group(4).strip()
+                parts = rest.split()
+                if len(parts) >= 2:
+                    rule["source"] = parts[0]
+                    rule["destination"] = " ".join(parts[1:])
+                
+                acl["rules"].append(rule)
+            
+            acls["advanced"].append(acl)
+        
+        # Extract named ACLs
+        named_pattern = r'acl name\s+(\S+)\s+(basic|advanced)(.*?)(?=acl\s|\n\S|\Z)'
+        for match in re.finditer(named_pattern, content, re.DOTALL | re.IGNORECASE):
+            acl_name = match.group(1)
+            acl_type = match.group(2)
+            acl_content = match.group(3)
+            
+            acl = {"name": acl_name, "type": acl_type, "rules": [], "applied_interfaces": interface_acls.get(acl_name, [])}
+            
+            # Extract rules
+            if acl_type == "basic":
+                rule_pattern = r'rule\s+(\d+)\s+(permit|deny)\s+(.*)'
+            else:
+                rule_pattern = r'rule\s+(\d+)\s+(permit|deny)\s+([a-z]+)\s+(.*)'
+            
+            for rule_match in re.finditer(rule_pattern, acl_content, re.IGNORECASE):
+                if acl_type == "basic":
+                    rule = {
+                        "rule_id": rule_match.group(1),
+                        "action": rule_match.group(2),
+                        "source": rule_match.group(3).strip(),
+                        "access_interfaces": interface_acls.get(acl_name, [])
+                    }
+                else:
+                    rule = {
+                        "rule_id": rule_match.group(1),
+                        "action": rule_match.group(2),
+                        "protocol": rule_match.group(3),
+                        "access_interfaces": interface_acls.get(acl_name, [])
+                    }
+                    
+                    rest = rule_match.group(4).strip()
+                    parts = rest.split()
+                    if len(parts) >= 2:
+                        rule["source"] = parts[0]
+                        rule["destination"] = " ".join(parts[1:])
+                
+                acl["rules"].append(rule)
+            
+            acls[acl_type].append(acl)
+        
+        return acls
+    
+    def extract_nat_policies(self, content: str) -> List[Dict[str, Any]]:
+        """Extract NAT policies from Huawei"""
+        policies = []
+        
+        # Extract NAT address groups
+        address_group_pattern = r'nat address-group\s+(\d+)\s+(\S+)\s+(\S+)'
+        for match in re.finditer(address_group_pattern, content, re.IGNORECASE):
+            group_id = match.group(1)
+            start_ip = match.group(2)
+            end_ip = match.group(3)
+            
+            # Look for ACL that uses this address group
+            acl_pattern = fr'nat\s+outbound\s+(\S+)\s+address-group\s+{group_id}'
+            acl_match = re.search(acl_pattern, content, re.IGNORECASE)
+            
+            if acl_match:
+                acl_name = acl_match.group(1)
+                policy = {
+                    "type": "dynamic",
+                    "acl": acl_name,
+                    "address_group": group_id,
+                    "address_range": f"{start_ip}-{end_ip}",
+                    "overload": True
+                }
+                policies.append(policy)
+        
+        # Extract static NAT
+        static_pattern = r'nat server\s+(protocol\s+([a-z]+)\s+)?(global\s+(\S+)\s+(inside\s+(\S+)|(\d+)))'
+        for match in re.finditer(static_pattern, content, re.IGNORECASE):
+            protocol = match.group(2) or "tcp"
+            global_addr = match.group(4)
+            inside_addr = match.group(6) or match.group(7)
+            
+            policy = {
+                "type": "static",
+                "protocol": protocol,
+                "outside_global": global_addr,
+                "inside_local": inside_addr
+            }
+            policies.append(policy)
+        
+        # Extract NAT with interface
+        interface_pattern = r'nat\s+outbound\s+(\S+)\s+interface\s+(\S+)'
+        for match in re.finditer(interface_pattern, content, re.IGNORECASE):
+            acl_name = match.group(1)
+            interface = match.group(2)
+            
+            policy = {
+                "type": "dynamic",
+                "acl": acl_name,
+                "interface": interface,
+                "overload": True
+            }
+            policies.append(policy)
+        
+        return policies
