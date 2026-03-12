@@ -3588,7 +3588,17 @@ const DeviceDetailsView = ({ project, deviceId, goBack, goBackHref, goIndex, goI
     const rows = filteredIfaces.map((r) =>
       headers.map((h) => (r[h] != null ? `"${String(r[h]).replaceAll('"', '""')}"` : "")).join(",")
     );
-    downloadCSV([headers.join(","), ...rows].join("\n"), `${facts.device}_interfaces.csv`);
+    const csv = [headers.join(","), ...rows].join("\n");
+    const normalizedCsv = csv.normalize('NFC');
+    const BOM = "\uFEFF";
+    const blob = new Blob([BOM + normalizedCsv], { type: "text/csv;charset=utf-8;" });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = `${facts.device}_interfaces.csv`;
+    a.click();
+    a.remove();
+    URL.revokeObjectURL(url);
   };
 
   const vlanColumns = [
@@ -3608,7 +3618,17 @@ const DeviceDetailsView = ({ project, deviceId, goBack, goBackHref, goIndex, goI
   const exportVlans = () => {
     const headers = ["vlanId", "name", "status", "accessPorts", "trunkPorts", "sviIp"];
     const rows = vlans.map((v) => headers.map((h) => `"${String(v[h] ?? "").replaceAll('"', '""')}"`).join(","));
-    downloadCSV([headers.join(","), ...rows].join("\n"), `${facts.device}_vlans.csv`);
+    const csv = [headers.join(","), ...rows].join("\n");
+    const normalizedCsv = csv.normalize('NFC');
+    const BOM = "\uFEFF";
+    const blob = new Blob([BOM + normalizedCsv], { type: "text/csv;charset=utf-8;" });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = `${facts.device}_vlans.csv`;
+    a.click();
+    a.remove();
+    URL.revokeObjectURL(url);
   };
 
   // Tabs
@@ -6953,9 +6973,16 @@ const HistoryPage = ({ project, can, authedUser }) => {
 
       // Combine headers and data
       const csvContent = [headers.join(','), ...csvData].join('\n');
+      
+      // Normalize Unicode characters for proper Thai display
+      const normalizedCsv = csvContent.normalize('NFC');
+      
+      // Add BOM for proper Thai/Unicode character display in Excel
+      const BOM = "\uFEFF";
+      const csvWithBOM = BOM + normalizedCsv;
 
       // Create download link
-      const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+      const blob = new Blob([csvWithBOM], { type: 'text/csv;charset=utf-8;' });
       const url = URL.createObjectURL(blob);
       const link = document.createElement('a');
       link.href = url;
@@ -10529,9 +10556,20 @@ const LogsPage = ({ project, uploadHistory }) => {
 
 /* ========= HELPERS ========= */
 function downloadCSV(csv, filename) {
+  // Normalize Unicode characters and ensure proper UTF-8 encoding
+  const normalizeString = (str) => {
+    // Convert from potential broken encoding to proper Unicode
+    return str.normalize('NFC');
+  };
+  
+  // Apply normalization to the entire CSV content
+  const normalizedCsv = normalizeString(csv);
+  
   // Add BOM for proper Thai/Unicode character display in Excel
   const BOM = "\uFEFF";
-  const csvWithBOM = BOM + csv;
+  const csvWithBOM = BOM + normalizedCsv;
+  
+  // Create blob with UTF-8 encoding
   const blob = new Blob([csvWithBOM], { type: "text/csv;charset=utf-8;" });
   const url = URL.createObjectURL(blob);
   const a = document.createElement("a");
