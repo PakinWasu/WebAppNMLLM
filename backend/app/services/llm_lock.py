@@ -29,25 +29,47 @@ async def acquire_llm_lock(project_id: str, user_id: str = None, job_type: str =
     coll = db()[COLLECTION]
     # Remove expired lock so we can take it
     await coll.delete_many({"project_id": project_id, "started_at": {"$lt": cutoff}})
-    try:
-        await coll.insert_one({
-            "project_id": project_id,
-            "started_at": now,
-            "user_id": user_id,
-            "job_type": job_type,
-        })
+
+    lock_doc = {
+        "project_id": project_id,
+        "started_at": now,
+        "user_id": user_id,
+        "job_type": job_type,
+    }
+
+    async def _try_insert() -> bool:
+        await coll.insert_one(lock_doc)
         return True
+
+    try:
+        return await _try_insert()
     except Exception as e:
         # Duplicate key (project_id unique) → lock held by another request
+        is_duplicate = False
         try:
             from pymongo.errors import DuplicateKeyError
+
             if isinstance(e, DuplicateKeyError):
-                return False
+                is_duplicate = True
         except ImportError:
             pass
-        if "duplicate" in str(e).lower() or "E11000" in str(e):
-            return False
-        raise
+        if not is_duplicate and "duplicate" not in str(e).lower() and "E11000" not in str(e):
+            # Not a duplicate-key error → real failure
+            raise
+
+        # Defensive: duplicate-key but no active lock doc (index/document mismatch or manual delete)
+        existing = await coll.find_one({"project_id": project_id, "started_at": {"$gte": cutoff}})
+        if not existing:
+            # Force-clear any leftover docs for this project and retry once
+            await coll.delete_many({"project_id": project_id})
+            try:
+                return await _try_insert()
+            except Exception:
+                # If it still fails, treat as locked rather than crashing
+                return False
+
+        # Real active lock exists
+        return False
 
 
 async def release_llm_lock(project_id: str) -> None:
