@@ -2251,8 +2251,8 @@ const CompareConfigModal = ({ project, deviceList = [], onClose }) => {
   const loadingConfigs = loadingLeftConfigs || loadingRightConfigs;
 
   return (
-    <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4" onClick={(e) => e.target === e.currentTarget && onClose()}>
-      <div className="bg-white dark:bg-slate-900 rounded-2xl shadow-xl border border-slate-300 dark:border-slate-700 w-[90%] max-w-6xl max-h-[90vh] flex flex-col" onClick={(e) => e.stopPropagation()}>
+    <div className="fixed inset-0 bg-black/50 flex items-stretch justify-stretch z-50 p-0" onClick={(e) => e.target === e.currentTarget && onClose()}>
+      <div className="bg-white dark:bg-slate-900 rounded-none shadow-xl border-0 w-full h-full flex flex-col" onClick={(e) => e.stopPropagation()}>
         <div className="flex-shrink-0 flex items-center justify-between p-4 border-b border-slate-300 dark:border-slate-700">
           <h3 className="text-lg font-semibold text-slate-800 dark:text-slate-100">Compare Configurations</h3>
           <button type="button" className="p-2 rounded-lg text-slate-500 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-800 hover:text-slate-700 dark:hover:text-slate-200 transition-colors" onClick={onClose} aria-label="Close">✕</button>
@@ -2529,20 +2529,24 @@ const SummaryPage = ({ project, projectId: projectIdProp, routeToHash, handleNav
     { header: "UNUSED", key: "unused", width: "70px" },
     { header: "VLANS", key: "vlans", width: "60px" },
     { header: "NATIVE VLAN", key: "native_vlan", width: "90px" },
-    { header: "TRUNK ALLOWED", key: "allowedShort", width: "100px", cell: (r) => r.allowedShort || "—" },
+    { header: "TRUNK ALLOWED", key: "trunk_allowed", width: "100px", cell: (r) => r.trunk_allowed ?? r.allowedShort ?? "—" },
     { header: "STP", key: "stp", width: "70px" },
     { header: "STP ROLE", key: "stp_role", width: "80px" },
     { header: "OSPF NEIGH", key: "ospf_neigh", width: "90px" },
     { header: "BGP ASN/NEIGH", key: "bgp_asn_neigh", width: "110px" },
     { header: "RT-PROTO", key: "rt_proto", width: "80px", cell: (r) => r.rt_proto || "—" },
-    { header: "CPU%", key: "cpu", width: "60px", cell: (r) => r.cpu != null ? `${r.cpu}%` : "0" },
-    { header: "MEM%", key: "mem", width: "60px", cell: (r) => r.mem != null ? `${r.mem}%` : "0" },
+    { header: "CPU%", key: "cpu", width: "60px", cell: (r) => (r.cpu != null && r.cpu !== "" && r.cpu !== "-") ? `${r.cpu}%` : "—" },
+    { header: "MEM%", key: "mem", width: "60px", cell: (r) => (r.mem != null && r.mem !== "" && r.mem !== "-") ? `${r.mem}%` : "—" },
     {
       header: "STATUS", key: "status", cell: (r) => {
         const raw = r.status;
         const status = (raw != null && typeof raw === "object") ? JSON.stringify(raw) : (raw || "OK");
         if (status === "OK") {
           return <span className="text-emerald-400">✅ OK</span>;
+        } else if (status === "Warning") {
+          return <span className="text-amber-400">⚠ Warning</span>;
+        } else if (status === "Critical") {
+          return <span className="text-red-400">⚠ Critical</span>;
         } else if (status === "Drift") {
           return <span className="text-amber-400">⚠ Drift</span>;
         } else {
@@ -4141,16 +4145,34 @@ const DeviceDetailsView = ({ project, deviceId, goBack, goBackHref, goIndex, goI
                 searchPlaceholder="Search DHCP pool name..."
                 columns={[
                   { header: "Pool Name", key: "name", cell: (r) => r.name },
-                  { header: "Network", key: "network", cell: (r) => r.network || "—" },
-                  { header: "Subnet Mask", key: "mask", cell: (r) => r.mask || "—" },
+                  { header: "Network (Subnet)", key: "network", cell: (r) => 
+                    r.network && r.mask ? `${r.network}/${r.mask}` : (r.network || "—")
+                  },
                   { header: "Gateway", key: "gateway", cell: (r) => r.gateway || "—" },
+                  { header: "Excluded IPs", key: "excluded", cell: (r) => {
+                    if (!r.excluded_addresses || r.excluded_addresses.length === 0) return "—";
+                    if (r.excluded_addresses.length === 1) return r.excluded_addresses[0];
+                    if (r.excluded_addresses.length === 2) {
+                      const [start, end] = r.excluded_addresses;
+                      const startParts = start.split('.');
+                      const endParts = end.split('.');
+                      if (startParts.slice(0, 3).join('.') === endParts.slice(0, 3).join('.')) {
+                        return `${startParts.slice(0, 3).join('.')}.${startParts[3]} - ${endParts[3]}`;
+                      }
+                      return `${start} - ${end}`;
+                    }
+                    return `${r.excluded_addresses[0]} - ${r.excluded_addresses[r.excluded_addresses.length - 1]}`;
+                  }},
                   { header: "DNS Servers", key: "dns_servers", cell: (r) => 
                     r.dns_servers?.length > 0 ? r.dns_servers.join(", ") : "—"
                   },
-                  { header: "Lease Time", key: "lease_time", cell: (r) => r.lease_time || "—" },
-                  { header: "Excluded", key: "excluded", cell: (r) => 
-                    r.excluded_addresses?.length > 0 ? `${r.excluded_addresses.length} addresses` : "—"
-                  },
+                  { header: "Lease Time", key: "lease_time", cell: (r) => {
+                    if (!r.lease_time) return "Default";
+                    if (r.lease_time.toString().match(/^\d+$/)) {
+                      return `${r.lease_time} Days`;
+                    }
+                    return r.lease_time;
+                  }},
                 ]}
                 data={deviceData.dhcp_pools}
                 empty="No DHCP pools"
@@ -4566,34 +4588,6 @@ const DeviceDetailsView = ({ project, deviceId, goBack, goBackHref, goIndex, goI
                 </div>
               </div>
             </div>
-            
-            {/* ACL & NAT Summary Cards */}
-            <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
-              <div className="p-3 rounded-xl border border-slate-300 dark:border-slate-700 bg-slate-50 dark:bg-slate-800/50">
-                <div className="text-xs text-slate-500 dark:text-slate-400">Standard ACLs</div>
-                <div className="text-xl font-semibold text-slate-800 dark:text-slate-200">
-                  {(deviceData?.acls?.standard || []).length}
-                </div>
-              </div>
-              <div className="p-3 rounded-xl border border-slate-300 dark:border-slate-700 bg-slate-50 dark:bg-slate-800/50">
-                <div className="text-xs text-slate-500 dark:text-slate-400">Extended ACLs</div>
-                <div className="text-xl font-semibold text-slate-800 dark:text-slate-200">
-                  {(deviceData?.acls?.extended || []).length}
-                </div>
-              </div>
-              <div className="p-3 rounded-xl border border-slate-300 dark:border-slate-700 bg-slate-50 dark:bg-slate-800/50">
-                <div className="text-xs text-slate-500 dark:text-slate-400">NAT Policies</div>
-                <div className="text-xl font-semibold text-slate-800 dark:text-slate-200">
-                  {(deviceData?.nat_policies || []).length}
-                </div>
-              </div>
-              <div className="p-3 rounded-xl border border-slate-300 dark:border-slate-700 bg-slate-50 dark:bg-slate-800/50">
-                <div className="text-xs text-slate-500 dark:text-slate-400">DHCP Pools</div>
-                <div className="text-xl font-semibold text-slate-800 dark:text-slate-200">
-                  {(deviceData?.dhcp_pools || []).length}
-                </div>
-              </div>
-            </div>
 
             {/* User Accounts - handle both user_accounts and users structures */}
             {((securityData.user_accounts && securityData.user_accounts.length > 0) || (securityData.users && securityData.users.length > 0)) && (
@@ -4721,255 +4715,309 @@ const DeviceDetailsView = ({ project, deviceId, goBack, goBackHref, goIndex, goI
                 </Card>
               )
             }
-
-            {/* ACLs */}
-            {
-              (securityData.acls && Array.isArray(securityData.acls) && securityData.acls.length > 0) && (
-                <Card title="Access Control Lists (ACLs)">
-                  <div className="grid gap-4">
-                    {securityData.acls.map((acl, idx) => (
-                      <Card key={idx} title={`ACL ${acl.acl_number || acl.name || `#${idx + 1}`}`} className="border border-slate-300 dark:border-gray-700">
-                        {acl.rules && Array.isArray(acl.rules) && acl.rules.length > 0 ? (
-                          <div className="max-h-[45vh] overflow-hidden rounded-xl border border-slate-300 dark:border-[#1F2937] bg-white dark:bg-slate-900/30 flex flex-col">
-                            {(() => {
-                              const rules = acl.rules;
-                              const hasStringRules = rules.some(r => typeof r === "string");
-                              const data = hasStringRules
-                                ? rules.map((r, i) => (typeof r === "string" ? { id: i + 1, rule: r } : { id: r.id ?? i + 1, ...r }))
-                                : rules;
-                              const columns = hasStringRules
-                                ? [
-                                  { header: "Rule ID", key: "id" },
-                                  { header: "Rule", key: "rule", cell: (r) => r.rule || "—" },
-                                ]
-                                : [
-                                  { header: "Rule ID", key: "id" },
-                                  { header: "Action", key: "action", cell: (r) => r.action?.toUpperCase() || "—" },
-                                  { header: "Protocol", key: "protocol", cell: (r) => r.protocol || "—" },
-                                  { header: "Source", key: "source", cell: (r) => r.source || r.source_ip || "—" },
-                                  { header: "Source Mask", key: "source_mask", cell: (r) => r.source_mask || "—" },
-                                  { header: "Destination", key: "destination", cell: (r) => r.destination || r.destination_ip || "—" },
-                                  { header: "Destination Mask", key: "destination_mask", cell: (r) => r.destination_mask || "—" }
-                                ];
-                              return (
-                                <Table
-                                  title="ACL Rules"
-                                  columns={columns}
-                                  data={data}
-                                  empty="No rules in this ACL"
-                                  minWidthClass={hasStringRules ? "min-w-[700px]" : "min-w-[1200px]"}
-                                  containerClassName="flex-1"
-                                />
-                              );
-                            })()}
-                          </div>
-                        ) : (
-                          <div className="text-sm text-gray-500 dark:text-gray-400">No rules defined for this ACL</div>
-                        )}
-                      </Card>
-                    ))}
-                  </div>
-                </Card>
-              )
-            }
-          </div>
-        )
-      }
-
-      {/* ACLs - New Implementation */}
+          
+      {/* ACLs - Unified Table */}
       {deviceData?.acls && (
-        <div className="grid gap-6">
-          {/* Standard ACLs */}
-          {deviceData.acls.standard && deviceData.acls.standard.length > 0 && (
-            <div className="max-h-[40vh] overflow-hidden rounded-2xl border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-900/30 flex flex-col">
-              <Table
-                title="Standard ACLs"
-                searchable
-                searchPlaceholder="Search ACL name or rule..."
-                columns={[
-                  { header: "ACL Name", key: "name", cell: (r) => r.name || r.number || "—" },
-                  { header: "Type", key: "type", cell: (r) => r.type || "standard" },
-                  { header: "Rules", key: "rules", cell: (r) => r.rules?.length || 0 },
-                  { header: "Applied On", key: "applied_interfaces", cell: (r) => 
-                    r.applied_interfaces?.length > 0 ? r.applied_interfaces.join(", ") : "—"
-                  },
-                ]}
-                data={deviceData.acls.standard}
-                empty="No standard ACLs"
-                minWidthClass="min-w-[600px]"
-                containerClassName="flex-1"
-                expandable
-                expandableContent={(acl) => (
-                  <div className="p-4 bg-slate-50 dark:bg-slate-800/50 border-t border-slate-200 dark:border-slate-700">
-                    <h4 className="font-semibold text-sm mb-2 text-slate-700 dark:text-slate-300">Rules:</h4>
-                    <div className="space-y-1">
-                      {acl.rules?.map((rule, idx) => (
-                        <div key={idx} className="text-xs p-2 bg-white dark:bg-slate-800 rounded border border-slate-200 dark:border-slate-700">
-                          <div className="flex items-center gap-2">
-                            <span className={`font-medium ${rule.action === "permit" ? "text-green-600" : "text-red-600"}`}>
-                              {rule.action}
-                            </span>
-                            <span className="text-slate-600 dark:text-slate-400">{rule.source}</span>
-                          </div>
-                          {rule.access_interfaces?.length > 0 && (
-                            <div className="text-xs text-slate-500 dark:text-slate-400 mt-1">
-                              Applied: {rule.access_interfaces.join(", ")}
-                            </div>
-                          )}
-                        </div>
-                      ))}
-                    </div>
-                  </div>
-                )}
-              />
-            </div>
-          )}
+        <div className="max-h-[40vh] overflow-hidden rounded-2xl border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-900/30 flex flex-col">
+          <Table
+            title="ACLs"
+            searchable
+            searchPlaceholder="Search ACL name or rule..."
+            columns={[
+              { 
+                header: "ACL ID / Name", 
+                key: "name", 
+                cell: (r) => r.name || r.number || "—" 
+              },
+              { 
+                header: "Type", 
+                key: "type", 
+                cell: (r) => {
+                  const type = r.type || "standard";
+                  return type.charAt(0).toUpperCase() + type.slice(1);
+                }
+              },
+              { 
+                header: "Rule Count", 
+                key: "rules", 
+                cell: (r) => `${r.rules?.length || 0} Rules` 
+              },
+              { 
+                header: "Applied Targets (Bindings)", 
+                key: "applied_interfaces", 
+                cell: (r) => {
+                  if (!r.applied_interfaces || r.applied_interfaces.length === 0) {
+                    return "Unassigned";
+                  }
+                  return r.applied_interfaces.map(iface => {
+                    // Extract interface name and direction
+                    const match = iface.match(/(.+)\((.+)\)/);
+                    if (match) {
+                      return `${match[1]} (${match[2].charAt(0).toUpperCase() + match[2].slice(1)})`;
+                    }
+                    return iface;
+                  }).join(", ");
+                }
+              },
+              { 
+                header: "More Detail", 
+                key: "detail", 
+                cell: (r) => {
+                  const aclId = r.name || r.number || `acl-${Math.random().toString(36).substr(2, 9)}`;
+                  return (
+                    <button 
+                      className="px-2 py-1 text-xs bg-blue-500 text-white rounded hover:bg-blue-600 transition-colors"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        // Toggle popup visibility using ACL ID
+                        const popupId = `acl-popup-${aclId}`;
+                        const popup = document.getElementById(popupId);
+                        if (popup) {
+                          popup.style.display = popup.style.display === 'none' ? 'block' : 'none';
+                        } else {
+                          console.log('Popup not found:', popupId);
+                        }
+                      }}
+                    >
+                      View Rules
+                    </button>
+                  );
+                }
+              },
+            ]}
+            data={[
+              ...(deviceData.acls.standard || []),
+              ...(deviceData.acls.extended || []),
+              ...(deviceData.acls.basic || []),
+              ...(deviceData.acls.advanced || []),
+              ...(deviceData.acls.l2 || [])
+            ]}
+            empty="No ACLs"
+            minWidthClass="min-w-[700px]"
+            containerClassName="flex-1"
+          />
+        </div>
+      )}
 
-          {/* Extended ACLs */}
-          {deviceData.acls.extended && deviceData.acls.extended.length > 0 && (
-            <div className="max-h-[40vh] overflow-hidden rounded-2xl border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-900/30 flex flex-col">
-              <Table
-                title="Extended ACLs"
-                searchable
-                searchPlaceholder="Search ACL name or rule..."
-                columns={[
-                  { header: "ACL Name", key: "name", cell: (r) => r.name || r.number || "—" },
-                  { header: "Type", key: "type", cell: (r) => r.type || "extended" },
-                  { header: "Rules", key: "rules", cell: (r) => r.rules?.length || 0 },
-                  { header: "Applied On", key: "applied_interfaces", cell: (r) => 
-                    r.applied_interfaces?.length > 0 ? r.applied_interfaces.join(", ") : "—"
-                  },
-                ]}
-                data={deviceData.acls.extended}
-                empty="No extended ACLs"
-                minWidthClass="min-w-[600px]"
-                containerClassName="flex-1"
-                expandable
-                expandableContent={(acl) => (
-                  <div className="p-4 bg-slate-50 dark:bg-slate-800/50 border-t border-slate-200 dark:border-slate-700">
-                    <h4 className="font-semibold text-sm mb-2 text-slate-700 dark:text-slate-300">Rules:</h4>
-                    <div className="space-y-1">
-                      {acl.rules?.map((rule, idx) => (
-                        <div key={idx} className="text-xs p-2 bg-white dark:bg-slate-800 rounded border border-slate-200 dark:border-slate-700">
-                          <div className="flex items-center gap-2">
-                            <span className={`font-medium ${rule.action === "permit" ? "text-green-600" : "text-red-600"}`}>
-                              {rule.action}
+      {/* ACL Rules Popups */}
+      {deviceData?.acls && (
+        <div className="contents">
+          {[
+            ...(deviceData.acls.standard || []),
+            ...(deviceData.acls.extended || []),
+            ...(deviceData.acls.basic || []),
+            ...(deviceData.acls.advanced || []),
+            ...(deviceData.acls.l2 || [])
+          ].map((acl) => {
+            const aclId = acl.name || acl.number || `acl-${Math.random().toString(36).substr(2, 9)}`;
+            return (
+            <div
+              key={aclId}
+              id={`acl-popup-${aclId}`}
+              className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4"
+              style={{ display: 'none' }}
+              onClick={(e) => {
+                if (e.target === e.currentTarget) {
+                  e.currentTarget.style.display = 'none';
+                }
+              }}
+            >
+              <div className="bg-white dark:bg-slate-900 rounded-xl p-6 max-w-4xl max-h-[80vh] overflow-auto w-full mx-auto shadow-xl">
+                <div className="flex justify-between items-center mb-4">
+                  <h3 className="text-lg font-semibold text-slate-800 dark:text-slate-200">
+                    ACL Rules: {acl.name || acl.number || 'Unknown'}
+                  </h3>
+                  <button
+                    className="text-slate-500 hover:text-slate-700 dark:text-slate-400 dark:hover:text-slate-200"
+                    onClick={() => {
+                      const popup = document.getElementById(`acl-popup-${aclId}`);
+                      if (popup) popup.style.display = 'none';
+                    }}
+                  >
+                    ✕
+                  </button>
+                </div>
+                <div className="overflow-x-auto">
+                  <table className="w-full text-sm">
+                    <thead>
+                      <tr className="border-b border-slate-200 dark:border-slate-700">
+                        <th className="text-left p-3 font-medium text-slate-700 dark:text-slate-300">Seq</th>
+                        <th className="text-left p-3 font-medium text-slate-700 dark:text-slate-300">Action</th>
+                        <th className="text-left p-3 font-medium text-slate-700 dark:text-slate-300">Protocol</th>
+                        <th className="text-left p-3 font-medium text-slate-700 dark:text-slate-300">Source</th>
+                        <th className="text-left p-3 font-medium text-slate-700 dark:text-slate-300">Destination</th>
+                        <th className="text-left p-3 font-medium text-slate-700 dark:text-slate-300">Port/Service</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {acl.rules?.map((rule, ruleIdx) => (
+                        <tr key={ruleIdx} className="border-b border-slate-100 dark:border-slate-800">
+                          <td className="p-3">{rule.rule_id || ruleIdx + 1}</td>
+                          <td className="p-3">
+                            <span 
+                              style={{ 
+                                color: rule.action === "permit" ? "green" : "red",
+                                fontWeight: "medium"
+                              }}
+                            >
+                              {rule.action?.toUpperCase()}
                             </span>
-                            <span className="text-slate-600 dark:text-slate-400">{rule.protocol || "—"}</span>
-                            <span className="text-slate-600 dark:text-slate-400">{rule.source}</span>
-                            <span className="text-slate-600 dark:text-slate-400">{rule.destination}</span>
-                            {rule.port && (
-                              <span className="text-slate-600 dark:text-slate-400">port {rule.port}</span>
-                            )}
-                          </div>
-                          {rule.access_interfaces?.length > 0 && (
-                            <div className="text-xs text-slate-500 dark:text-slate-400 mt-1">
-                              Applied: {rule.access_interfaces.join(", ")}
-                            </div>
-                          )}
-                        </div>
+                          </td>
+                          <td className="p-3">{rule.protocol?.toUpperCase() || "IP"}</td>
+                          <td className="p-3">{rule.source || "Any"}</td>
+                          <td className="p-3">{rule.destination || "Any"}</td>
+                          <td className="p-3">
+                            {rule.port ? (
+                              rule.port.includes('eq') ? rule.port : `eq ${rule.port}`
+                            ) : "Any"}
+                          </td>
+                        </tr>
                       ))}
-                    </div>
-                  </div>
-                )}
-              />
+                    </tbody>
+                  </table>
+                </div>
+              </div>
             </div>
-          )}
+            );
+          })}
+        </div>
+      )}
 
-          {/* NAT Policies */}
-          {deviceData.nat_policies && deviceData.nat_policies.length > 0 && (
-            <div className="max-h-[40vh] overflow-hidden rounded-2xl border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-900/30 flex flex-col">
-              <Table
-                title="NAT Policies"
-                searchable
-                searchPlaceholder="Search NAT policies..."
-                columns={[
-                  { header: "Type", key: "type", cell: (r) => (
+      {/* NAT Policies */}
+      {deviceData.nat_policies && deviceData.nat_policies.length > 0 && (
+        <div className="max-h-[40vh] overflow-hidden rounded-2xl border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-900/30 flex flex-col">
+          <Table
+            title="NAT Policies"
+            searchable
+            searchPlaceholder="Search NAT policies..."
+            columns={[
+              { 
+                header: "Type", 
+                key: "type", 
+                cell: (r) => {
+                  let displayType = r.type;
+                  if (r.type === "dynamic" && r.overload) {
+                    displayType = "Dynamic (PAT)";
+                  } else if (r.type === "dynamic" && r.address_group) {
+                    displayType = "Dynamic (Pool)";
+                  } else if (r.type === "static" && r.ports) {
+                    displayType = "Static (Port Fwd)";
+                  }
+                  return (
                     <span className={`px-2 py-1 rounded text-xs font-medium ${
                       r.type === "static" 
                         ? "bg-blue-100 text-blue-800 dark:bg-blue-800/30 dark:text-blue-300"
                         : "bg-green-100 text-green-800 dark:bg-green-800/30 dark:text-green-300"
                     }`}>
-                      {r.type}
+                      {displayType}
                     </span>
-                  )},
-                  { header: "ACL", key: "acl", cell: (r) => r.acl || "—" },
-                  { header: "Interface", key: "interface", cell: (r) => r.interface || "—" },
-                  { header: "Overload", key: "overload", cell: (r) => r.overload ? "Yes" : "No" },
-                  { header: "Details", key: "details", cell: (r) => {
-                    if (r.inside_local && r.outside_global) {
-                      return `${r.inside_local} → ${r.outside_global}`;
-                    }
-                    if (r.address_range) {
-                      return `Range: ${r.address_range}`;
-                    }
-                    if (r.address_group) {
-                      return `Group: ${r.address_group}`;
-                    }
-                    return "—";
-                  }},
-                ]}
-                data={deviceData.nat_policies}
-                empty="No NAT policies"
-                minWidthClass="min-w-[700px]"
-                containerClassName="flex-1"
-                expandable
-                expandableContent={(policy) => (
-                  <div className="p-4 bg-slate-50 dark:bg-slate-800/50 border-t border-slate-200 dark:border-slate-700">
-                    <div className="grid grid-cols-2 gap-4 text-sm">
-                      <div>
-                        <span className="font-medium text-slate-700 dark:text-slate-300">Type:</span>
-                        <span className="ml-2 text-slate-600 dark:text-slate-400">{policy.type}</span>
-                      </div>
-                      {policy.acl && (
-                        <div>
-                          <span className="font-medium text-slate-700 dark:text-slate-300">ACL:</span>
-                          <span className="ml-2 text-slate-600 dark:text-slate-400">{policy.acl}</span>
-                        </div>
-                      )}
-                      {policy.interface && (
-                        <div>
-                          <span className="font-medium text-slate-700 dark:text-slate-300">Interface:</span>
-                          <span className="ml-2 text-slate-600 dark:text-slate-400">{policy.interface}</span>
-                        </div>
-                      )}
-                      {policy.protocol && (
-                        <div>
-                          <span className="font-medium text-slate-700 dark:text-slate-300">Protocol:</span>
-                          <span className="ml-2 text-slate-600 dark:text-slate-400">{policy.protocol}</span>
-                        </div>
-                      )}
-                      {policy.inside_local && (
-                        <div>
-                          <span className="font-medium text-slate-700 dark:text-slate-300">Inside Local:</span>
-                          <span className="ml-2 text-slate-600 dark:text-slate-400">{policy.inside_local}</span>
-                        </div>
-                      )}
-                      {policy.outside_global && (
-                        <div>
-                          <span className="font-medium text-slate-700 dark:text-slate-300">Outside Global:</span>
-                          <span className="ml-2 text-slate-600 dark:text-slate-400">{policy.outside_global}</span>
-                        </div>
-                      )}
-                      {policy.ports && (
-                        <div className="col-span-2">
-                          <span className="font-medium text-slate-700 dark:text-slate-300">Port Mapping:</span>
-                          <span className="ml-2 text-slate-600 dark:text-slate-400">
-                            {policy.ports.inside} → {policy.ports.outside}
-                          </span>
-                        </div>
-                      )}
-                    </div>
+                  );
+                }
+              },
+              { 
+                header: "Outbound Interface", 
+                key: "interface", 
+                cell: (r) => r.interface || "—" 
+              },
+              { 
+                header: "Original Source (Inside)", 
+                key: "source", 
+                cell: (r) => {
+                  if (r.acl) return `ACL ${r.acl}`;
+                  if (r.inside_local) return r.inside_local;
+                  return "—";
+                }
+              },
+              { 
+                header: "Translated To (Global/Outside)", 
+                key: "destination", 
+                cell: (r) => {
+                  if (r.interface && r.overload) return "Interface IP";
+                  if (r.address_group) return `Address Group ${r.address_group}`;
+                  if (r.outside_global) return r.outside_global;
+                  return "—";
+                }
+              },
+              { 
+                header: "Protocol : Ports", 
+                key: "protocol", 
+                cell: (r) => {
+                  if (r.protocol && r.ports) {
+                    return `${r.protocol?.toUpperCase()} : ${r.ports.inside} -> ${r.ports.outside}`;
+                  }
+                  return "Any";
+                }
+              },
+            ]}
+            data={deviceData.nat_policies}
+            empty="No NAT policies"
+            minWidthClass="min-w-[700px]"
+            containerClassName="flex-1"
+            expandable
+            expandableContent={(policy) => (
+              <div className="p-4 bg-slate-50 dark:bg-slate-800/50 border-t border-slate-200 dark:border-slate-700">
+                <div className="grid grid-cols-2 gap-4 text-sm">
+                  <div>
+                    <span className="font-medium text-slate-700 dark:text-slate-300">Type:</span>
+                    <span className="ml-2 text-slate-600 dark:text-slate-400">{policy.type}</span>
                   </div>
-                )}
-              />
-            </div>
-          )}
+                  {policy.acl && (
+                    <div>
+                      <span className="font-medium text-slate-700 dark:text-slate-300">ACL:</span>
+                      <span className="ml-2 text-slate-600 dark:text-slate-400">{policy.acl}</span>
+                    </div>
+                  )}
+                  {policy.interface && (
+                    <div>
+                      <span className="font-medium text-slate-700 dark:text-slate-300">Interface:</span>
+                      <span className="ml-2 text-slate-600 dark:text-slate-400">{policy.interface}</span>
+                    </div>
+                  )}
+                  {policy.protocol && (
+                    <div>
+                      <span className="font-medium text-slate-700 dark:text-slate-300">Protocol:</span>
+                      <span className="ml-2 text-slate-600 dark:text-slate-400">{policy.protocol}</span>
+                    </div>
+                  )}
+                  {policy.inside_local && (
+                    <div>
+                      <span className="font-medium text-slate-700 dark:text-slate-300">Inside Local:</span>
+                      <span className="ml-2 text-slate-600 dark:text-slate-400">{policy.inside_local}</span>
+                    </div>
+                  )}
+                  {policy.outside_global && (
+                    <div>
+                      <span className="font-medium text-slate-700 dark:text-slate-300">Outside Global:</span>
+                      <span className="ml-2 text-slate-600 dark:text-slate-400">{policy.outside_global}</span>
+                    </div>
+                  )}
+                  {policy.ports && (
+                    <div className="col-span-2">
+                      <span className="font-medium text-slate-700 dark:text-slate-300">Port Mapping:</span>
+                      <span className="ml-2 text-slate-600 dark:text-slate-400">
+                        {policy.ports.inside} → {policy.ports.outside}
+                      </span>
+                    </div>
+                  )}
+                </div>
+              </div>
+            )}
+          />
+        </div>
+      )}
         </div>
       )}
 
+      {/* Security Fallback */}
       {
-        !loading && !error && tab === "security" && (!securityData.user_accounts || securityData.user_accounts.length === 0) && (!securityData.users || securityData.users.length === 0) && !securityData.aaa && !securityData.ssh && !securityData.snmp && !securityData.ntp && !securityData.syslog && !(securityData.logging && (securityData.logging.enabled || (securityData.logging.log_hosts && securityData.logging.log_hosts.length))) && (!securityData.acls || securityData.acls.length === 0) && (!deviceData?.acls || (!deviceData.acls.standard?.length && !deviceData.acls.extended?.length)) && (!deviceData?.nat_policies || deviceData.nat_policies.length === 0) && (
+        !loading && !error && tab === "security" && 
+        (!securityData.user_accounts || securityData.user_accounts.length === 0) && 
+        (!securityData.users || securityData.users.length === 0) && 
+        !securityData.aaa && !securityData.ssh && !securityData.snmp && !securityData.ntp && !securityData.syslog && 
+        !(securityData.logging && (securityData.logging.enabled || (securityData.logging.log_hosts && securityData.logging.log_hosts.length))) && 
+        (!securityData.acls || securityData.acls.length === 0) && 
+        (!deviceData?.acls || (!deviceData.acls.standard?.length && !deviceData.acls.extended?.length)) && 
+        (!deviceData?.nat_policies || deviceData.nat_policies.length === 0) && (
           <Card title="Security">
             <div className="text-sm text-gray-500 dark:text-gray-400">No security information available</div>
           </Card>

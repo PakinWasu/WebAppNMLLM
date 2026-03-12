@@ -212,6 +212,10 @@ async def upload_documents_endpoint(
                                 "mac_arp": parsed_data.get("mac_arp", {}),
                                 "security": parsed_data.get("security", {}),
                                 "ha": parsed_data.get("ha", {}),
+                                # Add new ACL, DHCP, NAT fields to hash for consistency
+                                "dhcp_pools": parsed_data.get("dhcp_pools", []),
+                                "nat_policies": parsed_data.get("nat_policies", []),
+                                "acls": parsed_data.get("acls", {}),
                             }
                             
                             # Calculate hash of parsed data (for duplicate detection)
@@ -253,6 +257,10 @@ async def upload_documents_endpoint(
                                 "mac_arp": parsed_data.get("mac_arp", {}),
                                 "security": parsed_data.get("security", {}),
                                 "ha": parsed_data.get("ha", {}),
+                                # Add new ACL, DHCP, NAT fields
+                                "dhcp_pools": parsed_data.get("dhcp_pools", []),
+                                "nat_policies": parsed_data.get("nat_policies", []),
+                                "acls": parsed_data.get("acls", {}),
                                 "created_at": datetime.now(timezone.utc),
                                 "updated_at": datetime.now(timezone.utc),
                             }

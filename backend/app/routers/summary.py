@@ -44,6 +44,139 @@ def _iso_utc(dt):
     return str(dt)
 
 
+def _compute_summary_stats(interfaces: List[Dict], vlans: Dict, stp: Dict, routing: Dict, overview: Dict) -> Dict[str, Any]:
+    """Compute ACCESS, TRUNK, TRUNK_ALLOWED, etc. for Device Summary (supports Huawei hybrid + vlans fallback)."""
+    total_ifaces = len(interfaces)
+    up_ifaces = sum(1 for i in interfaces if i.get("oper_status") == "up")
+    down_ifaces = sum(1 for i in interfaces if i.get("oper_status") == "down")
+    admin_down = sum(1 for i in interfaces if i.get("admin_status") == "down")
+
+    access_ports = sum(1 for i in interfaces if (i.get("port_mode") or "").lower() == "access")
+    trunk_ports = sum(1 for i in interfaces if (i.get("port_mode") or "").lower() in ("trunk", "hybrid"))
+    if access_ports == 0 and trunk_ports == 0:
+        vlan_access = vlans.get("access_ports") or []
+        vlan_trunk = vlans.get("trunk_ports") or []
+        access_ports = len(vlan_access) if isinstance(vlan_access, list) else 0
+        trunk_ports = len(vlan_trunk) if isinstance(vlan_trunk, list) else 0
+    unused_ports = sum(1 for i in interfaces if not i.get("port_mode") or (i.get("port_mode") or "").lower() == "none")
+
+    vlan_count = vlans.get("total_vlan_count", len(vlans.get("vlan_list", [])))
+    native_vlans = [i.get("native_vlan") for i in interfaces if i.get("native_vlan")]
+    native_vlan = native_vlans[0] if native_vlans else None
+
+    stp_mode = stp.get("stp_mode") or stp.get("mode") or "-"
+    stp_interfaces = stp.get("interfaces", [])
+    stp_roles = {}
+    for stp_iface in stp_interfaces:
+        role = stp_iface.get("role")
+        if role:
+            stp_roles[role] = stp_roles.get(role, 0) + 1
+    if stp_roles:
+        root_bridges = stp.get("root_bridges", [])
+        if root_bridges:
+            stp_role_summary = "Root"
+        elif "Root" in stp_roles:
+            stp_role_summary = f"R:{stp_roles.get('Root', 0)}/D:{stp_roles.get('Designated', 0)}"
+        elif "Designated" in stp_roles:
+            stp_role_summary = f"D:{stp_roles.get('Designated', 0)}"
+        else:
+            stp_role_summary = ", ".join([f"{k}:{v}" for k, v in list(stp_roles.items())[:2]])
+    else:
+        stp_role_summary = "-"
+
+    all_trunk_vlans = set()
+    has_all_vlans = False
+    for iface in interfaces:
+        pm = (iface.get("port_mode") or "").lower()
+        if pm in ("trunk", "hybrid"):
+            allowed = iface.get("allowed_vlans")
+            if allowed:
+                allowed_str = str(allowed).strip()
+                if allowed_str.upper() == "ALL" or allowed_str in ["1-4094", "1-4095"]:
+                    has_all_vlans = True
+                else:
+                    for part in allowed_str.replace(",", " ").split():
+                        if part.strip().isdigit():
+                            all_trunk_vlans.add(int(part.strip()))
+    for tp in (vlans.get("trunk_ports") or []):
+        if isinstance(tp, dict):
+            allowed = tp.get("allowed_vlans")
+            if allowed:
+                allowed_str = str(allowed).strip()
+                if allowed_str.upper() == "ALL" or allowed_str in ["1-4094", "1-4095"]:
+                    has_all_vlans = True
+                else:
+                    for part in allowed_str.replace(",", " ").split():
+                        if part.strip().isdigit():
+                            all_trunk_vlans.add(int(part.strip()))
+    if has_all_vlans:
+        trunk_allowed_summary = "ALL"
+    elif all_trunk_vlans:
+        sorted_vlans = sorted(all_trunk_vlans)
+        trunk_allowed_summary = " ".join(str(v) for v in sorted_vlans)
+        if len(trunk_allowed_summary) > 20:
+            trunk_allowed_summary = trunk_allowed_summary[:17] + "..."
+    else:
+        trunk_allowed_summary = "-"
+
+    ospf = routing.get("ospf")
+    ospf_neighbors = len(ospf.get("neighbors", [])) if isinstance(ospf, dict) else 0
+    bgp = routing.get("bgp")
+    if isinstance(bgp, dict):
+        bgp_asn = bgp.get("as_number") or bgp.get("local_as") or "-"
+        bgp_neighbors = len(bgp.get("peers", []))
+    else:
+        bgp_asn = "-"
+        bgp_neighbors = 0
+    bgp_summary = f"{bgp_asn}/{bgp_neighbors}" if bgp_asn != "-" else "-/-"
+
+    rt_protos = []
+    if isinstance(ospf, dict) and ospf.get("process_id"):
+        rt_protos.append("OSPF")
+    if isinstance(bgp, dict) and (bgp.get("as_number") or bgp.get("local_as")):
+        rt_protos.append("BGP")
+    rip = routing.get("rip")
+    if isinstance(rip, dict) and (rip.get("version") or rip.get("networks") or rip.get("interfaces")):
+        rt_protos.append("RIP")
+    eigrp = routing.get("eigrp")
+    if isinstance(eigrp, dict) and (eigrp.get("as_number") or eigrp.get("router_id")):
+        rt_protos.append("EIGRP")
+    static_routes = routing.get("static", [])
+    if isinstance(static_routes, list) and static_routes:
+        rt_protos.append("Static")
+    elif isinstance(static_routes, dict) and static_routes.get("routes"):
+        rt_protos.append("Static")
+    rt_proto_str = ", ".join(rt_protos) if rt_protos else "-"
+
+    cpu_val = overview.get("cpu_utilization") or overview.get("cpu_util")
+    mem_val = overview.get("memory_usage") or overview.get("mem_util") or overview.get("memory_utilization")
+    # Keep 0 as 0 (display "0%"); only use "-" when truly absent
+    if cpu_val is None or cpu_val == "":
+        cpu_val = "-"
+    if mem_val is None or mem_val == "":
+        mem_val = "-"
+
+    return {
+        "total_ifaces": total_ifaces,
+        "up_ifaces": up_ifaces,
+        "down_ifaces": down_ifaces,
+        "admin_down": admin_down,
+        "access_ports": access_ports,
+        "trunk_ports": trunk_ports,
+        "unused_ports": unused_ports,
+        "vlan_count": vlan_count,
+        "native_vlan": native_vlan,
+        "stp_mode": stp_mode,
+        "stp_role_summary": stp_role_summary,
+        "trunk_allowed_summary": trunk_allowed_summary,
+        "ospf_neighbors": ospf_neighbors,
+        "bgp_summary": bgp_summary,
+        "rt_proto_str": rt_proto_str,
+        "cpu": cpu_val,
+        "mem": mem_val,
+    }
+
+
 @device_router.post("/{device_name}/image")
 async def upload_device_image(
     project_id: str,
@@ -318,9 +451,54 @@ async def list_device_configs(
     return {"configs": configs}
 
 
+def _parse_num(val) -> Optional[float]:
+    """Parse CPU/MEM value to number; return None if absent or invalid."""
+    if val is None or val == "" or val == "-":
+        return None
+    try:
+        n = float(val) if not isinstance(val, (int, float)) else float(val)
+        return n if n >= 0 else None
+    except (TypeError, ValueError):
+        return None
+
+
+def _derive_status_from_stats(stats: Dict[str, Any]) -> str:
+    """
+    Derive device status from summary stats.
+    - Critical: CPU >= 90 or MEM >= 90, or > 50% interfaces down
+    - Warning: CPU >= 80 or MEM >= 80, or > 30% interfaces down
+    - OK: otherwise
+    """
+    cpu = _parse_num(stats.get("cpu"))
+    mem = _parse_num(stats.get("mem"))
+    total = stats.get("total_ifaces") or 0
+    down = stats.get("down_ifaces") or 0
+    down_pct = (down / total * 100) if total > 0 else 0
+
+    if cpu is not None and cpu >= 90:
+        return "Critical"
+    if mem is not None and mem >= 90:
+        return "Critical"
+    if total > 0 and down_pct > 50:
+        return "Critical"
+    if cpu is not None and cpu >= 80:
+        return "Warning"
+    if mem is not None and mem >= 80:
+        return "Warning"
+    if total > 0 and down_pct > 30:
+        return "Warning"
+    return "OK"
+
+
 def _device_status(latest: dict) -> str:
-    """Derive status from parsed config (OK or not)."""
-    return "OK"  # Can add drift/warning logic later
+    """Derive status from parsed config using CPU/MEM/interfaces."""
+    interfaces = latest.get("interfaces", [])
+    vlans = latest.get("vlans", {})
+    stp = latest.get("stp", {})
+    routing = latest.get("routing", {})
+    overview = latest.get("device_overview", {})
+    stats = _compute_summary_stats(interfaces, vlans, stp, routing, overview)
+    return _derive_status_from_stats(stats)
 
 
 @router.get("/metrics")
@@ -426,141 +604,31 @@ async def get_summary(
                 stp = latest.get("stp", {})
                 routing = latest.get("routing", {})
                 overview = latest.get("device_overview", {})
-                
-                # Calculate stats
-                total_ifaces = len(interfaces)
-                up_ifaces = sum(1 for i in interfaces if i.get("oper_status") == "up")
-                down_ifaces = sum(1 for i in interfaces if i.get("oper_status") == "down")
-                admin_down = sum(1 for i in interfaces if i.get("admin_status") == "down")
-                
-                access_ports = sum(1 for i in interfaces if i.get("port_mode") == "access")
-                trunk_ports = sum(1 for i in interfaces if i.get("port_mode") == "trunk")
-                unused_ports = sum(1 for i in interfaces if not i.get("port_mode") or i.get("port_mode") == "none")
-                
-                vlan_count = vlans.get("total_vlan_count", len(vlans.get("vlan_list", [])))
-                
-                # Get native VLAN (most common from trunk ports)
-                native_vlans = [i.get("native_vlan") for i in interfaces if i.get("native_vlan")]
-                native_vlan = native_vlans[0] if native_vlans else None
-                
-                # STP info - extract from stp.interfaces
-                stp_mode = stp.get("stp_mode") or stp.get("mode") or "-"
-                stp_interfaces = stp.get("interfaces", [])
-                stp_roles = {}
-                for stp_iface in stp_interfaces:
-                    role = stp_iface.get("role")
-                    if role:
-                        stp_roles[role] = stp_roles.get(role, 0) + 1
-                
-                if stp_roles:
-                    root_bridges = stp.get("root_bridges", [])
-                    if root_bridges and len(root_bridges) > 0:
-                        stp_role_summary = "Root"
-                    elif "Root" in stp_roles:
-                        stp_role_summary = f"R:{stp_roles.get('Root', 0)}/D:{stp_roles.get('Designated', 0)}"
-                    elif "Designated" in stp_roles:
-                        stp_role_summary = f"D:{stp_roles.get('Designated', 0)}"
-                    else:
-                        stp_role_summary = ", ".join([f"{k}:{v}" for k, v in list(stp_roles.items())[:2]])
-                else:
-                    stp_role_summary = "-"
-                
-                # Get trunk allowed VLANs summary - collect all unique VLANs from trunk ports
-                all_trunk_vlans = set()
-                has_all_vlans = False
-                for iface in interfaces:
-                    if iface.get("port_mode") == "trunk":
-                        allowed = iface.get("allowed_vlans")
-                        if allowed:
-                            allowed_str = str(allowed).strip()
-                            if allowed_str.upper() == "ALL" or allowed_str in ["1-4094", "1-4095"]:
-                                has_all_vlans = True
-                            else:
-                                parts = allowed_str.replace(",", " ").split()
-                                for part in parts:
-                                    part = part.strip()
-                                    if part.isdigit():
-                                        all_trunk_vlans.add(int(part))
-                
-                if has_all_vlans:
-                    trunk_allowed_summary = "ALL"
-                elif all_trunk_vlans:
-                    sorted_vlans = sorted(all_trunk_vlans)
-                    trunk_allowed_summary = " ".join(str(v) for v in sorted_vlans)
-                    if len(trunk_allowed_summary) > 20:
-                        trunk_allowed_summary = trunk_allowed_summary[:17] + "..."
-                else:
-                    trunk_allowed_summary = "-"
-                
-                # OSPF neighbors - updated for new parser structure
-                ospf = routing.get("ospf")
-                if isinstance(ospf, dict):
-                    ospf_neighbors = len(ospf.get("neighbors", []))
-                else:
-                    ospf_neighbors = 0
-                
-                # BGP info - updated for new parser structure
-                bgp = routing.get("bgp")
-                if isinstance(bgp, dict):
-                    bgp_asn = bgp.get("as_number") or bgp.get("local_as") or "-"
-                    bgp_neighbors = len(bgp.get("peers", []))
-                else:
-                    bgp_asn = "-"
-                    bgp_neighbors = 0
-                bgp_summary = f"{bgp_asn}/{bgp_neighbors}" if bgp_asn != "-" else "-/-"
-                
-                # Routing protocols - updated for new parser structure
-                rt_protos = []
-                if isinstance(ospf, dict) and ospf.get("process_id"):
-                    rt_protos.append("OSPF")
-                if isinstance(bgp, dict) and (bgp.get("as_number") or bgp.get("local_as")):
-                    rt_protos.append("BGP")
-                
-                # Check for RIP
-                rip = routing.get("rip")
-                if isinstance(rip, dict) and (rip.get("version") or rip.get("networks") or rip.get("interfaces")):
-                    rt_protos.append("RIP")
-                
-                # Check for EIGRP
-                eigrp = routing.get("eigrp")
-                if isinstance(eigrp, dict) and (eigrp.get("as_number") or eigrp.get("router_id")):
-                    rt_protos.append("EIGRP")
-                
-                static_routes = routing.get("static", [])
-                if isinstance(static_routes, list) and len(static_routes) > 0:
-                    rt_protos.append("Static")
-                elif isinstance(static_routes, dict) and static_routes.get("routes"):
-                    rt_protos.append("Static")
-                rt_proto_str = ", ".join(rt_protos) if rt_protos else "-"
-                
-                # Status (simplified - OK for now, can add drift detection later)
-                status = "OK"
-                
-                # Format datetime
-                upload_ts = latest.get("upload_timestamp")
-                upload_ts = _iso_utc(upload_ts)
-                
+
+                stats = _compute_summary_stats(interfaces, vlans, stp, routing, overview)
+                upload_ts = _iso_utc(latest.get("upload_timestamp"))
+
                 devices.append({
                     "device": latest.get("device_name", "-"),
                     "model": overview.get("model") or "-",
                     "serial": overview.get("serial_number") or "-",
                     "os_ver": overview.get("os_version") or "-",
                     "mgmt_ip": overview.get("management_ip") or overview.get("mgmt_ip") or "-",
-                    "ifaces": f"{total_ifaces}/{up_ifaces}/{down_ifaces}/{admin_down}",
-                    "access": access_ports,
-                    "trunk": trunk_ports,
-                    "unused": unused_ports,
-                    "vlans": vlan_count,
-                    "native_vlan": native_vlan or "-",
-                    "trunk_allowed": trunk_allowed_summary,
-                    "stp": stp_mode,
-                    "stp_role": stp_role_summary,
-                    "ospf_neigh": ospf_neighbors,
-                    "bgp_asn_neigh": bgp_summary,
-                    "rt_proto": rt_proto_str,
-                    "cpu": overview.get("cpu_utilization") or overview.get("cpu_util") or "-",
-                    "mem": overview.get("memory_usage") or overview.get("mem_util") or "-",
-                    "status": status,
+                    "ifaces": f"{stats['total_ifaces']}/{stats['up_ifaces']}/{stats['down_ifaces']}/{stats['admin_down']}",
+                    "access": stats["access_ports"],
+                    "trunk": stats["trunk_ports"],
+                    "unused": stats["unused_ports"],
+                    "vlans": stats["vlan_count"],
+                    "native_vlan": stats["native_vlan"] or "-",
+                    "trunk_allowed": stats["trunk_allowed_summary"],
+                    "stp": stats["stp_mode"],
+                    "stp_role": stats["stp_role_summary"],
+                    "ospf_neigh": stats["ospf_neighbors"],
+                    "bgp_asn_neigh": stats["bgp_summary"],
+                    "rt_proto": stats["rt_proto_str"],
+                    "cpu": stats["cpu"],
+                    "mem": stats["mem"],
+                    "status": _derive_status_from_stats(stats),
                     "upload_timestamp": upload_ts,
                 })
     
@@ -579,150 +647,37 @@ async def get_summary(
             device_names.add(device_name)
             # Use parsed_config from documents collection - reuse the same formatting logic
             if parsed_config:
-                # Remove MongoDB _id to avoid serialization issues
                 parsed_config.pop("_id", None)
-                
-                # Format for table display (reuse same logic as above)
                 interfaces = parsed_config.get("interfaces", [])
                 vlans = parsed_config.get("vlans", {})
                 stp = parsed_config.get("stp", {})
                 routing = parsed_config.get("routing", {})
                 overview = parsed_config.get("device_overview", {})
-                
-                # Calculate stats
-                total_ifaces = len(interfaces)
-                up_ifaces = sum(1 for i in interfaces if i.get("oper_status") == "up")
-                down_ifaces = sum(1 for i in interfaces if i.get("oper_status") == "down")
-                admin_down = sum(1 for i in interfaces if i.get("admin_status") == "down")
-                
-                access_ports = sum(1 for i in interfaces if i.get("port_mode") == "access")
-                trunk_ports = sum(1 for i in interfaces if i.get("port_mode") == "trunk")
-                unused_ports = sum(1 for i in interfaces if not i.get("port_mode") or i.get("port_mode") == "none")
-                
-                vlan_count = vlans.get("total_vlan_count", len(vlans.get("vlan_list", [])))
-                
-                # Get native VLAN (most common from trunk ports)
-                native_vlans = [i.get("native_vlan") for i in interfaces if i.get("native_vlan")]
-                native_vlan = native_vlans[0] if native_vlans else None
-                
-                # STP info - extract from stp.interfaces
-                stp_mode = stp.get("stp_mode") or stp.get("mode") or "-"
-                stp_interfaces = stp.get("interfaces", [])
-                stp_roles = {}
-                for stp_iface in stp_interfaces:
-                    role = stp_iface.get("role")
-                    if role:
-                        stp_roles[role] = stp_roles.get(role, 0) + 1
-                
-                if stp_roles:
-                    root_bridges = stp.get("root_bridges", [])
-                    if root_bridges and len(root_bridges) > 0:
-                        stp_role_summary = "Root"
-                    elif "Root" in stp_roles:
-                        stp_role_summary = f"R:{stp_roles.get('Root', 0)}/D:{stp_roles.get('Designated', 0)}"
-                    elif "Designated" in stp_roles:
-                        stp_role_summary = f"D:{stp_roles.get('Designated', 0)}"
-                    else:
-                        stp_role_summary = ", ".join([f"{k}:{v}" for k, v in list(stp_roles.items())[:2]])
-                else:
-                    stp_role_summary = "-"
-                
-                # Get trunk allowed VLANs summary - collect all unique VLANs from trunk ports
-                all_trunk_vlans = set()
-                has_all_vlans = False
-                for iface in interfaces:
-                    if iface.get("port_mode") == "trunk":
-                        allowed = iface.get("allowed_vlans")
-                        if allowed:
-                            allowed_str = str(allowed).strip()
-                            if allowed_str.upper() == "ALL" or allowed_str in ["1-4094", "1-4095"]:
-                                has_all_vlans = True
-                            else:
-                                parts = allowed_str.replace(",", " ").split()
-                                for part in parts:
-                                    part = part.strip()
-                                    if part.isdigit():
-                                        all_trunk_vlans.add(int(part))
-                
-                if has_all_vlans:
-                    trunk_allowed_summary = "ALL"
-                elif all_trunk_vlans:
-                    sorted_vlans = sorted(all_trunk_vlans)
-                    trunk_allowed_summary = " ".join(str(v) for v in sorted_vlans)
-                    if len(trunk_allowed_summary) > 20:
-                        trunk_allowed_summary = trunk_allowed_summary[:17] + "..."
-                else:
-                    trunk_allowed_summary = "-"
-                
-                # OSPF neighbors - updated for new parser structure
-                ospf = routing.get("ospf")
-                if isinstance(ospf, dict):
-                    ospf_neighbors = len(ospf.get("neighbors", []))
-                else:
-                    ospf_neighbors = 0
-                
-                # BGP info - updated for new parser structure
-                bgp = routing.get("bgp")
-                if isinstance(bgp, dict):
-                    bgp_asn = bgp.get("as_number") or bgp.get("local_as") or "-"
-                    bgp_neighbors = len(bgp.get("peers", []))
-                else:
-                    bgp_asn = "-"
-                    bgp_neighbors = 0
-                bgp_summary = f"{bgp_asn}/{bgp_neighbors}" if bgp_asn != "-" else "-/-"
-                
-                # Routing protocols - updated for new parser structure
-                rt_protos = []
-                if isinstance(ospf, dict) and ospf.get("process_id"):
-                    rt_protos.append("OSPF")
-                if isinstance(bgp, dict) and (bgp.get("as_number") or bgp.get("local_as")):
-                    rt_protos.append("BGP")
-                
-                # Check for RIP
-                rip = routing.get("rip")
-                if isinstance(rip, dict) and (rip.get("version") or rip.get("networks") or rip.get("interfaces")):
-                    rt_protos.append("RIP")
-                
-                # Check for EIGRP
-                eigrp = routing.get("eigrp")
-                if isinstance(eigrp, dict) and (eigrp.get("as_number") or eigrp.get("router_id")):
-                    rt_protos.append("EIGRP")
-                
-                static_routes = routing.get("static", [])
-                if isinstance(static_routes, list) and len(static_routes) > 0:
-                    rt_protos.append("Static")
-                elif isinstance(static_routes, dict) and static_routes.get("routes"):
-                    rt_protos.append("Static")
-                rt_proto_str = ", ".join(rt_protos) if rt_protos else "-"
-                
-                # Status (simplified - OK for now, can add drift detection later)
-                status = "OK"
-                
-                # Format datetime
-                upload_ts = parsed_config.get("upload_timestamp")
-                upload_ts = _iso_utc(upload_ts)
-                
+
+                stats = _compute_summary_stats(interfaces, vlans, stp, routing, overview)
+                upload_ts = _iso_utc(parsed_config.get("upload_timestamp"))
+
                 devices.append({
                     "device": parsed_config.get("device_name", "-"),
                     "model": overview.get("model") or "-",
                     "serial": overview.get("serial_number") or "-",
                     "os_ver": overview.get("os_version") or "-",
                     "mgmt_ip": overview.get("management_ip") or overview.get("mgmt_ip") or "-",
-                    "ifaces": f"{total_ifaces}/{up_ifaces}/{down_ifaces}/{admin_down}",
-                    "access": access_ports,
-                    "trunk": trunk_ports,
-                    "unused": unused_ports,
-                    "vlans": vlan_count,
-                    "native_vlan": native_vlan or "-",
-                    "trunk_allowed": trunk_allowed_summary,
-                    "stp": stp_mode,
-                    "stp_role": stp_role_summary,
-                    "ospf_neigh": ospf_neighbors,
-                    "bgp_asn_neigh": bgp_summary,
-                    "rt_proto": rt_proto_str,
-                    "cpu": overview.get("cpu_utilization") or overview.get("cpu_util") or "-",
-                    "mem": overview.get("memory_usage") or overview.get("mem_util") or "-",
-                    "status": status,
+                    "ifaces": f"{stats['total_ifaces']}/{stats['up_ifaces']}/{stats['down_ifaces']}/{stats['admin_down']}",
+                    "access": stats["access_ports"],
+                    "trunk": stats["trunk_ports"],
+                    "unused": stats["unused_ports"],
+                    "vlans": stats["vlan_count"],
+                    "native_vlan": stats["native_vlan"] or "-",
+                    "trunk_allowed": stats["trunk_allowed_summary"],
+                    "stp": stats["stp_mode"],
+                    "stp_role": stats["stp_role_summary"],
+                    "ospf_neigh": stats["ospf_neighbors"],
+                    "bgp_asn_neigh": stats["bgp_summary"],
+                    "rt_proto": stats["rt_proto_str"],
+                    "cpu": stats["cpu"],
+                    "mem": stats["mem"],
+                    "status": _derive_status_from_stats(stats),
                     "upload_timestamp": upload_ts,
                 })
     

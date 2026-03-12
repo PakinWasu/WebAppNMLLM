@@ -280,6 +280,29 @@ def normalize_cisco_to_legacy(parsed: Dict[str, Any]) -> Dict[str, Any]:
     etherchannel = [{"name": e.get("name") or "Po", "mode": e.get("protocol") or e.get("mode"), "members": e.get("members") or [], "status": e.get("status") or "up"} for e in etherchannels]
     ha = {"etherchannels": etherchannels, "port_channels": port_channels, "etherchannel": etherchannel, "hsrp": hsrp, "vrrp": vrrp}
 
+    # Add new ACL, DHCP, NAT fields from parsed data
+    dhcp_pools = parsed.get("dhcp_pools", [])
+    nat_policies = parsed.get("nat_policies", [])
+    
+    # Enhanced ACLs with detailed structure
+    acls_enhanced = parsed.get("acls", {})
+    if acls_enhanced:
+        # Convert new ACL structure to legacy format with detailed rules
+        detailed_acls = []
+        for acl_type in ["standard", "extended"]:
+            for acl in acls_enhanced.get(acl_type, []):
+                detailed_acls.append({
+                    "name": acl.get("name", ""),
+                    "type": acl.get("type", acl_type.title()),
+                    "rules": acl.get("rules", []),
+                    "access_interfaces": acl.get("access_interfaces", [])
+                })
+        # Update security.acls with enhanced data
+        security["acls"] = detailed_acls
+    else:
+        # Fallback to legacy security.acls if no enhanced ACLs
+        pass
+
     # Ensure device_name is set (Cisco stores hostname in device_overview only; topology/summary expect top-level device_name)
     device_name = (overview.get("hostname") or "").strip() if isinstance(overview.get("hostname"), str) else None
     return {
@@ -293,6 +316,9 @@ def normalize_cisco_to_legacy(parsed: Dict[str, Any]) -> Dict[str, Any]:
         "mac_arp": mac_arp,
         "security": security,
         "ha": ha,
+        "dhcp_pools": dhcp_pools,
+        "nat_policies": nat_policies,
+        "acls": acls_enhanced,
     }
 
 
@@ -583,6 +609,26 @@ def normalize_huawei_to_legacy(parsed: Dict[str, Any]) -> Dict[str, Any]:
             vrrp.append({"group": v.get("vrid") or v.get("group"), "virtual_ip": v.get("virtual_ip"), "interface": v.get("interface"), "state": v.get("state")})
     ha = {"port_channels": port_channels, "etherchannel": etherchannel, "etherchannels": etherchannels_out, "hsrp": ha_raw.get("hsrp") or [], "vrrp": vrrp}
 
+    # Add new ACL, DHCP, NAT fields
+    dhcp_pools = parsed.get("dhcp_pools", [])
+    nat_policies = parsed.get("nat_policies", [])
+    
+    # Enhanced ACLs with detailed structure
+    acls_enhanced = parsed.get("acls", {})
+    if acls_enhanced:
+        # Convert new ACL structure to legacy format with detailed rules
+        detailed_acls = []
+        for acl_type in ["basic", "advanced", "l2"]:
+            for acl in acls_enhanced.get(acl_type, []):
+                detailed_acls.append({
+                    "name": acl.get("name", ""),
+                    "type": acl.get("type", acl_type.title()),
+                    "rules": acl.get("rules", []),
+                    "access_interfaces": acl.get("access_interfaces", [])
+                })
+        # Update security.acls with enhanced data
+        security["acls"] = detailed_acls
+
     device_name = (overview.get("hostname") or "").strip() if isinstance(overview.get("hostname"), str) else None
     return {
         "device_name": device_name,
@@ -595,6 +641,9 @@ def normalize_huawei_to_legacy(parsed: Dict[str, Any]) -> Dict[str, Any]:
         "mac_arp": mac_arp,
         "security": security,
         "ha": ha,
+        "dhcp_pools": dhcp_pools,
+        "nat_policies": nat_policies,
+        "acls": acls_enhanced,
     }
 
 
