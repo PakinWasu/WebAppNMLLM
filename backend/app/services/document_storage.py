@@ -455,7 +455,9 @@ async def upload_documents(
         
         # Decide how to group versions:
         # - Config folder: group by filename_prefix (device-based versioning)
-        # - Other folders: group by exact filename + folder (document-based versioning)
+        # - Other folders: prefer grouping by filename_prefix within the same folder
+        #   when a date can be extracted (document-based versioning with smart date),
+        #   otherwise fall back to exact filename + folder.
         parent_document_id = None
         document_id = None
         
@@ -470,25 +472,49 @@ async def upload_documents(
                 }
             )
         else:
-            # Build query to find existing document with same filename and folder
-            find_query = {
-                "project_id": project_id,
-                "filename": filename,
-                "is_latest": True,
-            }
-            # If folder_id is provided, also match by folder_id
-            # If folder_id is None, match documents with folder_id = None or missing
-            if folder_id is not None:
-                find_query["folder_id"] = folder_id
-            else:
-                # Match documents with folder_id = None or missing
-                find_query["$or"] = [
-                    {"folder_id": None},
-                    {"folder_id": {"$exists": False}},
-                ]
-            
-            # Find existing document with same filename and folder
-            existing_doc = await db()["documents"].find_one(find_query)
+            existing_doc = None
+
+            # 1) Prefer grouping by filename_prefix (same logical document) when we
+            #    can extract a date from the filename. This lets uploads like:
+            #    overview_context_v1v2_20260221.drawio
+            #    overview_context_v1v2_20260321.drawio
+            #    be treated as versions of the same document, not separate files.
+            if extracted_date is not None and filename_prefix:
+                prefix_query = {
+                    "project_id": project_id,
+                    "filename_prefix": filename_prefix,
+                    "is_latest": True,
+                }
+                # Respect folder boundary when grouping
+                if folder_id is not None:
+                    prefix_query["folder_id"] = folder_id
+                else:
+                    prefix_query["$or"] = [
+                        {"folder_id": None},
+                        {"folder_id": {"$exists": False}},
+                    ]
+
+                existing_doc = await db()["documents"].find_one(prefix_query)
+
+            # 2) Fallback: exact filename + folder behaviour (backwards compatible)
+            if existing_doc is None:
+                find_query = {
+                    "project_id": project_id,
+                    "filename": filename,
+                    "is_latest": True,
+                }
+                # If folder_id is provided, also match by folder_id
+                # If folder_id is None, match documents with folder_id = None or missing
+                if folder_id is not None:
+                    find_query["folder_id"] = folder_id
+                else:
+                    # Match documents with folder_id = None or missing
+                    find_query["$or"] = [
+                        {"folder_id": None},
+                        {"folder_id": {"$exists": False}},
+                    ]
+
+                existing_doc = await db()["documents"].find_one(find_query)
         
         if existing_doc:
             # Existing document/group found - create new version in that group

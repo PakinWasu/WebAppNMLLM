@@ -9180,66 +9180,115 @@ const DocumentsPage = ({ project, can, authedUser, uploadHistory, setUploadHisto
   const PreviewPane = (
     <Card
       title={
-        <div className="text-sm font-semibold text-gray-700 dark:text-gray-200">
-          {safeDisplay(selectedFile?.name) || "Preview"}
+        <div className="text-sm font-semibold text-gray-700 dark:text-gray-200 flex items-center gap-2">
+          <span>{safeDisplay(selectedFile?.name) || "Preview"}</span>
+          {selectedFolder && (
+            <span className="text-xs font-normal text-gray-500 dark:text-gray-400">
+              {(() => {
+                const info = findFolder(tree, selectedFolder);
+                return info?.node?.name ? `(${info.node.name})` : "";
+              })()}
+            </span>
+          )}
         </div>
       }
       actions={
         (() => {
           const doc = selectedDocument || (selectedFile?.document_id && documents?.find(d => d.document_id === selectedFile.document_id));
-          if (!selectedFile || !doc) return null;
-          return (
-            <div className="flex gap-2 flex-wrap">
-              {can("download-document", project) && (
-                <Button
-                  variant="secondary"
-                  onClick={async () => {
-                    try {
-                      const projectId = project.project_id || project.id;
-                      await api.downloadDocument(projectId, doc.document_id);
-                    } catch (error) {
-                      alert('Download failed: ' + formatError(error));
-                    }
-                  }}
-                >
-                  ⬇ Download
-                </Button>
-              )}
+          const actionButtons = [];
+
+          // Folder-level Download button (moved from tree, more visible)
+          if (
+            selectedFolder &&
+            selectedFolder !== "Config" &&
+            selectedFolder !== "Other" &&
+            handleDownloadFolder
+          ) {
+            const info = findFolder(tree, selectedFolder);
+            const folderName = info?.node?.name || "Folder";
+            actionButtons.push(
               <Button
+                key="download-folder"
                 variant="secondary"
                 onClick={(e) => {
                   e.stopPropagation();
-                  loadVersions(doc.document_id, doc);
+                  handleDownloadFolder(selectedFolder);
                 }}
               >
-                📜 Versions
+                ⬇ Download "{folderName}"
               </Button>
-              {doc.folder_id !== "Config" && (
+            );
+          }
+
+          if (!selectedFile || !doc) {
+            return actionButtons.length ? <div className="flex gap-2 flex-wrap">{actionButtons}</div> : null;
+          }
+
+          if (can("download-document", project)) {
+            actionButtons.push(
+              <Button
+                key="download-file"
+                variant="secondary"
+                onClick={async () => {
+                  try {
+                    const projectId = project.project_id || project.id;
+                    await api.downloadDocument(projectId, doc.document_id);
+                  } catch (error) {
+                    alert('Download failed: ' + formatError(error));
+                  }
+                }}
+              >
+                ⬇ Download
+              </Button>
+            );
+          }
+
+          actionButtons.push(
+            <Button
+              key="versions"
+              variant="secondary"
+              onClick={(e) => {
+                e.stopPropagation();
+                loadVersions(doc.document_id, doc);
+              }}
+            >
+              📜 Versions
+            </Button>
+          );
+
+          if (doc.folder_id !== "Config") {
+            actionButtons.push(
+              <Button
+                key="rename"
+                variant="secondary"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  handleEditFile(selectedFile);
+                }}
+              >
+                ✏️ Rename
+              </Button>
+            );
+
+            actionButtons.push(
+              <Button
+                key="move"
+                variant="secondary"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  setMoveFolderTarget(doc);
+                  setMoveFolderId(doc.folder_id ?? '');
+                  setShowMoveFolder(true);
+                }}
+              >
+                📁 Move
+              </Button>
+            );
+
+            if (can("delete-document", project)) {
+              actionButtons.push(
                 <Button
-                  variant="secondary"
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    handleEditFile(selectedFile);
-                  }}
-                >
-                  ✏️ Rename
-                </Button>
-              )}
-              {doc.folder_id !== "Config" && (
-                <Button
-                  variant="secondary"
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    setMoveFolderTarget(doc);
-                    setMoveFolderId(doc.folder_id ?? '');
-                    setShowMoveFolder(true);
-                  }}
-                >
-                  📁 Move
-                </Button>
-              )}
-              {doc.folder_id !== "Config" && can("delete-document", project) && (
-                <Button
+                  key="delete"
                   variant="danger"
                   onClick={(e) => {
                     e.stopPropagation();
@@ -9267,9 +9316,12 @@ const DocumentsPage = ({ project, can, authedUser, uploadHistory, setUploadHisto
                 >
                   🗑️ Delete
                 </Button>
-              )}
-            </div>
-          );
+              );
+            }
+          }
+
+          if (!actionButtons.length) return null;
+          return <div className="flex gap-2 flex-wrap">{actionButtons}</div>;
         })()
       }
       className="flex-1 min-h-0 flex flex-col overflow-hidden"
@@ -9467,6 +9519,7 @@ const DocumentsPage = ({ project, can, authedUser, uploadHistory, setUploadHisto
                     onEditFile={handleEditFile}
                     selectedFile={selectedFile}
                     selectedFolder={selectedFolder}
+                    handleDownloadFolder={handleDownloadFolder}
                   />
                 </div>
               )}
@@ -9528,6 +9581,7 @@ const DocumentsPage = ({ project, can, authedUser, uploadHistory, setUploadHisto
                     onEditFile={handleEditFile}
                     selectedFile={selectedFile}
                     selectedFolder={selectedFolder}
+                    handleDownloadFolder={handleDownloadFolder}
                   />
                 </div>
               )}
@@ -9841,6 +9895,7 @@ const FileTree2 = ({
   onEditFile,
   selectedFile,
   selectedFolder,
+  handleDownloadFolder,
   parentPath = [],
   isRoot = false,
   indentSize = 20,
@@ -9977,6 +10032,7 @@ const FileTree2 = ({
                     onEditFile={onEditFile}
                     selectedFile={selectedFile}
                     selectedFolder={selectedFolder}
+                    handleDownloadFolder={handleDownloadFolder}
                     parentPath={current}
                   />
                 )}
