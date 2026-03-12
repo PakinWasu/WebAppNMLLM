@@ -18,13 +18,21 @@ export default function ProjectIndex({
   const visible = useMemo(() => {
     if (!authedUser) return [];
 
-    const mine = projects.filter(
-      (p) => can("see-all-projects") || isMember(p, authedUser.username)
-    );
+    // Backend already returns:
+    // - projects user is member of
+    // - plus visibility === "Shared" (for non-admins)
+    // but frontend previously hid non-member Shared projects here.
+    // Fix: keep member projects + Shared projects visible for everyone.
+    const mineOrShared = projects.filter((p) => {
+      if (can("see-all-projects")) return true;
+      const member = isMember(p, authedUser.username);
+      const isShared = (p.visibility || "").toLowerCase() === "shared";
+      return member || isShared;
+    });
 
     const qLower = q.trim().toLowerCase();
 
-    let list = mine.filter((p) => {
+    let list = mineOrShared.filter((p) => {
       if (!qLower) return true;
       const name = (p.name || "").toLowerCase();
       const desc = (p.desc || "").toLowerCase();
@@ -306,27 +314,38 @@ export default function ProjectIndex({
                 </span>
               </div>
 
-              {/* Open Project */}
+              {/* Open Project / View only depending on membership & visibility */}
               <div className="pt-4 mt-auto">
-                <a
-                  href={
-                    p.project_id || p.id
-                      ? routeToHash
-                        ? routeToHash({ name: "project", projectId: p.project_id || p.id, tab: "summary" })
+                {can("see-all-projects") || isMember(p, authedUser.username) ? (
+                  <a
+                    href={
+                      p.project_id || p.id
+                        ? routeToHash
+                          ? routeToHash({ name: "project", projectId: p.project_id || p.id, tab: "summary" })
+                          : "#/"
                         : "#/"
-                      : "#/"
-                  }
-                  onClick={(e) =>
-                    handleNavClick(e, () => {
-                      if (p.project_id || p.id)
-                        setRoute({ name: "project", projectId: p.project_id || p.id, tab: "summary" });
-                      else console.error("Project missing project_id:", p);
-                    })
-                  }
-                  className="flex items-center justify-center w-full rounded-xl py-3 px-4 text-sm font-semibold bg-slate-800 dark:bg-slate-200 text-white dark:text-slate-900 hover:bg-slate-700 dark:hover:bg-slate-100 shadow-md hover:shadow-lg transition-all focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-slate-500"
-                >
-                  Open Project
-                </a>
+                    }
+                    onClick={(e) =>
+                      handleNavClick(e, () => {
+                        if (p.project_id || p.id)
+                          setRoute({ name: "project", projectId: p.project_id || p.id, tab: "summary" });
+                        else console.error("Project missing project_id:", p);
+                      })
+                    }
+                    className="flex items-center justify-center w-full rounded-xl py-3 px-4 text-sm font-semibold bg-slate-800 dark:bg-slate-200 text-white dark:text-slate-900 hover:bg-slate-700 dark:hover:bg-slate-100 shadow-md hover:shadow-lg transition-all focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-slate-500"
+                  >
+                    Open Project
+                  </a>
+                ) : (
+                  <button
+                    type="button"
+                    disabled
+                    className="flex items-center justify-center w-full rounded-xl py-3 px-4 text-sm font-semibold bg-slate-600/60 dark:bg-slate-500/50 text-slate-300 dark:text-slate-200 cursor-not-allowed border border-dashed border-slate-400/60"
+                    title="Shared project – only members can open details"
+                  >
+                    Shared (view list only)
+                  </button>
+                )}
               </div>
             </Card>
           ))}

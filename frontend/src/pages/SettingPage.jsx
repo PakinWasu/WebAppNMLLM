@@ -272,20 +272,7 @@ export default function SettingPage({ project, setProjects, authedUser, goIndex 
               />
             </Field>
             <div>
-              <Field
-                label={
-                  <span className="inline-flex items-center gap-1.5">
-                    Visibility
-                    <span
-                      title="Private: only members see this project. Shared: everyone can see it in the list, but only members can open and view content."
-                      className="inline-flex items-center justify-center w-4 h-4 rounded-full bg-slate-200 dark:bg-slate-600 text-slate-600 dark:text-slate-300 text-xs font-bold cursor-help"
-                      aria-label="Visibility info"
-                    >
-                      i
-                    </span>
-                  </span>
-                }
-              >
+              <Field label="Visibility">
                 <Select
                   value={visibility}
                   onChange={setVisibility}

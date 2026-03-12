@@ -2535,8 +2535,8 @@ const SummaryPage = ({ project, projectId: projectIdProp, routeToHash, handleNav
     { header: "OSPF NEIGH", key: "ospf_neigh", width: "90px" },
     { header: "BGP ASN/NEIGH", key: "bgp_asn_neigh", width: "110px" },
     { header: "RT-PROTO", key: "rt_proto", width: "80px", cell: (r) => r.rt_proto || "—" },
-    { header: "CPU%", key: "cpu", width: "60px", cell: (r) => (r.cpu != null && r.cpu !== "" && r.cpu !== "-") ? `${r.cpu}%` : "—" },
-    { header: "MEM%", key: "mem", width: "60px", cell: (r) => (r.mem != null && r.mem !== "" && r.mem !== "-") ? `${r.mem}%` : "—" },
+    { header: "CPU%", key: "cpu", width: "60px", cell: (r) => (r.cpu != null && r.cpu !== "" && r.cpu !== "-") ? `${r.cpu}%` : "0%" },
+    { header: "MEM%", key: "mem", width: "60px", cell: (r) => (r.mem != null && r.mem !== "" && r.mem !== "-") ? `${r.mem}%` : "0%" },
     {
       header: "STATUS", key: "status", cell: (r) => {
         const raw = r.status;
@@ -2627,19 +2627,19 @@ const SummaryPage = ({ project, projectId: projectIdProp, routeToHash, handleNav
                 placeholder="Search..."
                 value={q}
                 onChange={(e) => setQ(e.target.value)}
-                className="w-28 text-[9px] py-1 px-2.5 h-6 bg-slate-100 dark:bg-slate-900/80 border-slate-300 dark:border-slate-700 focus:border-slate-400 dark:focus:border-slate-500 focus:ring-1 focus:ring-slate-400/50 dark:focus:ring-slate-500/50 rounded-lg text-slate-800 dark:text-slate-200 placeholder:text-slate-600 dark:placeholder:text-slate-500"
+                className="w-28 text-[9px] py-0.5 px-2.5 h-5 bg-slate-100 dark:bg-slate-900/80 border-slate-300 dark:border-slate-700 focus:border-slate-400 dark:focus:border-slate-500 focus:ring-1 focus:ring-slate-400/50 dark:focus:ring-slate-500/50 rounded-lg text-slate-800 dark:text-slate-200 placeholder:text-slate-600 dark:placeholder:text-slate-500"
               />
               <span className="absolute right-2.5 top-1/2 -translate-y-1/2 text-[9px] text-slate-600 dark:text-slate-500 pointer-events-none">🔍</span>
             </div>
             <button
-              className="px-2.5 py-0.5 h-6 flex items-center justify-center rounded-lg border border-slate-300 dark:border-slate-700 bg-slate-100 dark:bg-slate-900/80 hover:bg-slate-200 dark:hover:bg-slate-800 text-slate-700 dark:text-slate-300 text-[9px] font-medium transition-colors whitespace-nowrap"
+              className="px-2.5 py-0 h-5 flex items-center justify-center rounded-lg border border-slate-300 dark:border-slate-700 bg-slate-100 dark:bg-slate-900/80 hover:bg-slate-200 dark:hover:bg-slate-800 text-slate-700 dark:text-slate-300 text-[9px] font-medium transition-colors whitespace-nowrap"
               onClick={exportCSV}
               title="Export CSV"
             >
               CSV
             </button>
             <button
-              className="px-2.5 py-0.5 h-6 flex items-center justify-center rounded-lg border border-slate-300 dark:border-slate-700 bg-slate-100 dark:bg-slate-900/80 hover:bg-slate-200 dark:hover:bg-slate-800 text-slate-700 dark:text-slate-300 text-[9px] font-medium transition-colors whitespace-nowrap"
+              className="px-2.5 py-0 h-5 flex items-center justify-center rounded-lg border border-slate-300 dark:border-slate-700 bg-slate-100 dark:bg-slate-900/80 hover:bg-slate-200 dark:hover:bg-slate-800 text-slate-700 dark:text-slate-300 text-[9px] font-medium transition-colors whitespace-nowrap"
               onClick={() => setShowCompareConfig(true)}
               title="Compare two config files line by line"
             >
@@ -2647,7 +2647,7 @@ const SummaryPage = ({ project, projectId: projectIdProp, routeToHash, handleNav
             </button>
             {can("upload-config", project) && (
               <button
-                className="px-2.5 py-0.5 h-6 flex items-center justify-center rounded-lg border border-slate-300 dark:border-slate-700 bg-slate-100 dark:bg-slate-900/80 hover:bg-slate-200 dark:hover:bg-slate-800 text-slate-700 dark:text-slate-300 text-[9px] font-medium transition-colors whitespace-nowrap"
+                className="px-2.5 py-0 h-5 flex items-center justify-center rounded-lg border border-slate-300 dark:border-slate-700 bg-slate-100 dark:bg-slate-900/80 hover:bg-slate-200 dark:hover:bg-slate-800 text-slate-700 dark:text-slate-300 text-[9px] font-medium transition-colors whitespace-nowrap"
                 onClick={() => setShowUploadConfig(true)}
                 title="Upload Config"
               >
@@ -3074,7 +3074,7 @@ const DeviceDetailsView = ({ project, deviceId, goBack, goBackHref, goIndex, goI
     const uptime = ov.uptime || "—";
     const cpuVal = ov.cpu_utilization != null ? ov.cpu_utilization : (ov.cpu_util != null ? ov.cpu_util : null);
     const memVal = ov.memory_usage != null ? ov.memory_usage : (ov.mem_util != null ? ov.mem_util : null);
-    const cpuMem = [cpuVal != null ? `${cpuVal}%` : null, memVal != null ? `${memVal}%` : null].filter(v => v !== null).join(" / ") || "—";
+    const cpuMem = [cpuVal != null ? `${cpuVal}%` : "0%", memVal != null ? `${memVal}%` : "0%"].join(" / ");
     const lastUpload = lastConfigUpload ? formatDateTime(lastConfigUpload) : "—";
     return [
       { key: "hostname", label: "Hostname", value: hostname },
@@ -3120,7 +3120,7 @@ const DeviceDetailsView = ({ project, deviceId, goBack, goBackHref, goIndex, goI
     }
 
     // Mgmt/Health
-    parts.push(`• NTP: ${facts.ntpStatus}  |  SNMP: ${facts.snmp}  |  Syslog: ${facts.syslog}  |  CPU ${facts.cpu != null ? facts.cpu + '%' : '—'} / MEM ${facts.mem != null ? facts.mem + '%' : '—'}`);
+    parts.push(`• NTP: ${facts.ntpStatus}  |  SNMP: ${facts.snmp}  |  Syslog: ${facts.syslog}  |  CPU ${facts.cpu != null ? facts.cpu + '%' : '0%'} / MEM ${facts.mem != null ? facts.mem + '%' : '0%'}`);
 
     // HA
     if (facts.hsrpGroups > 0 || facts.vrrpGroups > 0) {
@@ -11930,23 +11930,29 @@ const TopologyGraph = ({ project, projectId, routeToHash, handleNavClick, onOpen
             evidence: e.evidence || "",
             type: "trunk",
           }));
-          // Merge saved layout links with newly generated links so refresh doesn't lose new connections
+          // Merge saved layout links with newly generated links, but neighbor-based edges win:
+          // - If neighbor analysis removes an edge, it disappears from the graph.
+          // - If an edge still exists, we reuse any saved styling/metadata.
           const savedLinks = Array.isArray(layout.links) ? layout.links : [];
           const linkKey = (l) => {
             const a = String(l?.a ?? "").trim();
             const b = String(l?.b ?? "").trim();
             return [a, b].sort().join("|");
           };
-          const mergedMap = new Map();
+          const savedByKey = new Map();
           savedLinks.forEach(l => {
-            if (l?.a && l?.b) mergedMap.set(linkKey(l), l);
+            if (l?.a && l?.b) {
+              savedByKey.set(linkKey(l), l);
+            }
           });
-          newLinks.forEach(l => {
-            if (!l?.a || !l?.b) return;
+          const linksToUse = newLinks.map(l => {
+            if (!l?.a || !l?.b) return l;
             const k = linkKey(l);
-            if (!mergedMap.has(k)) mergedMap.set(k, l);
+            const saved = savedByKey.get(k);
+            // If we have a saved link for the same pair, keep its extra fields but ensure
+            // endpoints stay aligned with latest neighbor-based analysis.
+            return saved ? { ...saved, a: l.a, b: l.b, label: l.label, evidence: l.evidence, type: l.type } : l;
           });
-          const linksToUse = Array.from(mergedMap.values());
           setTopologyNodes(newNodes);
           setLinks(linksToUse);
 
@@ -12974,7 +12980,7 @@ function buildDeviceNarrative(project, row) {
   if (l3.length) parts.push(`• Routing: ${l3.join(" | ")}`);
 
   // Mgmt/Health
-  parts.push(`• NTP: ${row.ntpStatus || "—"}  |  SNMP: ${row.snmp || "—"}  |  Syslog: ${row.syslog || "—"}  |  CPU ${row.cpu != null ? row.cpu + '%' : '—'} / MEM ${row.mem != null ? row.mem + '%' : '—'}`);
+  parts.push(`• NTP: ${row.ntpStatus || "—"}  |  SNMP: ${row.snmp || "—"}  |  Syslog: ${row.syslog || "—"}  |  CPU ${row.cpu != null ? row.cpu + '%' : '0%'} / MEM ${row.mem != null ? row.mem + '%' : '0%'}`);
 
   // Relationships from graph
   if (uniqNeigh.length) {

@@ -15,30 +15,55 @@ router = APIRouter(prefix="/projects/{project_id}/script-settings", tags=["scrip
 # Default command templates
 CISCO_DEFAULTS = """term len 0
 ! --- System Info ---
+term len 0
 show version
 show running-config
 show processes cpu sorted
 show memory statistics
+show logging
+show ntp status
 ! --- Interfaces & VLANs ---
 show interfaces
 show interfaces switchport
+show ip interface brief
+show ipv6 interface brief
 show vlan brief
+show spanning-tree
+show spanning-tree summary
 show spanning-tree detail
 ! --- Routing & Neighbors ---
+show ip protocols
 show ip route
+show ipv6 route
+show ip ospf
 show ip ospf neighbor
+show ip eigrp neighbors
+show ip rip database
+show ip route rip
+show ip bgp summary
+show bgp ipv4 unicast summary
+show ip bgp
+show ip bgp neighbors
 show cdp neighbors detail
 show lldp neighbors detail
 ! --- Tables ---
 show mac address-table
 show ip arp
+show ipv6 neighbors
 ! --- Security & Management ---
 show ssh
-show ntp status
-show logging
+show access-lists
+show snmp
+show snmp community
+show snmp host
+show snmp user
+show aaa sessions
+show aaa user
+show aaa method-suite
 ! --- HA ---
 show etherchannel summary
-show standby brief"""
+show standby brief
+show vrrp brief"""
 
 HUAWEI_DEFAULTS = """screen-length 0 temporary
 ! --- System Info ---

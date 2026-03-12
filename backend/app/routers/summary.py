@@ -479,13 +479,9 @@ def _derive_status_from_stats(stats: Dict[str, Any]) -> str:
         return "Critical"
     if mem is not None and mem >= 90:
         return "Critical"
-    if total > 0 and down_pct > 50:
-        return "Critical"
-    if cpu is not None and cpu >= 80:
+    if cpu is not None and cpu >= 70:
         return "Warning"
-    if mem is not None and mem >= 80:
-        return "Warning"
-    if total > 0 and down_pct > 30:
+    if mem is not None and mem >= 70:
         return "Warning"
     return "OK"
 
