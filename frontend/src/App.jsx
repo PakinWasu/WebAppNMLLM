@@ -2616,48 +2616,48 @@ const SummaryPage = ({ project, projectId: projectIdProp, routeToHash, handleNav
     <div className="h-full flex flex-col gap-0 overflow-hidden min-h-0" style={{ pointerEvents: 'auto' }}>
       {/* Top section: 55% — header + topology + network overview */}
       <div className="flex-[0_0_55%] min-h-0 flex flex-col overflow-hidden">
-        <div className="flex-shrink-0 flex items-center justify-between gap-2 py-1 px-2">
+        <div className="flex-shrink-0 flex items-center justify-between gap-2 py-0.5 px-2">
           <h2 className="text-base font-bold text-slate-800 dark:text-slate-200 flex items-center gap-2">
             <span className="w-1 h-4 bg-slate-500 dark:bg-slate-400 rounded-full" />
             Summary Config
           </h2>
-          <div className="flex gap-1.5 items-center">
-            <div className="relative">
+          <div className="flex gap-2 items-center flex-1 justify-end">
+            <div className="relative flex-1 max-w-xs">
               <Input
-                placeholder="Search..."
+                placeholder="Search ..."
                 value={q}
                 onChange={(e) => setQ(e.target.value)}
-                className="w-28 text-[9px] py-0.5 px-2.5 h-5 bg-slate-100 dark:bg-slate-900/80 border-slate-300 dark:border-slate-700 focus:border-slate-400 dark:focus:border-slate-500 focus:ring-1 focus:ring-slate-400/50 dark:focus:ring-slate-500/50 rounded-lg text-slate-800 dark:text-slate-200 placeholder:text-slate-600 dark:placeholder:text-slate-500"
+                className="w-full text-sm py-2 px-3 h-8 bg-white dark:bg-slate-800 border-slate-300 dark:border-slate-600 focus:border-blue-500 dark:focus:border-blue-400 focus:ring-2 focus:ring-blue-500/20 dark:focus:ring-blue-400/20 rounded-lg text-slate-800 dark:text-slate-200 placeholder:text-slate-500 dark:placeholder:text-slate-400 shadow-sm"
               />
-              <span className="absolute right-2.5 top-1/2 -translate-y-1/2 text-[9px] text-slate-600 dark:text-slate-500 pointer-events-none">🔍</span>
+              <span className="absolute right-3 top-1/2 -translate-y-1/2 text-sm text-slate-400 pointer-events-none">🔍</span>
             </div>
-            <button
-              className="px-2.5 py-0 h-5 flex items-center justify-center rounded-lg border border-slate-300 dark:border-slate-700 bg-slate-100 dark:bg-slate-900/80 hover:bg-slate-200 dark:hover:bg-slate-800 text-slate-700 dark:text-slate-300 text-[9px] font-medium transition-colors whitespace-nowrap"
-              onClick={exportCSV}
-              title="Export CSV"
-            >
-              CSV
-            </button>
-            <button
-              className="px-2.5 py-0 h-5 flex items-center justify-center rounded-lg border border-slate-300 dark:border-slate-700 bg-slate-100 dark:bg-slate-900/80 hover:bg-slate-200 dark:hover:bg-slate-800 text-slate-700 dark:text-slate-300 text-[9px] font-medium transition-colors whitespace-nowrap"
-              onClick={() => setShowCompareConfig(true)}
-              title="Compare two config files line by line"
-            >
-              Compare Config
-            </button>
-            {can("upload-config", project) && (
+            <div className="flex gap-2">
               <button
-                className="px-2.5 py-0 h-5 flex items-center justify-center rounded-lg border border-slate-300 dark:border-slate-700 bg-slate-100 dark:bg-slate-900/80 hover:bg-slate-200 dark:hover:bg-slate-800 text-slate-700 dark:text-slate-300 text-[9px] font-medium transition-colors whitespace-nowrap"
-                onClick={() => setShowUploadConfig(true)}
-                title="Upload Config"
+                className="px-3 py-1.5 h-8 flex items-center justify-center rounded-lg border border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-800 hover:bg-slate-50 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-300 text-sm font-medium transition-colors shadow-sm whitespace-nowrap"
+                onClick={exportCSV}
+                title="Export CSV"
               >
-                Upload
+                CSV
               </button>
-            )}
+              <button
+                className="px-3 py-1.5 h-8 flex items-center justify-center rounded-lg border border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-800 hover:bg-slate-50 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-300 text-sm font-medium transition-colors shadow-sm whitespace-nowrap"
+                onClick={() => setShowCompareConfig(true)}
+                title="Compare two config files line by line"
+              >
+                Compare
+              </button>
+              {can("upload-config", project) && (
+                <button
+                  className="px-3 py-1.5 h-8 flex items-center justify-center rounded-lg border border-blue-300 dark:border-blue-600 bg-blue-50 dark:bg-blue-900/20 hover:bg-blue-100 dark:hover:bg-blue-900/30 text-blue-700 dark:text-blue-300 text-sm font-medium transition-colors shadow-sm whitespace-nowrap"
+                  onClick={() => setShowUploadConfig(true)}
+                  title="Upload Config"
+                >
+                  Upload Config
+                </button>
+              )}
+            </div>
           </div>
         </div>
-
-
 
         {llmBusy && (
           <div className="flex-shrink-0 px-2 py-0.5 text-[10px] text-slate-600 dark:text-slate-500 bg-slate-200 dark:bg-slate-800/30 rounded-lg" title={llmBusyMessage || undefined}>
@@ -3972,7 +3972,49 @@ const DeviceDetailsView = ({ project, deviceId, goBack, goBackHref, goIndex, goI
                             Error: {safeDisplay(deviceDriftError)}
                           </div>
                         )}
-                        {deviceDriftData ? (
+                        <div className="grid gap-2 mb-4">
+                          <div className="text-xs text-slate-700 dark:text-slate-300">
+                            <b>Device:</b> {safeDisplay(facts?.device)}
+                          </div>
+                          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                            <div>
+                              <label className="block text-xs font-medium text-slate-700 dark:text-slate-300 mb-1">
+                                Select old version (From):
+                              </label>
+                              <select
+                                value={selectedFromVersion || ""}
+                                onChange={(e) => setSelectedFromVersion(e.target.value ? parseInt(e.target.value) : null)}
+                                className="w-full text-xs border border-slate-300 dark:border-slate-600 rounded px-2 py-1 bg-white dark:bg-slate-800 text-slate-900 dark:text-slate-100"
+                              >
+                                <option value="">-- Select file --</option>
+                                {deviceConfigVersions.versions.map(v => (
+                                  <option key={v.version} value={v.version}>
+                                    {v.filename} {v.is_latest ? '(Latest)' : `(v${v.version} - ${formatDateTime(v.extracted_date)})`}
+                                  </option>
+                                ))}
+                              </select>
+                            </div>
+                            <div>
+                              <label className="block text-xs font-medium text-slate-700 dark:text-slate-300 mb-1">
+                                Select new version (To):
+                              </label>
+                              <select
+                                value={selectedToVersion || ""}
+                                onChange={(e) => setSelectedToVersion(e.target.value ? parseInt(e.target.value) : null)}
+                                className="w-full text-xs border border-slate-300 dark:border-slate-600 rounded px-2 py-1 bg-white dark:bg-slate-800 text-slate-900 dark:text-slate-100"
+                              >
+                                <option value="">-- Select file --</option>
+                                {deviceConfigVersions.versions.map(v => (
+                                  <option key={v.version} value={v.version}>
+                                    {v.filename} {v.is_latest ? '(Latest)' : `(v${v.version} - ${formatDateTime(v.extracted_date)})`}
+                                  </option>
+                                ))}
+                              </select>
+                            </div>
+                          </div>
+                        </div>
+
+                        {deviceDriftData && (
                           <div className="text-xs text-slate-700 dark:text-slate-300 space-y-3">
                             <div className="flex items-center justify-between">
                               <div className="font-semibold text-slate-800 dark:text-slate-200">Device: {safeDisplay(deviceDriftData.device_name || facts?.device)}</div>
@@ -4054,48 +4096,6 @@ const DeviceDetailsView = ({ project, deviceId, goBack, goBackHref, goIndex, goI
                                 No configuration changes detected between versions.
                               </div>
                             )}
-                          </div>
-                        ) : (
-                          <div className="grid gap-2">
-                            <div className="text-xs text-slate-700 dark:text-slate-300">
-                              <b>Device:</b> {safeDisplay(facts?.device)}
-                            </div>
-                            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                              <div>
-                                <label className="block text-xs font-medium text-slate-700 dark:text-slate-300 mb-1">
-                                  Select old version (From):
-                                </label>
-                                <select
-                                  value={selectedFromVersion || ""}
-                                  onChange={(e) => setSelectedFromVersion(e.target.value ? parseInt(e.target.value) : null)}
-                                  className="w-full text-xs border border-slate-300 dark:border-slate-600 rounded px-2 py-1 bg-white dark:bg-slate-800 text-slate-900 dark:text-slate-100"
-                                >
-                                  <option value="">-- Select file --</option>
-                                  {deviceConfigVersions.versions.map(v => (
-                                    <option key={v.version} value={v.version}>
-                                      {v.filename} {v.is_latest ? '(Latest)' : `(v${v.version} - ${formatDateTime(v.extracted_date)})`}
-                                    </option>
-                                  ))}
-                                </select>
-                              </div>
-                              <div>
-                                <label className="block text-xs font-medium text-slate-700 dark:text-slate-300 mb-1">
-                                  Select new version (To):
-                                </label>
-                                <select
-                                  value={selectedToVersion || ""}
-                                  onChange={(e) => setSelectedToVersion(e.target.value ? parseInt(e.target.value) : null)}
-                                  className="w-full text-xs border border-slate-300 dark:border-slate-600 rounded px-2 py-1 bg-white dark:bg-slate-800 text-slate-900 dark:text-slate-100"
-                                >
-                                  <option value="">-- Select file --</option>
-                                  {deviceConfigVersions.versions.map(v => (
-                                    <option key={v.version} value={v.version}>
-                                      {v.filename} {v.is_latest ? '(Latest)' : `(v${v.version} - ${formatDateTime(v.extracted_date)})`}
-                                    </option>
-                                  ))}
-                                </select>
-                              </div>
-                            </div>
                           </div>
                         )}
                       </>
