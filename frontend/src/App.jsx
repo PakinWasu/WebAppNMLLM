@@ -7288,7 +7288,7 @@ const HistoryPage = ({ project, can, authedUser }) => {
             onClick={() => setShowDescriptionModal(false)}
           />
           <div
-            className="relative z-10 w-full max-w-lg rounded-xl border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-900 shadow-lg"
+            className="relative z-10 w-full max-w-3xl rounded-xl border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-900 shadow-lg"
             onClick={(e) => e.stopPropagation()}
           >
             <div className="flex items-center justify-between border-b border-slate-200 dark:border-slate-700 px-4 py-3">
