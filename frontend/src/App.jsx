@@ -7409,6 +7409,9 @@ const ScriptGeneratorPage = ({ project, can, authedUser, toast, showConfirmModal
   const [generatedScript, setGeneratedScript] = React.useState(null);
   const [scriptLanguage, setScriptLanguage] = React.useState(null);
   const [scriptFilename, setScriptFilename] = React.useState(null);
+  const [showScriptDeviceModal, setShowScriptDeviceModal] = React.useState(false);
+  const [scriptDeviceIndexes, setScriptDeviceIndexes] = React.useState([]);
+  const [scriptModalTarget, setScriptModalTarget] = React.useState(null); // 'linux' | 'python'
 
   // Device form state
   const [deviceForm, setDeviceForm] = React.useState({
@@ -7602,12 +7605,72 @@ const ScriptGeneratorPage = ({ project, can, authedUser, toast, showConfirmModal
     e.target.value = "";
   };
 
+  const openScriptDeviceModal = (target) => {
+    const vendor = activeVendorTab === "cisco" ? "cisco_ios" : "huawei_vrp";
+    const vendorDeviceIndexes = deviceInventory
+      .map((d, idx) => ({ d, idx }))
+      .filter(({ d }) => d.device_type === vendor)
+      .map(({ idx }) => idx);
+
+    if (vendorDeviceIndexes.length === 0) {
+      if (toast) toast.warning("No devices found for selected vendor type");
+      return;
+    }
+
+    setScriptModalTarget(target);
+    setScriptDeviceIndexes(vendorDeviceIndexes);
+    setShowScriptDeviceModal(true);
+  };
+
+  const toggleAllScriptDevices = () => {
+    const vendor = activeVendorTab === "cisco" ? "cisco_ios" : "huawei_vrp";
+    const allVendorIndexes = deviceInventory
+      .map((d, idx) => ({ d, idx }))
+      .filter(({ d }) => d.device_type === vendor)
+      .map(({ idx }) => idx);
+
+    if (scriptDeviceIndexes.length === allVendorIndexes.length) {
+      setScriptDeviceIndexes([]);
+    } else {
+      setScriptDeviceIndexes(allVendorIndexes);
+    }
+  };
+
+  const toggleScriptDeviceIndex = (idx) => {
+    setScriptDeviceIndexes((prev) =>
+      prev.includes(idx) ? prev.filter((i) => i !== idx) : [...prev, idx]
+    );
+  };
+
+  const handleGenerateFromSelection = () => {
+    const vendor = activeVendorTab === "cisco" ? "cisco_ios" : "huawei_vrp";
+    const selectedDevices = deviceInventory.filter(
+      (d, idx) => d.device_type === vendor && scriptDeviceIndexes.includes(idx)
+    );
+
+    if (selectedDevices.length === 0) {
+      if (toast) toast.warning("Please select at least one device");
+      return;
+    }
+
+    if (scriptModalTarget === "linux") {
+      generateLinuxScript(selectedDevices);
+    } else if (scriptModalTarget === "python") {
+      generatePythonScript(selectedDevices);
+    }
+
+    setShowScriptDeviceModal(false);
+  };
+
   // Script generation
-  const generateLinuxScript = () => {
+  const generateLinuxScript = (selectedDevices = null) => {
     const commands = activeVendorTab === "cisco" ? ciscoCommands : huaweiCommands;
     const vendor = activeVendorTab === "cisco" ? "cisco_ios" : "huawei_vrp";
 
-    const filteredDevices = deviceInventory.filter(d => d.device_type === vendor);
+    const filteredDevices =
+      Array.isArray(selectedDevices) && selectedDevices.length > 0
+        ? selectedDevices
+        : deviceInventory.filter(d => d.device_type === vendor);
     if (filteredDevices.length === 0) {
       if (toast) toast.warning("No devices found for selected vendor type");
       return;
@@ -7724,11 +7787,14 @@ const ScriptGeneratorPage = ({ project, can, authedUser, toast, showConfirmModal
     if (toast) toast.success(`Linux script generated and downloaded: ${safeFilename}`);
   };
 
-  const generatePythonScript = () => {
+  const generatePythonScript = (selectedDevices = null) => {
     const commands = activeVendorTab === "cisco" ? ciscoCommands : huaweiCommands;
     const vendor = activeVendorTab === "cisco" ? "cisco_ios" : "huawei_vrp";
 
-    const filteredDevices = deviceInventory.filter(d => d.device_type === vendor);
+    const filteredDevices =
+      Array.isArray(selectedDevices) && selectedDevices.length > 0
+        ? selectedDevices
+        : deviceInventory.filter(d => d.device_type === vendor);
 
     // Helper function to sanitize hostname for filename
     const sanitizeFilename = (str) => {
@@ -7964,28 +8030,22 @@ const ScriptGeneratorPage = ({ project, can, authedUser, toast, showConfirmModal
             <table className="w-full border-collapse table-fixed">
               <thead>
                 <tr className="bg-slate-100 dark:bg-slate-800 border-b border-slate-200 dark:border-slate-600">
-                  <th className="px-4 py-3 text-left text-sm font-semibold text-slate-700 dark:text-slate-200 w-24">Status</th>
-                  <th className="px-4 py-3 text-left text-sm font-semibold text-slate-700 dark:text-slate-200 w-[44%]">Hostname/IP</th>
+                  <th className="px-4 py-3 text-left text-sm font-semibold text-slate-700 dark:text-slate-200 w-[48%]">Hostname/IP</th>
                   <th className="px-4 py-3 text-left text-sm font-semibold text-slate-700 dark:text-slate-200 w-32">Vendor</th>
-                  <th className="px-4 py-3 text-left text-sm font-semibold text-slate-700 dark:text-slate-200 w-[28%]">Auth</th>
+                  <th className="px-4 py-3 text-left text-sm font-semibold text-slate-700 dark:text-slate-200 w-[32%]">Auth</th>
                   <th className="px-4 py-3 text-right text-sm font-semibold text-slate-700 dark:text-slate-200 w-20">Actions</th>
                 </tr>
               </thead>
               <tbody>
                 {deviceInventory.length === 0 ? (
                   <tr>
-                    <td colSpan="5" className="px-5 py-10 text-center text-slate-600 dark:text-slate-300">
+                    <td colSpan="4" className="px-5 py-10 text-center text-slate-600 dark:text-slate-300">
                       No devices added yet. Click "+ Add Device" to get started.
                     </td>
                   </tr>
                 ) : (
                   deviceInventory.map((device, index) => (
                     <tr key={index} className="hover:bg-slate-50 dark:hover:bg-slate-800/60 border-b border-slate-200 dark:border-slate-700 transition-colors">
-                      <td className="px-4 py-3 align-middle">
-                        <span className="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-green-100 text-green-800 dark:bg-green-900/40 dark:text-green-200 border border-green-300 dark:border-green-700">
-                          Ready
-                        </span>
-                      </td>
                       <td className="px-4 py-3 align-middle">
                         <div className="font-medium text-slate-900 dark:text-slate-100 leading-tight truncate">{device.hostname || device.ip}</div>
                         <div className="text-xs text-slate-600 dark:text-slate-400 mt-0.5 truncate">{device.ip}</div>
@@ -8088,7 +8148,7 @@ const ScriptGeneratorPage = ({ project, can, authedUser, toast, showConfirmModal
             <div className="flex-shrink-0 flex flex-col gap-2">
               <button
                 type="button"
-                onClick={generateLinuxScript}
+                onClick={() => openScriptDeviceModal("linux")}
                 disabled={deviceInventory.filter(d => d.device_type === (activeVendorTab === "cisco" ? "cisco_ios" : "huawei_vrp")).length === 0}
                 className="w-full py-2.5 bg-orange-600 hover:bg-orange-700 disabled:opacity-50 disabled:cursor-not-allowed text-white rounded-lg flex items-center justify-center gap-2 text-sm font-semibold shadow-sm focus:outline-none focus:ring-2 focus:ring-orange-400 transition-colors"
               >
@@ -8097,7 +8157,7 @@ const ScriptGeneratorPage = ({ project, can, authedUser, toast, showConfirmModal
               </button>
               <button
                 type="button"
-                onClick={generatePythonScript}
+                onClick={() => openScriptDeviceModal("python")}
                 disabled={deviceInventory.filter(d => d.device_type === (activeVendorTab === "cisco" ? "cisco_ios" : "huawei_vrp")).length === 0}
                 className="w-full py-2.5 bg-indigo-600 hover:bg-indigo-700 disabled:opacity-50 disabled:cursor-not-allowed text-white rounded-lg flex items-center justify-center gap-2 text-sm font-semibold shadow-sm focus:outline-none focus:ring-2 focus:ring-indigo-400 transition-colors"
               >
@@ -8199,6 +8259,108 @@ const ScriptGeneratorPage = ({ project, can, authedUser, toast, showConfirmModal
                 <Button variant="success" onClick={handleSaveDevice}>
                   {editingDevice !== null ? "Update" : "Add"}
                 </Button>
+              </div>
+            </Card>
+          </div>
+        </div>
+      )}
+
+      {/* Script Device Selection Modal */}
+      {showScriptDeviceModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+          <div className="absolute inset-0 bg-black/50" onClick={() => setShowScriptDeviceModal(false)} />
+          <div className="relative z-10 w-full max-w-lg">
+            <Card
+              title="Select Devices for Script"
+              className="max-h-[80vh] flex flex-col overflow-hidden"
+              actions={
+                <button
+                  type="button"
+                  onClick={() => setShowScriptDeviceModal(false)}
+                  className="text-xs px-2 py-1 rounded-md border border-slate-400 dark:border-slate-600 text-slate-700 dark:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-700"
+                >
+                  Close
+                </button>
+              }
+            >
+              <div className="flex flex-col gap-3 p-3 overflow-hidden">
+                <p className="text-sm text-slate-700 dark:text-slate-200">
+                  Choose which devices to include for{" "}
+                  <span className="font-semibold">
+                    {activeVendorTab === "cisco" ? "Cisco IOS" : "Huawei VRP"}
+                  </span>{" "}
+                  script generation.
+                </p>
+                <div className="flex items-center gap-2 mb-1">
+                  <input
+                    id="script-select-all"
+                    type="checkbox"
+                    className="h-4 w-4 text-blue-600 border-slate-300 rounded"
+                    checked={
+                      scriptDeviceIndexes.length > 0 &&
+                      scriptDeviceIndexes.length ===
+                        deviceInventory.filter(
+                          (d, idx) =>
+                            d.device_type ===
+                              (activeVendorTab === "cisco" ? "cisco_ios" : "huawei_vrp") &&
+                            scriptDeviceIndexes.includes(idx)
+                        ).length
+                    }
+                    onChange={toggleAllScriptDevices}
+                  />
+                  <label
+                    htmlFor="script-select-all"
+                    className="text-sm font-medium text-slate-700 dark:text-slate-200"
+                  >
+                    Select all
+                  </label>
+                </div>
+                <div className="flex-1 min-h-0 overflow-auto rounded-md border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 p-2 space-y-1">
+                  {deviceInventory
+                    .map((device, idx) => ({ device, idx }))
+                    .filter(({ device }) =>
+                      device.device_type ===
+                      (activeVendorTab === "cisco" ? "cisco_ios" : "huawei_vrp")
+                    )
+                    .map(({ device, idx }) => (
+                      <label
+                        key={idx}
+                        className="flex items-center gap-2 px-2 py-1 rounded hover:bg-slate-50 dark:hover:bg-slate-800 cursor-pointer text-sm"
+                      >
+                        <input
+                          type="checkbox"
+                          className="h-4 w-4 text-blue-600 border-slate-300 rounded"
+                          checked={scriptDeviceIndexes.includes(idx)}
+                          onChange={() => toggleScriptDeviceIndex(idx)}
+                        />
+                        <div className="flex-1 min-w-0">
+                          <div className="font-medium text-slate-900 dark:text-slate-100 truncate">
+                            {device.hostname || device.ip}
+                          </div>
+                          <div className="text-xs text-slate-600 dark:text-slate-400 truncate">
+                            {device.ip} •{" "}
+                            {device.device_type === "cisco_ios" ? "Cisco IOS" : "Huawei VRP"}
+                          </div>
+                        </div>
+                      </label>
+                    ))}
+                </div>
+                <div className="flex justify-end gap-2 pt-2">
+                  <button
+                    type="button"
+                    onClick={() => setShowScriptDeviceModal(false)}
+                    className="px-3 py-1.5 rounded-md text-sm font-medium border border-slate-300 dark:border-slate-600 text-slate-700 dark:text-slate-200 bg-white dark:bg-slate-900 hover:bg-slate-50 dark:hover:bg-slate-800"
+                  >
+                    Cancel
+                  </button>
+                  <button
+                    type="button"
+                    onClick={handleGenerateFromSelection}
+                    className="px-3 py-1.5 rounded-md text-sm font-medium bg-blue-600 hover:bg-blue-700 text-white shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-400"
+                  >
+                    Generate Script
+                  </button>
+                </div>
               </div>
             </Card>
           </div>
