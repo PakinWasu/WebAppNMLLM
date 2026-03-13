@@ -242,43 +242,48 @@ async def download_folder(
     await check_project_access(project_id, user)
     await check_project_download_permission(project_id, user)
     
-    # Prevent downloading Config folder
+    # Config folder can now be downloaded (no restriction)
+    
+    # Special handling for Config folder
     if folder_id == "Config":
-        raise HTTPException(status_code=400, detail="Cannot download Config folder")
-    
-    # Get folder information
-    folders_doc = await db()["project_folders"].find_one({"project_id": project_id})
-    if not folders_doc:
-        raise HTTPException(status_code=404, detail="No folders found for this project")
-    
-    folders = folders_doc.get("folders", [])
-    target_folder = None
-    
-    for folder in folders:
-        if folder.get("id") == folder_id and not folder.get("deleted", False):
-            target_folder = folder
-            break
-    
-    if not target_folder:
-        raise HTTPException(status_code=404, detail="Folder not found")
-    
-    # Get all folders to build hierarchy
-    all_folders = folders_doc.get("folders", [])
-    
-    # Build folder hierarchy - get all subfolders recursively
-    def get_all_subfolders(folder_id):
-        subfolders = []
-        for folder in all_folders:
-            if (folder.get("parent_id") == folder_id and 
-                not folder.get("deleted", False)):
-                subfolders.append(folder)
-                # Recursively get subfolders
-                subfolders.extend(get_all_subfolders(folder["id"]))
-        return subfolders
-    
-    # Get target folder and all its subfolders
-    folder_hierarchy = [target_folder] + get_all_subfolders(folder_id)
-    folder_ids = [f["id"] for f in folder_hierarchy]
+        # Config folder is a special folder - create virtual folder object
+        target_folder = {"id": "Config", "name": "Config"}
+        all_folders = []  # Config folder has no subfolders
+        folder_ids = ["Config"]
+    else:
+        # Get folder information for custom folders
+        folders_doc = await db()["project_folders"].find_one({"project_id": project_id})
+        if not folders_doc:
+            raise HTTPException(status_code=404, detail="No folders found for this project")
+        
+        folders = folders_doc.get("folders", [])
+        target_folder = None
+        
+        for folder in folders:
+            if folder.get("id") == folder_id and not folder.get("deleted", False):
+                target_folder = folder
+                break
+        
+        if not target_folder:
+            raise HTTPException(status_code=404, detail="Folder not found")
+        
+        # Get all folders to build hierarchy
+        all_folders = folders_doc.get("folders", [])
+        
+        # Build folder hierarchy - get all subfolders recursively
+        def get_all_subfolders(folder_id):
+            subfolders = []
+            for folder in all_folders:
+                if (folder.get("parent_id") == folder_id and 
+                    not folder.get("deleted", False)):
+                    subfolders.append(folder)
+                    # Recursively get subfolders
+                    subfolders.extend(get_all_subfolders(folder["id"]))
+            return subfolders
+        
+        # Get target folder and all its subfolders
+        folder_hierarchy = [target_folder] + get_all_subfolders(folder_id)
+        folder_ids = [f["id"] for f in folder_hierarchy]
     
     # Get all documents in this folder and all subfolders
     documents = []
@@ -297,6 +302,10 @@ async def download_folder(
     
     # Create folder path mapping
     def get_folder_path(doc_folder_id):
+        # Special handling for Config folder
+        if folder_id == "Config":
+            return "Config"
+        
         # Build full path from target folder to document's folder
         path_parts = []
         current_id = doc_folder_id

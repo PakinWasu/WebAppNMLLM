@@ -8957,8 +8957,8 @@ const DocumentsPage = ({ project, can, authedUser, uploadHistory, setUploadHisto
   };
 
   const handleDownloadFolder = async (folderId) => {
-    // Prevent downloading Config folder and Other folder
-    if (folderId === "Config" || folderId === "Other") {
+    // Prevent downloading Other folder only (allow Config folder)
+    if (folderId === "Other") {
       alert("Cannot download this folder.");
       return;
     }
@@ -9200,7 +9200,6 @@ const DocumentsPage = ({ project, can, authedUser, uploadHistory, setUploadHisto
           // Folder-level Download button (moved from tree, more visible)
           if (
             selectedFolder &&
-            selectedFolder !== "Config" &&
             selectedFolder !== "Other" &&
             handleDownloadFolder
           ) {

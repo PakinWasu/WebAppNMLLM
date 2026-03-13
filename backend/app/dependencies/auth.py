@@ -78,8 +78,9 @@ async def check_project_download_permission(project_id: str, user: dict):
     if not membership:
         raise HTTPException(status_code=403, detail="Not a member of this project")
 
-    if membership.get("role") == "viewer":
-        raise HTTPException(status_code=403, detail="Viewer cannot download files")
+    # Viewers can now download files (permission removed)
+    # if membership.get("role") == "viewer":
+    #     raise HTTPException(status_code=403, detail="Viewer cannot download files")
 
 
 async def check_project_delete_permission(project_id: str, user: dict):
